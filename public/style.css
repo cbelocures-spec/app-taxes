@@ -1419,3 +1419,32 @@ body {
   color: #94a3b8;
 }
 
+/* Active Mechanics Checklist Styles */
+.mechanic-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 8px;
+  background-color: #f8fafc;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+.mechanic-check-item:hover {
+  background-color: #f1f5f9;
+}
+.mechanic-check-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary-color);
+  cursor: pointer;
+}
+.mechanic-check-item span {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main);
+}
+

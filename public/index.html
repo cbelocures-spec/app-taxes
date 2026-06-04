@@ -73,9 +73,14 @@
         </div>
 
         <!-- Section: Operarios Libres (Mecánicos sin tarea activa) -->
-        <div class="dashboard-sub-title" style="margin-top: 20px;">
-          <span class="indicator free"></span>
-          <span>Mecánicos Libres / Disponibles (<span id="count-free">0</span>)</span>
+        <div class="dashboard-sub-title" style="margin-top: 20px; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="indicator free"></span>
+            <span>Mecánicos Libres / Disponibles (<span id="count-free">0</span>)</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-xs" onclick="openActiveMechanicsModal()" style="padding: 2px 6px; font-size: 10px; height: auto; display: flex; align-items: center; gap: 2px;">
+            <span class="material-icons" style="font-size: 12px;">playlist_add_check</span> Activos Hoy
+          </button>
         </div>
         <div class="free-employees-list" id="list-free-employees">
           <!-- List of tags for free employees -->
@@ -302,6 +307,36 @@
         <button class="btn btn-secondary" onclick="closeErrorModal()">Cerrar</button>
         <button class="btn btn-primary" id="btn-modal-retry" onclick="retryOrderFromModal()">
           <span class="material-icons">sync</span> Reintentar Ahora
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIVE MECHANICS MODAL -->
+  <div class="modal-overlay" id="active-mechanics-modal">
+    <div class="dialog-modal">
+      <div class="dialog-header">
+        <h3>Mecánicos Activos Hoy</h3>
+        <button class="dialog-close" onclick="closeActiveMechanicsModal()">&times;</button>
+      </div>
+      <div class="dialog-body" style="max-height: 380px; overflow-y: auto;">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+          Selecciona los mecánicos que están trabajando hoy en este turno. Solo los que estén marcados aparecerán en la lista de "Disponibles".
+        </p>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+          <button type="button" class="btn btn-secondary btn-xs" onclick="toggleAllActiveMechanics(true)" style="padding: 4px 8px; font-size: 11px;">Marcar Todos</button>
+          <button type="button" class="btn btn-secondary btn-xs" onclick="toggleAllActiveMechanics(false)" style="padding: 4px 8px; font-size: 11px;">Desmarcar Todos</button>
+        </div>
+        <form id="active-mechanics-form">
+          <div class="active-mechanics-checklist" id="active-mechanics-checklist-container">
+            <!-- Dynamic checkboxes will go here -->
+          </div>
+        </form>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="closeActiveMechanicsModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveActiveMechanicsList()">
+          <span class="material-icons">save</span> Guardar
         </button>
       </div>
     </div>

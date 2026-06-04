@@ -4,6 +4,7 @@ let activeOrders = [];
 let currentRetryOrderId = null;
 let currentEditingOrderId = null;
 let catalogSyncInterval = null;
+let activeMechanicsList = [];
 
 const MECANICA_EMPLOYEES = [
   "Canaviri Fernandez, Jesús",
@@ -42,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchSettings();
   fetchCatalogs();
   fetchOrders();
+  fetchActiveMechanics();
 
   // Setup Event Listeners
   document.getElementById('settings-form').addEventListener('submit', saveSettings);
@@ -1292,7 +1294,9 @@ function renderDashboard() {
   // 3. Render Free Mechanics
   const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
 
-  const freeMechanics = MECANICA_EMPLOYEES.filter(name => {
+  const activeBaseList = activeMechanicsList && activeMechanicsList.length > 0 ? activeMechanicsList : MECANICA_EMPLOYEES;
+
+  const freeMechanics = activeBaseList.filter(name => {
     const cleaned = cleanName(name);
     let isWorking = false;
     workingEmployeeLabels.forEach(label => {
@@ -1441,5 +1445,76 @@ async function markDashboardTaskFinished(orderId, taskId) {
   } catch (error) {
     showToast("Error al finalizar la tarea", "danger");
     console.error(error);
+  }
+}
+
+// --- ACTIVE MECHANICS MANAGEMENT ---
+
+async function fetchActiveMechanics() {
+  try {
+    const res = await fetch('/api/active-mechanics');
+    if (res.ok) {
+      activeMechanicsList = await res.json();
+      // If we are currently on home view, render it
+      const activeTab = document.querySelector('.nav-item.active');
+      if (activeTab && activeTab.id === 'nav-home') {
+        renderDashboard();
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching active mechanics:", error);
+  }
+}
+
+function openActiveMechanicsModal() {
+  const container = document.getElementById('active-mechanics-checklist-container');
+  if (!container) return;
+
+  // Render checklist items
+  container.innerHTML = MECANICA_EMPLOYEES.map((name, index) => {
+    const isChecked = activeMechanicsList.includes(name);
+    return `
+      <label class="mechanic-check-item">
+        <input type="checkbox" name="active_mechanic" value="${name}" ${isChecked ? 'checked' : ''}>
+        <span>${name}</span>
+      </label>
+    `;
+  }).join('');
+
+  document.getElementById('active-mechanics-modal').classList.add('open');
+}
+
+function closeActiveMechanicsModal() {
+  document.getElementById('active-mechanics-modal').classList.remove('open');
+}
+
+function toggleAllActiveMechanics(isChecked) {
+  const checkboxes = document.querySelectorAll('input[name="active_mechanic"]');
+  checkboxes.forEach(cb => cb.checked = isChecked);
+}
+
+async function saveActiveMechanicsList() {
+  const checkboxes = document.querySelectorAll('input[name="active_mechanic"]:checked');
+  const selectedList = Array.from(checkboxes).map(cb => cb.value);
+
+  try {
+    const res = await fetch('/api/active-mechanics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ list: selectedList })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      activeMechanicsList = data.list;
+      showToast("Lista de mecánicos activos actualizada", "success");
+      closeActiveMechanicsModal();
+      renderDashboard();
+    } else {
+      throw new Error("Error saving active mechanics");
+    }
+  } catch (error) {
+    console.error(error);
+    showToast("Error al guardar la lista de mecánicos activos", "danger");
   }
 }

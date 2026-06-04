@@ -193,6 +193,30 @@ app.get('/api/worker/status', (req, res) => {
   });
 });
 
+// Get active mechanics list
+app.get('/api/active-mechanics', (req, res) => {
+  try {
+    const list = db.getActiveMechanics();
+    res.json(list);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update active mechanics list
+app.post('/api/active-mechanics', (req, res) => {
+  try {
+    const { list } = req.body;
+    if (!Array.isArray(list)) {
+      return res.status(400).json({ error: "El cuerpo debe contener una lista en formato array." });
+    }
+    const saved = db.saveActiveMechanics(list);
+    res.json({ success: true, list: saved });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Fallback: serve frontend index.html for SPA routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

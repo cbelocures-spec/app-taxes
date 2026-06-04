@@ -3,6 +3,26 @@ const path = require('path');
 
 const DB_PATH = path.join(__dirname, 'db.json');
 
+const DEFAULT_MECHANICS = [
+  "Canaviri Fernandez, Jesús",
+  "Cuba Orosco, Kevín Genaro",
+  "GERRY CRISTIAN MARCELO",
+  "Gustavo Javier Benitez",
+  "Monzon, Carlos Agustin",
+  "Morel, Luis Maximiliano",
+  "OJEDA FERNANDEZ JOSE ENRIQUE",
+  "Ojeda Fernández, Miguel",
+  "Olivera, Diego",
+  "PANETTA ALBARRACIN FEDERICO",
+  "Perino Martin Adrian",
+  "Ríos, Cesar Damián",
+  "Rocha, Ariel Maximiliano",
+  "RODRIGUEZ CARLOS FERNANDO",
+  "RODRIGUEZ NICOLAS",
+  "Sosa, Alejandro Damian",
+  "Vera, Domingo Sergio"
+];
+
 // Default database structure
 const DEFAULT_DB = {
   settings: {
@@ -18,7 +38,8 @@ const DEFAULT_DB = {
     empleados: [],    // array of { value, label }
     centrosCosto: []  // array of { value, label }
   },
-  workOrders: []
+  workOrders: [],
+  activeMechanics: DEFAULT_MECHANICS
 };
 
 // Thread-safe read/write helper
@@ -162,6 +183,22 @@ class LocalDB {
       return db.workOrders[idx];
     }
     return null;
+  }
+
+  // --- Active Mechanics Methods ---
+  getActiveMechanics() {
+    const db = this.read();
+    if (!db.activeMechanics || db.activeMechanics.length === 0) {
+      return DEFAULT_MECHANICS;
+    }
+    return db.activeMechanics;
+  }
+
+  saveActiveMechanics(list) {
+    const db = this.read();
+    db.activeMechanics = list || [];
+    this.write(db);
+    return db.activeMechanics;
   }
 
   deleteWorkOrder(id) {
