@@ -1,0 +1,2497 @@
+{
+  "settings": {
+    "username": "paniol@contenedoreshugo.com.ar",
+    "password": "Paniol2015",
+    "portalUrl": "https://taxes.com.ar",
+    "catalogSyncStatus": "success",
+    "catalogSyncError": null
+  },
+  "catalogs": {
+    "rodados": [
+      {
+        "value": "1",
+        "label": "FORD - F100. Interno 1"
+      },
+      {
+        "value": "2",
+        "label": "VOLKSWAGEN - SAVEIRO 1.6L Interno 2"
+      },
+      {
+        "value": "4",
+        "label": "VOLKSWAGEN - AMAROK Interno 4"
+      },
+      {
+        "value": "5",
+        "label": "VOLKSWAGEN - AMAROK Interno 5"
+      },
+      {
+        "value": "7",
+        "label": "VOLKSWAGEN - AMAROK Interno 7"
+      }
+    ],
+    "responsables": [
+      {
+        "value": "562",
+        "label": "Acosta Ontivero Ariel Hernan"
+      },
+      {
+        "value": "424",
+        "label": "Acosta Riveros, Claudia"
+      },
+      {
+        "value": "278",
+        "label": "Acosta, Daniel Eduardo"
+      },
+      {
+        "value": "297",
+        "label": "Acosta, Horacio Candido"
+      },
+      {
+        "value": "311",
+        "label": "Acosta, Jorge Omar"
+      },
+      {
+        "value": "417",
+        "label": "Acosta, Paula Beatríz"
+      },
+      {
+        "value": "515",
+        "label": "Acuña Juan"
+      },
+      {
+        "value": "295",
+        "label": "Acuña, Alejandro Martín"
+      },
+      {
+        "value": "300",
+        "label": "Agüero, Luis Sebastián"
+      },
+      {
+        "value": "286",
+        "label": "Agüero, Matías"
+      },
+      {
+        "value": "305",
+        "label": "Aguirre, Nestor Hugo"
+      },
+      {
+        "value": "516",
+        "label": "Aizaguerre Pablo"
+      },
+      {
+        "value": "298",
+        "label": "Aizaguerre, Pablo Javier"
+      },
+      {
+        "value": "233",
+        "label": "Albarracín, Ramón Antonio"
+      },
+      {
+        "value": "517",
+        "label": "ALBIRZU PABLO LEONARDO"
+      },
+      {
+        "value": "254",
+        "label": "Albornoz Diego Hernan"
+      },
+      {
+        "value": "290",
+        "label": "Alfonzo Rívola, Nicolás Matías"
+      },
+      {
+        "value": "408",
+        "label": "Aliano, Rodrigo José"
+      },
+      {
+        "value": "289",
+        "label": "Alonso, Gerardo"
+      },
+      {
+        "value": "344",
+        "label": "Alvez, Juan Marcelo"
+      },
+      {
+        "value": "273",
+        "label": "Añon, Hernán"
+      },
+      {
+        "value": "325",
+        "label": "Aquino, Carlos Alberto"
+      },
+      {
+        "value": "316",
+        "label": "Arando Quispe, Atanacio Félix"
+      },
+      {
+        "value": "235",
+        "label": "Arce, Federico Martín"
+      },
+      {
+        "value": "410",
+        "label": "Argentieri, Mauro Carlos"
+      },
+      {
+        "value": "231",
+        "label": "Artaza, Salvador Ignacio"
+      },
+      {
+        "value": "423",
+        "label": "Avatte, Diego Martín"
+      },
+      {
+        "value": "309",
+        "label": "Ayala, Juan Ricardo"
+      },
+      {
+        "value": "356",
+        "label": "Balmaceda, Hugo Orlando"
+      },
+      {
+        "value": "283",
+        "label": "Banegas, Matías Ezequiel"
+      },
+      {
+        "value": "405",
+        "label": "Barboza Salica, Alejandro"
+      },
+      {
+        "value": "519",
+        "label": "Bartolome Ignacio"
+      },
+      {
+        "value": "520",
+        "label": "Bazó Analia Roxana"
+      },
+      {
+        "value": "395",
+        "label": "Belizán, Diego Andrés"
+      },
+      {
+        "value": "426",
+        "label": "Belocures, Cesar Hernán"
+      },
+      {
+        "value": "581",
+        "label": "BENITEZ GONZALO SEBASTIAN"
+      },
+      {
+        "value": "446",
+        "label": "Benitez Nicolas Santiago"
+      },
+      {
+        "value": "301",
+        "label": "Benítez, Adolfo Romualdo"
+      },
+      {
+        "value": "230",
+        "label": "Benítez, Carlos Gustavo"
+      },
+      {
+        "value": "304",
+        "label": "Benítez, Cesar Martín"
+      },
+      {
+        "value": "322",
+        "label": "Benítez, Diego Alejandro"
+      },
+      {
+        "value": "578",
+        "label": "BERETTI FEDERICO"
+      },
+      {
+        "value": "307",
+        "label": "Bertuzzi, Roberto Fabián"
+      },
+      {
+        "value": "296",
+        "label": "Bianchi, Pablo Alfredo"
+      },
+      {
+        "value": "271",
+        "label": "Billet Damian Ezequiel"
+      },
+      {
+        "value": "315",
+        "label": "Bottiroli, Pablo Norberto"
+      },
+      {
+        "value": "521",
+        "label": "Bracamonte Marcelo"
+      },
+      {
+        "value": "574",
+        "label": "BRAHIM DYLAN"
+      },
+      {
+        "value": "507",
+        "label": "Brahim, Hugo Adrian"
+      },
+      {
+        "value": "310",
+        "label": "Brioso, Hector Alejandro"
+      },
+      {
+        "value": "229",
+        "label": "Britos, Jorge Luis"
+      },
+      {
+        "value": "419",
+        "label": "Burgos, Luis Eduardo"
+      },
+      {
+        "value": "371",
+        "label": "Cabrera, Angel Gabriel"
+      },
+      {
+        "value": "412",
+        "label": "Cabrera, Gabriela Laura"
+      },
+      {
+        "value": "558",
+        "label": "Caceres Lautaro Ricardo"
+      },
+      {
+        "value": "599",
+        "label": "CAMPANINI FERNANDO"
+      },
+      {
+        "value": "582",
+        "label": "CAÑAL GONZALO LEONEL"
+      },
+      {
+        "value": "326",
+        "label": "Canaviri Fernandez, Jesús"
+      },
+      {
+        "value": "369",
+        "label": "Carmona González, Juan Manuel"
+      },
+      {
+        "value": "232",
+        "label": "Carvalho, Emanuel Alejandro"
+      },
+      {
+        "value": "415",
+        "label": "Cascante, Osmar Hector"
+      },
+      {
+        "value": "333",
+        "label": "Castillo, Sebastián Alejandro"
+      },
+      {
+        "value": "291",
+        "label": "Cirigliano, Federico Emilio"
+      },
+      {
+        "value": "292",
+        "label": "Cirigliano, Norberto Emilio"
+      },
+      {
+        "value": "335",
+        "label": "Cisneros, Lucas Matías"
+      },
+      {
+        "value": "488",
+        "label": "CISTERNA WALTER"
+      },
+      {
+        "value": "239",
+        "label": "Condori, Herbas Cristian"
+      },
+      {
+        "value": "345",
+        "label": "Coseres, Leandro Ezequiel"
+      },
+      {
+        "value": "489",
+        "label": "CRUCEÑO ALEJANDRO AGUSTIN"
+      },
+      {
+        "value": "238",
+        "label": "Cuba Orosco, Kevín Genaro"
+      },
+      {
+        "value": "227",
+        "label": "Cybulski, Casimiro Antonio"
+      },
+      {
+        "value": "225",
+        "label": "De Jesus Reyes, Emmanuel"
+      },
+      {
+        "value": "397",
+        "label": "Delgado, Gabriel Ruben"
+      },
+      {
+        "value": "403",
+        "label": "Delgado, José Angel"
+      },
+      {
+        "value": "523",
+        "label": "Delseno Nicolas"
+      },
+      {
+        "value": "302",
+        "label": "Delseno, Adrian Antonio"
+      },
+      {
+        "value": "303",
+        "label": "Delseno, Walter Germán"
+      },
+      {
+        "value": "587",
+        "label": "Diaz Gomez Gabriel"
+      },
+      {
+        "value": "391",
+        "label": "Díaz, Cristian Maximiliano"
+      },
+      {
+        "value": "425",
+        "label": "Diharse, Gastón Alejandro"
+      },
+      {
+        "value": "306",
+        "label": "Do Carmo, Arnaldo Sebastián"
+      },
+      {
+        "value": "276",
+        "label": "Echazu, Nahuel Alejandro"
+      },
+      {
+        "value": "299",
+        "label": "Fernández, Eduardo Alberto"
+      },
+      {
+        "value": "490",
+        "label": "FIGUEROA MARIANO"
+      },
+      {
+        "value": "324",
+        "label": "Foggia, Pablo Mauricio"
+      },
+      {
+        "value": "594",
+        "label": "FORASTIERI CHRISTIAN"
+      },
+      {
+        "value": "336",
+        "label": "Franco, Joaquin Matías"
+      },
+      {
+        "value": "563",
+        "label": "FRESCO SAUL EZEQUIEL"
+      },
+      {
+        "value": "525",
+        "label": "Galarza Victor Hugo"
+      },
+      {
+        "value": "284",
+        "label": "Galarza, Jorge"
+      },
+      {
+        "value": "416",
+        "label": "Gallo, Jonathan Gastón"
+      },
+      {
+        "value": "584",
+        "label": "GALVAN WALTER FABIAN"
+      },
+      {
+        "value": "597",
+        "label": "GARCIA BRIAN NICOLAS"
+      },
+      {
+        "value": "293",
+        "label": "García, Atilio Horacio"
+      },
+      {
+        "value": "375",
+        "label": "García, Paulo Cesar Antonio"
+      },
+      {
+        "value": "323",
+        "label": "García, Yamandú Liborio"
+      },
+      {
+        "value": "526",
+        "label": "Gaspari Mauricio Edgardo"
+      },
+      {
+        "value": "258",
+        "label": "Gayoso Matias Jose"
+      },
+      {
+        "value": "598",
+        "label": "GERRY CRISTIAN MARCELO"
+      },
+      {
+        "value": "234",
+        "label": "Giacobbe, Nahuel"
+      },
+      {
+        "value": "566",
+        "label": "GIANNI AGUSTIN"
+      },
+      {
+        "value": "308",
+        "label": "Gianni, Diego Alberto"
+      },
+      {
+        "value": "601",
+        "label": "GIMENEZ DEOLINDO EMANUEL"
+      },
+      {
+        "value": "557",
+        "label": "GOMEZ EMANUEL ELISEO"
+      },
+      {
+        "value": "313",
+        "label": "Gómez, Víctor Abel"
+      },
+      {
+        "value": "223",
+        "label": "Gonzalez Nicolas Maximiliano"
+      },
+      {
+        "value": "252",
+        "label": "González, Daniel Guillermo"
+      },
+      {
+        "value": "431",
+        "label": "González, Federico Alfredo"
+      },
+      {
+        "value": "381",
+        "label": "González, Gustavo Daniel"
+      },
+      {
+        "value": "433",
+        "label": "Goudal, Nicolás Ezequiel"
+      },
+      {
+        "value": "285",
+        "label": "Guerrero, Diego"
+      },
+      {
+        "value": "570",
+        "label": "GUEVARA FRANCO"
+      },
+      {
+        "value": "528",
+        "label": "Gustavo Javier Benitez"
+      },
+      {
+        "value": "529",
+        "label": "Huarte Christian Ariel"
+      },
+      {
+        "value": "491",
+        "label": "IBANEZ ROSSI  CRISTIAN NARCISO."
+      },
+      {
+        "value": "358",
+        "label": "Ibarra, Ramón Angel"
+      },
+      {
+        "value": "435",
+        "label": "Jara, Nelson"
+      },
+      {
+        "value": "569",
+        "label": "JIMENEZ FRANCO"
+      },
+      {
+        "value": "437",
+        "label": "Josserme Martínez, Agustín"
+      },
+      {
+        "value": "565",
+        "label": "Juarez Walter Hernan"
+      },
+      {
+        "value": "583",
+        "label": "KRAMER FEDERICO"
+      },
+      {
+        "value": "508",
+        "label": "Lara Gustavo"
+      },
+      {
+        "value": "422",
+        "label": "Leonelli, Alejandro Nahuel"
+      },
+      {
+        "value": "251",
+        "label": "Lescano, Pedro"
+      },
+      {
+        "value": "329",
+        "label": "Llanos Mercado, Edgar"
+      },
+      {
+        "value": "580",
+        "label": "LOPEZ GUSTAVO"
+      },
+      {
+        "value": "530",
+        "label": "López Joaquin"
+      },
+      {
+        "value": "236",
+        "label": "López, Raul Silvio"
+      },
+      {
+        "value": "240",
+        "label": "López, Solano Fabián"
+      },
+      {
+        "value": "401",
+        "label": "Lovera, Daniel Andrés"
+      },
+      {
+        "value": "602",
+        "label": "LUNA AGUSTIN"
+      },
+      {
+        "value": "436",
+        "label": "Luongo, Franco"
+      },
+      {
+        "value": "444",
+        "label": "Luque Lucas Leonel"
+      },
+      {
+        "value": "430",
+        "label": "Made, Ismael Anuar Mehde"
+      },
+      {
+        "value": "531",
+        "label": "Maidana Santiago Tomás"
+      },
+      {
+        "value": "372",
+        "label": "Maidana, Marcelo Sebastián"
+      },
+      {
+        "value": "393",
+        "label": "Mandiles, José Enrique"
+      },
+      {
+        "value": "338",
+        "label": "Mandiles, Luis Hernán"
+      },
+      {
+        "value": "359",
+        "label": "Manrrique, Alberto Nelson Darío"
+      },
+      {
+        "value": "228",
+        "label": "Marín, Leandro Damián"
+      },
+      {
+        "value": "533",
+        "label": "Marquez David"
+      },
+      {
+        "value": "534",
+        "label": "Martínez Nicolas Fernando"
+      },
+      {
+        "value": "385",
+        "label": "Martínez, Adrián Alejandro"
+      },
+      {
+        "value": "399",
+        "label": "Martínez, Federico Carlos"
+      },
+      {
+        "value": "362",
+        "label": "Martínez, Pablo Marcelo"
+      },
+      {
+        "value": "494",
+        "label": "MAYDANA LUKAS"
+      },
+      {
+        "value": "535",
+        "label": "Medina Daniel"
+      },
+      {
+        "value": "332",
+        "label": "Medina, Rodrigo"
+      },
+      {
+        "value": "277",
+        "label": "Mekbel, Gustavo Ezequiel"
+      },
+      {
+        "value": "281",
+        "label": "Mekbel, Roberto Carlos"
+      },
+      {
+        "value": "536",
+        "label": "Mena Heber Uriel"
+      },
+      {
+        "value": "537",
+        "label": "Mendez Agustin"
+      },
+      {
+        "value": "592",
+        "label": "MENDEZ LUCAS NAHUEL"
+      },
+      {
+        "value": "339",
+        "label": "Mendez, Christian Omar"
+      },
+      {
+        "value": "327",
+        "label": "Menlik, Oscar Esteban"
+      },
+      {
+        "value": "568",
+        "label": "MIRANDA CORIA FACUNDO"
+      },
+      {
+        "value": "263",
+        "label": "Miranda Nestor Eduardo"
+      },
+      {
+        "value": "370",
+        "label": "Moine, Ruben Jose Luis"
+      },
+      {
+        "value": "575",
+        "label": "Molina Coria Martin Lucas"
+      },
+      {
+        "value": "538",
+        "label": "Molina Leandro Ivan"
+      },
+      {
+        "value": "334",
+        "label": "Molina, Brian Gabriel"
+      },
+      {
+        "value": "241",
+        "label": "Monjes, Oscar Marcelo"
+      },
+      {
+        "value": "357",
+        "label": "Montes, Francisco Damian"
+      },
+      {
+        "value": "389",
+        "label": "Montiel, Víctor David"
+      },
+      {
+        "value": "434",
+        "label": "Montoya, Luciano Damián"
+      },
+      {
+        "value": "253",
+        "label": "Monzon, Carlos Agustin"
+      },
+      {
+        "value": "243",
+        "label": "Monzón, Carlos Horacio"
+      },
+      {
+        "value": "244",
+        "label": "Monzón, Jorge Mauro"
+      },
+      {
+        "value": "552",
+        "label": "Morel, Luis Maximiliano"
+      },
+      {
+        "value": "346",
+        "label": "Morillo Reyes, Jose Luis"
+      },
+      {
+        "value": "382",
+        "label": "Nacia, Lucas Martín"
+      },
+      {
+        "value": "449",
+        "label": "Navatta Maria Laura"
+      },
+      {
+        "value": "341",
+        "label": "Nicolari, Pablo Ariel"
+      },
+      {
+        "value": "378",
+        "label": "Nuñez, Pablo Ladislao"
+      },
+      {
+        "value": "379",
+        "label": "Nuñez, Roque Salvador"
+      },
+      {
+        "value": "560",
+        "label": "Ocampo Diaz Tomas Andres"
+      },
+      {
+        "value": "595",
+        "label": "OCAMPO JOAQUIN"
+      },
+      {
+        "value": "380",
+        "label": "Ochoa, Luis Eduardo"
+      },
+      {
+        "value": "591",
+        "label": "OJEDA FERNANDEZ JOSE ENRIQUE"
+      },
+      {
+        "value": "348",
+        "label": "Ojeda Fernández, Miguel"
+      },
+      {
+        "value": "394",
+        "label": "Olivera, Diego"
+      },
+      {
+        "value": "245",
+        "label": "Ontivero, Gabriel"
+      },
+      {
+        "value": "404",
+        "label": "Orciari, Karina Milva"
+      },
+      {
+        "value": "288",
+        "label": "Orellana, Javier"
+      },
+      {
+        "value": "256",
+        "label": "Orosco, Damian Agustin"
+      },
+      {
+        "value": "539",
+        "label": "Ortiz Mariano"
+      },
+      {
+        "value": "275",
+        "label": "Ovejero, Julio Cesar"
+      },
+      {
+        "value": "540",
+        "label": "Palavecino Thiago"
+      },
+      {
+        "value": "603",
+        "label": "PANETTA ALBARRACIN FEDERICO"
+      },
+      {
+        "value": "586",
+        "label": "Panetta Javier Mariano"
+      },
+      {
+        "value": "497",
+        "label": "PAPPA JONATHAN"
+      },
+      {
+        "value": "388",
+        "label": "Pasayo, Juan Eduardo"
+      },
+      {
+        "value": "250",
+        "label": "Pataccini, Leonel Matías"
+      },
+      {
+        "value": "249",
+        "label": "Pataccini, Marcelo"
+      },
+      {
+        "value": "320",
+        "label": "Pataccini, Sergio Damián"
+      },
+      {
+        "value": "542",
+        "label": "Pavon Simon"
+      },
+      {
+        "value": "509",
+        "label": "Pay Esteban"
+      },
+      {
+        "value": "279",
+        "label": "Paz, Hernán Eduardo"
+      },
+      {
+        "value": "280",
+        "label": "Paz, Matías Gabriel"
+      },
+      {
+        "value": "387",
+        "label": "Peñalva, Cristian Germán"
+      },
+      {
+        "value": "321",
+        "label": "Peñalva, Fabián Rafael"
+      },
+      {
+        "value": "561",
+        "label": "Pereira Jorge Ariel"
+      },
+      {
+        "value": "512",
+        "label": "Perez Facundo"
+      },
+      {
+        "value": "340",
+        "label": "Pérez, Omar Antonio"
+      },
+      {
+        "value": "247",
+        "label": "Pérez, Roque Luis"
+      },
+      {
+        "value": "543",
+        "label": "Perino Martin Adrian"
+      },
+      {
+        "value": "312",
+        "label": "Piñeyro, Damián Gabriel"
+      },
+      {
+        "value": "414",
+        "label": "Pontisso, Silvia Rosa"
+      },
+      {
+        "value": "274",
+        "label": "Posada, Luis Alberto"
+      },
+      {
+        "value": "287",
+        "label": "Postrosija David Nahuel"
+      },
+      {
+        "value": "545",
+        "label": "Pudiza Galeano Walter"
+      },
+      {
+        "value": "262",
+        "label": "Quiroga Martin Nahuel"
+      },
+      {
+        "value": "411",
+        "label": "Ramírez, Pablo Emmanuel"
+      },
+      {
+        "value": "413",
+        "label": "Regadio, Leonel Norberto"
+      },
+      {
+        "value": "246",
+        "label": "Retamoza, Walter Fabio"
+      },
+      {
+        "value": "559",
+        "label": "RIOS RUBEN EMILIO"
+      },
+      {
+        "value": "272",
+        "label": "Ríos, Cesar Damián"
+      },
+      {
+        "value": "242",
+        "label": "Rivas, Sebastián Alberto"
+      },
+      {
+        "value": "365",
+        "label": "Rocha, Ariel Maximiliano"
+      },
+      {
+        "value": "260",
+        "label": "Rodriguez Adrian Ariel"
+      },
+      {
+        "value": "573",
+        "label": "RODRIGUEZ CARLOS FERNANDO"
+      },
+      {
+        "value": "585",
+        "label": "Rodriguez Guillermo Daniel"
+      },
+      {
+        "value": "579",
+        "label": "RODRIGUEZ MARCELO"
+      },
+      {
+        "value": "600",
+        "label": "RODRIGUEZ NICOLAS"
+      },
+      {
+        "value": "266",
+        "label": "Romero José Emanuel"
+      },
+      {
+        "value": "376",
+        "label": "Romero, Juan Manuel"
+      },
+      {
+        "value": "432",
+        "label": "Romero, María Jimena"
+      },
+      {
+        "value": "440",
+        "label": "Romero, Miguel Angel"
+      },
+      {
+        "value": "267",
+        "label": "Rossi Sosa Daniel Emanuel"
+      },
+      {
+        "value": "237",
+        "label": "Rossi, Franco Andrés"
+      },
+      {
+        "value": "577",
+        "label": "ROTAR ALEJANDRO SEBASTIAN"
+      },
+      {
+        "value": "407",
+        "label": "Ruíz, Sandra Graciela"
+      },
+      {
+        "value": "318",
+        "label": "Salvatierra, Mario Andrés"
+      },
+      {
+        "value": "547",
+        "label": "Sanabria Pablo"
+      },
+      {
+        "value": "270",
+        "label": "Sanchez German Omar"
+      },
+      {
+        "value": "337",
+        "label": "Saryanovich, Martín Alejandro"
+      },
+      {
+        "value": "503",
+        "label": "SAVINI LISANDRO JOAQUIN"
+      },
+      {
+        "value": "396",
+        "label": "Schirripa, Sergio Ricardo"
+      },
+      {
+        "value": "589",
+        "label": "SERRANO LUCRECIA"
+      },
+      {
+        "value": "596",
+        "label": "SILVA NICOLAS"
+      },
+      {
+        "value": "259",
+        "label": "Sosa, Alejandro Damian"
+      },
+      {
+        "value": "593",
+        "label": "SOTELO MARTIN EMANUEL"
+      },
+      {
+        "value": "400",
+        "label": "Sotelo, Carlos Alberto Martín"
+      },
+      {
+        "value": "409",
+        "label": "Spagnolo, Luis"
+      },
+      {
+        "value": "418",
+        "label": "Spano, Marcelo Andrés"
+      },
+      {
+        "value": "367",
+        "label": "Suruguay, Armando José"
+      },
+      {
+        "value": "350",
+        "label": "Suyo Montoya, Jhonny"
+      },
+      {
+        "value": "386",
+        "label": "Tagliapietra, Hugo Daniel"
+      },
+      {
+        "value": "294",
+        "label": "Tagliapietra, Marcos"
+      },
+      {
+        "value": "342",
+        "label": "Talavera, Osvaldo Antonio"
+      },
+      {
+        "value": "429",
+        "label": "Tejeira, Claudio Alejandro"
+      },
+      {
+        "value": "353",
+        "label": "Tironi, Abel Ernesto"
+      },
+      {
+        "value": "428",
+        "label": "Toledo, Fernando Damián"
+      },
+      {
+        "value": "548",
+        "label": "Torchelli Eros"
+      },
+      {
+        "value": "383",
+        "label": "Torchelli, Marcos Gustavo"
+      },
+      {
+        "value": "343",
+        "label": "Torres, Leandro Javier"
+      },
+      {
+        "value": "390",
+        "label": "Toscano, Juan Carlos"
+      },
+      {
+        "value": "352",
+        "label": "Urreli, Julian Nicolas"
+      },
+      {
+        "value": "349",
+        "label": "Urreli, Pablo Luciano"
+      },
+      {
+        "value": "392",
+        "label": "Ururi Mamani, Raul Adolfo"
+      },
+      {
+        "value": "265",
+        "label": "Vallejos Jorge Ariel"
+      },
+      {
+        "value": "421",
+        "label": "Vanni, Hugo Darío"
+      },
+      {
+        "value": "406",
+        "label": "Vattino, Angela Marcela"
+      },
+      {
+        "value": "402",
+        "label": "Vattino, Cristian Alejandro"
+      },
+      {
+        "value": "438",
+        "label": "Vazquez Leòn, Fatima Dolores"
+      },
+      {
+        "value": "549",
+        "label": "Vela Patricio"
+      },
+      {
+        "value": "550",
+        "label": "Ventura Sánchez Anderson Javier"
+      },
+      {
+        "value": "269",
+        "label": "Ventura Sanchez Arinson"
+      },
+      {
+        "value": "366",
+        "label": "Ventura Sanchez, Anyelo"
+      },
+      {
+        "value": "317",
+        "label": "Vera, Domingo Sergio"
+      },
+      {
+        "value": "319",
+        "label": "Vera, Sergio Leonardo"
+      },
+      {
+        "value": "398",
+        "label": "Villa, Carlos Alberto"
+      },
+      {
+        "value": "567",
+        "label": "VILLAFAÑE FLORENCIA DENISE"
+      },
+      {
+        "value": "361",
+        "label": "Villalba, Martín Antonio"
+      },
+      {
+        "value": "363",
+        "label": "Villalba, Rodrigo Emanuel"
+      },
+      {
+        "value": "588",
+        "label": "VILLIVAR FACUNDO"
+      },
+      {
+        "value": "347",
+        "label": "Zenteno Sanchez, Benigno"
+      },
+      {
+        "value": "448",
+        "label": "Zotta Gabriel Antonio"
+      },
+      {
+        "value": "551",
+        "label": "Zunni Sergio Carlos"
+      }
+    ],
+    "empleados": [
+      {
+        "value": "562",
+        "label": "Acosta Ontivero Ariel Hernan"
+      },
+      {
+        "value": "424",
+        "label": "Acosta Riveros, Claudia"
+      },
+      {
+        "value": "278",
+        "label": "Acosta, Daniel Eduardo"
+      },
+      {
+        "value": "297",
+        "label": "Acosta, Horacio Candido"
+      },
+      {
+        "value": "311",
+        "label": "Acosta, Jorge Omar"
+      },
+      {
+        "value": "417",
+        "label": "Acosta, Paula Beatríz"
+      },
+      {
+        "value": "515",
+        "label": "Acuña Juan"
+      },
+      {
+        "value": "295",
+        "label": "Acuña, Alejandro Martín"
+      },
+      {
+        "value": "300",
+        "label": "Agüero, Luis Sebastián"
+      },
+      {
+        "value": "286",
+        "label": "Agüero, Matías"
+      },
+      {
+        "value": "305",
+        "label": "Aguirre, Nestor Hugo"
+      },
+      {
+        "value": "516",
+        "label": "Aizaguerre Pablo"
+      },
+      {
+        "value": "298",
+        "label": "Aizaguerre, Pablo Javier"
+      },
+      {
+        "value": "233",
+        "label": "Albarracín, Ramón Antonio"
+      },
+      {
+        "value": "517",
+        "label": "ALBIRZU PABLO LEONARDO"
+      },
+      {
+        "value": "254",
+        "label": "Albornoz Diego Hernan"
+      },
+      {
+        "value": "290",
+        "label": "Alfonzo Rívola, Nicolás Matías"
+      },
+      {
+        "value": "408",
+        "label": "Aliano, Rodrigo José"
+      },
+      {
+        "value": "289",
+        "label": "Alonso, Gerardo"
+      },
+      {
+        "value": "344",
+        "label": "Alvez, Juan Marcelo"
+      },
+      {
+        "value": "273",
+        "label": "Añon, Hernán"
+      },
+      {
+        "value": "325",
+        "label": "Aquino, Carlos Alberto"
+      },
+      {
+        "value": "316",
+        "label": "Arando Quispe, Atanacio Félix"
+      },
+      {
+        "value": "235",
+        "label": "Arce, Federico Martín"
+      },
+      {
+        "value": "410",
+        "label": "Argentieri, Mauro Carlos"
+      },
+      {
+        "value": "231",
+        "label": "Artaza, Salvador Ignacio"
+      },
+      {
+        "value": "423",
+        "label": "Avatte, Diego Martín"
+      },
+      {
+        "value": "309",
+        "label": "Ayala, Juan Ricardo"
+      },
+      {
+        "value": "356",
+        "label": "Balmaceda, Hugo Orlando"
+      },
+      {
+        "value": "283",
+        "label": "Banegas, Matías Ezequiel"
+      },
+      {
+        "value": "405",
+        "label": "Barboza Salica, Alejandro"
+      },
+      {
+        "value": "519",
+        "label": "Bartolome Ignacio"
+      },
+      {
+        "value": "520",
+        "label": "Bazó Analia Roxana"
+      },
+      {
+        "value": "395",
+        "label": "Belizán, Diego Andrés"
+      },
+      {
+        "value": "426",
+        "label": "Belocures, Cesar Hernán"
+      },
+      {
+        "value": "581",
+        "label": "BENITEZ GONZALO SEBASTIAN"
+      },
+      {
+        "value": "446",
+        "label": "Benitez Nicolas Santiago"
+      },
+      {
+        "value": "301",
+        "label": "Benítez, Adolfo Romualdo"
+      },
+      {
+        "value": "230",
+        "label": "Benítez, Carlos Gustavo"
+      },
+      {
+        "value": "304",
+        "label": "Benítez, Cesar Martín"
+      },
+      {
+        "value": "322",
+        "label": "Benítez, Diego Alejandro"
+      },
+      {
+        "value": "578",
+        "label": "BERETTI FEDERICO"
+      },
+      {
+        "value": "307",
+        "label": "Bertuzzi, Roberto Fabián"
+      },
+      {
+        "value": "296",
+        "label": "Bianchi, Pablo Alfredo"
+      },
+      {
+        "value": "271",
+        "label": "Billet Damian Ezequiel"
+      },
+      {
+        "value": "315",
+        "label": "Bottiroli, Pablo Norberto"
+      },
+      {
+        "value": "521",
+        "label": "Bracamonte Marcelo"
+      },
+      {
+        "value": "574",
+        "label": "BRAHIM DYLAN"
+      },
+      {
+        "value": "507",
+        "label": "Brahim, Hugo Adrian"
+      },
+      {
+        "value": "310",
+        "label": "Brioso, Hector Alejandro"
+      },
+      {
+        "value": "229",
+        "label": "Britos, Jorge Luis"
+      },
+      {
+        "value": "419",
+        "label": "Burgos, Luis Eduardo"
+      },
+      {
+        "value": "371",
+        "label": "Cabrera, Angel Gabriel"
+      },
+      {
+        "value": "412",
+        "label": "Cabrera, Gabriela Laura"
+      },
+      {
+        "value": "558",
+        "label": "Caceres Lautaro Ricardo"
+      },
+      {
+        "value": "599",
+        "label": "CAMPANINI FERNANDO"
+      },
+      {
+        "value": "582",
+        "label": "CAÑAL GONZALO LEONEL"
+      },
+      {
+        "value": "326",
+        "label": "Canaviri Fernandez, Jesús"
+      },
+      {
+        "value": "369",
+        "label": "Carmona González, Juan Manuel"
+      },
+      {
+        "value": "232",
+        "label": "Carvalho, Emanuel Alejandro"
+      },
+      {
+        "value": "415",
+        "label": "Cascante, Osmar Hector"
+      },
+      {
+        "value": "333",
+        "label": "Castillo, Sebastián Alejandro"
+      },
+      {
+        "value": "291",
+        "label": "Cirigliano, Federico Emilio"
+      },
+      {
+        "value": "292",
+        "label": "Cirigliano, Norberto Emilio"
+      },
+      {
+        "value": "335",
+        "label": "Cisneros, Lucas Matías"
+      },
+      {
+        "value": "488",
+        "label": "CISTERNA WALTER"
+      },
+      {
+        "value": "239",
+        "label": "Condori, Herbas Cristian"
+      },
+      {
+        "value": "345",
+        "label": "Coseres, Leandro Ezequiel"
+      },
+      {
+        "value": "489",
+        "label": "CRUCEÑO ALEJANDRO AGUSTIN"
+      },
+      {
+        "value": "238",
+        "label": "Cuba Orosco, Kevín Genaro"
+      },
+      {
+        "value": "227",
+        "label": "Cybulski, Casimiro Antonio"
+      },
+      {
+        "value": "225",
+        "label": "De Jesus Reyes, Emmanuel"
+      },
+      {
+        "value": "397",
+        "label": "Delgado, Gabriel Ruben"
+      },
+      {
+        "value": "403",
+        "label": "Delgado, José Angel"
+      },
+      {
+        "value": "523",
+        "label": "Delseno Nicolas"
+      },
+      {
+        "value": "302",
+        "label": "Delseno, Adrian Antonio"
+      },
+      {
+        "value": "303",
+        "label": "Delseno, Walter Germán"
+      },
+      {
+        "value": "587",
+        "label": "Diaz Gomez Gabriel"
+      },
+      {
+        "value": "391",
+        "label": "Díaz, Cristian Maximiliano"
+      },
+      {
+        "value": "425",
+        "label": "Diharse, Gastón Alejandro"
+      },
+      {
+        "value": "306",
+        "label": "Do Carmo, Arnaldo Sebastián"
+      },
+      {
+        "value": "276",
+        "label": "Echazu, Nahuel Alejandro"
+      },
+      {
+        "value": "299",
+        "label": "Fernández, Eduardo Alberto"
+      },
+      {
+        "value": "490",
+        "label": "FIGUEROA MARIANO"
+      },
+      {
+        "value": "324",
+        "label": "Foggia, Pablo Mauricio"
+      },
+      {
+        "value": "594",
+        "label": "FORASTIERI CHRISTIAN"
+      },
+      {
+        "value": "336",
+        "label": "Franco, Joaquin Matías"
+      },
+      {
+        "value": "563",
+        "label": "FRESCO SAUL EZEQUIEL"
+      },
+      {
+        "value": "525",
+        "label": "Galarza Victor Hugo"
+      },
+      {
+        "value": "284",
+        "label": "Galarza, Jorge"
+      },
+      {
+        "value": "416",
+        "label": "Gallo, Jonathan Gastón"
+      },
+      {
+        "value": "584",
+        "label": "GALVAN WALTER FABIAN"
+      },
+      {
+        "value": "597",
+        "label": "GARCIA BRIAN NICOLAS"
+      },
+      {
+        "value": "293",
+        "label": "García, Atilio Horacio"
+      },
+      {
+        "value": "375",
+        "label": "García, Paulo Cesar Antonio"
+      },
+      {
+        "value": "323",
+        "label": "García, Yamandú Liborio"
+      },
+      {
+        "value": "526",
+        "label": "Gaspari Mauricio Edgardo"
+      },
+      {
+        "value": "258",
+        "label": "Gayoso Matias Jose"
+      },
+      {
+        "value": "598",
+        "label": "GERRY CRISTIAN MARCELO"
+      },
+      {
+        "value": "234",
+        "label": "Giacobbe, Nahuel"
+      },
+      {
+        "value": "566",
+        "label": "GIANNI AGUSTIN"
+      },
+      {
+        "value": "308",
+        "label": "Gianni, Diego Alberto"
+      },
+      {
+        "value": "601",
+        "label": "GIMENEZ DEOLINDO EMANUEL"
+      },
+      {
+        "value": "557",
+        "label": "GOMEZ EMANUEL ELISEO"
+      },
+      {
+        "value": "313",
+        "label": "Gómez, Víctor Abel"
+      },
+      {
+        "value": "223",
+        "label": "Gonzalez Nicolas Maximiliano"
+      },
+      {
+        "value": "252",
+        "label": "González, Daniel Guillermo"
+      },
+      {
+        "value": "431",
+        "label": "González, Federico Alfredo"
+      },
+      {
+        "value": "381",
+        "label": "González, Gustavo Daniel"
+      },
+      {
+        "value": "433",
+        "label": "Goudal, Nicolás Ezequiel"
+      },
+      {
+        "value": "285",
+        "label": "Guerrero, Diego"
+      },
+      {
+        "value": "570",
+        "label": "GUEVARA FRANCO"
+      },
+      {
+        "value": "528",
+        "label": "Gustavo Javier Benitez"
+      },
+      {
+        "value": "529",
+        "label": "Huarte Christian Ariel"
+      },
+      {
+        "value": "491",
+        "label": "IBANEZ ROSSI  CRISTIAN NARCISO."
+      },
+      {
+        "value": "358",
+        "label": "Ibarra, Ramón Angel"
+      },
+      {
+        "value": "435",
+        "label": "Jara, Nelson"
+      },
+      {
+        "value": "569",
+        "label": "JIMENEZ FRANCO"
+      },
+      {
+        "value": "437",
+        "label": "Josserme Martínez, Agustín"
+      },
+      {
+        "value": "565",
+        "label": "Juarez Walter Hernan"
+      },
+      {
+        "value": "583",
+        "label": "KRAMER FEDERICO"
+      },
+      {
+        "value": "508",
+        "label": "Lara Gustavo"
+      },
+      {
+        "value": "422",
+        "label": "Leonelli, Alejandro Nahuel"
+      },
+      {
+        "value": "251",
+        "label": "Lescano, Pedro"
+      },
+      {
+        "value": "329",
+        "label": "Llanos Mercado, Edgar"
+      },
+      {
+        "value": "580",
+        "label": "LOPEZ GUSTAVO"
+      },
+      {
+        "value": "530",
+        "label": "López Joaquin"
+      },
+      {
+        "value": "236",
+        "label": "López, Raul Silvio"
+      },
+      {
+        "value": "240",
+        "label": "López, Solano Fabián"
+      },
+      {
+        "value": "401",
+        "label": "Lovera, Daniel Andrés"
+      },
+      {
+        "value": "602",
+        "label": "LUNA AGUSTIN"
+      },
+      {
+        "value": "436",
+        "label": "Luongo, Franco"
+      },
+      {
+        "value": "444",
+        "label": "Luque Lucas Leonel"
+      },
+      {
+        "value": "430",
+        "label": "Made, Ismael Anuar Mehde"
+      },
+      {
+        "value": "531",
+        "label": "Maidana Santiago Tomás"
+      },
+      {
+        "value": "372",
+        "label": "Maidana, Marcelo Sebastián"
+      },
+      {
+        "value": "393",
+        "label": "Mandiles, José Enrique"
+      },
+      {
+        "value": "338",
+        "label": "Mandiles, Luis Hernán"
+      },
+      {
+        "value": "359",
+        "label": "Manrrique, Alberto Nelson Darío"
+      },
+      {
+        "value": "228",
+        "label": "Marín, Leandro Damián"
+      },
+      {
+        "value": "533",
+        "label": "Marquez David"
+      },
+      {
+        "value": "534",
+        "label": "Martínez Nicolas Fernando"
+      },
+      {
+        "value": "385",
+        "label": "Martínez, Adrián Alejandro"
+      },
+      {
+        "value": "399",
+        "label": "Martínez, Federico Carlos"
+      },
+      {
+        "value": "362",
+        "label": "Martínez, Pablo Marcelo"
+      },
+      {
+        "value": "494",
+        "label": "MAYDANA LUKAS"
+      },
+      {
+        "value": "535",
+        "label": "Medina Daniel"
+      },
+      {
+        "value": "332",
+        "label": "Medina, Rodrigo"
+      },
+      {
+        "value": "277",
+        "label": "Mekbel, Gustavo Ezequiel"
+      },
+      {
+        "value": "281",
+        "label": "Mekbel, Roberto Carlos"
+      },
+      {
+        "value": "536",
+        "label": "Mena Heber Uriel"
+      },
+      {
+        "value": "537",
+        "label": "Mendez Agustin"
+      },
+      {
+        "value": "592",
+        "label": "MENDEZ LUCAS NAHUEL"
+      },
+      {
+        "value": "339",
+        "label": "Mendez, Christian Omar"
+      },
+      {
+        "value": "327",
+        "label": "Menlik, Oscar Esteban"
+      },
+      {
+        "value": "568",
+        "label": "MIRANDA CORIA FACUNDO"
+      },
+      {
+        "value": "263",
+        "label": "Miranda Nestor Eduardo"
+      },
+      {
+        "value": "370",
+        "label": "Moine, Ruben Jose Luis"
+      },
+      {
+        "value": "575",
+        "label": "Molina Coria Martin Lucas"
+      },
+      {
+        "value": "538",
+        "label": "Molina Leandro Ivan"
+      },
+      {
+        "value": "334",
+        "label": "Molina, Brian Gabriel"
+      },
+      {
+        "value": "241",
+        "label": "Monjes, Oscar Marcelo"
+      },
+      {
+        "value": "357",
+        "label": "Montes, Francisco Damian"
+      },
+      {
+        "value": "389",
+        "label": "Montiel, Víctor David"
+      },
+      {
+        "value": "434",
+        "label": "Montoya, Luciano Damián"
+      },
+      {
+        "value": "253",
+        "label": "Monzon, Carlos Agustin"
+      },
+      {
+        "value": "243",
+        "label": "Monzón, Carlos Horacio"
+      },
+      {
+        "value": "244",
+        "label": "Monzón, Jorge Mauro"
+      },
+      {
+        "value": "552",
+        "label": "Morel, Luis Maximiliano"
+      },
+      {
+        "value": "346",
+        "label": "Morillo Reyes, Jose Luis"
+      },
+      {
+        "value": "382",
+        "label": "Nacia, Lucas Martín"
+      },
+      {
+        "value": "449",
+        "label": "Navatta Maria Laura"
+      },
+      {
+        "value": "341",
+        "label": "Nicolari, Pablo Ariel"
+      },
+      {
+        "value": "378",
+        "label": "Nuñez, Pablo Ladislao"
+      },
+      {
+        "value": "379",
+        "label": "Nuñez, Roque Salvador"
+      },
+      {
+        "value": "560",
+        "label": "Ocampo Diaz Tomas Andres"
+      },
+      {
+        "value": "595",
+        "label": "OCAMPO JOAQUIN"
+      },
+      {
+        "value": "380",
+        "label": "Ochoa, Luis Eduardo"
+      },
+      {
+        "value": "591",
+        "label": "OJEDA FERNANDEZ JOSE ENRIQUE"
+      },
+      {
+        "value": "348",
+        "label": "Ojeda Fernández, Miguel"
+      },
+      {
+        "value": "394",
+        "label": "Olivera, Diego"
+      },
+      {
+        "value": "245",
+        "label": "Ontivero, Gabriel"
+      },
+      {
+        "value": "404",
+        "label": "Orciari, Karina Milva"
+      },
+      {
+        "value": "288",
+        "label": "Orellana, Javier"
+      },
+      {
+        "value": "256",
+        "label": "Orosco, Damian Agustin"
+      },
+      {
+        "value": "539",
+        "label": "Ortiz Mariano"
+      },
+      {
+        "value": "275",
+        "label": "Ovejero, Julio Cesar"
+      },
+      {
+        "value": "540",
+        "label": "Palavecino Thiago"
+      },
+      {
+        "value": "603",
+        "label": "PANETTA ALBARRACIN FEDERICO"
+      },
+      {
+        "value": "586",
+        "label": "Panetta Javier Mariano"
+      },
+      {
+        "value": "497",
+        "label": "PAPPA JONATHAN"
+      },
+      {
+        "value": "388",
+        "label": "Pasayo, Juan Eduardo"
+      },
+      {
+        "value": "250",
+        "label": "Pataccini, Leonel Matías"
+      },
+      {
+        "value": "249",
+        "label": "Pataccini, Marcelo"
+      },
+      {
+        "value": "320",
+        "label": "Pataccini, Sergio Damián"
+      },
+      {
+        "value": "542",
+        "label": "Pavon Simon"
+      },
+      {
+        "value": "509",
+        "label": "Pay Esteban"
+      },
+      {
+        "value": "279",
+        "label": "Paz, Hernán Eduardo"
+      },
+      {
+        "value": "280",
+        "label": "Paz, Matías Gabriel"
+      },
+      {
+        "value": "387",
+        "label": "Peñalva, Cristian Germán"
+      },
+      {
+        "value": "321",
+        "label": "Peñalva, Fabián Rafael"
+      },
+      {
+        "value": "561",
+        "label": "Pereira Jorge Ariel"
+      },
+      {
+        "value": "512",
+        "label": "Perez Facundo"
+      },
+      {
+        "value": "340",
+        "label": "Pérez, Omar Antonio"
+      },
+      {
+        "value": "247",
+        "label": "Pérez, Roque Luis"
+      },
+      {
+        "value": "543",
+        "label": "Perino Martin Adrian"
+      },
+      {
+        "value": "312",
+        "label": "Piñeyro, Damián Gabriel"
+      },
+      {
+        "value": "414",
+        "label": "Pontisso, Silvia Rosa"
+      },
+      {
+        "value": "274",
+        "label": "Posada, Luis Alberto"
+      },
+      {
+        "value": "287",
+        "label": "Postrosija David Nahuel"
+      },
+      {
+        "value": "545",
+        "label": "Pudiza Galeano Walter"
+      },
+      {
+        "value": "262",
+        "label": "Quiroga Martin Nahuel"
+      },
+      {
+        "value": "411",
+        "label": "Ramírez, Pablo Emmanuel"
+      },
+      {
+        "value": "413",
+        "label": "Regadio, Leonel Norberto"
+      },
+      {
+        "value": "246",
+        "label": "Retamoza, Walter Fabio"
+      },
+      {
+        "value": "559",
+        "label": "RIOS RUBEN EMILIO"
+      },
+      {
+        "value": "272",
+        "label": "Ríos, Cesar Damián"
+      },
+      {
+        "value": "242",
+        "label": "Rivas, Sebastián Alberto"
+      },
+      {
+        "value": "365",
+        "label": "Rocha, Ariel Maximiliano"
+      },
+      {
+        "value": "260",
+        "label": "Rodriguez Adrian Ariel"
+      },
+      {
+        "value": "573",
+        "label": "RODRIGUEZ CARLOS FERNANDO"
+      },
+      {
+        "value": "585",
+        "label": "Rodriguez Guillermo Daniel"
+      },
+      {
+        "value": "579",
+        "label": "RODRIGUEZ MARCELO"
+      },
+      {
+        "value": "600",
+        "label": "RODRIGUEZ NICOLAS"
+      },
+      {
+        "value": "266",
+        "label": "Romero José Emanuel"
+      },
+      {
+        "value": "376",
+        "label": "Romero, Juan Manuel"
+      },
+      {
+        "value": "432",
+        "label": "Romero, María Jimena"
+      },
+      {
+        "value": "440",
+        "label": "Romero, Miguel Angel"
+      },
+      {
+        "value": "267",
+        "label": "Rossi Sosa Daniel Emanuel"
+      },
+      {
+        "value": "237",
+        "label": "Rossi, Franco Andrés"
+      },
+      {
+        "value": "577",
+        "label": "ROTAR ALEJANDRO SEBASTIAN"
+      },
+      {
+        "value": "407",
+        "label": "Ruíz, Sandra Graciela"
+      },
+      {
+        "value": "318",
+        "label": "Salvatierra, Mario Andrés"
+      },
+      {
+        "value": "547",
+        "label": "Sanabria Pablo"
+      },
+      {
+        "value": "270",
+        "label": "Sanchez German Omar"
+      },
+      {
+        "value": "337",
+        "label": "Saryanovich, Martín Alejandro"
+      },
+      {
+        "value": "503",
+        "label": "SAVINI LISANDRO JOAQUIN"
+      },
+      {
+        "value": "396",
+        "label": "Schirripa, Sergio Ricardo"
+      },
+      {
+        "value": "589",
+        "label": "SERRANO LUCRECIA"
+      },
+      {
+        "value": "596",
+        "label": "SILVA NICOLAS"
+      },
+      {
+        "value": "259",
+        "label": "Sosa, Alejandro Damian"
+      },
+      {
+        "value": "593",
+        "label": "SOTELO MARTIN EMANUEL"
+      },
+      {
+        "value": "400",
+        "label": "Sotelo, Carlos Alberto Martín"
+      },
+      {
+        "value": "409",
+        "label": "Spagnolo, Luis"
+      },
+      {
+        "value": "418",
+        "label": "Spano, Marcelo Andrés"
+      },
+      {
+        "value": "367",
+        "label": "Suruguay, Armando José"
+      },
+      {
+        "value": "350",
+        "label": "Suyo Montoya, Jhonny"
+      },
+      {
+        "value": "386",
+        "label": "Tagliapietra, Hugo Daniel"
+      },
+      {
+        "value": "294",
+        "label": "Tagliapietra, Marcos"
+      },
+      {
+        "value": "342",
+        "label": "Talavera, Osvaldo Antonio"
+      },
+      {
+        "value": "429",
+        "label": "Tejeira, Claudio Alejandro"
+      },
+      {
+        "value": "353",
+        "label": "Tironi, Abel Ernesto"
+      },
+      {
+        "value": "428",
+        "label": "Toledo, Fernando Damián"
+      },
+      {
+        "value": "548",
+        "label": "Torchelli Eros"
+      },
+      {
+        "value": "383",
+        "label": "Torchelli, Marcos Gustavo"
+      },
+      {
+        "value": "343",
+        "label": "Torres, Leandro Javier"
+      },
+      {
+        "value": "390",
+        "label": "Toscano, Juan Carlos"
+      },
+      {
+        "value": "352",
+        "label": "Urreli, Julian Nicolas"
+      },
+      {
+        "value": "349",
+        "label": "Urreli, Pablo Luciano"
+      },
+      {
+        "value": "392",
+        "label": "Ururi Mamani, Raul Adolfo"
+      },
+      {
+        "value": "265",
+        "label": "Vallejos Jorge Ariel"
+      },
+      {
+        "value": "421",
+        "label": "Vanni, Hugo Darío"
+      },
+      {
+        "value": "406",
+        "label": "Vattino, Angela Marcela"
+      },
+      {
+        "value": "402",
+        "label": "Vattino, Cristian Alejandro"
+      },
+      {
+        "value": "438",
+        "label": "Vazquez Leòn, Fatima Dolores"
+      },
+      {
+        "value": "549",
+        "label": "Vela Patricio"
+      },
+      {
+        "value": "550",
+        "label": "Ventura Sánchez Anderson Javier"
+      },
+      {
+        "value": "269",
+        "label": "Ventura Sanchez Arinson"
+      },
+      {
+        "value": "366",
+        "label": "Ventura Sanchez, Anyelo"
+      },
+      {
+        "value": "317",
+        "label": "Vera, Domingo Sergio"
+      },
+      {
+        "value": "319",
+        "label": "Vera, Sergio Leonardo"
+      },
+      {
+        "value": "398",
+        "label": "Villa, Carlos Alberto"
+      },
+      {
+        "value": "567",
+        "label": "VILLAFAÑE FLORENCIA DENISE"
+      },
+      {
+        "value": "361",
+        "label": "Villalba, Martín Antonio"
+      },
+      {
+        "value": "363",
+        "label": "Villalba, Rodrigo Emanuel"
+      },
+      {
+        "value": "588",
+        "label": "VILLIVAR FACUNDO"
+      },
+      {
+        "value": "347",
+        "label": "Zenteno Sanchez, Benigno"
+      },
+      {
+        "value": "448",
+        "label": "Zotta Gabriel Antonio"
+      },
+      {
+        "value": "551",
+        "label": "Zunni Sergio Carlos"
+      }
+    ],
+    "centrosCosto": [
+      {
+        "value": "4",
+        "label": "CHOFERES"
+      },
+      {
+        "value": "8",
+        "label": "EDILICIO"
+      },
+      {
+        "value": "11",
+        "label": "HERRERIA"
+      },
+      {
+        "value": "13",
+        "label": "LAVADERO"
+      },
+      {
+        "value": "15",
+        "label": "MECANICA"
+      },
+      {
+        "value": "17",
+        "label": "PLAYA"
+      },
+      {
+        "value": "20",
+        "label": "RECOLECCION"
+      },
+      {
+        "value": "26",
+        "label": "MDQ"
+      }
+    ]
+  },
+  "workOrders": [
+    {
+      "id": "1780320409150",
+      "rodado": "FORD - F100. Interno 1",
+      "responsable": "BELOCURES CESAR HERNAN",
+      "fechaEntrega": "2026-06-01",
+      "horario": "10:26",
+      "interno": "01 ford",
+      "clasificacion": "Correctivo",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-06-01T16:38:21.469Z",
+      "createdAt": "2026-06-01T13:26:49.150Z",
+      "tasks": [
+        {
+          "id": "1780320409150-0",
+          "centroCosto": "15",
+          "empleado": "326",
+          "horasEstimadas": 5,
+          "descripcion": "se rasco los huevosd ",
+          "status": "Finalizada"
+        }
+      ]
+    },
+    {
+      "id": "1780321921817",
+      "rodado": "VOLKSWAGEN - AMAROK Interno 4",
+      "responsable": "BELOCURES CESAR HERNAN",
+      "fechaEntrega": "2026-06-01",
+      "horario": "10:51",
+      "interno": "int 4 preventivo",
+      "clasificacion": "Preventivo",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-06-01T16:39:49.939Z",
+      "createdAt": "2026-06-01T13:52:01.817Z",
+      "tasks": [
+        {
+          "id": "1780321921817-0",
+          "centroCosto": "15",
+          "empleado": "326",
+          "horasEstimadas": 2,
+          "descripcion": "realiza preventivo",
+          "status": "Finalizada"
+        }
+      ]
+    },
+    {
+      "id": "1780326033453",
+      "rodado": "FORD - F100. Interno 1",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-06-01",
+      "horario": "12:00",
+      "interno": "int  1 ford",
+      "clasificacion": "Preventivo",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-06-01T16:28:52.528Z",
+      "createdAt": "2026-06-01T15:00:33.453Z",
+      "tasks": [
+        {
+          "id": "1780326033453-0",
+          "centroCosto": "15",
+          "empleado": "326",
+          "horasEstimadas": 2,
+          "descripcion": "tardo dos horas y nose que hizo ",
+          "status": "Finalizada"
+        }
+      ]
+    },
+    {
+      "id": "1780571051876",
+      "rodado": "VOLKSWAGEN - AMAROK Interno 7",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-06-04",
+      "horario": "08:04",
+      "interno": "int 7 prueba",
+      "clasificacion": "Preventivo",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-06-04T11:05:35.559Z",
+      "createdAt": "2026-06-04T11:04:11.877Z",
+      "tasks": [
+        {
+          "id": "1780571051877-0",
+          "centroCosto": "15",
+          "empleado": "591",
+          "horasEstimadas": 2,
+          "descripcion": "realiza preventivo ala unidad ",
+          "status": "Finalizada"
+        }
+      ]
+    },
+    {
+      "id": "1780571829198",
+      "rodado": "VOLKSWAGEN - SAVEIRO 1.6L Interno 2",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-06-04",
+      "horario": "08:17",
+      "interno": "int 2 prueba",
+      "clasificacion": "Auxilio",
+      "incidente": "choque y siin cedula verde",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-06-04T11:18:19.448Z",
+      "createdAt": "2026-06-04T11:17:09.198Z",
+      "tasks": [
+        {
+          "id": "1780571829198-0",
+          "centroCosto": "15",
+          "empleado": "394",
+          "horasEstimadas": 3,
+          "descripcion": "revision choque",
+          "status": "Finalizada"
+        }
+      ]
+    },
+    {
+      "id": "1780575558842",
+      "rodado": "VOLKSWAGEN - SAVEIRO 1.6L Interno 2",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-06-04",
+      "horario": "12:30",
+      "interno": "int 2 test toggle",
+      "clasificacion": "Correctivo",
+      "incidente": "Test toggle task switch status",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-06-04T12:20:34.454Z",
+      "createdAt": "2026-06-04T12:19:18.843Z",
+      "tasks": [
+        {
+          "id": "1780575558856-0",
+          "centroCosto": "15",
+          "empleado": "394",
+          "horasEstimadas": 1.5,
+          "descripcion": "Test task marked as Finalizada",
+          "status": "Finalizada"
+        }
+      ]
+    },
+    {
+      "id": "1780576376242",
+      "rodado": "VOLKSWAGEN - AMAROK Interno 7",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-06-04",
+      "horario": "09:32",
+      "interno": "int 7 prueba",
+      "clasificacion": "Preventivo",
+      "incidente": "preventivo 2500.000 km",
+      "syncStatus": "error",
+      "syncError": "No se pudo seleccionar el Empleado para la tarea 1.",
+      "syncDate": null,
+      "createdAt": "2026-06-04T12:32:56.242Z",
+      "tasks": [
+        {
+          "id": "1780576376242-0",
+          "centroCosto": "4",
+          "empleado": "574",
+          "horasEstimadas": 4,
+          "descripcion": "preventivo",
+          "status": "Finalizada"
+        }
+      ]
+    },
+    {
+      "id": "1780578473658",
+      "rodado": "VOLKSWAGEN - AMAROK Interno 7",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-06-04",
+      "horario": "10:07",
+      "interno": "int 7 prueba",
+      "clasificacion": "Preventivo",
+      "incidente": "preventivo 80.000",
+      "syncStatus": "local",
+      "syncError": null,
+      "syncDate": null,
+      "createdAt": "2026-06-04T13:07:53.658Z",
+      "tasks": [
+        {
+          "id": "1780578473658-0",
+          "centroCosto": "15",
+          "empleado": "591",
+          "horasEstimadas": 0,
+          "descripcion": "realiza preventivo",
+          "status": "Pendiente"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Taller Taxes - Móvil</title>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Google Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-logo">
+      <span class="material-icons logo-icon">build_circle</span>
+      <div class="logo-text">
+        <h1>Taxes <span>Taller</span></h1>
+        <small id="current-user">Operador Móvil</small>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="material-icons sync-indicator idle" id="global-sync-icon">sync</span>
+    </div>
+  </header>
+
+  <!-- Main View Container -->
+  <main class="app-container">
+
+    <!-- VIEW 1: HOME (INICIO) -->
+    <section id="view-home" class="app-view active">
+      <!-- Big Call to Action to Create Order -->
+      <div class="create-order-banner" onclick="switchView('orders'); openNewOrderModal();">
+        <div class="banner-content">
+          <span class="material-icons banner-icon">add_circle_outline</span>
+          <div class="banner-text">
+            <h2>Crear Orden de Trabajo</h2>
+            <p>Registra un nuevo ingreso de unidad</p>
+          </div>
+        </div>
+        <span class="material-icons arrow-icon">chevron_right</span>
+      </div>
+
+      <!-- OPERATOR DASHBOARD SECTION -->
+      <div class="dashboard-section">
+        <div class="dashboard-header-row">
+          <span class="material-icons">engineering</span>
+          <h3>Estado de Operarios y Tareas</h3>
+        </div>
+
+        <!-- Section: En Proceso (Trabajando) -->
+        <div class="dashboard-sub-title">
+          <span class="indicator working"></span>
+          <span>Trabajando en el Taller (<span id="count-working">0</span>)</span>
+        </div>
+        <div class="dashboard-grid working" id="grid-working">
+          <!-- Square cards for working tasks -->
+          <div class="empty-dashboard-state">No hay operarios trabajando actualmente.</div>
+        </div>
+
+        <!-- Section: En Pausa -->
+        <div class="dashboard-sub-title" style="margin-top: 20px;">
+          <span class="indicator paused"></span>
+          <span>Tareas en Pausa (<span id="count-paused">0</span>)</span>
+        </div>
+        <div class="dashboard-grid paused" id="grid-paused">
+          <!-- Square cards for paused tasks -->
+          <div class="empty-dashboard-state">No hay tareas en pausa.</div>
+        </div>
+
+        <!-- Section: Operarios Libres (Mecánicos sin tarea activa) -->
+        <div class="dashboard-sub-title" style="margin-top: 20px;">
+          <span class="indicator free"></span>
+          <span>Mecánicos Libres / Disponibles (<span id="count-free">0</span>)</span>
+        </div>
+        <div class="free-employees-list" id="list-free-employees">
+          <!-- List of tags for free employees -->
+          <div class="empty-dashboard-state">No hay mecánicos libres registrados.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: ORDERS (ÓRDENES DE TRABAJO) -->
+    <section id="view-orders" class="app-view">
+      <div class="view-header">
+        <h2>Órdenes de Trabajo</h2>
+        <button class="btn btn-primary btn-sm" onclick="openNewOrderModal()">
+          <span class="material-icons">add</span> Nueva
+        </button>
+      </div>
+
+      <div class="search-bar">
+        <span class="material-icons search-icon">search</span>
+        <input type="text" id="order-search" placeholder="Buscar por Rodado, Interno o Clasificación..." oninput="filterOrders()">
+      </div>
+
+      <div class="orders-list" id="orders-list-container">
+        <!-- Dynamic content -->
+      </div>
+    </section>
+
+    <!-- VIEW 3: SYNC MONITOR -->
+    <section id="view-sync" class="app-view">
+      <div class="view-header">
+        <h2>Monitor de Sincronización</h2>
+      </div>
+      
+      <div class="worker-card">
+        <div class="worker-info">
+          <span class="material-icons worker-status-icon active" id="worker-status-pulse">bolt</span>
+          <div>
+            <h4>Worker en Segundo Plano</h4>
+            <p id="worker-desc">Buscando órdenes pendientes cada 10 segundos...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">
+        <h3>Cola de Sincronización</h3>
+      </div>
+      <div class="sync-queue-list" id="sync-queue-container">
+        <!-- Dynamic queue items -->
+      </div>
+    </section>
+
+    <!-- VIEW 4: SETTINGS (AJUSTES) -->
+    <section id="view-settings" class="app-view">
+      <div class="view-header">
+        <h2>Configuración</h2>
+      </div>
+
+      <form id="settings-form" class="settings-card">
+        <div class="form-group">
+          <label for="set-portal-url">URL del Portal de Taxes</label>
+          <input type="url" id="set-portal-url" required value="https://taxes.com.ar">
+        </div>
+        <div class="form-group">
+          <label for="set-username">Usuario / Email de Taxes</label>
+          <input type="text" id="set-username" placeholder="ejemplo@correo.com" required>
+        </div>
+        <div class="form-group">
+          <label for="set-password">Contraseña de Taxes</label>
+          <input type="password" id="set-password" placeholder="••••••••••••" required>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">
+          <span class="material-icons">save</span> Guardar Configuración
+        </button>
+      </form>
+
+      <div class="section-title">
+        <h3>Catálogos y Selectores</h3>
+      </div>
+      <div class="catalog-sync-card">
+        <p>Para cargar la lista de vehículos, empleados y centros de costo reales desde la web de Taxes, haz clic abajo.</p>
+        <button class="btn btn-secondary btn-block" id="btn-sync-catalogs" onclick="triggerCatalogSync()">
+          <span class="material-icons" id="catalog-sync-spinner">autorenew</span>
+          <span id="catalog-sync-text">Sincronizar Catálogos desde Taxes</span>
+        </button>
+        <small class="catalog-status" id="catalog-status-text">Catálogos locales listos (Mockup activado)</small>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Navigation Bar -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="switchView('home')" id="nav-home">
+      <span class="material-icons">home</span>
+      <span>Inicio</span>
+    </button>
+    <button class="nav-item" onclick="switchView('orders')" id="nav-orders">
+      <span class="material-icons">assignment</span>
+      <span>Órdenes</span>
+    </button>
+    <button class="nav-item" onclick="switchView('sync')" id="nav-sync">
+      <span class="material-icons">sync_alt</span>
+      <span>Sincronizar</span>
+    </button>
+    <button class="nav-item" onclick="switchView('settings')" id="nav-settings">
+      <span class="material-icons">settings</span>
+      <span>Ajustes</span>
+    </button>
+  </nav>
+
+  <!-- FULLSCREEN NEW ORDER MODAL -->
+  <div class="fullscreen-modal" id="new-order-modal">
+    <div class="modal-header">
+      <button class="modal-close-btn" onclick="closeNewOrderModal()">
+        <span class="material-icons">close</span>
+      </button>
+      <h2 id="modal-order-title">Nueva Orden de Trabajo</h2>
+      <button class="btn btn-success btn-sm" onclick="submitWorkOrder()">
+        <span class="material-icons">check</span> Enviar
+      </button>
+    </div>
+    
+    <div class="modal-content">
+      <form id="work-order-form">
+        
+        <!-- CARD 1: DATOS GENERALES -->
+        <div class="form-section-card">
+          <div class="card-title-header">
+            <span class="material-icons">feed</span>
+            <h3>Datos Generales</h3>
+          </div>
+          
+          <div class="form-group">
+            <label for="form-rodado">Rodado *</label>
+            <select id="form-rodado" required>
+              <option value="">Seleccionar Rodado...</option>
+            </select>
+          </div>
+          
+          <div class="form-group" style="display: none;">
+            <label for="form-responsable">Responsable *</label>
+            <select id="form-responsable">
+              <option value="AUTO" selected>AUTO</option>
+            </select>
+          </div>
+
+          <div class="form-row" style="display: none;">
+            <div class="form-group col-6">
+              <label for="form-fecha">F. Est. Entrega</label>
+              <input type="date" id="form-fecha">
+            </div>
+            <div class="form-group col-6">
+              <label for="form-hora">Horario</label>
+              <input type="time" id="form-hora">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label for="form-interno">Interno Unidad *</label>
+              <input type="text" id="form-interno" placeholder="Ej: 1" required>
+            </div>
+            <div class="form-group col-6">
+              <label for="form-clasificacion">Clasificación *</label>
+              <select id="form-clasificacion" required>
+                <option value="Preventivo">Preventivo</option>
+                <option value="Auxilio">Auxilio</option>
+                <option value="Correctivo">Correctivo</option>
+                <option value="Herrería">Herrería</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="form-incidente">Incidente o Requisito</label>
+            <textarea id="form-incidente" placeholder="Describa el incidente o requisito..." rows="3"></textarea>
+          </div>
+        </div>
+
+        <!-- CARD 2: TAREAS A REALIZAR -->
+        <div class="form-section-card">
+          <div class="card-title-header split">
+            <div class="flex-align">
+              <span class="material-icons">build</span>
+              <h3>Tareas a Realizar</h3>
+              <span class="badge" id="task-count-badge">0</span>
+            </div>
+            <button type="button" class="btn btn-primary btn-xs" onclick="addTaskField()">
+              <span class="material-icons">add</span> AGREGAR TAREA
+            </button>
+          </div>
+
+          <div class="tasks-container" id="modal-tasks-list">
+            <!-- Dynamic task items go here -->
+            <div class="tasks-empty-state" id="tasks-empty-state">
+              <span class="material-icons">assignment_late</span>
+              <p>No hay tareas asignadas.</p>
+              <small>Haz clic en "AGREGAR TAREA" para crear la primera tarea.</small>
+            </div>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION SYSTEM -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- SYNC ERROR LOG MODAL -->
+  <div class="modal-overlay" id="error-modal">
+    <div class="dialog-modal">
+      <div class="dialog-header error">
+        <h3>Error de Sincronización</h3>
+        <button class="dialog-close" onclick="closeErrorModal()">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <p><strong>Detalle del error reportado por Taxes.com.ar:</strong></p>
+        <pre class="error-log" id="error-modal-log">El servicio de taxes.com.ar no respondió.</pre>
+        <p class="error-tip"><span class="material-icons">info</span> Asegúrate de que tus credenciales y conexión de red sean correctas e intenta de nuevo.</p>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="closeErrorModal()">Cerrar</button>
+        <button class="btn btn-primary" id="btn-modal-retry" onclick="retryOrderFromModal()">
+          <span class="material-icons">sync</span> Reintentar Ahora
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

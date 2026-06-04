@@ -1,0 +1,10 @@
+node_modules/
+*.png
+*.log
+scratch/
+.env
+inspect*.js
+find_portal.js
+sync_test.js
+verify_ot.js
+run_catalog_sync_now.js
