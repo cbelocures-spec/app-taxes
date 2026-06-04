@@ -10,23 +10,1331 @@
     "rodados": [
       {
         "value": "1",
-        "label": "FORD - F100. Interno 1"
+        "label": "FORD F100 Interno 1",
+        "interno": "1",
+        "modelo": "FORD F100",
+        "patente": "SXD684",
+        "equipo": "CAMIONETA"
       },
       {
         "value": "2",
-        "label": "VOLKSWAGEN - SAVEIRO 1.6L Interno 2"
+        "label": "VOLKSWAGEN SAVEIRO 1,6L Interno 2",
+        "interno": "2",
+        "modelo": "VOLKSWAGEN SAVEIRO 1,6L",
+        "patente": "AA412BM",
+        "equipo": "CAMIONETA"
       },
       {
         "value": "4",
-        "label": "VOLKSWAGEN - AMAROK Interno 4"
+        "label": "VOLKSWAGEN AMAROK Interno 4",
+        "interno": "4",
+        "modelo": "VOLKSWAGEN AMAROK",
+        "patente": "MFF688",
+        "equipo": "CAMIONETA"
       },
       {
         "value": "5",
-        "label": "VOLKSWAGEN - AMAROK Interno 5"
+        "label": "VOLKSWAGEN AMAROK Interno 5",
+        "interno": "5",
+        "modelo": "VOLKSWAGEN AMAROK",
+        "patente": "AC000GY",
+        "equipo": "CAMIONETA"
       },
       {
         "value": "7",
-        "label": "VOLKSWAGEN - AMAROK Interno 7"
+        "label": "VOLKSWAGEN AMAROK Interno 7",
+        "interno": "7",
+        "modelo": "VOLKSWAGEN AMAROK",
+        "patente": "AD947SE",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "8",
+        "label": "FIAT CRONOS Interno 8",
+        "interno": "8",
+        "modelo": "FIAT CRONOS",
+        "patente": "AE616WH",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "9",
+        "label": "FIAT CRONOS Interno 9",
+        "interno": "9",
+        "modelo": "FIAT CRONOS",
+        "patente": "AE616WI",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "9B",
+        "label": "HANGCHA S-30 CPCD25T8 Interno 9B",
+        "interno": "9B",
+        "modelo": "HANGCHA S-30 CPCD25T8",
+        "patente": "0130",
+        "equipo": "AUTOELEVADOR"
+      },
+      {
+        "value": "10",
+        "label": "HANGCHA S-30 CPCD35N Interno 10",
+        "interno": "10",
+        "modelo": "HANGCHA S-30 CPCD35N",
+        "patente": "0007",
+        "equipo": "AUTOELEVADOR"
+      },
+      {
+        "value": "17",
+        "label": "MERCEDES BENZ 1718 Interno 17",
+        "interno": "17",
+        "modelo": "MERCEDES BENZ 1718",
+        "patente": "BTP439",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "25",
+        "label": "MERCEDES BENZ 1215 Interno 25",
+        "interno": "25",
+        "modelo": "MERCEDES BENZ 1215",
+        "patente": "VZL733",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "26",
+        "label": "BOBCAT S570 Interno 26",
+        "interno": "26",
+        "modelo": "BOBCAT S570",
+        "patente": "EEL92",
+        "equipo": "MINI PALA CARGADORA"
+      },
+      {
+        "value": "27",
+        "label": "BOBCAT S570 Interno 27",
+        "interno": "27",
+        "modelo": "BOBCAT S570",
+        "patente": "EEM01",
+        "equipo": "MINI PALA CARGADORA"
+      },
+      {
+        "value": "35",
+        "label": "MERCEDES BENZ 1720 Interno 35",
+        "interno": "35",
+        "modelo": "MERCEDES BENZ 1720",
+        "patente": "ELN128",
+        "equipo": "ROLL OFF 20 M3"
+      },
+      {
+        "value": "38",
+        "label": "MERCEDES BENZ 1720 Interno 38",
+        "interno": "38",
+        "modelo": "MERCEDES BENZ 1720",
+        "patente": "EQB161",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "43",
+        "label": "MERCEDES BENZ 1720 Interno 43",
+        "interno": "43",
+        "modelo": "MERCEDES BENZ 1720",
+        "patente": "FDH974",
+        "equipo": "ROLL OFF 20 M3"
+      },
+      {
+        "value": "44",
+        "label": "MERCEDES BENZ 1720 Interno 44",
+        "interno": "44",
+        "modelo": "MERCEDES BENZ 1720",
+        "patente": "FEF015",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "45",
+        "label": "MERCEDES BENZ 1720 Interno 45",
+        "interno": "45",
+        "modelo": "MERCEDES BENZ 1720",
+        "patente": "FGK296",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "46",
+        "label": "MERCEDES BENZ 1620 Interno 46",
+        "interno": "46",
+        "modelo": "MERCEDES BENZ 1620",
+        "patente": "FNC988",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "47",
+        "label": "MERCEDES BENZ 1720 Interno 47",
+        "interno": "47",
+        "modelo": "MERCEDES BENZ 1720",
+        "patente": "FUM746",
+        "equipo": "ROLL OFF 20 M3"
+      },
+      {
+        "value": "50",
+        "label": "MERCEDES BENZ 1624 ELEC. Interno 50",
+        "interno": "50",
+        "modelo": "MERCEDES BENZ 1624 ELEC.",
+        "patente": "GHH672",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "51",
+        "label": "MERCEDES BENZ ATEGO Interno 51",
+        "interno": "51",
+        "modelo": "MERCEDES BENZ ATEGO",
+        "patente": "GPP956",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "52",
+        "label": "MERCEDES BENZ ATEGO Interno 52",
+        "interno": "52",
+        "modelo": "MERCEDES BENZ ATEGO",
+        "patente": "GYN260",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "53",
+        "label": "MERCEDES BENZ ATEGO Interno 53",
+        "interno": "53",
+        "modelo": "MERCEDES BENZ ATEGO",
+        "patente": "HTR485",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "54",
+        "label": "MERCEDES BENZ ATEGO Interno 54",
+        "interno": "54",
+        "modelo": "MERCEDES BENZ ATEGO",
+        "patente": "IFB529",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "56",
+        "label": "MERCEDES BENZ 1624 ELEC. Interno 56",
+        "interno": "56",
+        "modelo": "MERCEDES BENZ 1624 ELEC.",
+        "patente": "IMI928",
+        "equipo": "ROLL OFF 20 M3"
+      },
+      {
+        "value": "57",
+        "label": "MERCEDES BENZ 1215 Interno 57",
+        "interno": "57",
+        "modelo": "MERCEDES BENZ 1215",
+        "patente": "IVP604",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "59",
+        "label": "MERCEDES BENZ 1624 ELEC. Interno 59",
+        "interno": "59",
+        "modelo": "MERCEDES BENZ 1624 ELEC.",
+        "patente": "JAP788",
+        "equipo": "ROLL OFF 20 M3"
+      },
+      {
+        "value": "60",
+        "label": "MERCEDES BENZ 1624 ELEC. Interno 60",
+        "interno": "60",
+        "modelo": "MERCEDES BENZ 1624 ELEC.",
+        "patente": "JXA757",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "61",
+        "label": "MERCEDES BENZ ATEGO Interno 61",
+        "interno": "61",
+        "modelo": "MERCEDES BENZ ATEGO",
+        "patente": "KOJ250",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "63",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 63",
+        "interno": "63",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "LDH459",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "64",
+        "label": "MERCEDES BENZ ATEGO Interno 64",
+        "interno": "64",
+        "modelo": "MERCEDES BENZ ATEGO",
+        "patente": "LIZ724",
+        "equipo": "ROLL OFF 30 M3"
+      },
+      {
+        "value": "65",
+        "label": "MERCEDES BENZ ATEGO Interno 65",
+        "interno": "65",
+        "modelo": "MERCEDES BENZ ATEGO",
+        "patente": "LMT383",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "66",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 66",
+        "interno": "66",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "MAH464",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "67",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 67",
+        "interno": "67",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "MAH463",
+        "equipo": "ROLL OFF 30 M3"
+      },
+      {
+        "value": "68",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 68",
+        "interno": "68",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "MAH466",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "69",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 69",
+        "interno": "69",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "MAH465",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "70",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 70",
+        "interno": "70",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "MAH467",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "71",
+        "label": "MERCEDES BENZ ATEGO 2425 Interno 71",
+        "interno": "71",
+        "modelo": "MERCEDES BENZ ATEGO 2425",
+        "patente": "NKL878",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "72",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 72",
+        "interno": "72",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "NRW714",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "73",
+        "label": "MERCEDES BENZ ATEGO Interno 73",
+        "interno": "73",
+        "modelo": "MERCEDES BENZ ATEGO",
+        "patente": "NRW717",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "74",
+        "label": "MERCEDES BENZ ATEGO Interno 74",
+        "interno": "74",
+        "modelo": "MERCEDES BENZ ATEGO",
+        "patente": "NVX357",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "75",
+        "label": "MERCEDES BENZ ATEGO Interno 75",
+        "interno": "75",
+        "modelo": "MERCEDES BENZ ATEGO",
+        "patente": "NVX356",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "76",
+        "label": "MERCEDES BENZ ATRON 1720 Interno 76",
+        "interno": "76",
+        "modelo": "MERCEDES BENZ ATRON 1720",
+        "patente": "OMM782",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "77",
+        "label": "MERCEDES BENZ ATRON 1720 Interno 77",
+        "interno": "77",
+        "modelo": "MERCEDES BENZ ATRON 1720",
+        "patente": "OMM781",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "78",
+        "label": "MERCEDES BENZ ATRON 1720 Interno 78",
+        "interno": "78",
+        "modelo": "MERCEDES BENZ ATRON 1720",
+        "patente": "OMM783",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "79",
+        "label": "MERCEDES BENZ ATRON 1720 Interno 79",
+        "interno": "79",
+        "modelo": "MERCEDES BENZ ATRON 1720",
+        "patente": "OMM780",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "80",
+        "label": "MERCEDES BENZ 1720 Interno 80",
+        "interno": "80",
+        "modelo": "MERCEDES BENZ 1720",
+        "patente": "GSN586",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "81",
+        "label": "MERCEDES BENZ 1215 Interno 81",
+        "interno": "81",
+        "modelo": "MERCEDES BENZ 1215",
+        "patente": "APB259",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "82",
+        "label": "MERCEDES BENZ 1215 Interno 82",
+        "interno": "82",
+        "modelo": "MERCEDES BENZ 1215",
+        "patente": "APB255",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "86",
+        "label": "MERCEDES BENZ 1718 Interno 86",
+        "interno": "86",
+        "modelo": "MERCEDES BENZ 1718",
+        "patente": "BJQ959",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "87",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 87",
+        "interno": "87",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "HGT994",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "88",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 88",
+        "interno": "88",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "HGT995",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "89",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 89",
+        "interno": "89",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "HSC167",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "90",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 90",
+        "interno": "90",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "HSC170",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "91",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 91",
+        "interno": "91",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "HZY622",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "92",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 92",
+        "interno": "92",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "HSC171",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "93",
+        "label": "MERCEDES BENZ 1720 Interno 93",
+        "interno": "93",
+        "modelo": "MERCEDES BENZ 1720",
+        "patente": "GGZ483",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "94",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 94",
+        "interno": "94",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "HZY621",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "95",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 95",
+        "interno": "95",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "HZY623",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "96",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 96",
+        "interno": "96",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "KUS869",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "97",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 97",
+        "interno": "97",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "IEQ747",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "98",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 98",
+        "interno": "98",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "JOS108",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "99",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 99",
+        "interno": "99",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "IEQ749",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "100",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 100",
+        "interno": "100",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "KGJ083",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "101",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 101",
+        "interno": "101",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "KDU219",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "102",
+        "label": "VOLKSWAGEN 305-9,150 Interno 102",
+        "interno": "102",
+        "modelo": "VOLKSWAGEN 305-9,150",
+        "patente": "FAF658",
+        "equipo": "CHASIS CON PLANCHA"
+      },
+      {
+        "value": "103",
+        "label": "IVECO TECTOR 240 E Interno 103",
+        "interno": "103",
+        "modelo": "IVECO TECTOR 240 E",
+        "patente": "AF037YV",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "104",
+        "label": "MERCEDES BENZ ATEGO 1725-42 Interno 104",
+        "interno": "104",
+        "modelo": "MERCEDES BENZ ATEGO 1725-42",
+        "patente": "KUS861",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "105",
+        "label": "IVECO 170 E22 Interno 105",
+        "interno": "105",
+        "modelo": "IVECO 170 E22",
+        "patente": "JXV488",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "106",
+        "label": "IVECO 170 E22 Interno 106",
+        "interno": "106",
+        "modelo": "IVECO 170 E22",
+        "patente": "HXB871",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "107",
+        "label": "IVECO 170 E22 Interno 107",
+        "interno": "107",
+        "modelo": "IVECO 170 E22",
+        "patente": "FJL072",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "108",
+        "label": "IVECO 170 E28 Interno 108",
+        "interno": "108",
+        "modelo": "IVECO 170 E28",
+        "patente": "AF302NZ",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "109",
+        "label": "IVECO 170 E22 Interno 109",
+        "interno": "109",
+        "modelo": "IVECO 170 E22",
+        "patente": "LEG291",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "110",
+        "label": "IVECO 170 E22 Interno 110",
+        "interno": "110",
+        "modelo": "IVECO 170 E22",
+        "patente": "LXO071",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "111",
+        "label": "IVECO 170 E28 Interno 111",
+        "interno": "111",
+        "modelo": "IVECO 170 E28",
+        "patente": "AF513GN",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "112",
+        "label": "IVECO 170 E28 Interno 112",
+        "interno": "112",
+        "modelo": "IVECO 170 E28",
+        "patente": "AF513GO",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "113",
+        "label": "MERCEDES BENZ 1114 Interno 113",
+        "interno": "113",
+        "modelo": "MERCEDES BENZ 1114",
+        "patente": "UXF466",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "114",
+        "label": "IVECO 170 E28 Interno 114",
+        "interno": "114",
+        "modelo": "IVECO 170 E28",
+        "patente": "AF756NL",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "115",
+        "label": "IVECO 170 E24 Interno 115",
+        "interno": "115",
+        "modelo": "IVECO 170 E24",
+        "patente": "HDE827",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "116",
+        "label": "SCANIA P270 Interno 116",
+        "interno": "116",
+        "modelo": "SCANIA P270",
+        "patente": "GTO176",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "117",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 117",
+        "interno": "117",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "KVX842",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "118",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 118",
+        "interno": "118",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "ICT511",
+        "equipo": "COMPACTADOR EJES"
+      },
+      {
+        "value": "119",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 119",
+        "interno": "119",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "KVX850",
+        "equipo": "COMPACTADOR EJES"
+      },
+      {
+        "value": "120",
+        "label": "IVECO 170 E22 Interno 120",
+        "interno": "120",
+        "modelo": "IVECO 170 E22",
+        "patente": "MZN101",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "121",
+        "label": "IVECO 170 E22 Interno 121",
+        "interno": "121",
+        "modelo": "IVECO 170 E22",
+        "patente": "MZN099",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "122",
+        "label": "IVECO 170 E22 Interno 122",
+        "interno": "122",
+        "modelo": "IVECO 170 E22",
+        "patente": "MZN063",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "123",
+        "label": "VOLKSWAGEN 13180 Interno 123",
+        "interno": "123",
+        "modelo": "VOLKSWAGEN 13180",
+        "patente": "KGD338",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "124",
+        "label": "VOLKSWAGEN 13180 Interno 124",
+        "interno": "124",
+        "modelo": "VOLKSWAGEN 13180",
+        "patente": "KDG777",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "23",
+        "label": "MERCEDES BENZ 2318 Interno 23",
+        "interno": "23",
+        "modelo": "MERCEDES BENZ 2318",
+        "patente": "DEE139",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "85",
+        "label": "MERCEDES BENZ 1720 Interno 85",
+        "interno": "85",
+        "modelo": "MERCEDES BENZ 1720",
+        "patente": "GXZ013",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "1000",
+        "label": "TANQUE SISTERNA TANQUE SISTERNA Interno 1000",
+        "interno": "1000",
+        "modelo": "TANQUE SISTERNA TANQUE SISTERNA",
+        "patente": "XBY161",
+        "equipo": "TANQUE SISTERNA"
+      },
+      {
+        "value": "2000",
+        "label": "RENAULT DUSTER Interno 2000",
+        "interno": "2000",
+        "modelo": "RENAULT DUSTER",
+        "patente": "AA276OH",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "2001",
+        "label": "CHEVROLET PRISMA Interno 2001",
+        "interno": "2001",
+        "modelo": "CHEVROLET PRISMA",
+        "patente": "AC186DE",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "3000",
+        "label": "CITROEN C3 Interno 3000",
+        "interno": "3000",
+        "modelo": "CITROEN C3",
+        "patente": "FUU225",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "3001",
+        "label": "HIUNDAY H1 Interno 3001",
+        "interno": "3001",
+        "modelo": "HIUNDAY H1",
+        "patente": "ICQ513",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "3002",
+        "label": "HONDA CIVIC Interno 3002",
+        "interno": "3002",
+        "modelo": "HONDA CIVIC",
+        "patente": "NJC057",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "3003",
+        "label": "VOLKSWAGEN GOL Interno 3003",
+        "interno": "3003",
+        "modelo": "VOLKSWAGEN GOL",
+        "patente": "OAI399",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "3004",
+        "label": "TOYOTA SW4 Interno 3004",
+        "interno": "3004",
+        "modelo": "TOYOTA SW4",
+        "patente": "OJQ316",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "5000",
+        "label": "LEXUS NX 300 Interno 5000",
+        "interno": "5000",
+        "modelo": "LEXUS NX 300",
+        "patente": "AE022XI",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "5001",
+        "label": "PEUGEOT 208 Interno 5001",
+        "interno": "5001",
+        "modelo": "PEUGEOT 208",
+        "patente": "AC520MR",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "1001",
+        "label": "TANQUE SISTERNA TANQUE SISTERNA Interno 1001",
+        "interno": "1001",
+        "modelo": "TANQUE SISTERNA TANQUE SISTERNA",
+        "patente": "BACKUP01",
+        "equipo": "TANQUE SISTERNA"
+      },
+      {
+        "value": "5002",
+        "label": "TOYOTA SW4 Interno 5002",
+        "interno": "5002",
+        "modelo": "TOYOTA SW4",
+        "patente": "AG483IL",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "5003",
+        "label": "CITROEN C4 CACTUS Interno 5003",
+        "interno": "5003",
+        "modelo": "CITROEN C4 CACTUS",
+        "patente": "AG483ID",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "3005",
+        "label": "JEEP RENEGADE SPORT Interno 3005",
+        "interno": "3005",
+        "modelo": "JEEP RENEGADE SPORT",
+        "patente": "AG483IM",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "125",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 125",
+        "interno": "125",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "ICT512",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "5004",
+        "label": "VOLKSWAGEN AMAROK Interno 5004",
+        "interno": "5004",
+        "modelo": "VOLKSWAGEN AMAROK",
+        "patente": "AE829ZE",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "3006",
+        "label": "HIUNDAY H1 Interno 3006",
+        "interno": "3006",
+        "modelo": "HIUNDAY H1",
+        "patente": "AB522WD",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "29",
+        "label": "BOBCAT S570 Interno 29",
+        "interno": "29",
+        "modelo": "BOBCAT S570",
+        "patente": "1111JJJ",
+        "equipo": "MINI PALA CARGADORA"
+      },
+      {
+        "value": "28",
+        "label": "BOBCAT S570 Interno 28",
+        "interno": "28",
+        "modelo": "BOBCAT S570",
+        "patente": "PALA28",
+        "equipo": "MINI PALA CARGADORA"
+      },
+      {
+        "value": "127",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 127",
+        "interno": "127",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "AG643PG",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "128",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 128",
+        "interno": "128",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "KVX840",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "132",
+        "label": "VOLKSWAGEN 13180 Interno 132",
+        "interno": "132",
+        "modelo": "VOLKSWAGEN 13180",
+        "patente": "LLP358",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "126",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 126",
+        "interno": "126",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "IEQ745",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "12",
+        "label": "FIAT FIORINO Interno 12",
+        "interno": "12",
+        "modelo": "FIAT FIORINO",
+        "patente": "AC145XQ",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "14",
+        "label": "FIAT CRONOS Interno 14",
+        "interno": "14",
+        "modelo": "FIAT CRONOS",
+        "patente": "AG729GA",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "131",
+        "label": "VOLKSWAGEN 13180 Interno 131",
+        "interno": "131",
+        "modelo": "VOLKSWAGEN 13180",
+        "patente": "HJD245",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "133",
+        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 133",
+        "interno": "133",
+        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
+        "patente": "AG787VM",
+        "equipo": "ROLL OFF 30 M3"
+      },
+      {
+        "value": "A01",
+        "label": "TOYOTA HILUX Interno A01",
+        "interno": "A01",
+        "modelo": "TOYOTA HILUX",
+        "patente": "AG787UB",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "134",
+        "label": "IVECO 170 E28 Interno 134",
+        "interno": "134",
+        "modelo": "IVECO 170 E28",
+        "patente": "AF430QT",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "9A",
+        "label": "HANGCHA S-30 CPCD25T8 Interno 9A",
+        "interno": "9A",
+        "modelo": "HANGCHA S-30 CPCD25T8",
+        "patente": "0129",
+        "equipo": "AUTOELEVADOR"
+      },
+      {
+        "value": "135",
+        "label": "IVECO 170 E28 Interno 135",
+        "interno": "135",
+        "modelo": "IVECO 170 E28",
+        "patente": "AG916WU",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "136",
+        "label": "IVECO 170 E28 Interno 136",
+        "interno": "136",
+        "modelo": "IVECO 170 E28",
+        "patente": "AG916WV",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "137",
+        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 137",
+        "interno": "137",
+        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
+        "patente": "AH182UI",
+        "equipo": "ROLL OFF 30 M3"
+      },
+      {
+        "value": "PRENSAS",
+        "label": "PRENSAS PRENSAS (REP) Interno PRENSAS",
+        "interno": "PRENSAS",
+        "modelo": "PRENSAS PRENSAS (REP)",
+        "patente": "0000",
+        "equipo": "PRENSAS"
+      },
+      {
+        "value": "FABRICACIÓN CONT. METALICO 1Mts",
+        "label": "FABRICACION CONTENEDOR METALICO FABRICACIÓN CONTENEDOR METALICO 1 Mts Interno FABRICACIÓN CONT. METALICO 1Mts",
+        "interno": "FABRICACIÓN CONT. METALICO 1Mts",
+        "modelo": "FABRICACION CONTENEDOR METALICO FABRICACIÓN CONTENEDOR METALICO 1 Mts",
+        "patente": "FAB-1MTS",
+        "equipo": "FABRICACIÓN CONTENEDOR METALICO  1 Mts"
+      },
+      {
+        "value": "FABRICACIÓN CONT. METALICO 1 1/2 Mts",
+        "label": "FABRICACION CONTENEDOR METALICO FABRICACIÓN CONTENEDOR METALICO 1 1/2 Mts Interno FABRICACIÓN CONT. METALICO 1 1/2 Mts",
+        "interno": "FABRICACIÓN CONT. METALICO 1 1/2 Mts",
+        "modelo": "FABRICACION CONTENEDOR METALICO FABRICACIÓN CONTENEDOR METALICO 1 1/2 Mts",
+        "patente": "FAB-11/2MTS",
+        "equipo": "FABRICACIÓN CONTENEDOR METALICO 1.1/2 Mts"
+      },
+      {
+        "value": "FABRICACIÓN CONT. METALICO 2Mts",
+        "label": "FABRICACION CONTENEDOR METALICO FABRICACIÓN CONTENEDOR METALICO 2 Mts Interno FABRICACIÓN CONT. METALICO 2Mts",
+        "interno": "FABRICACIÓN CONT. METALICO 2Mts",
+        "modelo": "FABRICACION CONTENEDOR METALICO FABRICACIÓN CONTENEDOR METALICO 2 Mts",
+        "patente": "FAB-2MTS",
+        "equipo": "FABRICACIÓN CONTENEDOR METALICO 2 Mts"
+      },
+      {
+        "value": "FABRICACIÓN CONT. METALICO MEPLA",
+        "label": "FABRICACION CONTENEDOR METALICO FABRICACIÓN CONTENEDOR METALICO MEPLA Interno FABRICACIÓN CONT. METALICO MEPLA",
+        "interno": "FABRICACIÓN CONT. METALICO MEPLA",
+        "modelo": "FABRICACION CONTENEDOR METALICO FABRICACIÓN CONTENEDOR METALICO MEPLA",
+        "patente": "FAB-MEPLA-MTS",
+        "equipo": "FABRICACIÓN CONTENEDOR METALICO MEPLA"
+      },
+      {
+        "value": "FABRICACIÓN CAJA ROLL-OFF",
+        "label": "FABRICACION CAJA ROLL-OFF FABRICACIÓN CAJA ROLL-OFF Interno FABRICACIÓN CAJA ROLL-OFF",
+        "interno": "FABRICACIÓN CAJA ROLL-OFF",
+        "modelo": "FABRICACION CAJA ROLL-OFF FABRICACIÓN CAJA ROLL-OFF",
+        "patente": "FAB-C-ROLL-OFF",
+        "equipo": "FABRICACIÓN CAJA ROLL-OFF"
+      },
+      {
+        "value": "FABRICACIÓN CANASTO RECICLAJE",
+        "label": "FABRICACION CANASTO RECICLAJE FABRICACIÓN CANASTO RECICLAJE Interno FABRICACIÓN CANASTO RECICLAJE",
+        "interno": "FABRICACIÓN CANASTO RECICLAJE",
+        "modelo": "FABRICACION CANASTO RECICLAJE FABRICACIÓN CANASTO RECICLAJE",
+        "patente": "FAB-CAN-REC",
+        "equipo": "FABRICACIÓN CANASTO RECICLAJE"
+      },
+      {
+        "value": "FINALIZACIÓN CONTENEDORES PLASTICOS NUEVOS",
+        "label": "CONTENEDOR PLASTICO FABRICACION CONTENEDOR METALICO Interno FINALIZACIÓN CONTENEDORES PLASTICOS NUEVOS",
+        "interno": "FINALIZACIÓN CONTENEDORES PLASTICOS NUEVOS",
+        "modelo": "CONTENEDOR PLASTICO FABRICACION CONTENEDOR METALICO",
+        "patente": "FIN-CONT-PLAST",
+        "equipo": "FINALIZACION CONTENEDOR PLASTICO (NUEVO)"
+      },
+      {
+        "value": "REP. CONTENEDOR METALICO 1 MTS",
+        "label": "REP. CONTENEDOR METALICO REP. CONTENEDOR METALICO 1 Mts Interno REP. CONTENEDOR METALICO 1 MTS",
+        "interno": "REP. CONTENEDOR METALICO 1 MTS",
+        "modelo": "REP. CONTENEDOR METALICO REP. CONTENEDOR METALICO 1 Mts",
+        "patente": "REP-CONT-MET-1MTS",
+        "equipo": "REP. CONTENEDORE METALICO 1 Mts"
+      },
+      {
+        "value": "REP. CONTENEDOR METALICO 1 1/2 MTS",
+        "label": "REP. CONTENEDOR METALICO REP. CONTENEDOR METALICO 1 1/2 Mts Interno REP. CONTENEDOR METALICO 1 1/2 MTS",
+        "interno": "REP. CONTENEDOR METALICO 1 1/2 MTS",
+        "modelo": "REP. CONTENEDOR METALICO REP. CONTENEDOR METALICO 1 1/2 Mts",
+        "patente": "REP-CONT-MET-11/2MTS",
+        "equipo": "REP. CONTENEDOR METALICO 1 1/2 Mts"
+      },
+      {
+        "value": "REP. CONTENEDOR METALICO 2 MTS",
+        "label": "REP. CONTENEDOR METALICO REP. CONTENEDOR METALICO 2 Mts Interno REP. CONTENEDOR METALICO 2 MTS",
+        "interno": "REP. CONTENEDOR METALICO 2 MTS",
+        "modelo": "REP. CONTENEDOR METALICO REP. CONTENEDOR METALICO 2 Mts",
+        "patente": "REP-CONT-MET-2MTS",
+        "equipo": "REP. CONTENEDOR METALICO 2 Mts"
+      },
+      {
+        "value": "REP. CONTENEDOR METALICO MEPLA",
+        "label": "REP. CONTENEDOR METALICO REP. CONTENEDOR METALICO MEPLA Interno REP. CONTENEDOR METALICO MEPLA",
+        "interno": "REP. CONTENEDOR METALICO MEPLA",
+        "modelo": "REP. CONTENEDOR METALICO REP. CONTENEDOR METALICO MEPLA",
+        "patente": "REP-CONT-MET-MEPLA",
+        "equipo": "REP. CONTENEDOR METALICO MEPLA"
+      },
+      {
+        "value": "REP. CAJA ROLL-OFF",
+        "label": "CAJA ROLL-OFF REP. REP. CAJA ROLL-OFF Interno REP. CAJA ROLL-OFF",
+        "interno": "REP. CAJA ROLL-OFF",
+        "modelo": "CAJA ROLL-OFF REP. REP. CAJA ROLL-OFF",
+        "patente": "REP-CAJA-ROLL-OFF",
+        "equipo": "REP. CAJA ROLL-OFF"
+      },
+      {
+        "value": "REP. VOLQUETE",
+        "label": "VOLQUETE REP. REP. VOLQUETE Interno REP. VOLQUETE",
+        "interno": "REP. VOLQUETE",
+        "modelo": "VOLQUETE REP. REP. VOLQUETE",
+        "patente": "REP-VOLQ",
+        "equipo": "REP. VOLQUETE"
+      },
+      {
+        "value": "REP. CONTENEDOR PLASTICO",
+        "label": "CONTENEDOR PLASTICO REP. CONTENEDORE PLASTICO Interno REP. CONTENEDOR PLASTICO",
+        "interno": "REP. CONTENEDOR PLASTICO",
+        "modelo": "CONTENEDOR PLASTICO REP. CONTENEDORE PLASTICO",
+        "patente": "REP-CONT-PLAST",
+        "equipo": "REP. CONTENEDORE PLASTICO"
+      },
+      {
+        "value": "VARIOS",
+        "label": "ORDENAR / LIMPIEZA ORDENAR / LIMPIEZA Interno VARIOS",
+        "interno": "VARIOS",
+        "modelo": "ORDENAR / LIMPIEZA ORDENAR / LIMPIEZA",
+        "patente": "ORDENAR/LIMPIEZA",
+        "equipo": "ORDENAR / LIMPIEZA"
+      },
+      {
+        "value": "129",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 129",
+        "interno": "129",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "KVX858",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "AC01",
+        "label": "OMBU ACOPLADO Interno AC01",
+        "interno": "AC01",
+        "modelo": "OMBU ACOPLADO",
+        "patente": "AH380CD",
+        "equipo": "ACOPLADO"
+      },
+      {
+        "value": "AC02",
+        "label": "GOMATRO ACOPLADO * Interno AC02",
+        "interno": "AC02",
+        "modelo": "GOMATRO ACOPLADO *",
+        "patente": "WSI975",
+        "equipo": "ACOPLADO"
+      },
+      {
+        "value": "TR01",
+        "label": "BY LION TRACTOR Interno TR01",
+        "interno": "TR01",
+        "modelo": "BY LION TRACTOR",
+        "patente": "EZU19",
+        "equipo": "TRACTOR"
+      },
+      {
+        "value": "138",
+        "label": "IVECO 170 E28 Interno 138",
+        "interno": "138",
+        "modelo": "IVECO 170 E28",
+        "patente": "AH380CZ",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "139",
+        "label": "IVECO 170 E22 Interno 139",
+        "interno": "139",
+        "modelo": "IVECO 170 E22",
+        "patente": "NSM683",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "140",
+        "label": "IVECO TECTOR 15-210 Interno 140",
+        "interno": "140",
+        "modelo": "IVECO TECTOR 15-210",
+        "patente": "AH875HT",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "141",
+        "label": "IVECO 170 E28 Interno 141",
+        "interno": "141",
+        "modelo": "IVECO 170 E28",
+        "patente": "AH380DA",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "142",
+        "label": "IVECO 170 E28 Interno 142",
+        "interno": "142",
+        "modelo": "IVECO 170 E28",
+        "patente": "AH875EM",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "144",
+        "label": "IVECO 170 E28 Interno 144",
+        "interno": "144",
+        "modelo": "IVECO 170 E28",
+        "patente": "AH540JR",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "145",
+        "label": "VOLKSWAGEN 13180 Interno 145",
+        "interno": "145",
+        "modelo": "VOLKSWAGEN 13180",
+        "patente": "AH963YV",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "143",
+        "label": "VOLKSWAGEN 17-220 Interno 143",
+        "interno": "143",
+        "modelo": "VOLKSWAGEN 17-220",
+        "patente": "LQL160",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "AMAROK",
+        "label": "VOLKSWAGEN AMAROK Interno AMAROK",
+        "interno": "AMAROK",
+        "modelo": "VOLKSWAGEN AMAROK",
+        "patente": "AE694JS",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "AC03",
+        "label": "OMBU ACOPLADO Interno AC03",
+        "interno": "AC03",
+        "modelo": "OMBU ACOPLADO",
+        "patente": "ACOPLADOPLAYO",
+        "equipo": "ACOPLADO"
+      },
+      {
+        "value": "147",
+        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 147",
+        "interno": "147",
+        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
+        "patente": "AI000GR",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "148",
+        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 148",
+        "interno": "148",
+        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
+        "patente": "AI000GS",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "146",
+        "label": "IVECO 170 E24 Interno 146",
+        "interno": "146",
+        "modelo": "IVECO 170 E24",
+        "patente": "MGY392",
+        "equipo": "CHASIS CON PLANCHA"
+      },
+      {
+        "value": "149",
+        "label": "IVECO VERTIS 1380V18 Interno 149",
+        "interno": "149",
+        "modelo": "IVECO VERTIS 1380V18",
+        "patente": "MAL538",
+        "equipo": "CHASIS CON PLANCHA"
+      },
+      {
+        "value": "150",
+        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 150",
+        "interno": "150",
+        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
+        "patente": "AI000HM",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "11",
+        "label": "HANGCHA S-30 CPCD25N Interno 11",
+        "interno": "11",
+        "modelo": "HANGCHA S-30 CPCD25N",
+        "patente": "7911",
+        "equipo": "AUTOELEVADOR"
+      },
+      {
+        "value": "151",
+        "label": "IVECO 170 E28 Interno 151",
+        "interno": "151",
+        "modelo": "IVECO 170 E28",
+        "patente": "AD991FM",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "IRINEO GRAL.",
+        "label": "IRINEO GRAL. IRINEO GRAL. Interno IRINEO GRAL.",
+        "interno": "IRINEO GRAL.",
+        "modelo": "IRINEO GRAL. IRINEO GRAL.",
+        "patente": "IRINEOGRAL.",
+        "equipo": "IRINEO GRAL."
+      },
+      {
+        "value": "VOLQUETE NICO",
+        "label": "VOLQUETE NICO VOLQUETE NICO Interno VOLQUETE NICO",
+        "interno": "VOLQUETE NICO",
+        "modelo": "VOLQUETE NICO VOLQUETE NICO",
+        "patente": "VOLQUETENICO",
+        "equipo": "VOLQUETE NICO"
+      },
+      {
+        "value": "SERVICIOS OTROS",
+        "label": "SERVICIOS OTROS SERVICIOS OTROS Interno SERVICIOS OTROS",
+        "interno": "SERVICIOS OTROS",
+        "modelo": "SERVICIOS OTROS SERVICIOS OTROS",
+        "patente": "SERVICIOSOTROS",
+        "equipo": "SERVICIOS OTROS"
+      },
+      {
+        "value": "REPARACIONES INTERNAS",
+        "label": "REPARACIONES INTERNAS REPARACIONES INTERNAS Interno REPARACIONES INTERNAS",
+        "interno": "REPARACIONES INTERNAS",
+        "modelo": "REPARACIONES INTERNAS REPARACIONES INTERNAS",
+        "patente": "REPARACIONESINTERNAS",
+        "equipo": "REPARACIONES INTERNAS"
+      },
+      {
+        "value": "152",
+        "label": "IVECO 240 E28 Interno 152",
+        "interno": "152",
+        "modelo": "IVECO 240 E28",
+        "patente": "HMZ936",
+        "equipo": "ROLL OFF"
       }
     ],
     "responsables": [

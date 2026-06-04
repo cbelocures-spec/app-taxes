@@ -511,8 +511,191 @@ async function scrapeCatalogs() {
     // Login
     await autoLogin(page, settings.username, settings.password, settings.portalUrl);
 
-    // Navigate directly to the correct Ordenes de Trabajo list page
-    console.log("Navigating directly to Ordenes de Trabajo list page...");
+    // ============================================================
+    // STEP A: SCRAPE ALL RODADOS FROM FLOTA > FLOTA (limit 999)
+    // ============================================================
+    console.log("=== PASO 1/3: Scrapeando FLOTA completa ===");
+    console.log("Navigating to Flota > Flota page...");
+    await page.goto(`${settings.portalUrl}/tms/produccion/flota`, { waitUntil: 'networkidle2', timeout: 30000 });
+    await delay(3000);
+
+    // Set limit to 999 to show all vehicles
+    console.log("Setting limit to 999 to show all vehicles...");
+    const limitSet = await page.evaluate(() => {
+      // The Límite field is an input field on the Taxes Flota page
+      const inputs = Array.from(document.querySelectorAll('input'));
+      for (const inp of inputs) {
+        const name = (inp.name || '').toLowerCase();
+        const id = (inp.id || '').toLowerCase();
+        const placeholder = (inp.placeholder || '').toLowerCase();
+        // Also check by looking at nearby labels
+        const parent = inp.closest('.form-group') || inp.parentElement;
+        const parentText = parent ? parent.textContent.toLowerCase() : '';
+        
+        if (name.includes('limit') || id.includes('limit') || 
+            placeholder.includes('limit') || parentText.includes('límite') || parentText.includes('limite')) {
+          const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+          nativeSetter.call(inp, '999');
+          inp.dispatchEvent(new Event('input', { bubbles: true }));
+          inp.dispatchEvent(new Event('change', { bubbles: true }));
+          return { found: true, method: 'input_limite', value: '999' };
+        }
+      }
+      // Fallback: try finding any input near "Límite" text
+      const allLabels = Array.from(document.querySelectorAll('label, span, div'));
+      for (const lbl of allLabels) {
+        const text = lbl.textContent.trim().toLowerCase();
+        if (text === 'límite' || text === 'limite' || text === 'limit') {
+          const container = lbl.closest('.form-group') || lbl.parentElement;
+          const inp = container ? container.querySelector('input') : null;
+          if (inp) {
+            const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+            nativeSetter.call(inp, '999');
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+            inp.dispatchEvent(new Event('change', { bubbles: true }));
+            return { found: true, method: 'label_search', value: '999' };
+          }
+        }
+      }
+      return { found: false };
+    });
+    console.log("Limit set result:", JSON.stringify(limitSet));
+
+    // Click "BUSCAR" button
+    console.log("Clicking BUSCAR button...");
+    const buscarClicked = await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
+      for (const btn of buttons) {
+        const text = btn.textContent.trim().toUpperCase();
+        const val = (btn.value || '').toUpperCase();
+        if (text.includes('BUSCAR') || val.includes('BUSCAR')) {
+          btn.click();
+          return { clicked: true, text: btn.textContent.trim() };
+        }
+      }
+      // Fallback: submit the form
+      const form = document.querySelector('form');
+      if (form) { form.submit(); return { clicked: true, text: 'form.submit()' }; }
+      return { clicked: false };
+    });
+    console.log("Buscar result:", JSON.stringify(buscarClicked));
+
+    // Wait for the table to reload with all results
+    await delay(5000);
+    await page.waitForSelector('table tbody tr', { timeout: 15000 }).catch(() => {});
+    await delay(3000);
+
+    // Log total count from page
+    const totalText = await page.evaluate(() => {
+      const body = document.body.textContent;
+      const match = body.match(/Total:\s*(\d+)\s*registros/i);
+      return match ? match[0] : 'Total not found';
+    });
+    console.log("Fleet page reports:", totalText);
+
+    // Scrape all vehicles from the Flota table using pagination
+    console.log("Scraping all vehicles from fleet table...");
+    let rodados = [];
+    let hasNextPage = true;
+    let pageNum = 1;
+    
+    while (hasNextPage) {
+      console.log(`Scraping DataTable page ${pageNum}...`);
+      
+      const pageVehicles = await page.evaluate(() => {
+        const results = [];
+        const mainTable = document.querySelector('#tabla_flota');
+        if (!mainTable) return results;
+        
+        const rows = mainTable.querySelectorAll('tbody tr');
+        for (const row of rows) {
+          const cells = row.querySelectorAll('td');
+          if (cells.length < 3) continue;
+          
+          const cellTexts = Array.from(cells).map(c => c.textContent.trim());
+          const interno = cellTexts[1] || '';
+          const modelo = cellTexts[2] || '';
+          const patente = cellTexts[3] || '';
+          const equipo = cellTexts.length > 7 ? cellTexts[7] : '';
+          
+          if (!modelo || modelo === '-' || modelo === 'Ningún dato disponible en esta tabla') continue;
+          
+          let label = modelo;
+          if (interno && !label.toLowerCase().includes('interno')) {
+            label += ` Interno ${interno}`;
+          }
+          
+          // Get vehicle ID
+          let value = '';
+          const link = row.querySelector('a');
+          if (link) {
+            const href = link.href || '';
+            const idMatch = href.match(/\/(\d+)(?:\/|$|\?)/);
+            if (idMatch) value = idMatch[1];
+          }
+          if (!value && interno) value = interno;
+          
+          results.push({ value, label, interno, modelo, patente, equipo });
+        }
+        return results;
+      });
+      
+      console.log(`Found ${pageVehicles.length} vehicles on DataTable page ${pageNum}.`);
+      rodados.push(...pageVehicles);
+      
+      // Check if "Siguiente" button is enabled
+      const nextButtonInfo = await page.evaluate(() => {
+        const nextBtn = document.querySelector('#tabla_flota_next');
+        if (!nextBtn) return { exists: false };
+        
+        const isDisabled = nextBtn.classList.contains('disabled') || 
+                           nextBtn.getAttribute('aria-disabled') === 'true' ||
+                           nextBtn.classList.contains('ui-state-disabled');
+        return { exists: true, disabled: isDisabled };
+      });
+      
+      if (nextButtonInfo.exists && !nextButtonInfo.disabled) {
+        console.log("Clicking 'Siguiente' page...");
+        await page.click('#tabla_flota_next');
+        await delay(1500); // wait for DataTable page transition
+        pageNum++;
+      } else {
+        console.log("No more pages in DataTable.");
+        hasNextPage = false;
+      }
+    }
+
+    console.log(`Total scraped vehicles: ${rodados.length}`);
+
+    // If still no rodados found, take a screenshot for debugging and keep existing catalog
+    if (rodados.length < 3) {
+      console.log("WARNING: Could not scrape enough rodados. Taking debug screenshot...");
+      await page.screenshot({ path: 'debug_flota_page.png', fullPage: true });
+      
+      // Dump the page HTML structure for debugging
+      const pageTitle = await page.title();
+      const pageUrl = page.url();
+      const bodyText = await page.evaluate(() => document.body.textContent.substring(0, 500));
+      console.log(`Page title: ${pageTitle}`);
+      console.log(`Page URL: ${pageUrl}`);
+      console.log(`Body text preview: ${bodyText}`);
+      
+      // Keep existing rodados from database if available
+      const existingCatalogs = db.getCatalogs();
+      if (existingCatalogs.rodados && existingCatalogs.rodados.length > 5) {
+        rodados = existingCatalogs.rodados;
+        console.log(`Keeping ${rodados.length} existing rodados from database.`);
+      } else {
+        rodados = MOCK_CATALOGS.rodados;
+        console.log("Falling back to mock rodados.");
+      }
+    }
+
+    // ============================================================
+    // STEP B: SCRAPE EMPLOYEES & CENTROS DE COSTO FROM OT PAGE
+    // ============================================================
+    console.log("=== PASO 2/3: Scrapeando Empleados y Centros de Costo ===");
+    console.log("Navigating to Ordenes de Trabajo list page...");
     await page.goto(`${settings.portalUrl}/tms/produccion/ot`, { waitUntil: 'networkidle2', timeout: 30000 });
     
     console.log("Waiting for selects to load...");
@@ -524,7 +707,7 @@ async function scrapeCatalogs() {
       return selects.some(s => s.options.length > 50);
     }, { timeout: 15000 }).catch(e => console.log("Timeout waiting for employee select options: " + e.message));
 
-    // 1. Scrape all employees from the select that has the most options
+    // Scrape all employees from the select that has the most options
     console.log("Scraping employees/responsibles from list page...");
     const employees = await page.evaluate(() => {
       const selects = Array.from(document.querySelectorAll('select'));
@@ -550,7 +733,7 @@ async function scrapeCatalogs() {
 
     console.log(`Found ${employees.length} employees/responsibles.`);
 
-    // 2. Click NUEVO button to open creation form modal
+    // Click NUEVO button to open creation form modal
     console.log("Clicking NUEVO button...");
     const nuevoClicked = await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('button, a'));
@@ -572,7 +755,7 @@ async function scrapeCatalogs() {
     console.log("Waiting for modal to open...");
     await page.waitForSelector('select[name="inv_ot_clasificacion_id"]', { timeout: 10000 });
 
-    // 3. Click AGREGAR TAREA
+    // Click AGREGAR TAREA
     console.log("Clicking AGREGAR TAREA...");
     await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('button'));
@@ -590,7 +773,7 @@ async function scrapeCatalogs() {
       return ccSelect && ccSelect.options.length > 1;
     }, { timeout: 10000 }).catch(e => console.log("Timeout waiting for CC options: " + e.message));
 
-    // 4. Scrape Centros de Costo from the newly added task card
+    // Scrape Centros de Costo from the newly added task card
     console.log("Scraping Centros de Costo from task card...");
     const centrosCosto = await page.evaluate(() => {
       const ccSelect = document.querySelector('select[name="syj_centro_costo_id_0"]');
@@ -607,16 +790,17 @@ async function scrapeCatalogs() {
 
     console.log(`Found ${centrosCosto.length} Centros de Costo.`);
 
-    // Make sure we have scraped options, otherwise fall back to realistic defaults
-    const catalogs = db.getCatalogs();
+    // ============================================================
+    // STEP C: SAVE ALL CATALOGS
+    // ============================================================
+    console.log("=== PASO 3/3: Guardando catálogos ===");
     
-    const mergedRodados = MOCK_CATALOGS.rodados; // Keep mock rodados (we search them on portal by name/interno)
     const mergedResponsables = employees.length > 0 ? employees : MOCK_CATALOGS.responsables;
     const mergedEmpleados = employees.length > 0 ? employees : MOCK_CATALOGS.empleados;
     const mergedCentros = centrosCosto.length > 0 ? centrosCosto : MOCK_CATALOGS.centrosCosto;
 
     const finalCatalogs = {
-      rodados: mergedRodados,
+      rodados: rodados,
       responsables: mergedResponsables,
       empleados: mergedEmpleados,
       centrosCosto: mergedCentros
@@ -624,10 +808,10 @@ async function scrapeCatalogs() {
 
     db.saveCatalogs(finalCatalogs);
     db.saveSettings({ catalogSyncStatus: "success", catalogSyncError: null });
-    console.log("Catalog scraping completed successfully!");
+    console.log(`Catalog scraping completed! Rodados: ${rodados.length}, Empleados: ${mergedEmpleados.length}, Centros: ${mergedCentros.length}`);
     isScraping = false;
     await browser.close();
-    return { success: true, message: "Catálogos actualizados correctamente desde la web." };
+    return { success: true, message: `Catálogos actualizados: ${rodados.length} rodados, ${mergedEmpleados.length} empleados, ${mergedCentros.length} centros de costo.` };
   } catch (error) {
     console.error("Error scraping catalogs:", error);
     db.saveSettings({ catalogSyncStatus: "error", catalogSyncError: error.message });
