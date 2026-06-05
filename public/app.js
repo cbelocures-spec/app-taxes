@@ -541,10 +541,17 @@ function updateEmployeeDropdownForCard(card) {
 
   let filteredEmployees = cachedCatalogs.empleados;
   if (selectedCc === "15") { // MECANICA
-    const mecanicaNames = new Set(MECANICA_EMPLOYEES.map(name => name.toLowerCase().trim()));
+    const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
     filteredEmployees = cachedCatalogs.empleados.filter(emp => {
-      const empLabel = emp.label.toLowerCase().trim();
-      return mecanicaNames.has(empLabel);
+      const empCleaned = cleanName(emp.label);
+      if (mecanicaNamesCleaned.has(empCleaned)) return true;
+      for (const mName of mecanicaNamesCleaned) {
+        if (empCleaned.includes(mName) || mName.includes(empCleaned)) {
+          return true;
+        }
+      }
+      return false;
     });
   }
 
@@ -652,8 +659,18 @@ function addTaskField(taskData = null) {
     // We filter first and then assign the value
     let filteredEmployees = cachedCatalogs.empleados;
     if (taskData.centroCosto === "15") {
-      const mecanicaNames = new Set(MECANICA_EMPLOYEES.map(name => name.toLowerCase().trim()));
-      filteredEmployees = cachedCatalogs.empleados.filter(emp => mecanicaNames.has(emp.label.toLowerCase().trim()));
+      const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+      const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
+      filteredEmployees = cachedCatalogs.empleados.filter(emp => {
+        const empCleaned = cleanName(emp.label);
+        if (mecanicaNamesCleaned.has(empCleaned)) return true;
+        for (const mName of mecanicaNamesCleaned) {
+          if (empCleaned.includes(mName) || mName.includes(empCleaned)) {
+            return true;
+          }
+        }
+        return false;
+      });
     }
     let empOptions = `<option value="">Seleccionar Empleado...</option>`;
     filteredEmployees.forEach(opt => {
@@ -1058,7 +1075,7 @@ async function submitWorkOrder() {
     showToast(msg, "success");
     closeNewOrderModal();
     fetchOrders();
-    switchView('orders'); // Go to orders list
+    switchView('home'); // Go to dashboard (Inicio) to see the tasks and stopwatch
   } catch (error) {
     const msg = currentEditingOrderId ? "Fallo al actualizar la orden" : "Fallo al crear la orden";
     showToast(msg, "danger");
@@ -1620,8 +1637,8 @@ function renderDashboard() {
 
   if (!gridWorking || !gridPaused || !listFree) return;
 
-  // Active tasks from local or error orders
-  const activeLocalOrders = activeOrders.filter(o => o.syncStatus === 'local' || o.syncStatus === 'error');
+  // Active tasks from all orders (including local, error, pending, syncing, success)
+  const activeLocalOrders = activeOrders;
   
   const workingTasks = [];
   const pausedTasks = [];
