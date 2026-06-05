@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const https = require('https');
 const db = require('./database');
 const worker = require('./syncWorker');
 
@@ -225,6 +226,100 @@ app.post('/api/active-mechanics', (req, res) => {
     res.json({ success: true, list: saved });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// --- GOOGLE SHEETS NOVELTIES INTEGRATION ---
+let noveltiesCache = null;
+let noveltiesCacheTime = 0;
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/);
+  const result = [];
+  
+  if (lines.length === 0) return result;
+  
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    
+    const row = [];
+    let inQuotes = false;
+    let currentToken = '';
+    
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        row.push(currentToken.trim());
+        currentToken = '';
+      } else {
+        currentToken += char;
+      }
+    }
+    row.push(currentToken.trim());
+    
+    if (row.length > 0) {
+      result.push({
+        interno: row[0] || "",
+        rubro: row[1] || "",
+        subrubro: row[2] || "",
+        observacion: row[3] || ""
+      });
+    }
+  }
+  return result;
+}
+
+function fetchNoveltiesFromSheet(url) {
+  if (!url) {
+    url = 'https://docs.google.com/spreadsheets/d/1UdieUhcgaCDNUTk7toUGObKSySbXn1ZGS6IOio1A2lM/export?format=csv';
+  }
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        fetchNoveltiesFromSheet(res.headers.location).then(resolve).catch(reject);
+        return;
+      }
+      if (res.statusCode !== 200) {
+        reject(new Error(`Failed to fetch sheet: Status code ${res.statusCode}`));
+        return;
+      }
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const parsed = parseCSV(data);
+          resolve(parsed);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
+app.get('/api/novelties', async (req, res) => {
+  const now = Date.now();
+  // Cache for 5 minutes
+  if (noveltiesCache && (now - noveltiesCacheTime < 5 * 60 * 1000)) {
+    return res.json(noveltiesCache);
+  }
+
+  try {
+    const novelties = await fetchNoveltiesFromSheet();
+    noveltiesCache = novelties;
+    noveltiesCacheTime = now;
+    res.json(novelties);
+  } catch (error) {
+    console.error("Error fetching novelties from sheet:", error);
+    if (noveltiesCache) {
+      return res.json(noveltiesCache);
+    }
+    res.status(500).json({ error: "No se pudieron obtener las novedades del camión: " + error.message });
   }
 });
 

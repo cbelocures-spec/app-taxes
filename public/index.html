@@ -338,86 +338,99 @@
     </div>
     
     <div class="modal-content">
-      <form id="work-order-form">
-        
-        <!-- CARD 1: DATOS GENERALES -->
-        <div class="form-section-card">
-          <div class="card-title-header">
-            <span class="material-icons">feed</span>
-            <h3>Datos Generales</h3>
-          </div>
+      <div class="modal-body-layout">
+        <form id="work-order-form">
           
-          <div class="form-group">
-            <label for="form-rodado">Rodado *</label>
-            <select id="form-rodado" required>
-              <option value="">Seleccionar Rodado...</option>
-            </select>
-          </div>
-          
-          <div class="form-group" style="display: none;">
-            <label for="form-responsable">Responsable *</label>
-            <select id="form-responsable">
-              <option value="AUTO" selected>AUTO</option>
-            </select>
-          </div>
-
-          <div class="form-row" style="display: none;">
-            <div class="form-group col-6">
-              <label for="form-fecha">F. Est. Entrega</label>
-              <input type="date" id="form-fecha">
+          <!-- CARD 1: DATOS GENERALES -->
+          <div class="form-section-card">
+            <div class="card-title-header">
+              <span class="material-icons">feed</span>
+              <h3>Datos Generales</h3>
             </div>
-            <div class="form-group col-6">
-              <label for="form-hora">Horario</label>
-              <input type="time" id="form-hora">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group col-6">
-              <label for="form-interno">Interno Unidad *</label>
-              <input type="text" id="form-interno" placeholder="Ej: 1" required>
-            </div>
-            <div class="form-group col-6">
-              <label for="form-clasificacion">Clasificación *</label>
-              <select id="form-clasificacion" required>
-                <option value="Preventivo">Preventivo</option>
-                <option value="Auxilio">Auxilio</option>
-                <option value="Correctivo">Correctivo</option>
-                <option value="Herrería">Herrería</option>
+            
+            <div class="form-group">
+              <label for="form-rodado">Rodado *</label>
+              <select id="form-rodado" required>
+                <option value="">Seleccionar Rodado...</option>
               </select>
             </div>
+            
+            <div class="form-group" style="display: none;">
+              <label for="form-responsable">Responsable *</label>
+              <select id="form-responsable">
+                <option value="AUTO" selected>AUTO</option>
+              </select>
+            </div>
+
+            <div class="form-row" style="display: none;">
+              <div class="form-group col-6">
+                <label for="form-fecha">F. Est. Entrega</label>
+                <input type="date" id="form-fecha">
+              </div>
+              <div class="form-group col-6">
+                <label for="form-hora">Horario</label>
+                <input type="time" id="form-hora">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col-6">
+                <label for="form-interno">Interno Unidad *</label>
+                <input type="text" id="form-interno" placeholder="Ej: 1" required>
+              </div>
+              <div class="form-group col-6">
+                <label for="form-clasificacion">Clasificación *</label>
+                <select id="form-clasificacion" required>
+                  <option value="Preventivo">Preventivo</option>
+                  <option value="Auxilio">Auxilio</option>
+                  <option value="Correctivo">Correctivo</option>
+                  <option value="Herrería">Herrería</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="form-incidente">Incidente o Requisito</label>
+              <textarea id="form-incidente" placeholder="Describa el incidente o requisito..." rows="3"></textarea>
+            </div>
           </div>
 
-          <div class="form-group">
-            <label for="form-incidente">Incidente o Requisito</label>
-            <textarea id="form-incidente" placeholder="Describa el incidente o requisito..." rows="3"></textarea>
+          <!-- CARD 2: TAREAS A REALIZAR -->
+          <div class="form-section-card">
+            <div class="card-title-header split">
+              <div class="flex-align">
+                <span class="material-icons">build</span>
+                <h3>Tareas a Realizar</h3>
+                <span class="badge" id="task-count-badge">0</span>
+              </div>
+              <button type="button" class="btn btn-primary btn-xs" onclick="addTaskField()">
+                <span class="material-icons">add</span> AGREGAR TAREA
+              </button>
+            </div>
+
+            <div class="tasks-container" id="modal-tasks-list">
+              <!-- Dynamic task items go here -->
+              <div class="tasks-empty-state" id="tasks-empty-state">
+                <span class="material-icons">assignment_late</span>
+                <p>No hay tareas asignadas.</p>
+                <small>Haz clic en "AGREGAR TAREA" para crear la primera tarea.</small>
+              </div>
+            </div>
+          </div>
+
+        </form>
+
+        <!-- Novelties side panel (hidden by default) -->
+        <div class="modal-novelties-side" id="modal-novelties-side">
+          <div class="novelties-header">
+            <span class="material-icons">notification_important</span>
+            <h3>Novedades del Camión</h3>
+          </div>
+          <div class="novelties-list" id="modal-novelties-list">
+            <!-- Clickable items loaded dynamically -->
           </div>
         </div>
-
-        <!-- CARD 2: TAREAS A REALIZAR -->
-        <div class="form-section-card">
-          <div class="card-title-header split">
-            <div class="flex-align">
-              <span class="material-icons">build</span>
-              <h3>Tareas a Realizar</h3>
-              <span class="badge" id="task-count-badge">0</span>
-            </div>
-            <button type="button" class="btn btn-primary btn-xs" onclick="addTaskField()">
-              <span class="material-icons">add</span> AGREGAR TAREA
-            </button>
-          </div>
-
-          <div class="tasks-container" id="modal-tasks-list">
-            <!-- Dynamic task items go here -->
-            <div class="tasks-empty-state" id="tasks-empty-state">
-              <span class="material-icons">assignment_late</span>
-              <p>No hay tareas asignadas.</p>
-              <small>Haz clic en "AGREGAR TAREA" para crear la primera tarea.</small>
-            </div>
-          </div>
-        </div>
-
-      </form>
+      </div>
     </div>
   </div>
 

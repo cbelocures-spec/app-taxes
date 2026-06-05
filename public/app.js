@@ -1,5 +1,6 @@
 // Global State
 let cachedCatalogs = { rodados: [], responsables: [], empleados: [], centrosCosto: [] };
+let cachedNovelties = [];
 let activeOrders = [];
 let currentRetryOrderId = null;
 let currentEditingOrderId = null;
@@ -94,6 +95,36 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(fetchOrders, 3000);
   setInterval(checkWorkerStatus, 3000);
   setInterval(fetchSettingsPolling, 3000);
+
+  // Fetch novelties from Google Sheet on startup
+  fetchNovelties();
+
+  // Listen for changes on rodado field to auto-populate interno
+  const rodadoSelect = document.getElementById('form-rodado');
+  if (rodadoSelect) {
+    rodadoSelect.addEventListener('change', () => {
+      const selectedValue = rodadoSelect.value;
+      const rodadoOpt = cachedCatalogs.rodados.find(r => r.value === selectedValue);
+      if (rodadoOpt && rodadoOpt.interno) {
+        const internoInput = document.getElementById('form-interno');
+        if (internoInput) {
+          internoInput.value = rodadoOpt.interno;
+          showNoveltiesForInterno(rodadoOpt.interno.trim());
+        }
+      }
+    });
+  }
+
+  // Listen for changes on interno field to show novelties sidebar
+  const internoInput = document.getElementById('form-interno');
+  if (internoInput) {
+    internoInput.addEventListener('input', () => {
+      showNoveltiesForInterno(internoInput.value.trim());
+    });
+    internoInput.addEventListener('change', () => {
+      showNoveltiesForInterno(internoInput.value.trim());
+    });
+  }
 });
 
 // 1. SPA ROUTING
@@ -142,12 +173,18 @@ function openNewOrderModal() {
     </div>
   `;
   updateTaskCountBadge();
+  
+  // Hide novelties panel
+  showNoveltiesForInterno("");
 }
 
 function closeNewOrderModal() {
   const modal = document.getElementById('new-order-modal');
   modal.classList.remove('open', 'readonly-mode');
   currentEditingOrderId = null;
+  
+  // Hide novelties panel
+  showNoveltiesForInterno("");
 }
 
 function editOrder(orderId) {
@@ -203,6 +240,9 @@ function editOrder(orderId) {
     `;
     updateTaskCountBadge();
   }
+  
+  // Show novelties side panel if present
+  showNoveltiesForInterno(order.interno);
 }
 
 function viewOrder(orderId) {
@@ -256,6 +296,9 @@ function viewOrder(orderId) {
       </div>
     `;
   }
+  
+  // Clear/Hide novelties side panel in read-only mode
+  showNoveltiesForInterno("");
 }
 
 function openErrorModal(errorLog, orderId) {
@@ -2248,4 +2291,117 @@ async function submitBulkOrders() {
   } else {
     showToast(`Error: Falló la creación de las ${errorCount} órdenes.`, "danger");
   }
+}
+
+// --- GOOGLE SHEETS NOVELTIES INTEGRATION ---
+async function fetchNovelties() {
+  try {
+    const res = await fetch('/api/novelties');
+    if (!res.ok) {
+      throw new Error(`HTTP error ${res.status}`);
+    }
+    cachedNovelties = await res.json();
+    console.log(`Loaded ${cachedNovelties.length} novelties.`);
+    // If there is already an interno value (e.g. when editing), show it immediately
+    const internoInput = document.getElementById('form-interno');
+    if (internoInput && internoInput.value) {
+      showNoveltiesForInterno(internoInput.value.trim());
+    }
+  } catch (error) {
+    console.error("Error fetching novelties:", error);
+  }
+}
+
+function showNoveltiesForInterno(interno) {
+  const sidebar = document.getElementById('modal-novelties-side');
+  const listContainer = document.getElementById('modal-novelties-list');
+  if (!sidebar || !listContainer) return;
+
+  const modal = document.getElementById('new-order-modal');
+  if (modal && modal.classList.contains('readonly-mode')) {
+    sidebar.style.display = 'none';
+    listContainer.innerHTML = '';
+    return;
+  }
+
+  if (!interno) {
+    sidebar.style.display = 'none';
+    listContainer.innerHTML = '';
+    return;
+  }
+
+  const matches = cachedNovelties.filter(n => n.interno.toLowerCase().trim() === interno.toLowerCase().trim());
+  
+  if (matches.length === 0) {
+    sidebar.style.display = 'none';
+    listContainer.innerHTML = '';
+    return;
+  }
+
+  sidebar.style.display = 'block';
+  listContainer.innerHTML = '';
+
+  matches.forEach(n => {
+    const card = document.createElement('div');
+    card.className = 'novelty-item';
+    
+    // Set custom rubro attribute for badge coloring in CSS
+    const rubroLower = (n.rubro || '').toLowerCase().trim();
+    card.setAttribute('data-rubro', rubroLower);
+    
+    const rubroText = n.rubro || 'Novedad';
+    const subrubroText = n.subrubro || '';
+    const obsText = n.observacion || '';
+    
+    card.innerHTML = `
+      <span class="novelty-badge">${escapeHtml(rubroText)}</span>
+      ${subrubroText ? `<span class="novelty-title">${escapeHtml(subrubroText)}</span>` : ''}
+      ${obsText ? `<span class="novelty-desc">${escapeHtml(obsText)}</span>` : ''}
+      <div class="novelty-action">
+        <span class="material-icons" style="font-size:12px;">add_circle_outline</span>
+        <span>Crear tarea</span>
+      </div>
+    `;
+    
+    card.addEventListener('click', () => {
+      handleNoveltyClick(n);
+    });
+    
+    listContainer.appendChild(card);
+  });
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function mapRubroToCentroCosto(rubro) {
+  if (!rubro) return "15"; // Default to MECANICA
+  const rubroLower = rubro.toLowerCase().trim();
+  if (rubroLower.includes("herre")) {
+    return "11";
+  }
+  return "15";
+}
+
+function handleNoveltyClick(n) {
+  // Format is RUBRO + subrubro + OBSERVACION
+  const desc = [n.rubro, n.subrubro, n.observacion].filter(Boolean).join(' - ');
+  const ccValue = mapRubroToCentroCosto(n.rubro);
+  
+  addTaskField({
+    centroCosto: ccValue,
+    empleado: "",
+    horasEstimadas: 0,
+    status: "Pendiente",
+    descripcion: desc
+  });
+  
+  showToast("Tarea creada a partir de novedad", "success");
 }
