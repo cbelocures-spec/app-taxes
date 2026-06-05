@@ -402,6 +402,8 @@ async function checkAndTriggerGoogleSheetUpdates(existingOrder, updatedTasks, su
     });
     if (novelties.length === 0) return;
 
+    const catalogs = db.getCatalogs();
+
     for (const task of newlyFinalized) {
       const taskDesc = (task.descripcion || '').toLowerCase().trim();
       const taskInterno = String(orderInterno || (existingOrder ? existingOrder.interno : '')).toLowerCase().trim();
@@ -414,13 +416,48 @@ async function checkAndTriggerGoogleSheetUpdates(existingOrder, updatedTasks, su
 
       if (matchedNovelty) {
         console.log(`[Google Sheets] Matched task "${task.descripcion}" to novelty on sheet. Triggering update...`);
+        
+        // Resolve mechanic name from catalog ID
+        const mechanicObj = (catalogs.empleados || []).find(e => String(e.value) === String(task.empleado));
+        const mechanicName = mechanicObj ? mechanicObj.label : (task.empleado || "");
+
+        // Resolve supervisor name from catalog ID or AUTO
+        let supervisorName = "";
+        const selectedSupervisor = supervisor || (existingOrder ? existingOrder.responsable : '');
+        if (selectedSupervisor && selectedSupervisor !== "AUTO") {
+          const supervisorObj = (catalogs.responsables || []).find(r => String(r.value) === String(selectedSupervisor));
+          if (supervisorObj) supervisorName = supervisorObj.label;
+        }
+        
+        // If still AUTO or empty, resolve from settings.username (email)
+        if (!supervisorName || supervisorName === "AUTO") {
+          const email = (settings.username || '').toLowerCase().trim();
+          if (email) {
+            // Map known emails to names
+            if (email.includes("paniol") || email.includes("belocures") || email.includes("cesar")) {
+              const matched = (catalogs.responsables || []).find(r => r.label.toLowerCase().includes("belocures") || r.label.toLowerCase().includes("cesar"));
+              if (matched) supervisorName = matched.label;
+            } else {
+              // Try prefix match
+              const prefix = email.split('@')[0];
+              if (prefix.length > 2) {
+                const matched = (catalogs.responsables || []).find(r => r.label.toLowerCase().includes(prefix));
+                if (matched) supervisorName = matched.label;
+              }
+            }
+          }
+          if (!supervisorName) {
+            supervisorName = settings.username || "AUTO";
+          }
+        }
+
         const queryParams = new URLSearchParams({
           interno: matchedNovelty.interno,
           rubro: matchedNovelty.rubro,
           subrubro: matchedNovelty.subrubro,
           observacion: matchedNovelty.observacion,
-          mecanico: task.empleado || "",
-          supervisor: supervisor || (existingOrder ? existingOrder.responsable : '') || "AUTO"
+          mecanico: mechanicName || "",
+          supervisor: supervisorName || "AUTO"
         });
 
         const updateUrl = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${queryParams.toString()}`;
