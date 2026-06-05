@@ -83,7 +83,7 @@ app.put('/api/orders/:id', (req, res) => {
       interno,
       clasificacion,
       incidente,
-      syncStatus: allTasksCompleted ? "pending" : "local",
+      syncStatus: (existing.syncStatus === "pending" || existing.syncStatus === "syncing") ? existing.syncStatus : "local",
       syncError: null,
       syncDate: null,
       tasks: (tasks || []).map((t, idx) => ({

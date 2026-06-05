@@ -680,7 +680,12 @@ function createOrderCardHtml(order) {
   } else if (order.syncStatus === 'error') {
     statusBadge = `<span class="badge-status error" onclick="openErrorModal(\`${order.syncError.replace(/"/g, '&quot;')}\`, '${order.id}')"><span class="material-icons">error</span> Error</span>`;
   } else if (order.syncStatus === 'local') {
-    statusBadge = `<span class="badge-status local" style="background-color:#e0f2fe; color:#0369a1; border:1px solid rgba(3,105,161,0.2);"><span class="material-icons" style="font-size:12px;">construction</span> En Curso</span>`;
+    const allCompleted = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t.status === "Finalizada");
+    if (allCompleted) {
+      statusBadge = `<span class="badge-status success" style="background-color:#d1fae5; color:#065f46; border:1px solid rgba(6,95,70,0.2);"><span class="material-icons" style="font-size:12px;">check_circle</span> Completada</span>`;
+    } else {
+      statusBadge = `<span class="badge-status local" style="background-color:#e0f2fe; color:#0369a1; border:1px solid rgba(3,105,161,0.2);"><span class="material-icons" style="font-size:12px;">construction</span> En Curso</span>`;
+    }
   }
 
   const dateFormatted = order.fechaEntrega ? order.fechaEntrega.split('-').reverse().join('/') : '-';
@@ -701,14 +706,14 @@ function createOrderCardHtml(order) {
           <span>${order.tasks.length} Tareas asignadas</span>
         </div>
         <div class="card-actions">
-          ${(order.syncStatus === 'error' || order.syncStatus === 'pending' || order.syncStatus === 'local') ? `
+          ${(order.syncStatus !== 'pending' && order.syncStatus !== 'syncing') ? `
             <button class="icon-btn warning" onclick="editOrder('${order.id}')" title="Editar Orden">
               <span class="material-icons">edit</span>
             </button>
           ` : ''}
-          ${order.syncStatus === 'error' ? `
-            <button class="icon-btn primary" onclick="retrySync('${order.id}')" title="Reintentar Sincronización">
-              <span class="material-icons">sync</span>
+          ${(order.syncStatus === 'local' || order.syncStatus === 'error') ? `
+            <button class="icon-btn success" onclick="retrySync('${order.id}')" title="Subir a Taxes">
+              <span class="material-icons">cloud_upload</span>
             </button>
           ` : ''}
           <button class="icon-btn danger" onclick="deleteOrder('${order.id}')" title="Eliminar Localmente">
@@ -727,11 +732,17 @@ function createQueueCardHtml(order) {
 
   if (order.syncStatus === 'local') {
     statusColor = 'secondary';
-    desc = 'En Taller (tareas pendientes)';
+    const allCompleted = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t.status === "Finalizada");
+    desc = allCompleted ? 'Lista para subir a Taxes' : 'En Taller (tareas pendientes)';
     actionBtn = `
-      <button class="btn btn-warning btn-sm" onclick="editOrder('${order.id}')" style="display:flex; align-items:center; gap:4px;">
-        <span class="material-icons" style="font-size:16px;">edit</span> Editar
-      </button>
+      <div style="display:flex; gap: 8px;">
+        <button class="btn btn-warning btn-sm" onclick="editOrder('${order.id}')" style="display:flex; align-items:center; gap:4px;">
+          <span class="material-icons" style="font-size:16px;">edit</span> Editar
+        </button>
+        <button class="btn btn-success btn-sm" onclick="retrySync('${order.id}')" style="display:flex; align-items:center; gap:4px; background-color: var(--success); color: white; border-color: var(--success);">
+          <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
+        </button>
+      </div>
     `;
   } else if (order.syncStatus === 'syncing') {
     statusColor = 'syncing';
@@ -744,8 +755,8 @@ function createQueueCardHtml(order) {
         <button class="btn btn-warning btn-sm" onclick="editOrder('${order.id}')" style="display:flex; align-items:center; gap:4px;">
           <span class="material-icons" style="font-size:16px;">edit</span> Editar
         </button>
-        <button class="btn btn-primary btn-sm" onclick="retrySync('${order.id}')" style="display:flex; align-items:center; gap:4px;">
-          <span class="material-icons" style="font-size:16px;">sync</span> Reintentar
+        <button class="btn btn-success btn-sm" onclick="retrySync('${order.id}')" style="display:flex; align-items:center; gap:4px; background-color: var(--success); color: white; border-color: var(--success);">
+          <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
         </button>
       </div>
     `;
@@ -1704,7 +1715,7 @@ async function markDashboardTaskFinished(orderId, taskId) {
     fetchOrders();
     
     if (allCompleted) {
-      showToast("¡Todas las tareas finalizadas! La orden se sincronizará automáticamente.", "success");
+      showToast("¡Todas las tareas finalizadas! Puedes subir la orden a Taxes manualmente desde el listado de órdenes.", "success");
     }
   } catch (error) {
     showToast("Error al finalizar la tarea", "danger");

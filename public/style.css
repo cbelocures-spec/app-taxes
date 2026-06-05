@@ -626,6 +626,13 @@ body {
   background-color: var(--warning-light);
 }
 
+.icon-btn.success {
+  color: var(--success);
+}
+.icon-btn.success:hover {
+  background-color: var(--success-light);
+}
+
 /* EMPTY STATE */
 .empty-state, .tasks-empty-state {
   text-align: center;

@@ -162,7 +162,7 @@ class LocalDB {
       interno: orderData.interno || "",
       clasificacion: orderData.clasificacion || "Preventivo",
       incidente: orderData.incidente || "",
-      syncStatus: allCompleted ? "pending" : "local",
+      syncStatus: "local",
       syncError: null,
       syncDate: null,
       createdAt: new Date().toISOString(),
