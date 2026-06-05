@@ -2039,6 +2039,13 @@ function filterBulkVehicles() {
   });
 }
 
+function formatMinutesToHMM(totalMinutes) {
+  const h = Math.floor(totalMinutes / 60);
+  const m = Math.round(totalMinutes % 60);
+  const val = h + m / 100;
+  return val.toFixed(2);
+}
+
 function updateBulkSummary() {
   const startTimeVal = document.getElementById('bulk-time-start').value;
   const endTimeVal = document.getElementById('bulk-time-end').value;
@@ -2082,9 +2089,8 @@ function updateBulkSummary() {
   }
 
   if (numVehicles > 0) {
-    const totalHoursFloat = diffMinutes / 60;
-    const hoursPerVehicle = totalHoursFloat / numVehicles;
     const minutesPerVehicle = diffMinutes / numVehicles;
+    const hoursPerVehicleFormatted = formatMinutesToHMM(minutesPerVehicle);
 
     let minText = '';
     if (minutesPerVehicle < 1) {
@@ -2094,7 +2100,7 @@ function updateBulkSummary() {
     }
 
     if (timePerVehicleEl) timePerVehicleEl.textContent = minText;
-    if (hoursPerVehicleEl) hoursPerVehicleEl.textContent = `${hoursPerVehicle.toFixed(2)} hs`;
+    if (hoursPerVehicleEl) hoursPerVehicleEl.textContent = `${hoursPerVehicleFormatted} hs`;
   } else {
     if (timePerVehicleEl) timePerVehicleEl.textContent = "0 min";
     if (hoursPerVehicleEl) hoursPerVehicleEl.textContent = "0.00 hs";
@@ -2163,10 +2169,11 @@ async function submitBulkOrders() {
   if (endMinutes < startMinutes) {
     endMinutes += 24 * 60;
   }
-  const totalHoursFloat = (endMinutes - startMinutes) / 60;
-  const hoursPerVehicle = totalHoursFloat / selectedChks.length;
+  const totalMinutes = endMinutes - startMinutes;
+  const minutesPerVehicle = totalMinutes / selectedChks.length;
+  const hoursPerVehicleFormatted = formatMinutesToHMM(minutesPerVehicle);
 
-  const confirmMsg = `¿Estás seguro de generar ${selectedChks.length} órdenes de trabajo?\nDuración por unidad: ${hoursPerVehicle.toFixed(2)} horas.`;
+  const confirmMsg = `¿Estás seguro de generar ${selectedChks.length} órdenes de trabajo?\nDuración por unidad: ${hoursPerVehicleFormatted} horas.`;
   if (!confirm(confirmMsg)) return;
 
   const today = new Date();
@@ -2193,7 +2200,7 @@ async function submitBulkOrders() {
     const task = {
       centroCosto: ccEl.value,
       empleado: empEl.value,
-      horasEstimadas: hoursPerVehicle.toFixed(2),
+      horasEstimadas: hoursPerVehicleFormatted,
       descripcion: descEl.value.trim(),
       status: "Finalizada",
       timerStart: null
