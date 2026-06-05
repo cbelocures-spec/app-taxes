@@ -2330,7 +2330,28 @@ function showNoveltiesForInterno(interno) {
     return;
   }
 
-  const matches = cachedNovelties.filter(n => n.interno.toLowerCase().trim() === interno.toLowerCase().trim());
+  const matches = cachedNovelties.filter(n => {
+    if (n.interno.toLowerCase().trim() !== interno.toLowerCase().trim()) {
+      return false;
+    }
+    
+    // Check if there is already a completed task for this novelty
+    const desc = [n.rubro, n.subrubro, n.observacion].filter(Boolean).join(' - ').toLowerCase().trim();
+    
+    const isCompleted = activeOrders.some(order => {
+      const orderInterno = (order.interno || '').toLowerCase().trim();
+      const matchInterno = orderInterno === interno.toLowerCase().trim();
+      if (!matchInterno) return false;
+      
+      return (order.tasks || []).some(task => {
+        const taskDesc = (task.descripcion || '').toLowerCase().trim();
+        const taskCompleted = task.status === 'Finalizada';
+        return taskCompleted && taskDesc === desc;
+      });
+    });
+    
+    return !isCompleted;
+  });
   
   if (matches.length === 0) {
     sidebar.style.display = 'none';
@@ -2352,11 +2373,19 @@ function showNoveltiesForInterno(interno) {
     const rubroText = n.rubro || 'Novedad';
     const subrubroText = n.subrubro || '';
     const obsText = n.observacion || '';
+    const mecanicoText = n.mecanico || '';
+    const supervisorText = n.supervisor || '';
     
     card.innerHTML = `
       <span class="novelty-badge">${escapeHtml(rubroText)}</span>
       ${subrubroText ? `<span class="novelty-title">${escapeHtml(subrubroText)}</span>` : ''}
       ${obsText ? `<span class="novelty-desc">${escapeHtml(obsText)}</span>` : ''}
+      ${(mecanicoText || supervisorText) ? `
+        <div class="novelty-meta" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; border-top: 1px dashed var(--border-color); padding-top: 4px; width: 100%;">
+          ${mecanicoText ? `<div><strong>Mecánico:</strong> ${escapeHtml(mecanicoText)}</div>` : ''}
+          ${supervisorText ? `<div><strong>Supervisor:</strong> ${escapeHtml(supervisorText)}</div>` : ''}
+        </div>
+      ` : ''}
       <div class="novelty-action">
         <span class="material-icons" style="font-size:12px;">add_circle_outline</span>
         <span>Crear tarea</span>

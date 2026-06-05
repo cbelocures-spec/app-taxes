@@ -265,7 +265,9 @@ function parseCSV(text) {
         interno: row[0] || "",
         rubro: row[1] || "",
         subrubro: row[2] || "",
-        observacion: row[3] || ""
+        observacion: row[3] || "",
+        mecanico: row[4] || "",
+        supervisor: row[5] || ""
       });
     }
   }
