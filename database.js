@@ -29,6 +29,7 @@ const DEFAULT_DB = {
     username: "",
     password: "",
     portalUrl: "https://taxes.com.ar",
+    googleScriptUrl: "",
     catalogSyncStatus: "idle",
     catalogSyncError: null
   },
@@ -97,7 +98,7 @@ class LocalDB {
   // --- Settings Methods ---
   getSettings() {
     const db = this.read();
-    return db.settings || DEFAULT_DB.settings;
+    return { ...DEFAULT_DB.settings, ...(db.settings || {}) };
   }
 
   saveSettings(settings) {

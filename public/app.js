@@ -322,6 +322,7 @@ async function fetchSettings() {
     document.getElementById('set-portal-url').value = data.portalUrl || "https://taxes.com.ar";
     document.getElementById('set-username').value = data.username || "";
     document.getElementById('set-password').value = data.password || "";
+    document.getElementById('set-google-script-url').value = data.googleScriptUrl || "";
     
     if (data.username) {
       document.getElementById('current-user').textContent = data.username;
@@ -339,12 +340,13 @@ async function saveSettings(e) {
   const portalUrl = document.getElementById('set-portal-url').value;
   const username = document.getElementById('set-username').value;
   const password = document.getElementById('set-password').value;
+  const googleScriptUrl = document.getElementById('set-google-script-url').value;
 
   try {
     const res = await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ portalUrl, username, password })
+      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl })
     });
 
     if (!res.ok) throw new Error("Failed to save settings");

@@ -58,6 +58,9 @@ app.post('/api/orders', (req, res) => {
       tasks
     });
 
+    // Trigger Google Sheets update asynchronously for any finalized tasks
+    checkAndTriggerGoogleSheetUpdates(null, newOrder.tasks, responsable, interno);
+
     res.status(201).json(newOrder);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -97,6 +100,9 @@ app.put('/api/orders/:id', (req, res) => {
         timerStart: t.timerStart || null
       }))
     });
+
+    // Trigger Google Sheets update asynchronously for any newly finalized tasks
+    checkAndTriggerGoogleSheetUpdates(existing, updated.tasks, responsable, interno);
 
     res.json(updated);
   } catch (error) {
@@ -140,6 +146,7 @@ app.get('/api/settings', (req, res) => {
       username: settings.username,
       password: settings.password ? "••••••••••••" : "",
       portalUrl: settings.portalUrl || "https://taxes.com.ar",
+      googleScriptUrl: settings.googleScriptUrl || "",
       catalogSyncStatus: settings.catalogSyncStatus || "idle",
       catalogSyncError: settings.catalogSyncError || null
     };
@@ -152,12 +159,13 @@ app.get('/api/settings', (req, res) => {
 // Save connection settings
 app.post('/api/settings', (req, res) => {
   try {
-    const { username, password, portalUrl } = req.body;
+    const { username, password, portalUrl, googleScriptUrl } = req.body;
     const current = db.getSettings();
     
     const updates = {
       username: username !== undefined ? username : current.username,
-      portalUrl: portalUrl !== undefined ? portalUrl : current.portalUrl
+      portalUrl: portalUrl !== undefined ? portalUrl : current.portalUrl,
+      googleScriptUrl: googleScriptUrl !== undefined ? googleScriptUrl : current.googleScriptUrl
     };
 
     // Only update password if a new one is provided (not masked)
@@ -166,7 +174,7 @@ app.post('/api/settings', (req, res) => {
     }
 
     const saved = db.saveSettings(updates);
-    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl } });
+    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl } });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -324,6 +332,70 @@ app.get('/api/novelties', async (req, res) => {
     res.status(500).json({ error: "No se pudieron obtener las novedades del camión: " + error.message });
   }
 });
+
+async function checkAndTriggerGoogleSheetUpdates(existingOrder, updatedTasks, supervisor, orderInterno) {
+  const settings = db.getSettings();
+  const scriptUrl = settings.googleScriptUrl;
+  if (!scriptUrl) {
+    console.log("checkAndTriggerGoogleSheetUpdates: googleScriptUrl is not configured.");
+    return;
+  }
+
+  // Find newly finalized tasks
+  const newlyFinalized = (updatedTasks || []).filter(t => {
+    if (t.status !== "Finalizada") return false;
+    if (!existingOrder) return true; // It's a new order
+    const oldTask = (existingOrder.tasks || []).find(ot => ot.id === t.id);
+    return !oldTask || oldTask.status !== "Finalizada";
+  });
+
+  if (newlyFinalized.length === 0) return;
+
+  try {
+    const novelties = await fetchNoveltiesFromSheet().catch(e => {
+      console.error("checkAndTriggerGoogleSheetUpdates: failed to fetch sheet:", e.message);
+      return [];
+    });
+    if (novelties.length === 0) return;
+
+    for (const task of newlyFinalized) {
+      const taskDesc = (task.descripcion || '').toLowerCase().trim();
+      const taskInterno = String(orderInterno || (existingOrder ? existingOrder.interno : '')).toLowerCase().trim();
+
+      const matchedNovelty = novelties.find(n => {
+        if (String(n.interno || '').toLowerCase().trim() !== taskInterno) return false;
+        const nDesc = [n.rubro, n.subrubro, n.observacion].filter(Boolean).join(' - ').toLowerCase().trim();
+        return nDesc === taskDesc;
+      });
+
+      if (matchedNovelty) {
+        console.log(`[Google Sheets] Matched task "${task.descripcion}" to novelty on sheet. Triggering update...`);
+        const queryParams = new URLSearchParams({
+          interno: matchedNovelty.interno,
+          rubro: matchedNovelty.rubro,
+          subrubro: matchedNovelty.subrubro,
+          observacion: matchedNovelty.observacion,
+          mecanico: task.empleado || "",
+          supervisor: supervisor || (existingOrder ? existingOrder.responsable : '') || "AUTO"
+        });
+
+        const updateUrl = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${queryParams.toString()}`;
+        console.log(`[Google Sheets] Sending request to Apps Script URL: ${updateUrl}`);
+        
+        fetch(updateUrl)
+          .then(async (res) => {
+            const text = await res.text();
+            console.log(`[Google Sheets] Apps Script Response (Status ${res.status}):`, text);
+          })
+          .catch(err => {
+            console.error("[Google Sheets] Error calling Apps Script:", err.message);
+          });
+      }
+    }
+  } catch (error) {
+    console.error("Error in checkAndTriggerGoogleSheetUpdates:", error);
+  }
+}
 
 // Fallback: serve frontend index.html for SPA routes
 app.get('*', (req, res) => {
