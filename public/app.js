@@ -48,14 +48,43 @@ document.addEventListener('DOMContentLoaded', () => {
   // Setup Event Listeners
   document.getElementById('settings-form').addEventListener('submit', saveSettings);
 
-  // Dynamic change listener for Centro de Costo (task-cc) to filter employees (task-emp)
+  // Dynamic change listener for Centro de Costo (task-cc) and Empleado conflict checking
   const tasksContainer = document.getElementById('modal-tasks-list');
   if (tasksContainer) {
-    tasksContainer.addEventListener('change', (e) => {
+    tasksContainer.addEventListener('change', async (e) => {
       if (e.target && e.target.classList.contains('task-cc')) {
         const card = e.target.closest('.task-item-card');
         if (card) {
           updateEmployeeDropdownForCard(card);
+        }
+      } else if (e.target && e.target.classList.contains('task-emp')) {
+        const selectEl = e.target;
+        const card = selectEl.closest('.task-item-card');
+        if (!card) return;
+        
+        const taskId = card.id;
+        const isTimerRunning = localStorage.getItem(`timer_start_${taskId}`) !== null;
+        
+        if (isTimerRunning && selectEl.value) {
+          const conflict = getConflictForEmployee(selectEl.value, taskId);
+          if (conflict) {
+            const empOpt = cachedCatalogs.empleados.find(emp => emp.value === selectEl.value);
+            const empName = empOpt ? empOpt.label : "El operario";
+            const rodadoInfo = conflict.orderRodado || `Interno ${conflict.orderInterno}`;
+            const confirmMsg = `El mecánico ${empName} ya está trabajando en otra tarea activa para el rodado: ${rodadoInfo}.\n\n¿Desea pausar esa tarea automáticamente para asignar este operario a la tarea activa actual?`;
+            
+            if (confirm(confirmMsg)) {
+              await pauseTask(conflict);
+            } else {
+              // Revert selection
+              const oldVal = selectEl.dataset.prevVal || "";
+              selectEl.value = oldVal;
+              if (selectEl.rebuildSearchable) {
+                selectEl.rebuildSearchable();
+              }
+              showToast("Asignación cancelada", "warning");
+            }
+          }
         }
       }
     });
@@ -918,7 +947,119 @@ function showToast(message, type = 'info') {
 // 11. SEARCHABLE SELECTS & STOPWATCH SYSTEM
 let activeIntervalTimers = {};
 
-function toggleTaskTimer(taskId) {
+// --- HELPER FUNCTIONS FOR MECHANIC CONFLICT CHECKING ---
+function getActiveRunningTasks() {
+  const running = [];
+  
+  // 1. Check activeOrders (synced with server)
+  activeOrders.forEach(order => {
+    (order.tasks || []).forEach(task => {
+      const localStart = localStorage.getItem(`timer_start_${task.id}`);
+      const isRunning = (localStart !== null) || (task.timerStart !== null && task.timerStart > 0);
+      if (isRunning && task.status !== 'Finalizada') {
+        running.push({
+          source: 'order',
+          orderId: order.id,
+          orderInterno: order.interno,
+          orderRodado: order.rodado,
+          taskId: task.id,
+          empleado: task.empleado,
+          timerStart: localStart ? parseInt(localStart) : task.timerStart
+        });
+      }
+    });
+  });
+
+  // 2. Check current open modal tasks (which might not be saved on server yet)
+  const modalContainer = document.getElementById('modal-tasks-list');
+  if (modalContainer) {
+    const taskCards = modalContainer.querySelectorAll('.task-item-card');
+    taskCards.forEach(card => {
+      const taskId = card.id;
+      // Skip if we already added it from activeOrders
+      if (running.some(r => r.taskId === taskId)) return;
+
+      const localStart = localStorage.getItem(`timer_start_${taskId}`);
+      if (localStart) {
+        const empSelect = card.querySelector('.task-emp');
+        const statusSelect = card.querySelector('.task-status');
+        
+        if (empSelect && empSelect.value && statusSelect && statusSelect.value !== 'Finalizada') {
+          const rodadoEl = document.getElementById('form-rodado');
+          const rodadoText = rodadoEl && rodadoEl.selectedIndex >= 0 ? rodadoEl.options[rodadoEl.selectedIndex].text : '';
+          const internoVal = document.getElementById('form-interno') ? document.getElementById('form-interno').value : '';
+
+          running.push({
+            source: 'modal',
+            orderId: currentEditingOrderId,
+            orderInterno: internoVal,
+            orderRodado: rodadoText,
+            taskId: taskId,
+            empleado: empSelect.value,
+            timerStart: parseInt(localStart)
+          });
+        }
+      }
+    });
+  }
+
+  return running;
+}
+
+function getConflictForEmployee(employeeVal, currentTaskId) {
+  if (!employeeVal) return null;
+  const running = getActiveRunningTasks();
+  return running.find(r => r.empleado === employeeVal && r.taskId !== currentTaskId) || null;
+}
+
+async function pauseTask(taskInfo) {
+  const taskId = taskInfo.taskId;
+  const card = document.getElementById(taskId);
+  if (card) {
+    // Stop the timer in the modal UI
+    await toggleTaskTimer(taskId);
+    
+    // If it's a saved order, we also want to sync the paused state to the server immediately
+    if (taskInfo.source === 'order' && taskInfo.orderId) {
+      const order = activeOrders.find(o => o.id === taskInfo.orderId);
+      if (order) {
+        const hoursInput = card.querySelector('.task-hours');
+        const updatedHours = hoursInput ? parseFloat(hoursInput.value) : 0;
+        
+        const tasks = order.tasks.map(t => {
+          if (t.id === taskId) {
+            return {
+              ...t,
+              timerStart: null,
+              horasEstimadas: updatedHours
+            };
+          }
+          return t;
+        });
+        
+        try {
+          await fetch(`/api/orders/${taskInfo.orderId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...order,
+              tasks: tasks
+            })
+          });
+        } catch (e) {
+          console.error("Error updating paused task in DB:", e);
+        }
+      }
+    }
+  } else {
+    // If it's not in the modal DOM (e.g. it's in another order on the dashboard)
+    if (taskInfo.source === 'order' && taskInfo.orderId) {
+      await toggleDashboardTaskTimer(taskInfo.orderId, taskId);
+    }
+  }
+}
+
+async function toggleTaskTimer(taskId) {
   const display = document.getElementById(`timer-display-${taskId}`);
   const btn = document.getElementById(`timer-btn-${taskId}`);
   if (!display || !btn) return;
@@ -927,7 +1068,31 @@ function toggleTaskTimer(taskId) {
   const isRunning = localStorage.getItem(timerKey) !== null;
 
   if (!isRunning) {
-    // Start stopwatch
+    // Start stopwatch. First, check if an employee is selected
+    const card = document.getElementById(taskId) || btn.closest('.task-item-card');
+    const empSelect = card ? card.querySelector('.task-emp') : null;
+    const employeeVal = empSelect ? empSelect.value : '';
+
+    if (!employeeVal) {
+      showToast("Por favor, selecciona un operario antes de iniciar el cronómetro.", "danger");
+      return;
+    }
+
+    // Check for conflict
+    const conflict = getConflictForEmployee(employeeVal, taskId);
+    if (conflict) {
+      const empOpt = cachedCatalogs.empleados.find(e => e.value === employeeVal);
+      const empName = empOpt ? empOpt.label : "El operario";
+      const rodadoInfo = conflict.orderRodado || `Interno ${conflict.orderInterno}`;
+      const confirmMsg = `El mecánico ${empName} ya está trabajando en otra tarea activa para el rodado: ${rodadoInfo}.\n\n¿Desea pausar esa tarea automáticamente para iniciar esta?`;
+      
+      if (confirm(confirmMsg)) {
+        await pauseTask(conflict);
+      } else {
+        return; // User cancelled
+      }
+    }
+
     const startTime = Date.now();
     localStorage.setItem(timerKey, startTime);
     startTimerInterval(taskId, startTime);
@@ -1077,6 +1242,7 @@ function convertSelectToSearchable(selectEl) {
         searchInput.value = '';
         searchInput.focus();
         filterOptions('');
+        selectEl.dataset.prevVal = selectEl.value; // Store previous value before change
       }
     });
 
@@ -1369,6 +1535,24 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
   const isRunning = task.timerStart !== null && task.timerStart > 0;
 
   if (!isRunning) {
+    // Check for conflict
+    const employeeVal = task.empleado;
+    if (employeeVal) {
+      const conflict = getConflictForEmployee(employeeVal, taskId);
+      if (conflict) {
+        const empOpt = cachedCatalogs.empleados.find(e => e.value === employeeVal);
+        const empName = empOpt ? empOpt.label : "El operario";
+        const rodadoInfo = conflict.orderRodado || `Interno ${conflict.orderInterno}`;
+        const confirmMsg = `El mecánico ${empName} ya está trabajando en otra tarea activa para el rodado: ${rodadoInfo}.\n\n¿Desea pausar esa tarea automáticamente para iniciar esta?`;
+        
+        if (confirm(confirmMsg)) {
+          await pauseTask(conflict);
+        } else {
+          return; // User cancelled
+        }
+      }
+    }
+
     task.timerStart = Date.now();
     localStorage.setItem(`timer_start_${taskId}`, task.timerStart);
     showToast("Cronómetro iniciado", "info");
