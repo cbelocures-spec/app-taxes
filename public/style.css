@@ -1478,3 +1478,125 @@ body {
   pointer-events: none;
 }
 
+/* BULK ORDER CARGA MASIVA STYLES */
+.bulk-vehicle-selector {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--card-bg);
+  padding: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bulk-vehicle-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: #f8fafc;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s;
+}
+
+.bulk-vehicle-item:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.bulk-vehicle-item.selected {
+  background-color: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.bulk-vehicle-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.bulk-vehicle-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.bulk-vehicle-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.bulk-vehicle-subtext {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.bulk-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.summary-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s;
+}
+
+.summary-card:hover {
+  transform: translateY(-2px);
+}
+
+.summary-card .summary-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.summary-card .summary-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.summary-card.highlight {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.summary-card.highlight .summary-label {
+  color: var(--primary);
+}
+
+.summary-card.highlight .summary-value {
+  color: var(--primary);
+  font-size: 16px;
+}
+
+.summary-card .summary-subvalue {
+  font-size: 10px;
+  color: var(--primary);
+  opacity: 0.8;
+  margin-top: 2px;
+}
+

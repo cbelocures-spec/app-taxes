@@ -433,6 +433,20 @@ async function fetchCatalogs() {
     // Convert form-rodado to searchable select
     convertSelectToSearchable(document.getElementById('form-rodado'));
 
+    // Populate bulk form dropdowns
+    populateSelect('bulk-task-cc', data.centrosCosto, "Seleccionar Centro Costo...");
+    populateSelect('bulk-task-emp', data.empleados, "Seleccionar Empleado...");
+    
+    // Set default CC for bulk task to "15" (Mecanica) and filter employee list
+    const bulkCc = document.getElementById('bulk-task-cc');
+    if (bulkCc) {
+      bulkCc.value = "15";
+      updateBulkEmployeeDropdown();
+    }
+    
+    // Render the bulk vehicle selector list
+    renderBulkVehicleSelector();
+
     // Update status text
     if (data.rodados && data.rodados.length > 5) {
       document.getElementById('catalog-status-text').textContent = "Catálogos cargados desde la web de Taxes.";
@@ -1909,5 +1923,322 @@ async function saveActiveMechanicsList() {
   } catch (error) {
     console.error(error);
     showToast("Error al guardar la lista de mecánicos activos", "danger");
+  }
+}
+
+// ==========================================
+// CARGA MASIVA (BULK ORDERS) FUNCTIONS
+// ==========================================
+
+function renderBulkVehicleSelector() {
+  const container = document.getElementById('bulk-vehicle-list');
+  if (!container) return;
+
+  if (!cachedCatalogs.rodados || cachedCatalogs.rodados.length === 0) {
+    container.innerHTML = `<div class="text-muted" style="padding: 10px; text-align: center;">No hay vehículos cargados en el catálogo.</div>`;
+    return;
+  }
+
+  let html = '';
+  cachedCatalogs.rodados.forEach(rodado => {
+    const label = rodado.label || '';
+    const value = rodado.value || '';
+    const interno = rodado.interno || '';
+    const patente = rodado.patente || '';
+    const modelo = rodado.modelo || '';
+    const equipo = rodado.equipo || '';
+
+    html += `
+      <div class="bulk-vehicle-item" id="bulk-item-${value}" onclick="toggleBulkItemClick('${value}')">
+        <input type="checkbox" id="bulk-chk-${value}" value="${value}" onclick="event.stopPropagation(); handleBulkItemCheckChange();">
+        <div class="bulk-vehicle-info">
+          <span class="bulk-vehicle-name">${label}</span>
+          <span class="bulk-vehicle-subtext">Interno: ${interno} | Patente: ${patente} | ${modelo} ${equipo}</span>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+  
+  // Update selected count
+  handleBulkItemCheckChange();
+}
+
+function toggleBulkItemClick(value) {
+  const chk = document.getElementById(`bulk-chk-${value}`);
+  if (chk) {
+    chk.checked = !chk.checked;
+    const itemCard = document.getElementById(`bulk-item-${value}`);
+    if (itemCard) {
+      if (chk.checked) {
+        itemCard.classList.add('selected');
+      } else {
+        itemCard.classList.remove('selected');
+      }
+    }
+    handleBulkItemCheckChange();
+  }
+}
+
+function handleBulkItemCheckChange() {
+  const checkboxes = document.querySelectorAll('#bulk-vehicle-list input[type="checkbox"]');
+  let selectedCount = 0;
+  checkboxes.forEach(chk => {
+    const itemCard = document.getElementById(`bulk-item-${chk.value}`);
+    if (itemCard) {
+      if (chk.checked) {
+        itemCard.classList.add('selected');
+        selectedCount++;
+      } else {
+        itemCard.classList.remove('selected');
+      }
+    }
+  });
+
+  const badge = document.getElementById('bulk-selected-count');
+  if (badge) {
+    badge.textContent = `${selectedCount} seleccionado${selectedCount === 1 ? '' : 's'}`;
+  }
+
+  updateBulkSummary();
+}
+
+function toggleAllBulkVehicles(selectAll) {
+  const visibleItems = document.querySelectorAll('#bulk-vehicle-list .bulk-vehicle-item');
+  visibleItems.forEach(item => {
+    if (item.style.display !== 'none') {
+      const chk = item.querySelector('input[type="checkbox"]');
+      if (chk) {
+        chk.checked = selectAll;
+        if (selectAll) {
+          item.classList.add('selected');
+        } else {
+          item.classList.remove('selected');
+        }
+      }
+    }
+  });
+  handleBulkItemCheckChange();
+}
+
+function filterBulkVehicles() {
+  const searchInput = document.getElementById('bulk-vehicle-search');
+  if (!searchInput) return;
+
+  const query = searchInput.value.toLowerCase().trim();
+  const items = document.querySelectorAll('#bulk-vehicle-list .bulk-vehicle-item');
+
+  items.forEach(item => {
+    const text = item.textContent.toLowerCase();
+    if (text.includes(query)) {
+      item.style.display = 'flex';
+    } else {
+      item.style.display = 'none';
+    }
+  });
+}
+
+function updateBulkSummary() {
+  const startTimeVal = document.getElementById('bulk-time-start').value;
+  const endTimeVal = document.getElementById('bulk-time-end').value;
+
+  const checkboxes = document.querySelectorAll('#bulk-vehicle-list input[type="checkbox"]:checked');
+  const numVehicles = checkboxes.length;
+
+  const vehicleSummary = document.getElementById('bulk-summary-total-vehicles');
+  if (vehicleSummary) {
+    vehicleSummary.textContent = numVehicles;
+  }
+
+  const totalHoursEl = document.getElementById('bulk-summary-total-hours');
+  const timePerVehicleEl = document.getElementById('bulk-summary-time-per-vehicle');
+  const hoursPerVehicleEl = document.getElementById('bulk-summary-hours-per-vehicle');
+
+  if (!startTimeVal || !endTimeVal) {
+    if (totalHoursEl) totalHoursEl.textContent = "0h 00m";
+    if (timePerVehicleEl) timePerVehicleEl.textContent = "0 min";
+    if (hoursPerVehicleEl) hoursPerVehicleEl.textContent = "0.00 hs";
+    return;
+  }
+
+  const [startH, startM] = startTimeVal.split(':').map(Number);
+  const [endH, endM] = endTimeVal.split(':').map(Number);
+
+  let startMinutes = startH * 60 + startM;
+  let endMinutes = endH * 60 + endM;
+
+  if (endMinutes < startMinutes) {
+    // Crossed midnight, add 24 hours
+    endMinutes += 24 * 60;
+  }
+
+  const diffMinutes = endMinutes - startMinutes;
+  const totalHours = Math.floor(diffMinutes / 60);
+  const remainingMinutes = diffMinutes % 60;
+
+  if (totalHoursEl) {
+    totalHoursEl.textContent = `${totalHours}h ${String(remainingMinutes).padStart(2, '0')}m`;
+  }
+
+  if (numVehicles > 0) {
+    const totalHoursFloat = diffMinutes / 60;
+    const hoursPerVehicle = totalHoursFloat / numVehicles;
+    const minutesPerVehicle = diffMinutes / numVehicles;
+
+    let minText = '';
+    if (minutesPerVehicle < 1) {
+      minText = `${minutesPerVehicle.toFixed(2)} min`;
+    } else {
+      minText = `${minutesPerVehicle.toFixed(1)} min`;
+    }
+
+    if (timePerVehicleEl) timePerVehicleEl.textContent = minText;
+    if (hoursPerVehicleEl) hoursPerVehicleEl.textContent = `${hoursPerVehicle.toFixed(2)} hs`;
+  } else {
+    if (timePerVehicleEl) timePerVehicleEl.textContent = "0 min";
+    if (hoursPerVehicleEl) hoursPerVehicleEl.textContent = "0.00 hs";
+  }
+}
+
+function updateBulkEmployeeDropdown() {
+  const ccSelect = document.getElementById('bulk-task-cc');
+  const empSelect = document.getElementById('bulk-task-emp');
+  if (!ccSelect || !empSelect) return;
+
+  const selectedCc = ccSelect.value;
+  const currentValue = empSelect.value;
+
+  let filteredEmployees = cachedCatalogs.empleados;
+  if (selectedCc === "15") { // MECANICA
+    const mecanicaNames = new Set(MECANICA_EMPLOYEES.map(name => name.toLowerCase().trim()));
+    filteredEmployees = cachedCatalogs.empleados.filter(emp => {
+      const empLabel = emp.label.toLowerCase().trim();
+      return mecanicaNames.has(empLabel);
+    });
+  }
+
+  let empOptions = `<option value="">Seleccionar Empleado...</option>`;
+  filteredEmployees.forEach(opt => {
+    const isSelected = opt.value === currentValue;
+    empOptions += `<option value="${opt.value}" ${isSelected ? "selected" : ""}>${opt.label}</option>`;
+  });
+  empSelect.innerHTML = empOptions;
+
+  if (empSelect.rebuildSearchable) {
+    empSelect.rebuildSearchable();
+  }
+}
+
+async function submitBulkOrders() {
+  const ccEl = document.getElementById('bulk-task-cc');
+  const empEl = document.getElementById('bulk-task-emp');
+  const descEl = document.getElementById('bulk-task-desc');
+  const timeStartEl = document.getElementById('bulk-time-start');
+  const timeEndEl = document.getElementById('bulk-time-end');
+  const clasificacionEl = document.getElementById('bulk-clasificacion');
+  const incidenteEl = document.getElementById('bulk-incidente');
+
+  const selectedChks = document.querySelectorAll('#bulk-vehicle-list input[type="checkbox"]:checked');
+  if (selectedChks.length === 0) {
+    return showToast("Selecciona al menos un vehículo.", "danger");
+  }
+  if (!ccEl.value) {
+    return showToast("Selecciona un Centro de Costo.", "danger");
+  }
+  if (!empEl.value) {
+    return showToast("Selecciona un Operario/Empleado.", "danger");
+  }
+  if (!descEl.value.trim()) {
+    return showToast("Ingresa la descripción de la tarea.", "danger");
+  }
+  if (!timeStartEl.value || !timeEndEl.value) {
+    return showToast("Ingresa las horas de inicio y fin.", "danger");
+  }
+
+  const [startH, startM] = timeStartEl.value.split(':').map(Number);
+  const [endH, endM] = timeEndEl.value.split(':').map(Number);
+  let startMinutes = startH * 60 + startM;
+  let endMinutes = endH * 60 + endM;
+  if (endMinutes < startMinutes) {
+    endMinutes += 24 * 60;
+  }
+  const totalHoursFloat = (endMinutes - startMinutes) / 60;
+  const hoursPerVehicle = totalHoursFloat / selectedChks.length;
+
+  const confirmMsg = `¿Estás seguro de generar ${selectedChks.length} órdenes de trabajo?\nDuración por unidad: ${hoursPerVehicle.toFixed(2)} horas.`;
+  if (!confirm(confirmMsg)) return;
+
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const fechaEntrega = `${yyyy}-${mm}-${dd}`;
+  
+  const hh = String(today.getHours()).padStart(2, '0');
+  const min = String(today.getMinutes()).padStart(2, '0');
+  const horario = `${hh}:${min}`;
+
+  showToast(`Iniciando creación de ${selectedChks.length} órdenes...`, "warning");
+
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (let i = 0; i < selectedChks.length; i++) {
+    const chk = selectedChks[i];
+    const rodadoId = chk.value;
+    const rodadoOpt = cachedCatalogs.rodados.find(r => r.value === rodadoId);
+    if (!rodadoOpt) continue;
+
+    const task = {
+      centroCosto: ccEl.value,
+      empleado: empEl.value,
+      horasEstimadas: hoursPerVehicle.toFixed(2),
+      descripcion: descEl.value.trim(),
+      status: "Finalizada",
+      timerStart: null
+    };
+
+    const payload = {
+      rodado: rodadoOpt.label,
+      responsable: "AUTO",
+      interno: rodadoOpt.interno || "",
+      clasificacion: clasificacionEl.value,
+      fechaEntrega: fechaEntrega,
+      horario: horario,
+      incidente: incidenteEl.value.trim(),
+      tasks: [task]
+    };
+
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        successCount++;
+      } else {
+        errorCount++;
+      }
+    } catch (e) {
+      errorCount++;
+      console.error("Error creating bulk order for " + rodadoOpt.label, e);
+    }
+  }
+
+  if (errorCount === 0) {
+    showToast(`Éxito: Se crearon ${successCount} órdenes correctamente.`, "success");
+    toggleAllBulkVehicles(false);
+    document.getElementById('bulk-incidente').value = '';
+    fetchOrders();
+    switchView('orders');
+  } else if (successCount > 0) {
+    showToast(`Advertencia: Se crearon ${successCount} órdenes, pero ${errorCount} fallaron.`, "warning");
+    toggleAllBulkVehicles(false);
+    fetchOrders();
+    switchView('orders');
+  } else {
+    showToast(`Error: Falló la creación de las ${errorCount} órdenes.`, "danger");
   }
 }

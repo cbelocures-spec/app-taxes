@@ -124,28 +124,130 @@
       </div>
     </section>
 
-    <!-- VIEW 3: SYNC MONITOR -->
-    <section id="view-sync" class="app-view">
+    <!-- VIEW 3: CARGA MASIVA -->
+    <section id="view-bulk" class="app-view">
       <div class="view-header">
-        <h2>Monitor de Sincronización</h2>
-      </div>
-      
-      <div class="worker-card">
-        <div class="worker-info">
-          <span class="material-icons worker-status-icon active" id="worker-status-pulse">bolt</span>
-          <div>
-            <h4>Worker en Segundo Plano</h4>
-            <p id="worker-desc">Buscando órdenes pendientes cada 10 segundos...</p>
-          </div>
-        </div>
+        <h2>Carga Masiva</h2>
       </div>
 
-      <div class="section-title">
-        <h3>Cola de Sincronización</h3>
-      </div>
-      <div class="sync-queue-list" id="sync-queue-container">
-        <!-- Dynamic queue items -->
-      </div>
+      <form id="bulk-order-form" onsubmit="event.preventDefault(); submitBulkOrders();">
+        <!-- CARD 1: SELECCION DE VEHICULOS -->
+        <div class="form-section-card">
+          <div class="card-title-header split">
+            <div class="flex-align">
+              <span class="material-icons">local_shipping</span>
+              <h3>Vehículos *</h3>
+              <span class="badge" id="bulk-selected-count">0 seleccionados</span>
+            </div>
+          </div>
+
+          <div class="bulk-search-container" style="margin-top: 10px;">
+            <div class="search-bar" style="margin-bottom: 8px;">
+              <span class="material-icons search-icon">search</span>
+              <input type="text" id="bulk-vehicle-search" placeholder="Buscar por interno o patente..." oninput="filterBulkVehicles()">
+            </div>
+            <div class="bulk-actions-row" style="display: flex; gap: 8px; margin-bottom: 12px; width: 100%;">
+              <button type="button" class="btn btn-secondary btn-xs" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 4px;" onclick="toggleAllBulkVehicles(true)">
+                <span class="material-icons" style="font-size: 14px;">check_box</span> Seleccionar Todos
+              </button>
+              <button type="button" class="btn btn-secondary btn-xs" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 4px;" onclick="toggleAllBulkVehicles(false)">
+                <span class="material-icons" style="font-size: 14px;">check_box_outline_blank</span> Deseleccionar Todos
+              </button>
+            </div>
+          </div>
+
+          <div class="bulk-vehicle-selector" id="bulk-vehicle-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px;">
+            <!-- Dynamic checkboxes with label, interno, patente -->
+          </div>
+        </div>
+
+        <!-- CARD 2: TAREA COMUN -->
+        <div class="form-section-card">
+          <div class="card-title-header">
+            <span class="material-icons">build</span>
+            <h3>Tarea a Realizar</h3>
+          </div>
+
+          <div class="form-group">
+            <label for="bulk-task-cc">Centro de Costo *</label>
+            <select id="bulk-task-cc" required onchange="updateBulkEmployeeDropdown()">
+              <!-- Dynamic CC options populated from app.js -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="bulk-task-emp">Empleado Asignado *</label>
+            <select id="bulk-task-emp" required>
+              <option value="">Seleccionar Empleado...</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="bulk-task-desc">Descripción de la Tarea *</label>
+            <input type="text" id="bulk-task-desc" placeholder="Ej: Control de agua y aceite" required>
+          </div>
+        </div>
+
+        <!-- CARD 3: TIEMPO Y CONFIGURACIÓN -->
+        <div class="form-section-card">
+          <div class="card-title-header">
+            <span class="material-icons">schedule</span>
+            <h3>Horario y Detalles</h3>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label for="bulk-time-start">Hora Inicio *</label>
+              <input type="time" id="bulk-time-start" required onchange="updateBulkSummary()">
+            </div>
+            <div class="form-group col-6">
+              <label for="bulk-time-end">Hora Fin *</label>
+              <input type="time" id="bulk-time-end" required onchange="updateBulkSummary()">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-12">
+              <label for="bulk-clasificacion">Clasificación *</label>
+              <select id="bulk-clasificacion" required>
+                <option value="Preventivo">Preventivo</option>
+                <option value="Auxilio">Auxilio</option>
+                <option value="Correctivo">Correctivo</option>
+                <option value="Herrería">Herrería</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="bulk-incidente">Incidente o Requisito (Opcional)</label>
+            <textarea id="bulk-incidente" placeholder="Describa el incidente o requisito..." rows="2"></textarea>
+          </div>
+        </div>
+
+        <!-- SUMMARY PANEL -->
+        <div class="bulk-summary-container">
+          <div class="bulk-summary-cards" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px;">
+            <div class="summary-card" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+              <span class="summary-label" style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Tiempo Total</span>
+              <span class="summary-value" id="bulk-summary-total-hours" style="font-size: 14px; font-weight: 700; color: var(--text);">0h 00m</span>
+            </div>
+            <div class="summary-card" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+              <span class="summary-label" style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Camiones</span>
+              <span class="summary-value" id="bulk-summary-total-vehicles" style="font-size: 14px; font-weight: 700; color: var(--text);">0</span>
+            </div>
+            <div class="summary-card highlight" style="background: var(--primary-light); border: 1px solid var(--primary); border-radius: var(--radius-md); padding: 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+              <span class="summary-label" style="font-size: 10px; color: var(--primary); text-transform: uppercase; font-weight: 600;">Por Camión</span>
+              <span class="summary-value" id="bulk-summary-time-per-vehicle" style="font-size: 14px; font-weight: 700; color: var(--primary);">0 min</span>
+              <span class="summary-subvalue" id="bulk-summary-hours-per-vehicle" style="font-size: 9px; color: var(--primary); opacity: 0.8;">0.00 hs</span>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top: 20px; margin-bottom: 30px;">
+          <span class="material-icons">send</span> Generar Órdenes Masivas
+        </button>
+
+      </form>
     </section>
 
     <!-- VIEW 4: SETTINGS (AJUSTES) -->
@@ -213,9 +315,9 @@
       <span class="material-icons">task_alt</span>
       <span>Subidas</span>
     </button>
-    <button class="nav-item" onclick="switchView('sync')" id="nav-sync">
-      <span class="material-icons">sync_alt</span>
-      <span>Sincronizar</span>
+    <button class="nav-item" onclick="switchView('bulk')" id="nav-bulk">
+      <span class="material-icons">content_copy</span>
+      <span>Masiva</span>
     </button>
     <button class="nav-item" onclick="switchView('settings')" id="nav-settings">
       <span class="material-icons">settings</span>
