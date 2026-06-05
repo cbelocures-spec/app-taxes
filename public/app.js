@@ -115,7 +115,9 @@ function openNewOrderModal() {
   currentEditingOrderId = null;
   document.getElementById('modal-order-title').textContent = "Nueva Orden de Trabajo";
   
-  document.getElementById('new-order-modal').classList.add('open');
+  const modal = document.getElementById('new-order-modal');
+  modal.classList.remove('readonly-mode');
+  modal.classList.add('open');
   // Reset form
   document.getElementById('work-order-form').reset();
   
@@ -143,7 +145,8 @@ function openNewOrderModal() {
 }
 
 function closeNewOrderModal() {
-  document.getElementById('new-order-modal').classList.remove('open');
+  const modal = document.getElementById('new-order-modal');
+  modal.classList.remove('open', 'readonly-mode');
   currentEditingOrderId = null;
 }
 
@@ -155,6 +158,9 @@ function editOrder(orderId) {
 
   // Set modal title
   document.getElementById('modal-order-title').textContent = "Editar Orden de Trabajo";
+
+  // Ensure NOT read-only
+  document.getElementById('new-order-modal').classList.remove('readonly-mode');
 
   // Open modal
   document.getElementById('new-order-modal').classList.add('open');
@@ -196,6 +202,59 @@ function editOrder(orderId) {
       </div>
     `;
     updateTaskCountBadge();
+  }
+}
+
+function viewOrder(orderId) {
+  const order = activeOrders.find(o => o.id === orderId);
+  if (!order) return;
+
+  // Open in read-only mode (no save, no edit)
+  currentEditingOrderId = null;
+
+  // Set modal title with sync date
+  const syncDate = order.syncDate ? ` — Subida: ${new Date(order.syncDate).toLocaleDateString('es-AR')}` : '';
+  document.getElementById('modal-order-title').textContent = `Ver Orden${syncDate}`;
+
+  // Mark modal as readonly
+  const modal = document.getElementById('new-order-modal');
+  modal.classList.add('open', 'readonly-mode');
+
+  // Find corresponding Rodado value in cachedCatalogs
+  const rodadoSelect = document.getElementById('form-rodado');
+  const rodadoOpt = cachedCatalogs.rodados.find(r => r.label === order.rodado);
+  if (rodadoOpt) {
+    rodadoSelect.value = rodadoOpt.value;
+  } else {
+    rodadoSelect.value = "";
+  }
+  if (rodadoSelect.rebuildSearchable) {
+    rodadoSelect.rebuildSearchable();
+  }
+
+  // Populate basic inputs
+  document.getElementById('form-interno').value = order.interno;
+  document.getElementById('form-clasificacion').value = order.clasificacion;
+  document.getElementById('form-incidente').value = order.incidente || '';
+  document.getElementById('form-fecha').value = order.fechaEntrega;
+  document.getElementById('form-hora').value = order.horario;
+
+  // Clear modal tasks
+  const container = document.getElementById('modal-tasks-list');
+  container.innerHTML = "";
+
+  // Populate tasks (read-only, no timers)
+  if (order.tasks && order.tasks.length > 0) {
+    order.tasks.forEach(t => {
+      addTaskField(t);
+    });
+  } else {
+    container.innerHTML = `
+      <div class="tasks-empty-state">
+        <span class="material-icons">assignment_late</span>
+        <p>No hay tareas asignadas.</p>
+      </div>
+    `;
   }
 }
 
@@ -660,11 +719,11 @@ function renderOrders() {
       historyContainer.innerHTML = `
         <div class="empty-state">
           <span class="material-icons">history_toggle_off</span>
-          <p>No hay órdenes sincronizadas.</p>
+          <p>No hay órdenes sincronizadas aún.</p>
         </div>
       `;
     } else {
-      historyContainer.innerHTML = filteredHistory.map(order => createOrderCardHtml(order)).join('');
+      historyContainer.innerHTML = filteredHistory.map(order => createHistoryCardHtml(order)).join('');
     }
   }
 
@@ -683,6 +742,35 @@ function renderOrders() {
 
   // Render the Operator/Tasks active dashboard on home page
   renderDashboard();
+}
+
+function createHistoryCardHtml(order) {
+  const syncDate = order.syncDate ? new Date(order.syncDate).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha desconocida';
+  return `
+    <div class="order-card">
+      <div class="order-card-header">
+        <div>
+          <div class="order-card-title">${order.rodado}</div>
+          <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion}</strong></div>
+        </div>
+        <span class="badge-status success"><span class="material-icons">check_circle</span> Sincronizado</span>
+      </div>
+      <div class="order-card-footer">
+        <div class="tasks-summary">
+          <span class="material-icons">format_list_bulleted</span>
+          <span>${order.tasks.length} Tareas &nbsp;·&nbsp; <span class="material-icons" style="font-size:12px;vertical-align:middle;">cloud_upload</span> ${syncDate}</span>
+        </div>
+        <div class="card-actions">
+          <button class="icon-btn primary" onclick="viewOrder('${order.id}')" title="Ver Orden">
+            <span class="material-icons">visibility</span>
+          </button>
+          <button class="icon-btn danger" onclick="deleteOrder('${order.id}')" title="Eliminar de la App (ya está en Taxes)">
+            <span class="material-icons">delete</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function updateStats() {

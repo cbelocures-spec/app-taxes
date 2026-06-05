@@ -1455,3 +1455,26 @@ body {
   color: var(--text-main);
 }
 
+/* Readonly mode for work order modal */
+#new-order-modal.readonly-mode .modal-header button.btn-success,
+#new-order-modal.readonly-mode .card-title-header button,
+#new-order-modal.readonly-mode .task-item-header .task-delete-btn,
+#new-order-modal.readonly-mode .timer-container-row {
+  display: none !important;
+}
+
+#new-order-modal.readonly-mode input,
+#new-order-modal.readonly-mode textarea,
+#new-order-modal.readonly-mode select,
+#new-order-modal.readonly-mode .searchable-select-trigger {
+  pointer-events: none;
+  background-color: var(--secondary-light) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-muted) !important;
+  opacity: 0.85;
+}
+
+#new-order-modal.readonly-mode .searchable-select-container {
+  pointer-events: none;
+}
+
