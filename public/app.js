@@ -365,6 +365,45 @@ async function saveSettings(e) {
   }
 }
 
+async function testGoogleScriptConnection() {
+  const url = document.getElementById('set-google-script-url').value.trim();
+  if (!url) {
+    showToast("Por favor, ingresa una URL primero", "warning");
+    return;
+  }
+
+  const btn = document.getElementById('btn-test-google-script');
+  const originalText = btn.textContent;
+  btn.textContent = "...";
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/settings/test-google-sheet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP error ${res.status}`);
+    }
+
+    const data = await res.json();
+    if (data.status === 'success' || data.status === 'not_found') {
+      showToast("¡Conexión con Google Sheets exitosa!", "success");
+    } else {
+      showToast(`Error del script: ${data.message || 'Desconocido'}`, "danger");
+    }
+  } catch (error) {
+    console.error(error);
+    showToast(`Falló la conexión: ${error.message}. Verifica haberlo publicado como 'Cualquiera' (Anyone).`, "danger");
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+}
+
 // 4. SYNC DROP-DOWN CATALOGS FROM WEBSITE
 async function triggerCatalogSync() {
   try {

@@ -180,6 +180,39 @@ app.post('/api/settings', (req, res) => {
   }
 });
 
+// Test Google Sheets Apps Script URL connection
+app.post('/api/settings/test-google-sheet', async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: "Falta la URL del script." });
+    }
+
+    const testParams = new URLSearchParams({
+      interno: "test",
+      rubro: "test",
+      subrubro: "test",
+      observacion: "test",
+      mecanico: "test",
+      supervisor: "test"
+    });
+
+    const testUrl = `${url}${url.includes('?') ? '&' : '?'}${testParams.toString()}`;
+    console.log(`[Google Sheets Test] Testing connection to URL: ${testUrl}`);
+
+    const response = await fetch(testUrl);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `El script devolvió estado HTTP ${response.status}` });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("[Google Sheets Test] Connection test failed:", error.message);
+    res.status(500).json({ error: `Falló la conexión: ${error.message}` });
+  }
+});
+
 // Get catalogs dropdown options
 app.get('/api/catalogs', (req, res) => {
   try {
