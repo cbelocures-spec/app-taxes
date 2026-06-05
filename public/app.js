@@ -608,6 +608,7 @@ async function fetchOrders() {
     const data = await res.json();
     
     activeOrders = data;
+    await resolveDatabaseConflicts();
     renderOrders();
     updateStats();
   } catch (error) {
@@ -948,12 +949,91 @@ function showToast(message, type = 'info') {
 let activeIntervalTimers = {};
 
 // --- HELPER FUNCTIONS FOR MECHANIC CONFLICT CHECKING ---
+async function resolveDatabaseConflicts() {
+  const runningByEmployee = {};
+
+  activeOrders.forEach(order => {
+    (order.tasks || []).forEach(task => {
+      const localStart = localStorage.getItem(`timer_start_${task.id}`);
+      const isRunning = (localStart !== null) || (task.timerStart !== null && task.timerStart > 0);
+      if (isRunning && task.status !== 'Finalizada' && task.empleado) {
+        if (!runningByEmployee[task.empleado]) {
+          runningByEmployee[task.empleado] = [];
+        }
+        runningByEmployee[task.empleado].push({
+          order: order,
+          task: task,
+          timerStart: localStart ? parseInt(localStart) : task.timerStart
+        });
+      }
+    });
+  });
+
+  for (const empleado in runningByEmployee) {
+    const tasks = runningByEmployee[empleado];
+    if (tasks.length > 1) {
+      // Sort by timerStart descending (newest first)
+      tasks.sort((a, b) => b.timerStart - a.timerStart);
+
+      const newestTask = tasks[0];
+      const olderTasks = tasks.slice(1);
+
+      console.warn(`Conflict auto-resolution: Mechanic ${empleado} had multiple active timers. Keeping newest task ${newestTask.task.id} running, pausing older ones.`);
+
+      for (const tInfo of olderTasks) {
+        const order = tInfo.order;
+        const task = tInfo.task;
+        const startVal = tInfo.timerStart;
+
+        // Calculate elapsed time and update hours
+        const elapsedMs = Date.now() - startVal;
+        const addedHours = parseFloat((elapsedMs / (1000 * 60 * 60)).toFixed(2));
+        const currentHours = parseFloat(task.horasEstimadas) || 0;
+        const newHours = parseFloat((currentHours + addedHours).toFixed(2));
+
+        // Clean up local storage and update database task
+        localStorage.removeItem(`timer_start_${task.id}`);
+
+        task.timerStart = null;
+        task.horasEstimadas = newHours;
+
+        const updatedTasks = order.tasks.map(t => {
+          if (t.id === task.id) {
+            return {
+              ...t,
+              timerStart: null,
+              horasEstimadas: newHours
+            };
+          }
+          return t;
+        });
+
+        try {
+          await fetch(`/api/orders/${order.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...order,
+              tasks: updatedTasks
+            })
+          });
+        } catch (e) {
+          console.error("Error auto-resolving conflict in DB:", e);
+        }
+      }
+    }
+  }
+}
+
 function getActiveRunningTasks() {
   const running = [];
   
   // 1. Check activeOrders (synced with server)
   activeOrders.forEach(order => {
     (order.tasks || []).forEach(task => {
+      // If the task is currently open in the modal, skip it here so the modal's live version takes precedence
+      if (document.getElementById(task.id)) return;
+
       const localStart = localStorage.getItem(`timer_start_${task.id}`);
       const isRunning = (localStart !== null) || (task.timerStart !== null && task.timerStart > 0);
       if (isRunning && task.status !== 'Finalizada') {
@@ -976,7 +1056,7 @@ function getActiveRunningTasks() {
     const taskCards = modalContainer.querySelectorAll('.task-item-card');
     taskCards.forEach(card => {
       const taskId = card.id;
-      // Skip if we already added it from activeOrders
+      // Skip if we already added it from activeOrders (redundant safety check, but good)
       if (running.some(r => r.taskId === taskId)) return;
 
       const localStart = localStorage.getItem(`timer_start_${taskId}`);
