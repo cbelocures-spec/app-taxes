@@ -721,7 +721,7 @@ body {
   background-color: var(--card-bg);
   border-top: 1px solid var(--border-color);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   z-index: 100;
   box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
 }

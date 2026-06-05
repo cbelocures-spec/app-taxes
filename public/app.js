@@ -619,12 +619,14 @@ async function fetchOrders() {
 function renderOrders() {
   const container = document.getElementById('orders-list-container');
   const queueContainer = document.getElementById('sync-queue-container');
+  const historyContainer = document.getElementById('history-list-container');
   
   if (!container) return;
 
-  // Apply search filtering
+  // Apply search filtering for active (non-synced) orders
   const query = document.getElementById('order-search').value.toLowerCase();
-  const filtered = activeOrders.filter(o => 
+  const activeLocalOrders = activeOrders.filter(o => o.syncStatus !== 'success');
+  const filtered = activeLocalOrders.filter(o => 
     o.rodado.toLowerCase().includes(query) || 
     o.interno.toLowerCase().includes(query) || 
     o.clasificacion.toLowerCase().includes(query)
@@ -640,6 +642,30 @@ function renderOrders() {
     `;
   } else {
     container.innerHTML = filtered.map(order => createOrderCardHtml(order)).join('');
+  }
+
+  // Render History Tab (only synced success orders)
+  if (historyContainer) {
+    const historySearchEl = document.getElementById('history-search');
+    const historyQuery = historySearchEl ? historySearchEl.value.toLowerCase() : '';
+    
+    const syncedOrders = activeOrders.filter(o => o.syncStatus === 'success');
+    const filteredHistory = syncedOrders.filter(o => 
+      o.rodado.toLowerCase().includes(historyQuery) || 
+      o.interno.toLowerCase().includes(historyQuery) || 
+      o.clasificacion.toLowerCase().includes(historyQuery)
+    );
+
+    if (filteredHistory.length === 0) {
+      historyContainer.innerHTML = `
+        <div class="empty-state">
+          <span class="material-icons">history_toggle_off</span>
+          <p>No hay órdenes sincronizadas.</p>
+        </div>
+      `;
+    } else {
+      historyContainer.innerHTML = filteredHistory.map(order => createOrderCardHtml(order)).join('');
+    }
   }
 
   // Render Sync Queue (only pending, syncing, or error ones)
@@ -784,6 +810,10 @@ function createQueueCardHtml(order) {
 }
 
 function filterOrders() {
+  renderOrders();
+}
+
+function filterHistory() {
   renderOrders();
 }
 
