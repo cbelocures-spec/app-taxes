@@ -205,8 +205,19 @@ app.post('/api/settings/test-google-sheet', async (req, res) => {
       return res.status(response.status).json({ error: `El script devolvió estado HTTP ${response.status}` });
     }
 
-    const data = await response.json();
-    res.json(data);
+    const text = await response.text();
+    try {
+      const data = JSON.parse(text);
+      res.json(data);
+    } catch (parseError) {
+      console.error("[Google Sheets Test] Failed to parse JSON response:", text.substring(0, 200));
+      if (text.trim().startsWith('<')) {
+        return res.status(400).json({ 
+          error: "El script devolvió HTML en lugar de JSON. Esto suele ocurrir si pegaste la URL de la hoja de Google Sheet en lugar de la 'URL de la aplicación web' del script de Google Apps Script, o si el script no está configurado para acceso 'Cualquiera' (Anyone)." 
+        });
+      }
+      return res.status(400).json({ error: `Respuesta no válida del script: ${text.substring(0, 100)}` });
+    }
   } catch (error) {
     console.error("[Google Sheets Test] Connection test failed:", error.message);
     res.status(500).json({ error: `Falló la conexión: ${error.message}` });
