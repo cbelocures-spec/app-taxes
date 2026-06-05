@@ -1,0 +1,1794 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demo Interactivo - Taxes Taller</title>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Google Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <!-- Main Stylesheet of the app -->
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+    /* SPECIFIC DEMO PAGE OVERRIDES */
+    body.demo-page {
+      display: flex !important;
+      flex-direction: row !important;
+      height: 100vh !important;
+      width: 100vw !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      background-color: #0f172a !important;
+      color: #e2e8f0 !important;
+    }
+
+    /* Left Sidebar: Guide and Terminal */
+    .demo-sidebar {
+      width: 440px;
+      min-width: 440px;
+      background: #1e293b;
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .demo-sidebar-header {
+      padding: 20px;
+      background: #0f172a;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .demo-logo-icon {
+      font-size: 28px;
+      color: #3b82f6;
+    }
+
+    .demo-sidebar-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0;
+      color: #ffffff;
+    }
+
+    .demo-sidebar-content {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .tutorial-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: all 0.3s ease;
+    }
+
+    .tutorial-card.active {
+      border-color: #3b82f6;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+    }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 8px;
+      margin-bottom: 4px;
+    }
+
+    .step-badge {
+      background: #2563eb;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+    }
+
+    .step-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f8fafc;
+      margin: 0;
+    }
+
+    .step-desc {
+      font-size: 13px;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .btn-step-action {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+
+    .btn-step-action:hover {
+      background: #2563eb;
+    }
+
+    /* Terminal Console */
+    .demo-terminal {
+      height: 200px;
+      min-height: 200px;
+      background: #020617;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 12px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #10b981;
+      overflow-y: auto;
+      box-sizing: border-box;
+    }
+
+    .terminal-title {
+      color: #94a3b8;
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .terminal-line {
+      margin: 3px 0;
+      line-height: 1.4;
+    }
+
+    .terminal-line.error { color: #f87171; }
+    .terminal-line.warn { color: #fbbf24; }
+    .terminal-line.info { color: #60a5fa; }
+
+    /* Right Side: Phone container */
+    .demo-viewport {
+      flex: 1;
+      background: radial-gradient(circle, #1e293b 0%, #020617 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .phone-frame {
+      width: 380px;
+      height: 760px;
+      background: #000000;
+      border-radius: 44px;
+      padding: 10px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 10px #1e293b;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Speaker notch */
+    .phone-notch {
+      width: 140px;
+      height: 24px;
+      background: #000000;
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-bottom-left-radius: 16px;
+      border-bottom-right-radius: 16px;
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .phone-camera {
+      width: 10px;
+      height: 10px;
+      background: #1e293b;
+      border-radius: 50%;
+    }
+
+    /* Embed Mobile App inside Phone */
+    .phone-content {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      background: var(--bg-color);
+      border-radius: 36px;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* PHONE APP LAYOUT RESTORATION/OVERRIDES */
+    .phone-content .app-header {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      height: var(--header-height) !important;
+      z-index: 90 !important;
+    }
+
+    .phone-content .app-container {
+      position: absolute !important;
+      top: var(--header-height) !important;
+      bottom: var(--nav-height) !important;
+      left: 0 !important;
+      right: 0 !important;
+      height: auto !important;
+      overflow-y: auto !important;
+      padding: 16px !important;
+      z-index: 10 !important;
+    }
+
+    .phone-content .bottom-nav {
+      position: absolute !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      height: var(--nav-height) !important;
+      z-index: 90 !important;
+    }
+
+    .phone-content .fullscreen-modal {
+      position: absolute !important;
+      top: 0 !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      z-index: 200 !important;
+    }
+
+    .phone-content .modal-overlay {
+      position: absolute !important;
+      top: 0 !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      z-index: 300 !important;
+    }
+
+    /* Pointer element for tutorial guidance */
+    .tutorial-pointer {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      background: rgba(239, 68, 68, 0.4);
+      border: 2px solid #ef4444;
+      border-radius: 50%;
+      z-index: 9999;
+      pointer-events: none;
+      animation: pulse-pointer 1.2s infinite;
+      display: none;
+      box-shadow: 0 0 10px #ef4444;
+    }
+
+    @keyframes pulse-pointer {
+      0% { transform: scale(0.8); opacity: 0.5; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.8); opacity: 0.5; }
+    }
+
+    /* Responsive behaviors */
+    @media (max-width: 900px) {
+      body.demo-page {
+        flex-direction: column !important;
+        overflow-y: auto !important;
+      }
+      .demo-sidebar {
+        width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
+      }
+      .demo-terminal {
+        height: 150px !important;
+        min-height: 150px !important;
+      }
+      .demo-viewport {
+        padding: 40px 0 !important;
+      }
+    }
+  </style>
+</head>
+<body class="demo-page">
+
+  <!-- LEFT PANEL: GUIDE AND TERMINAL -->
+  <div class="demo-sidebar">
+    <div class="demo-sidebar-header">
+      <span class="material-icons demo-logo-icon">school</span>
+      <div>
+        <h2>Guía del Demo Interactivo</h2>
+        <small style="color: #94a3b8;">Aprende cómo funciona Taxes Taller</small>
+      </div>
+    </div>
+
+    <div class="demo-sidebar-content" id="guide-list">
+      <!-- Tutorial step cards -->
+      <div class="tutorial-card active" id="card-step-1">
+        <div class="step-header">
+          <span class="step-badge">Paso 1</span>
+          <span style="color: #60a5fa; font-size: 11px; font-weight: bold;">Inicio</span>
+        </div>
+        <h4 class="step-title">Crear una Orden de Trabajo</h4>
+        <p class="step-desc">
+          Ocultamos los campos redundantes (Fecha, Hora y Responsable) en la interfaz móvil para ahorrar espacio. 
+          Haz clic en <strong>Crear Orden de Trabajo</strong> (arriba) o pulsa el botón de abajo para simularlo.
+        </p>
+        <button class="btn-step-action" onclick="goToStep(1)">
+          <span class="material-icons" style="font-size: 16px;">open_in_new</span> Abrir Formulario
+        </button>
+      </div>
+
+      <div class="tutorial-card" id="card-step-2">
+        <div class="step-header">
+          <span class="step-badge">Paso 2</span>
+          <span style="color: #60a5fa; font-size: 11px; font-weight: bold;">Selector inteligente</span>
+        </div>
+        <h4 class="step-title">Cargar Tareas de MECÁNICA</h4>
+        <p class="step-desc">
+          En el formulario modal, el centro de costo viene pre-seleccionado como **MECANICA**. Esto filtra de inmediato la nómina de operarios a solo los **17 mecánicos habilitados**. Prueba agregar una tarea y seleccionar el Empleado.
+        </p>
+        <button class="btn-step-action" onclick="goToStep(2)" id="btn-step-2">
+          <span class="material-icons" style="font-size: 16px;">add</span> Agregar Tarea Mock
+        </button>
+      </div>
+
+      <div class="tutorial-card" id="card-step-3">
+        <div class="step-header">
+          <span class="step-badge">Paso 3</span>
+          <span style="color: #60a5fa; font-size: 11px; font-weight: bold;">Cronómetro</span>
+        </div>
+        <h4 class="step-title">Iniciar Tiempos en Taller</h4>
+        <p class="step-desc">
+          Una vez creada la orden, ve al **Inicio** y haz clic en **Iniciar** en la tarea del mecánico asignado. La tarea se moverá al grupo **"Trabajando en el Taller"** y el cronómetro correrá en tiempo real.
+        </p>
+        <button class="btn-step-action" onclick="goToStep(3)">
+          <span class="material-icons" style="font-size: 16px;">play_arrow</span> Iniciar Primer Timer
+        </button>
+      </div>
+
+      <div class="tutorial-card" id="card-step-4">
+        <div class="step-header">
+          <span class="step-badge">Paso 4</span>
+          <span style="color: #60a5fa; font-size: 11px; font-weight: bold;">Anti-Conflictos</span>
+        </div>
+        <h4 class="step-title">Detener y Auto-pausar</h4>
+        <p class="step-desc">
+          Si intentas iniciar el cronómetro de otra tarea para el **mismo mecánico**, el sistema lo detecta y ofrece auto-pausar la anterior para evitar que registre horas dobles. ¡Prueba iniciar una segunda tarea para el mismo operario!
+        </p>
+        <button class="btn-step-action" onclick="goToStep(4)">
+          <span class="material-icons" style="font-size: 16px;">notifications_active</span> Provocar Conflicto
+        </button>
+      </div>
+
+      <div class="tutorial-card" id="card-step-5">
+        <div class="step-header">
+          <span class="step-badge">Paso 5</span>
+          <span style="color: #60a5fa; font-size: 11px; font-weight: bold;">Sincronizar</span>
+        </div>
+        <h4 class="step-title">Subir a Taxes (Simulación Puppeteer)</h4>
+        <p class="step-desc">
+          Cuando las tareas pasen a **"Finalizada"**, la orden queda lista. Ve a **Órdenes** y pulsa **Subir a Taxes**.
+          Observa la terminal de abajo para ver la simulación en vivo del robot Puppeteer llenando los selectores y encendiendo el switch **"Tarea Completada"**.
+        </p>
+        <button class="btn-step-action" onclick="goToStep(5)" style="background-color: var(--success);">
+          <span class="material-icons" style="font-size: 16px;">cloud_upload</span> Sincronizar Orden
+        </button>
+      </div>
+
+      <div class="tutorial-card" id="card-step-6">
+        <div class="step-header">
+          <span class="step-badge">Paso 6</span>
+          <span style="color: #60a5fa; font-size: 11px; font-weight: bold;">Historial</span>
+        </div>
+        <h4 class="step-title">Historial de Subidas y Vista Solo Lectura</h4>
+        <p class="step-desc">
+          Al sincronizarse, la orden desaparece de la pestaña de Órdenes y pasa a la nueva pestaña **Subidas**. Allí puedes inspeccionarla en modo de solo lectura (icono del ojo 👁️) o eliminarla localmente de la aplicación.
+        </p>
+        <button class="btn-step-action" onclick="goToStep(6)">
+          <span class="material-icons" style="font-size: 16px;">visibility</span> Ver Orden Subida
+        </button>
+      </div>
+    </div>
+
+    <!-- TERMINAL CONSOLE LOGS -->
+    <div class="demo-terminal" id="terminal">
+      <div class="terminal-title">
+        <span class="material-icons" style="font-size: 12px; animation: spin 4s linear infinite;">settings</span>
+        Console Log del Robot Sincronizador
+      </div>
+      <div class="terminal-line">[SISTEMA] Demo inicializado. Esperando comandos del usuario...</div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL: PORTABLE SMARTPHONE SCREEN -->
+  <div class="demo-viewport">
+    <!-- Red dot helper for click targets -->
+    <div class="tutorial-pointer" id="tutorial-pointer"></div>
+
+    <div class="phone-frame">
+      <div class="phone-notch"><div class="phone-camera"></div></div>
+      <div class="phone-content">
+        
+        <!-- APP HEADER -->
+        <header class="app-header">
+          <div class="header-logo">
+            <span class="material-icons logo-icon">build_circle</span>
+            <div class="logo-text">
+              <h1>Taxes <span>Taller</span></h1>
+              <small>Demo Móvil Interactivo</small>
+            </div>
+          </div>
+          <div class="header-actions">
+            <span class="material-icons sync-indicator idle" id="global-sync-icon">sync</span>
+          </div>
+        </header>
+
+        <!-- APP CONTAINER -->
+        <main class="app-container">
+
+          <!-- VIEW 1: HOME (DASHBOARD) -->
+          <section id="view-home" class="app-view active">
+            <div class="create-order-banner" onclick="openNewOrderModalDirect()" id="banner-create-ot">
+              <div class="banner-content">
+                <span class="material-icons banner-icon">add_circle_outline</span>
+                <div class="banner-text">
+                  <h2>Crear Orden de Trabajo</h2>
+                  <p>Registra un nuevo ingreso de unidad</p>
+                </div>
+              </div>
+              <span class="material-icons arrow-icon">chevron_right</span>
+            </div>
+
+            <div class="dashboard-section">
+              <div class="dashboard-header-row">
+                <span class="material-icons">engineering</span>
+                <h3>Estado de Operarios y Tareas</h3>
+              </div>
+
+              <!-- Trabajando -->
+              <div class="dashboard-sub-title">
+                <span class="indicator working"></span>
+                <span>Trabajando en el Taller (<span id="count-working">0</span>)</span>
+              </div>
+              <div class="dashboard-grid working" id="grid-working">
+                <div class="empty-dashboard-state">No hay operarios trabajando actualmente.</div>
+              </div>
+
+              <!-- En Pausa -->
+              <div class="dashboard-sub-title" style="margin-top: 20px;">
+                <span class="indicator paused"></span>
+                <span>Tareas en Pausa (<span id="count-paused">0</span>)</span>
+              </div>
+              <div class="dashboard-grid paused" id="grid-paused">
+                <div class="empty-dashboard-state">No hay tareas en pausa.</div>
+              </div>
+
+              <!-- Mecánicos Libres -->
+              <div class="dashboard-sub-title" style="margin-top: 20px; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="indicator free"></span>
+                  <span>Mecánicos Libres / Disponibles (<span id="count-free">0</span>)</span>
+                </div>
+                <button type="button" class="btn btn-secondary btn-xs" onclick="openActiveMechanicsModalDirect()" style="padding: 2px 6px; font-size: 10px; height: auto; display: flex; align-items: center; gap: 2px;">
+                  <span class="material-icons" style="font-size: 12px;">playlist_add_check</span> Activos Hoy
+                </button>
+              </div>
+              <div class="free-employees-list" id="list-free-employees">
+                <div class="empty-dashboard-state">Cargando operarios...</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW 2: ORDERS LIST -->
+          <section id="view-orders" class="app-view" style="display: none;">
+            <div class="view-header">
+              <h2>Órdenes de Trabajo</h2>
+              <button class="btn btn-primary btn-sm" onclick="openNewOrderModalDirect()">
+                <span class="material-icons">add</span> Nueva
+              </button>
+            </div>
+            <div class="search-bar">
+              <span class="material-icons search-icon">search</span>
+              <input type="text" id="order-search" placeholder="Buscar por Rodado, Interno..." oninput="renderOrdersDirect()">
+            </div>
+            <div class="orders-list" id="orders-list-container">
+              <!-- Render orders -->
+            </div>
+          </section>
+
+          <!-- VIEW 2.5: HISTORY (SUBIDAS) -->
+          <section id="view-history" class="app-view" style="display: none;">
+            <div class="view-header">
+              <h2>Órdenes Sincronizadas</h2>
+            </div>
+            <div class="search-bar">
+              <span class="material-icons search-icon">search</span>
+              <input type="text" id="history-search" placeholder="Buscar por Rodado..." oninput="renderOrdersDirect()">
+            </div>
+            <div class="orders-list" id="history-list-container">
+              <!-- Synced orders -->
+            </div>
+          </section>
+
+          <!-- VIEW 3: SYNC MONITOR -->
+          <section id="view-sync" class="app-view" style="display: none;">
+            <div class="view-header">
+              <h2>Monitor de Sincronización</h2>
+            </div>
+            <div class="worker-card">
+              <div class="worker-info">
+                <span class="material-icons worker-status-icon active" style="animation: pulse-pointer 1s infinite;">bolt</span>
+                <div>
+                  <h4>Worker en Segundo Plano</h4>
+                  <p>Buscando órdenes pendientes...</p>
+                </div>
+              </div>
+            </div>
+            <div class="section-title">
+              <h3>Cola de Sincronización</h3>
+            </div>
+            <div class="sync-queue-list" id="sync-queue-container">
+              <!-- Sync items -->
+            </div>
+          </section>
+
+          <!-- VIEW 4: SETTINGS -->
+          <section id="view-settings" class="app-view" style="display: none;">
+            <div class="view-header">
+              <h2>Configuración</h2>
+            </div>
+            <div class="settings-card">
+              <div class="form-group">
+                <label>URL del Portal de Taxes</label>
+                <input type="url" value="https://taxes.com.ar" disabled>
+              </div>
+              <div class="form-group">
+                <label>Usuario de Taxes</label>
+                <input type="text" value="cbelocures@contenedoreshugo.com.ar" disabled>
+              </div>
+              <div class="form-group">
+                <label>Contraseña de Taxes</label>
+                <input type="password" value="••••••••" disabled>
+              </div>
+              <button type="button" class="btn btn-primary btn-block" onclick="showToastDirect('Credenciales y URL de Taxes guardadas con éxito', 'success')">
+                <span class="material-icons">save</span> Guardar Configuración
+              </button>
+            </div>
+          </section>
+
+        </main>
+
+        <!-- BOTTOM NAV BAR -->
+        <nav class="bottom-nav">
+          <button class="nav-item active" onclick="switchViewDirect('home')" id="nav-home">
+            <span class="material-icons">home</span>
+            <span>Inicio</span>
+          </button>
+          <button class="nav-item" onclick="switchViewDirect('orders')" id="nav-orders">
+            <span class="material-icons">assignment</span>
+            <span>Órdenes</span>
+          </button>
+          <button class="nav-item" onclick="switchViewDirect('history')" id="nav-history">
+            <span class="material-icons">task_alt</span>
+            <span>Subidas</span>
+          </button>
+          <button class="nav-item" onclick="switchViewDirect('sync')" id="nav-sync">
+            <span class="material-icons">sync_alt</span>
+            <span>Sincronizar</span>
+          </button>
+          <button class="nav-item" onclick="switchViewDirect('settings')" id="nav-settings">
+            <span class="material-icons">settings</span>
+            <span>Ajustes</span>
+          </button>
+        </nav>
+
+        <!-- FULLSCREEN WORK ORDER MODAL -->
+        <div class="fullscreen-modal" id="new-order-modal">
+          <div class="modal-header">
+            <button class="modal-close-btn" onclick="closeNewOrderModalDirect()">
+              <span class="material-icons">close</span>
+            </button>
+            <h2 id="modal-order-title">Nueva Orden de Trabajo</h2>
+            <button class="btn btn-success btn-sm" onclick="submitWorkOrderDirect()">
+              <span class="material-icons">check</span> Enviar
+            </button>
+          </div>
+          
+          <div class="modal-content" style="padding: 16px;">
+            <form id="work-order-form" onsubmit="event.preventDefault();">
+              
+              <!-- CARD 1: GENERAL DATA -->
+              <div class="form-section-card">
+                <div class="card-title-header">
+                  <span class="material-icons">feed</span>
+                  <h3>Datos Generales</h3>
+                </div>
+                
+                <div class="form-group">
+                  <label for="form-rodado">Rodado *</label>
+                  <select id="form-rodado" required>
+                    <option value="">Seleccionar Rodado...</option>
+                    <option value="Volvo FH 420" selected>Volvo FH 420 - Int 22</option>
+                    <option value="Scania R450">Scania R450 - Int 14</option>
+                    <option value="Mercedes Accelo">Mercedes Benz Accelo - Int 8</option>
+                  </select>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group col-6">
+                    <label for="form-interno">Interno Unidad *</label>
+                    <input type="text" id="form-interno" value="22" required>
+                  </div>
+                  <div class="form-group col-6">
+                    <label for="form-clasificacion">Clasificación *</label>
+                    <select id="form-clasificacion" required>
+                      <option value="Preventivo" selected>Preventivo</option>
+                      <option value="Auxilio">Auxilio</option>
+                      <option value="Correctivo">Correctivo</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="form-incidente">Incidente o Requisito</label>
+                  <textarea id="form-incidente" placeholder="Describa el incidente..." rows="2">Control preventivo mensual</textarea>
+                </div>
+              </div>
+
+              <!-- CARD 2: TASKS -->
+              <div class="form-section-card" style="margin-top: 16px;">
+                <div class="card-title-header split">
+                  <div class="flex-align">
+                    <span class="material-icons">build</span>
+                    <h3>Tareas a Realizar</h3>
+                    <span class="badge" id="task-count-badge">0</span>
+                  </div>
+                  <button type="button" class="btn btn-primary btn-xs" onclick="addTaskFieldDirect()">
+                    <span class="material-icons">add</span> AGREGAR TAREA
+                  </button>
+                </div>
+
+                <div class="tasks-container" id="modal-tasks-list">
+                  <!-- Dynamic task cards -->
+                </div>
+              </div>
+
+            </form>
+          </div>
+        </div>
+
+        <!-- ACTIVE MECHANICS MODAL -->
+        <div class="modal-overlay" id="active-mechanics-modal">
+          <div class="dialog-modal">
+            <div class="dialog-header">
+              <h3>Mecánicos Activos Hoy</h3>
+              <button class="dialog-close" onclick="closeActiveMechanicsModalDirect()">&times;</button>
+            </div>
+            <div class="dialog-body" style="max-height: 280px; overflow-y: auto;">
+              <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
+                Selecciona los mecánicos activos hoy.
+              </p>
+              <div class="active-mechanics-checklist" id="active-mechanics-checklist-container">
+                <!-- Checkboxes -->
+              </div>
+            </div>
+            <div class="dialog-footer">
+              <button class="btn btn-secondary" onclick="closeActiveMechanicsModalDirect()">Cancelar</button>
+              <button class="btn btn-primary" onclick="saveActiveMechanicsListDirect()">Guardar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TOAST CONTAINER -->
+        <div class="toast-container" id="toast-container"></div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- DEMO ENGINE JAVASCRIPT -->
+  <script>
+    // 17 authorized mechanics
+    const MECANICA_EMPLOYEES = [
+      "Canaviri Fernandez, Jesús",
+      "Cuba Orosco, Kevín Genaro",
+      "GERRY CRISTIAN MARCELO",
+      "Gustavo Javier Benitez",
+      "Monzon, Carlos Agustin",
+      "Morel, Luis Maximiliano",
+      "OJEDA FERNANDEZ JOSE ENRIQUE",
+      "Ojeda Fernández, Miguel",
+      "Olivera, Diego",
+      "PANETTA ALBARRACIN FEDERICO",
+      "Perino Martin Adrian",
+      "Ríos, Cesar Damián",
+      "Rocha, Ariel Maximiliano",
+      "RODRIGUEZ CARLOS FERNANDO",
+      "RODRIGUEZ NICOLAS",
+      "Sosa, Alejandro Damian",
+      "Vera, Domingo Sergio"
+    ];
+
+    // Other non-mechanic employees
+    const ALL_EMPLOYEES = [
+      ...MECANICA_EMPLOYEES,
+      "Gomez, Juan Ignacio",
+      "Martinez, Lucas Nicolas",
+      "Alvarez, Roberto Carlos"
+    ];
+
+    // Mock Databases in Memory
+    let activeOrders = [
+      {
+        id: "order-1",
+        rodado: "Volvo FH 420",
+        interno: "22",
+        clasificacion: "Preventivo",
+        incidente: "Control preventivo de frenos y lubricación",
+        fechaEntrega: new Date().toISOString().split('T')[0],
+        horario: "08:00",
+        syncStatus: "local", // local, success, syncing, pending
+        syncDate: null,
+        tasks: [
+          {
+            id: "task-1-1",
+            centroCosto: "15", // MECANICA
+            empleado: "Monzon, Carlos Agustin",
+            horasEstimadas: 1.5,
+            status: "Pendiente",
+            descripcion: "Cambio de pastillas de freno delanteras",
+            timerStart: null
+          },
+          {
+            id: "task-1-2",
+            centroCosto: "15",
+            empleado: "Olivera, Diego",
+            horasEstimadas: 1.0,
+            status: "Pendiente",
+            descripcion: "Revisión de niveles de aceite e hidráulicos",
+            timerStart: null
+          }
+        ]
+      }
+    ];
+
+    let activeMechanicsList = [...MECANICA_EMPLOYEES]; // All checked by default
+    let activeIntervalTimers = {};
+    let currentEditingOrderId = null;
+    let currentStep = 1;
+
+    // Initialize Page
+    document.addEventListener("DOMContentLoaded", () => {
+      renderActiveMechanicsList();
+      renderOrdersDirect();
+      updateStatsDirect();
+      logTerminal("Demo iniciado. El paso actual está destacado a la izquierda.");
+      highlightStepCard(1);
+    });
+
+    // Helper: log to simulated Puppeteer worker terminal
+    function logTerminal(message, type = '') {
+      const term = document.getElementById("terminal");
+      const line = document.createElement("div");
+      line.className = `terminal-line ${type}`;
+      const time = new Date().toLocaleTimeString();
+      line.textContent = `[${time}] ${message}`;
+      term.appendChild(line);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    // Tab Switching
+    function switchViewDirect(viewName) {
+      document.querySelectorAll(".app-view").forEach(view => {
+        view.style.display = "none";
+      });
+      const activeView = document.getElementById(`view-${viewName}`);
+      if (activeView) activeView.style.display = "block";
+
+      document.querySelectorAll(".bottom-nav .nav-item").forEach(btn => {
+        btn.classList.remove("active");
+      });
+      
+      const activeNav = document.getElementById(`nav-${viewName}`);
+      if (activeNav) activeNav.classList.add("active");
+
+      // Hide pointer when switching tabs manually
+      hidePointer();
+    }
+
+    // Toast System
+    function showToastDirect(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      let icon = 'info';
+      if (type === 'success') icon = 'check_circle';
+      if (type === 'danger') icon = 'error';
+      if (type === 'warning') icon = 'sync';
+
+      toast.innerHTML = `
+        <span class="material-icons">${icon}</span>
+        <span>${message}</span>
+      `;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 400);
+      }, 3000);
+    }
+
+    // Modal Control
+    function openNewOrderModalDirect() {
+      currentEditingOrderId = null;
+      document.getElementById('modal-order-title').textContent = "Nueva Orden de Trabajo";
+      const modal = document.getElementById('new-order-modal');
+      modal.classList.remove('readonly-mode');
+      modal.classList.add('open');
+      document.getElementById('work-order-form').reset();
+      
+      // Default inputs
+      document.getElementById('form-interno').value = "22";
+      document.getElementById('form-incidente').value = "Control preventivo de frenos";
+
+      const container = document.getElementById('modal-tasks-list');
+      container.innerHTML = "";
+      addTaskFieldDirect(); // start with 1 task
+      hidePointer();
+
+      if (currentStep === 1) {
+        logTerminal("Formulario de Orden abierto. Observa que Fecha, Hora y Responsable no se piden.");
+        setTimeout(() => {
+          highlightStepCard(2);
+          showPointer('#btn-step-2', -240, -100);
+        }, 800);
+      }
+    }
+
+    function closeNewOrderModalDirect() {
+      const modal = document.getElementById('new-order-modal');
+      modal.classList.remove('open', 'readonly-mode');
+      currentEditingOrderId = null;
+      hidePointer();
+    }
+
+    // Add Task Card in Modal
+    function addTaskFieldDirect(taskData = null) {
+      const container = document.getElementById('modal-tasks-list');
+      const taskIndex = container.querySelectorAll('.task-item-card').length;
+      const taskId = taskData && taskData.id ? taskData.id : `task-${Date.now()}-${taskIndex}`;
+
+      // Build options
+      let ccOptions = `
+        <option value="15" ${!taskData || taskData.centroCosto === '15' ? 'selected' : ''}>MECANICA</option>
+        <option value="16" ${taskData && taskData.centroCosto === '16' ? 'selected' : ''}>HERRERIA</option>
+        <option value="17" ${taskData && taskData.centroCosto === '17' ? 'selected' : ''}>ELECTRICIDAD</option>
+      `;
+
+      let selectedCc = taskData ? taskData.centroCosto : "15";
+      let employeesToUse = selectedCc === "15" ? MECANICA_EMPLOYEES : ALL_EMPLOYEES;
+
+      let empOptions = `<option value="">Seleccionar Empleado...</option>`;
+      employeesToUse.forEach(emp => {
+        const isSel = taskData && taskData.empleado === emp;
+        empOptions += `<option value="${emp}" ${isSel ? 'selected' : ''}>${emp}</option>`;
+      });
+
+      const cardHtml = `
+        <div class="task-item-card" id="${taskId}">
+          <div class="task-item-header">
+            <span class="task-item-title">Tarea #${taskIndex + 1}</span>
+            <button type="button" class="task-delete-btn" onclick="this.closest('.task-item-card').remove(); updateTaskCount();">
+              <span class="material-icons">delete</span>
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label>Centro de Costo *</label>
+            <select class="task-cc" onchange="filterEmployeeDropdown('${taskId}')" required>
+              ${ccOptions}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Empleado Asignado *</label>
+            <select class="task-emp" required>
+              ${empOptions}
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label>Horas Estimadas</label>
+              <input type="number" step="0.25" min="0" value="${taskData ? taskData.horasEstimadas : '1.50'}" class="task-hours">
+            </div>
+            <div class="form-group col-6">
+              <label>Estado Inicial</label>
+              <select class="task-status">
+                <option value="Pendiente" ${!taskData || taskData.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                <option value="Finalizada" ${taskData && taskData.status === 'Finalizada' ? 'selected' : ''}>Finalizada</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="timer-container-row">
+            <div class="timer-label">
+              <span class="material-icons" style="font-size:16px;">timer</span>
+              <span>Cronómetro (Inactivo)</span>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 12px;">
+            <label>Descripción de Actividades</label>
+            <textarea rows="2" class="task-desc" placeholder="Describa el trabajo...">${taskData ? taskData.descripcion : 'Cambio preventivo y control'}</textarea>
+          </div>
+        </div>
+      `;
+
+      const div = document.createElement('div');
+      div.innerHTML = cardHtml;
+      container.appendChild(div.firstElementChild);
+      updateTaskCount();
+
+      // Auto assign a default mechanic for step convenience
+      if (!taskData) {
+        const firstEmpSelect = container.querySelector(`#${taskId} .task-emp`);
+        firstEmpSelect.value = "Monzon, Carlos Agustin";
+      }
+    }
+
+    function filterEmployeeDropdown(taskId) {
+      const card = document.getElementById(taskId);
+      const cc = card.querySelector('.task-cc').value;
+      const empSelect = card.querySelector('.task-emp');
+
+      let list = cc === "15" ? MECANICA_EMPLOYEES : ALL_EMPLOYEES;
+      let html = `<option value="">Seleccionar Empleado...</option>`;
+      list.forEach(emp => {
+        html += `<option value="${emp}">${emp}</option>`;
+      });
+      empSelect.innerHTML = html;
+
+      if (cc === "15") {
+        logTerminal(`Filtrando mecánicos: Solo los 17 mecánicos listados aparecen para Centro Costo MECANICA.`, 'info');
+      } else {
+        logTerminal(`Filtrando mecánicos: Nómina completa cargada para otro Centro de Costo.`, 'info');
+      }
+    }
+
+    function updateTaskCount() {
+      const count = document.querySelectorAll('#modal-tasks-list .task-item-card').length;
+      document.getElementById('task-count-badge').textContent = count;
+    }
+
+    // Submit Order Form
+    function submitWorkOrderDirect() {
+      const rodado = document.getElementById('form-rodado').value;
+      const interno = document.getElementById('form-interno').value;
+      const clasificacion = document.getElementById('form-clasificacion').value;
+      const incidente = document.getElementById('form-incidente').value;
+
+      if (!rodado || !interno) {
+        showToastDirect("Por favor, rellene los campos obligatorios.", "danger");
+        return;
+      }
+
+      // Collect Tasks
+      const taskCards = document.querySelectorAll('#modal-tasks-list .task-item-card');
+      const tasks = [];
+      let allValid = true;
+
+      taskCards.forEach((card, idx) => {
+        const centroCosto = card.querySelector('.task-cc').value;
+        const empleado = card.querySelector('.task-emp').value;
+        const horas = parseFloat(card.querySelector('.task-hours').value) || 0;
+        const status = card.querySelector('.task-status').value;
+        const desc = card.querySelector('.task-desc').value;
+
+        if (!empleado) {
+          showToastDirect(`Falta asignar empleado en la Tarea #${idx+1}`, "danger");
+          allValid = false;
+          return;
+        }
+
+        tasks.push({
+          id: card.id,
+          centroCosto,
+          empleado,
+          horasEstimadas: horas,
+          status,
+          descripcion: desc,
+          timerStart: null
+        });
+      });
+
+      if (!allValid) return;
+
+      if (currentEditingOrderId) {
+        // Save edit
+        const orderIndex = activeOrders.findIndex(o => o.id === currentEditingOrderId);
+        if (orderIndex > -1) {
+          activeOrders[orderIndex].rodado = rodado;
+          activeOrders[orderIndex].interno = interno;
+          activeOrders[orderIndex].clasificacion = clasificacion;
+          activeOrders[orderIndex].incidente = incidente;
+          activeOrders[orderIndex].tasks = tasks;
+          // Re-queue sync
+          if (activeOrders[orderIndex].syncStatus === 'error') {
+            activeOrders[orderIndex].syncStatus = 'local';
+          }
+        }
+        showToastDirect("Orden de Trabajo actualizada localmente", "success");
+      } else {
+        // Create new
+        const newOrder = {
+          id: `order-${Date.now()}`,
+          rodado,
+          interno,
+          clasificacion,
+          incidente,
+          fechaEntrega: new Date().toISOString().split('T')[0],
+          horario: new Date().toLocaleTimeString().slice(0, 5),
+          syncStatus: "local",
+          syncDate: null,
+          tasks
+        };
+        activeOrders.push(newOrder);
+        showToastDirect("Orden de Trabajo guardada localmente", "success");
+      }
+
+      closeNewOrderModalDirect();
+      renderOrdersDirect();
+      updateStatsDirect();
+
+      if (currentStep === 1 || currentStep === 2) {
+        logTerminal("Orden de trabajo guardada. Redirigiendo al Dashboard de Operarios.");
+        switchViewDirect('home');
+        highlightStepCard(3);
+        // Point to the Start timer button
+        setTimeout(() => {
+          showPointer('.btn-timer-toggle', 45, 15);
+        }, 500);
+      }
+    }
+
+    // Render Lists
+    function renderOrdersDirect() {
+      const ordersContainer = document.getElementById('orders-list-container');
+      const historyContainer = document.getElementById('history-list-container');
+      const queueContainer = document.getElementById('sync-queue-container');
+
+      const activeLocalList = activeOrders.filter(o => o.syncStatus !== 'success');
+      const historyList = activeOrders.filter(o => o.syncStatus === 'success');
+
+      // Orders Tab
+      if (activeLocalList.length === 0) {
+        ordersContainer.innerHTML = `
+          <div class="empty-state">
+            <span class="material-icons">search_off</span>
+            <p>No hay órdenes activas.</p>
+          </div>
+        `;
+      } else {
+        ordersContainer.innerHTML = activeLocalList.map(order => {
+          const allCompleted = order.tasks.every(t => t.status === "Finalizada");
+          const badgeColor = allCompleted ? 'background-color:#d1fae5; color:#065f46; border:1px solid rgba(6,95,70,0.2);' : 'background-color:#e0f2fe; color:#0369a1; border:1px solid rgba(3,105,161,0.2);';
+          const badgeText = allCompleted ? 'Completada' : 'En Curso';
+          const badgeIcon = allCompleted ? 'check_circle' : 'construction';
+
+          return `
+            <div class="order-card">
+              <div class="order-card-header">
+                <div>
+                  <div class="order-card-title">${order.rodado}</div>
+                  <div class="order-card-subtitle">Int: <strong>${order.interno}</strong> · Clasif: <strong>${order.clasificacion}</strong></div>
+                </div>
+                <span class="badge-status" style="${badgeColor}">
+                  <span class="material-icons" style="font-size:12px;">${badgeIcon}</span> ${badgeText}
+                </span>
+              </div>
+              <div class="order-card-footer">
+                <div class="tasks-summary">
+                  <span class="material-icons">format_list_bulleted</span>
+                  <span>${order.tasks.length} Tareas</span>
+                </div>
+                <div class="card-actions">
+                  <button class="icon-btn success" onclick="startSyncSequence('${order.id}')" title="Subir a Taxes">
+                    <span class="material-icons">cloud_upload</span>
+                  </button>
+                  <button class="icon-btn warning" onclick="editOrderDirect('${order.id}')" title="Editar">
+                    <span class="material-icons">edit</span>
+                  </button>
+                  <button class="icon-btn danger" onclick="deleteOrderDirect('${order.id}')" title="Eliminar">
+                    <span class="material-icons">delete</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // History Tab
+      if (historyList.length === 0) {
+        historyContainer.innerHTML = `
+          <div class="empty-state">
+            <span class="material-icons">history_toggle_off</span>
+            <p>No hay órdenes sincronizadas aún.</p>
+          </div>
+        `;
+      } else {
+        historyContainer.innerHTML = historyList.map(order => {
+          const syncDateStr = order.syncDate ? new Date(order.syncDate).toLocaleDateString('es-AR', { hour: '2-digit', minute: '2-digit' }) : 'Recién subido';
+          return `
+            <div class="order-card">
+              <div class="order-card-header">
+                <div>
+                  <div class="order-card-title">${order.rodado}</div>
+                  <div class="order-card-subtitle">Int: <strong>${order.interno}</strong> · Clasif: <strong>${order.clasificacion}</strong></div>
+                </div>
+                <span class="badge-status success"><span class="material-icons">check_circle</span> Sincronizado</span>
+              </div>
+              <div class="order-card-footer">
+                <div class="tasks-summary">
+                  <span class="material-icons">format_list_bulleted</span>
+                  <span>${order.tasks.length} Tareas · <span class="material-icons" style="font-size:12px;vertical-align:middle;">cloud_upload</span> ${syncDateStr}</span>
+                </div>
+                <div class="card-actions">
+                  <button class="icon-btn primary" onclick="viewOrderDirect('${order.id}')" title="Ver Detalle">
+                    <span class="material-icons">visibility</span>
+                  </button>
+                  <button class="icon-btn danger" onclick="deleteOrderDirect('${order.id}')" title="Eliminar Localmente">
+                    <span class="material-icons">delete</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Sync Queue Monitor Tab
+      if (activeLocalList.length === 0) {
+        queueContainer.innerHTML = `
+          <div class="empty-state">
+            <span class="material-icons">cloud_done</span>
+            <p>Todas las órdenes están sincronizadas.</p>
+          </div>
+        `;
+      } else {
+        queueContainer.innerHTML = activeLocalList.map(order => {
+          return `
+            <div class="queue-item card">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <strong style="color:var(--text-main);">${order.rodado} (Int ${order.interno})</strong>
+                  <div style="font-size:11px; color:var(--text-muted);">Estado: local (Lista para subir)</div>
+                </div>
+                <button class="btn btn-primary btn-xs" onclick="startSyncSequence('${order.id}')">Subir Ahora</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Render Operator Dashboard
+      renderDashboardDirect();
+    }
+
+    // Operator Dashboard Renderer
+    function renderDashboardDirect() {
+      const gridWorking = document.getElementById("grid-working");
+      const gridPaused = document.getElementById("grid-paused");
+      const listFree = document.getElementById("list-free-employees");
+
+      let workingCount = 0;
+      let pausedCount = 0;
+
+      let workingHtml = "";
+      let pausedHtml = "";
+
+      let busyMecs = new Set();
+
+      activeOrders.forEach(order => {
+        if (order.syncStatus === 'success') return; // ignore synced ones
+
+        order.tasks.forEach(t => {
+          const isTimerRunning = activeIntervalTimers[t.id] !== undefined;
+          
+          if (isTimerRunning) {
+            busyMecs.add(t.empleado);
+            workingCount++;
+            workingHtml += `
+              <div class="dashboard-card working">
+                <div class="dashboard-card-info">
+                  <h4>${t.empleado}</h4>
+                  <p>${order.rodado} (Int ${order.interno})</p>
+                  <small>${t.descripcion}</small>
+                </div>
+                <div class="dashboard-card-timer" id="dash-timer-${t.id}">00:00:00</div>
+                <div class="dashboard-card-actions">
+                  <button class="btn btn-warning btn-xs" onclick="pauseTaskTimer('${order.id}', '${t.id}')">
+                    <span class="material-icons" style="font-size:12px;">pause</span> Pausar
+                  </button>
+                  <button class="btn btn-success btn-xs" onclick="finishTaskDirect('${order.id}', '${t.id}')">
+                    <span class="material-icons" style="font-size:12px;">done</span> Terminar
+                  </button>
+                </div>
+              </div>
+            `;
+          } else if (t.status === "Pendiente" && t.horasEstimadas > 1.5 && t.id.includes('paused')) {
+            // Simulated Paused task for demonstration
+            busyMecs.add(t.empleado);
+            pausedCount++;
+            pausedHtml += `
+              <div class="dashboard-card paused">
+                <div class="dashboard-card-info">
+                  <h4>${t.empleado}</h4>
+                  <p>${order.rodado} (Int ${order.interno})</p>
+                  <small>${t.descripcion}</small>
+                </div>
+                <div class="dashboard-card-timer">00:45:00</div>
+                <div class="dashboard-card-actions">
+                  <button class="btn btn-primary btn-xs" onclick="resumeTaskTimer('${order.id}', '${t.id}')">
+                    <span class="material-icons" style="font-size:12px;">play_arrow</span> Reanudar
+                  </button>
+                  <button class="btn btn-success btn-xs" onclick="finishTaskDirect('${order.id}', '${t.id}')">
+                    <span class="material-icons" style="font-size:12px;">done</span> Terminar
+                  </button>
+                </div>
+              </div>
+            `;
+          } else {
+            // Just regular pending task, but if timer was started previously and stored
+            const timerVal = localStorage.getItem(`timer_start_${t.id}`);
+            if (timerVal) {
+              busyMecs.add(t.empleado);
+              pausedCount++;
+              pausedHtml += `
+                <div class="dashboard-card paused">
+                  <div class="dashboard-card-info">
+                    <h4>${t.empleado}</h4>
+                    <p>${order.rodado} (Int ${order.interno})</p>
+                    <small>${t.descripcion}</small>
+                  </div>
+                  <div class="dashboard-card-timer">En Pausa</div>
+                  <div class="dashboard-card-actions">
+                    <button class="btn btn-primary btn-xs" onclick="resumeTaskTimer('${order.id}', '${t.id}')">
+                      <span class="material-icons" style="font-size:12px;">play_arrow</span> Reanudar
+                    </button>
+                    <button class="btn btn-success btn-xs" onclick="finishTaskDirect('${order.id}', '${t.id}')">
+                      <span class="material-icons" style="font-size:12px;">done</span> Terminar
+                    </button>
+                  </div>
+                </div>
+              `;
+            }
+          }
+        });
+      });
+
+      // Update lists and counts
+      document.getElementById("count-working").textContent = workingCount;
+      document.getElementById("count-paused").textContent = pausedCount;
+
+      gridWorking.innerHTML = workingHtml || `<div class="empty-dashboard-state">No hay operarios trabajando actualmente.</div>`;
+      gridPaused.innerHTML = pausedHtml || `<div class="empty-dashboard-state">No hay tareas en pausa.</div>`;
+
+      // Render Free/Available Mechanics
+      const freeMecs = activeMechanicsList.filter(name => !busyMecs.has(name));
+      document.getElementById("count-free").textContent = freeMecs.length;
+
+      if (freeMecs.length === 0) {
+        listFree.innerHTML = `<div class="empty-dashboard-state">No hay mecánicos libres disponibles.</div>`;
+      } else {
+        listFree.innerHTML = freeMecs.map(name => `
+          <div class="free-employee-tag">
+            <span class="material-icons">person</span>
+            <span>${name}</span>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Chronometer Functions
+    function toggleTaskTimerDirect(orderId, taskId) {
+      const isRunning = activeIntervalTimers[taskId] !== undefined;
+      if (isRunning) {
+        pauseTaskTimer(orderId, taskId);
+      } else {
+        resumeTaskTimer(orderId, taskId);
+      }
+    }
+
+    function resumeTaskTimer(orderId, taskId) {
+      // Check for conflicts
+      const order = activeOrders.find(o => o.id === orderId);
+      if (!order) return;
+      const task = order.tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const currentMechanic = task.empleado;
+
+      // Find if this mechanic already has an active timer elsewhere
+      let conflictTask = null;
+      let conflictOrder = null;
+
+      activeOrders.forEach(o => {
+        if (o.syncStatus === 'success') return;
+        o.tasks.forEach(t => {
+          if (t.id !== taskId && t.empleado === currentMechanic && activeIntervalTimers[t.id]) {
+            conflictTask = t;
+            conflictOrder = o;
+          }
+        });
+      });
+
+      if (conflictTask) {
+        // Conflict detected!
+        const msg = `El mecánico ${currentMechanic} ya está trabajando en otra tarea activa para el rodado: ${conflictOrder.rodado} (Interno ${conflictOrder.interno}).\n\n¿Desea pausar esa tarea automáticamente para iniciar esta?`;
+        
+        if (confirm(msg)) {
+          // Pause previous task
+          pauseTaskTimer(conflictOrder.id, conflictTask.id);
+          logTerminal(`Conflicto resuelto: Se pausó automáticamente la tarea del mecánico en ${conflictOrder.rodado}.`, 'warn');
+        } else {
+          // Cancel start
+          logTerminal(`Se canceló el inicio del cronómetro para evitar conflicto con ${currentMechanic}.`, 'info');
+          return;
+        }
+      }
+
+      // Start new timer
+      const startTime = Date.now();
+      localStorage.setItem(`timer_start_${taskId}`, startTime);
+      
+      activeIntervalTimers[taskId] = setInterval(() => {
+        const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+        updateTimerDisplay(taskId, elapsedSec);
+      }, 1000);
+
+      logTerminal(`Cronómetro INICIADO para ${currentMechanic} (Tarea de ${order.rodado}).`, 'info');
+      renderOrdersDirect();
+
+      if (currentStep === 3) {
+        highlightStepCard(4);
+        // Target is to force conflict, point cursor to another "Iniciar" or step trigger
+        hidePointer();
+      }
+    }
+
+    function pauseTaskTimer(orderId, taskId) {
+      if (!activeIntervalTimers[taskId]) return;
+      
+      clearInterval(activeIntervalTimers[taskId]);
+      delete activeIntervalTimers[taskId];
+
+      const start = parseInt(localStorage.getItem(`timer_start_${taskId}`)) || Date.now();
+      localStorage.removeItem(`timer_start_${taskId}`);
+
+      const elapsedHrs = (Date.now() - start) / (1000 * 3600);
+
+      // Accumulate hours
+      const order = activeOrders.find(o => o.id === orderId);
+      if (order) {
+        const task = order.tasks.find(t => t.id === taskId);
+        if (task) {
+          task.horasEstimadas = parseFloat((task.horasEstimadas + elapsedHrs).toFixed(2));
+          logTerminal(`Cronómetro DETENIDO para ${task.empleado}. Horas acumuladas: +${elapsedHrs.toFixed(2)} hrs. Total: ${task.horasEstimadas} hrs.`, 'info');
+        }
+      }
+
+      renderOrdersDirect();
+    }
+
+    function finishTaskDirect(orderId, taskId) {
+      // Pause timer if running
+      if (activeIntervalTimers[taskId]) {
+        pauseTaskTimer(orderId, taskId);
+      }
+
+      const order = activeOrders.find(o => o.id === orderId);
+      if (order) {
+        const task = order.tasks.find(t => t.id === taskId);
+        if (task) {
+          task.status = "Finalizada";
+          logTerminal(`Tarea finalizada por ${task.empleado}.`, 'info');
+        }
+      }
+
+      renderOrdersDirect();
+
+      // Check if all tasks in the order are completed to guide step 5
+      const currentOrder = activeOrders.find(o => o.id === orderId);
+      const allCompleted = currentOrder && currentOrder.tasks.every(t => t.status === "Finalizada");
+      if (allCompleted && currentStep === 4) {
+        highlightStepCard(5);
+      }
+    }
+
+    function updateTimerDisplay(taskId, elapsedSec) {
+      const hrs = String(Math.floor(elapsedSec / 3600)).padStart(2, '0');
+      const mins = String(Math.floor((elapsedSec % 3600) / 60)).padStart(2, '0');
+      const secs = String(elapsedSec % 60).padStart(2, '0');
+      const timeStr = `${hrs}:${mins}:${secs}`;
+
+      const el = document.getElementById(`dash-timer-${taskId}`);
+      if (el) el.textContent = timeStr;
+    }
+
+    // Edit Order Direct
+    function editOrderDirect(orderId) {
+      const order = activeOrders.find(o => o.id === orderId);
+      if (!order) return;
+
+      currentEditingOrderId = orderId;
+      document.getElementById('modal-order-title').textContent = "Editar Orden de Trabajo";
+      
+      const modal = document.getElementById('new-order-modal');
+      modal.classList.remove('readonly-mode');
+      modal.classList.add('open');
+
+      document.getElementById('form-rodado').value = order.rodado;
+      document.getElementById('form-interno').value = order.interno;
+      document.getElementById('form-clasificacion').value = order.clasificacion;
+      document.getElementById('form-incidente').value = order.incidente;
+
+      const container = document.getElementById('modal-tasks-list');
+      container.innerHTML = "";
+      order.tasks.forEach(t => {
+        addTaskFieldDirect(t);
+      });
+      hidePointer();
+    }
+
+    // View Order Direct (Read Only)
+    function viewOrderDirect(orderId) {
+      const order = activeOrders.find(o => o.id === orderId);
+      if (!order) return;
+
+      currentEditingOrderId = null;
+      document.getElementById('modal-order-title').textContent = `Ver Orden — Subida: ${new Date().toLocaleDateString('es-AR')}`;
+      
+      const modal = document.getElementById('new-order-modal');
+      modal.classList.add('open', 'readonly-mode');
+
+      document.getElementById('form-rodado').value = order.rodado;
+      document.getElementById('form-interno').value = order.interno;
+      document.getElementById('form-clasificacion').value = order.clasificacion;
+      document.getElementById('form-incidente').value = order.incidente;
+
+      const container = document.getElementById('modal-tasks-list');
+      container.innerHTML = "";
+      order.tasks.forEach(t => {
+        addTaskFieldDirect(t);
+      });
+      hidePointer();
+    }
+
+    // Delete Order Direct
+    function deleteOrderDirect(orderId) {
+      const order = activeOrders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const msg = order.syncStatus === 'success' 
+        ? "¿Estás seguro de eliminar esta orden localmente? No se borrará del portal Taxes si ya fue sincronizada."
+        : "¿Desea eliminar esta orden de trabajo localmente?";
+
+      if (confirm(msg)) {
+        activeOrders = activeOrders.filter(o => o.id !== orderId);
+        showToastDirect("Orden eliminada localmente", "success");
+        renderOrdersDirect();
+        updateStatsDirect();
+      }
+    }
+
+    // Active Mechanics List Modal
+    function openActiveMechanicsModalDirect() {
+      const container = document.getElementById('active-mechanics-checklist-container');
+      container.innerHTML = MECANICA_EMPLOYEES.map(name => {
+        const isChecked = activeMechanicsList.includes(name);
+        return `
+          <label class="mechanic-check-item">
+            <input type="checkbox" name="active_mechanic" value="${name}" ${isChecked ? 'checked' : ''}>
+            <span>${name}</span>
+          </label>
+        `;
+      }).join('');
+      document.getElementById('active-mechanics-modal').classList.add('open');
+    }
+
+    function closeActiveMechanicsModalDirect() {
+      document.getElementById('active-mechanics-modal').classList.remove('open');
+    }
+
+    function saveActiveMechanicsListDirect() {
+      const checks = document.querySelectorAll('input[name="active_mechanic"]:checked');
+      activeMechanicsList = Array.from(checks).map(c => c.value);
+      closeActiveMechanicsModalDirect();
+      renderDashboardDirect();
+      showToastDirect("Lista de mecánicos activos guardada", "success");
+    }
+
+    // Stats
+    function updateStatsDirect() {
+      // In a real app stats are on the settings page or sync dashboard, but we keep counts updated
+    }
+
+    // PUPPETEER WORKER SIMULATOR SEQUENCE
+    function startSyncSequence(orderId) {
+      const order = activeOrders.find(o => o.id === orderId);
+      if (!order) return;
+
+      // Make sure all tasks are finished first
+      const allCompleted = order.tasks.every(t => t.status === "Finalizada");
+      if (!allCompleted) {
+        showToastDirect("No se puede subir. Hay tareas pendientes o en curso.", "warning");
+        logTerminal(`[ERROR WORKER] Se intentó subir OT #${order.interno} pero posee tareas pendientes.`, 'error');
+        return;
+      }
+
+      order.syncStatus = 'syncing';
+      renderOrdersDirect();
+      switchViewDirect('sync');
+
+      logTerminal(`=== INICIANDO SINCRONIZACIÓN DE OT #${order.interno} (ID: ${order.id}) ===`, 'info');
+      
+      setTimeout(() => {
+        logTerminal(`[PUPPETEER] Lanzando navegador Chromium sin cabeza...`);
+        setTimeout(() => {
+          logTerminal(`[PUPPETEER] Navegando directamente a https://taxes.com.ar/tms/produccion/ot ...`);
+          setTimeout(() => {
+            logTerminal(`[PUPPETEER] Cookie de sesión inválida. Redirigiendo a Login...`);
+            setTimeout(() => {
+              logTerminal(`[PUPPETEER] Escribiendo usuario: cbelocures@contenedoreshugo.com.ar ...`);
+              setTimeout(() => {
+                logTerminal(`[PUPPETEER] Iniciando sesión... ¡Login exitoso!`);
+                setTimeout(() => {
+                  logTerminal(`[PUPPETEER] Navegando a formulario "NUEVO" de Orden de Trabajo...`);
+                  setTimeout(() => {
+                    logTerminal(`[PUPPETEER] Resolviendo Responsable automáticamente por perfil: "Belocures, Cesar Hernán"`);
+                    setTimeout(() => {
+                      logTerminal(`[PUPPETEER] Llenando rodado buscador (Searchable Select): "${order.rodado}"`);
+                      setTimeout(() => {
+                        logTerminal(`[PUPPETEER] Ingresando Interno: "${order.interno}", Clasificación: "${order.clasificacion}"`);
+                        
+                        // Sync each task
+                        order.tasks.forEach((t, idx) => {
+                          setTimeout(() => {
+                            logTerminal(`[PUPPETEER] Agregando Tarea #${idx+1} en Taxes: "${t.descripcion}"`);
+                            logTerminal(`[PUPPETEER] Centro de costo: MECANICA (15) · Empleado: ${t.empleado}`);
+                            logTerminal(`[PUPPETEER] Tarea está FINALIZADA. Pulsando switch a TAREA COMPLETADA.`);
+                            logTerminal(`[PUPPETEER] Verificación del Switch: checked=true, label="Tarea Completada" ✅`);
+                          }, 1500 + idx * 800);
+                        });
+
+                        // Final Save
+                        const finalDelay = 1500 + order.tasks.length * 800;
+                        setTimeout(() => {
+                          logTerminal(`[PUPPETEER] Presionando botón GUARDAR en Taxes.com.ar...`);
+                          setTimeout(() => {
+                            logTerminal(`[PUPPETEER] Orden creada con éxito en el portal Taxes! ID Sincronizado.`, 'info');
+                            
+                            order.syncStatus = 'success';
+                            order.syncDate = new Date().toISOString();
+                            renderOrdersDirect();
+                            showToastDirect("Orden de Trabajo sincronizada con Taxes!", "success");
+                            
+                            if (currentStep === 5) {
+                              highlightStepCard(6);
+                            }
+                          }, 1000);
+                        }, finalDelay);
+
+                      }, 1000);
+                    }, 1000);
+                  }, 1000);
+                }, 1000);
+              }, 1000);
+            }, 1000);
+          }, 1000);
+        }, 1000);
+      }, 1000);
+    }
+
+    // Tutorial Helper Functions
+    function highlightStepCard(step) {
+      currentStep = step;
+      document.querySelectorAll(".tutorial-card").forEach(c => c.classList.remove("active"));
+      const activeCard = document.getElementById(`card-step-${step}`);
+      if (activeCard) {
+        activeCard.classList.add("active");
+        activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function showPointer(selector, xOffset = 0, yOffset = 0) {
+      const el = document.querySelector(selector);
+      const pointer = document.getElementById("tutorial-pointer");
+      if (el && pointer) {
+        const rect = el.getBoundingClientRect();
+        pointer.style.top = `${rect.top + window.scrollY + yOffset}px`;
+        pointer.style.left = `${rect.left + window.scrollX + xOffset}px`;
+        pointer.style.display = "block";
+      }
+    }
+
+    function hidePointer() {
+      const pointer = document.getElementById("tutorial-pointer");
+      if (pointer) pointer.style.display = "none";
+    }
+
+    // Step Guided Commands
+    function goToStep(step) {
+      highlightStepCard(step);
+      hidePointer();
+
+      if (step === 1) {
+        switchViewDirect('home');
+        openNewOrderModalDirect();
+      } 
+      else if (step === 2) {
+        if (!document.getElementById('new-order-modal').classList.contains('open')) {
+          openNewOrderModalDirect();
+        }
+        addTaskFieldDirect();
+        logTerminal("Agregando segunda tarea mockeada con centro de costo MECANICA.");
+        highlightStepCard(2);
+      } 
+      else if (step === 3) {
+        closeNewOrderModalDirect();
+        // Insert a mock order
+        activeOrders = [
+          {
+            id: "order-mock-step",
+            rodado: "Volvo FH 420",
+            interno: "22",
+            clasificacion: "Preventivo",
+            incidente: "Control de frenos",
+            fechaEntrega: new Date().toISOString().split('T')[0],
+            horario: "10:00",
+            syncStatus: "local",
+            syncDate: null,
+            tasks: [
+              {
+                id: "task-mock-3-1",
+                centroCosto: "15",
+                empleado: "Monzon, Carlos Agustin",
+                horasEstimadas: 1.5,
+                status: "Pendiente",
+                descripcion: "Control de frenos generales",
+                timerStart: null
+              }
+            ]
+          }
+        ];
+        renderOrdersDirect();
+        switchViewDirect('home');
+        logTerminal("Reemplazado lista de órdenes con una orden lista para simular cronómetros.");
+        setTimeout(() => {
+          showPointer('.btn-timer-toggle', 45, 15);
+        }, 300);
+      } 
+      else if (step === 4) {
+        // Force conflict simulation
+        switchViewDirect('home');
+        // Inject a running timer for Carlos Monzón
+        activeIntervalTimers["task-mock-3-1"] = setInterval(() => {}, 1000);
+        renderOrdersDirect();
+        
+        logTerminal("Forzando conflicto: Carlos Monzón ya tiene un cronómetro activo en el Rodado Volvo.");
+        
+        // Add another order with Carlos Monzón
+        const secondOrder = {
+          id: "order-mock-step-4",
+          rodado: "Scania R450",
+          interno: "14",
+          clasificacion: "Correctivo",
+          incidente: "Falla eléctrica",
+          fechaEntrega: new Date().toISOString().split('T')[0],
+          horario: "11:00",
+          syncStatus: "local",
+          syncDate: null,
+          tasks: [
+            {
+              id: "task-mock-4-1",
+              centroCosto: "15",
+              empleado: "Monzon, Carlos Agustin",
+              horasEstimadas: 0.0,
+              status: "Pendiente",
+              descripcion: "Revisión de luces e instrumental",
+              timerStart: null
+            }
+          ]
+        };
+        activeOrders.push(secondOrder);
+        renderOrdersDirect();
+
+        setTimeout(() => {
+          logTerminal("Iniciando una nueva tarea para Carlos Monzón en el Scania...");
+          resumeTaskTimer("order-mock-step-4", "task-mock-4-1");
+        }, 1000);
+      } 
+      else if (step === 5) {
+        // Prepare order for sync (all tasks finalizadas)
+        activeOrders = [
+          {
+            id: "order-ready-sync",
+            rodado: "Volvo FH 420",
+            interno: "22",
+            clasificacion: "Preventivo",
+            incidente: "Control de frenos",
+            fechaEntrega: new Date().toISOString().split('T')[0],
+            horario: "10:00",
+            syncStatus: "local",
+            syncDate: null,
+            tasks: [
+              {
+                id: "task-ready-1",
+                centroCosto: "15",
+                empleado: "Monzon, Carlos Agustin",
+                horasEstimadas: 2.25,
+                status: "Finalizada",
+                descripcion: "Control de frenos generales",
+                timerStart: null
+              }
+            ]
+          }
+        ];
+        renderOrdersDirect();
+        switchViewDirect('orders');
+        logTerminal("Listo para sincronizar: Tarea finalizada, orden marcada como COMPLETADA (verde).");
+        setTimeout(() => {
+          showPointer('.icon-btn.success', 15, 15);
+        }, 500);
+      } 
+      else if (step === 6) {
+        switchViewDirect('history');
+        logTerminal("Observa la pestaña de SUBIDAS. La orden subida con éxito se encuentra aquí.");
+        setTimeout(() => {
+          showPointer('.icon-btn.primary', 15, 15);
+        }, 500);
+      }
+    }
+  </script>
+</body>
+</html>
