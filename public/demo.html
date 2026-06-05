@@ -30,34 +30,34 @@
 
     /* Left Sidebar: Inspector and terminal */
     .demo-sidebar {
-      width: 480px;
-      min-width: 480px;
+      width: 320px;
+      min-width: 320px;
       background: #0f172a;
       border-right: 1px solid rgba(255, 255, 255, 0.1);
       display: flex;
       flex-direction: column;
       height: 100%;
       overflow: hidden;
-      box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+      box-shadow: 5px 0 15px rgba(0,0,0,0.3);
       z-index: 100;
     }
 
     .demo-sidebar-header {
-      padding: 20px;
+      padding: 15px 20px;
       background: #090d1a;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     .demo-logo-icon {
-      font-size: 32px;
+      font-size: 24px;
       color: #3b82f6;
     }
 
     .demo-sidebar-header h2 {
-      font-size: 18px;
+      font-size: 15px;
       font-weight: 700;
       margin: 0;
       color: #ffffff;
@@ -65,26 +65,26 @@
 
     .demo-sidebar-content {
       flex: 1;
-      padding: 20px;
+      padding: 15px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 15px;
     }
 
     /* Inspector cards */
     .inspector-card {
       background: rgba(30, 41, 59, 0.4);
       border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 16px;
+      border-radius: 10px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
 
     .inspector-card h3 {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -92,17 +92,17 @@
       margin: 0;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
 
     .inspector-action-box {
       background: rgba(15, 23, 42, 0.6);
       border-left: 3px solid #10b981;
-      padding: 12px;
+      padding: 10px;
       border-radius: 4px;
-      font-size: 13px;
+      font-size: 12px;
       color: #cbd5e1;
-      line-height: 1.5;
+      line-height: 1.4;
     }
 
     .inspector-action-box.warning {
@@ -113,21 +113,20 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 12px;
+      padding: 6px 10px;
       background: rgba(15, 23, 42, 0.4);
-      border-radius: 8px;
-      font-size: 13px;
-      border: 1px solid rgba(255, 255, 255, 0.03);
+      border-radius: 6px;
+      font-size: 11px;
     }
 
     .status-badge {
       display: flex;
       align-items: center;
       gap: 4px;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 12px;
+      padding: 1px 6px;
+      border-radius: 10px;
     }
 
     .status-badge.inactive {
@@ -139,7 +138,6 @@
       background: #065f46;
       color: #34d399;
       box-shadow: 0 0 8px rgba(52, 211, 153, 0.3);
-      animation: pulse-green 2s infinite;
     }
 
     .status-badge.alert {
@@ -148,27 +146,15 @@
       animation: pulse-amber 1.5s infinite;
     }
 
-    @keyframes pulse-green {
-      0% { opacity: 0.8; }
-      50% { opacity: 1; }
-      100% { opacity: 0.8; }
-    }
-
-    @keyframes pulse-amber {
-      0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
-      70% { box-shadow: 0 0 0 6px rgba(251, 191, 36, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
-    }
-
     /* Terminal Console */
     .demo-terminal {
-      height: 240px;
-      min-height: 240px;
+      height: 200px;
+      min-height: 200px;
       background: #020617;
-      border-top: 2px solid rgba(255, 255, 255, 0.15);
-      padding: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 12px;
       font-family: monospace;
-      font-size: 11px;
+      font-size: 10.5px;
       color: #34d399;
       overflow-y: auto;
       box-sizing: border-box;
@@ -176,19 +162,19 @@
 
     .terminal-title {
       color: #94a3b8;
-      font-size: 10px;
+      font-size: 9px;
       text-transform: uppercase;
       font-weight: 700;
       letter-spacing: 1px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
     }
 
     .terminal-line {
-      margin: 4px 0;
-      line-height: 1.4;
+      margin: 3px 0;
+      line-height: 1.3;
     }
 
     .terminal-line.error { color: #f87171; }
@@ -196,7 +182,7 @@
     .terminal-line.info { color: #60a5fa; }
     .terminal-line.success { color: #34d399; font-weight: bold; }
 
-    /* Right Side: Phone container */
+    /* Center Viewport: Phone emulator */
     .demo-viewport {
       flex: 1;
       background: radial-gradient(circle, #1e293b 0%, #030712 100%);
@@ -204,31 +190,31 @@
       align-items: center;
       justify-content: center;
       position: relative;
+      padding: 10px;
     }
 
     .phone-frame {
-      width: 380px;
-      height: 780px;
+      width: 360px;
+      height: 740px;
       background: #000000;
-      border-radius: 48px;
-      padding: 12px;
-      box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.8), 0 0 0 12px #334155;
+      border-radius: 40px;
+      padding: 10px;
+      box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.8), 0 0 0 10px #334155;
       position: relative;
       display: flex;
       flex-direction: column;
     }
 
-    /* Speaker notch */
     .phone-notch {
-      width: 140px;
-      height: 24px;
+      width: 130px;
+      height: 20px;
       background: #000000;
       position: absolute;
-      top: 12px;
+      top: 10px;
       left: 50%;
       transform: translateX(-50%);
-      border-bottom-left-radius: 18px;
-      border-bottom-right-radius: 18px;
+      border-bottom-left-radius: 15px;
+      border-bottom-right-radius: 15px;
       z-index: 1000;
       display: flex;
       justify-content: center;
@@ -236,26 +222,25 @@
     }
 
     .phone-camera {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       background: #1e293b;
       border-radius: 50%;
     }
 
-    /* Embed Mobile App inside Phone */
     .phone-content {
       flex: 1;
       width: 100%;
       height: 100%;
       background: var(--bg-color);
-      border-radius: 38px;
+      border-radius: 32px;
       overflow: hidden;
       position: relative;
       display: flex;
       flex-direction: column;
     }
 
-    /* PHONE APP LAYOUT RESTORATION/OVERRIDES */
+    /* Phone style resets */
     .phone-content .app-header {
       position: absolute !important;
       top: 0 !important;
@@ -273,7 +258,7 @@
       right: 0 !important;
       height: auto !important;
       overflow-y: auto !important;
-      padding: 16px !important;
+      padding: 14px !important;
       z-index: 10 !important;
     }
 
@@ -308,13 +293,139 @@
       z-index: 300 !important;
     }
 
-    /* Quick tutorial pointer overlay */
+    /* Right Panel: Architecture diagram */
+    .demo-diagram-panel {
+      width: 440px;
+      min-width: 440px;
+      background: #0f172a;
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .diagram-scroll-content {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-sizing: border-box;
+    }
+
+    /* Interactive diagram nodes styling */
+    .diagram-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .diagram-box {
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px;
+      background: rgba(30, 41, 59, 0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+
+    .diagram-box-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #94a3b8;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 3px;
+      margin-bottom: 2px;
+    }
+
+    .diagram-node {
+      background: #1e293b;
+      border: 1.5px solid #475569;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      text-align: center;
+      font-weight: 600;
+      color: #94a3b8;
+      transition: all 0.3s ease;
+      opacity: 0.45;
+    }
+
+    .diagram-node.active {
+      opacity: 1 !important;
+      transform: translateY(-1px);
+    }
+
+    /* Glowing color classes */
+    .diagram-node.supervisor { border-color: #ffffff; color: #ffffff; }
+    .diagram-node.supervisor.active { box-shadow: 0 0 10px rgba(255,255,255,0.4); }
+
+    .diagram-node.app-web { border-color: #3b82f6; color: #60a5fa; }
+    .diagram-node.app-web.active { box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+
+    .diagram-node.express { border-color: #10b981; color: #34d399; }
+    .diagram-node.express.active { box-shadow: 0 0 10px rgba(16, 185, 129, 0.5); }
+
+    .diagram-node.worker { border-color: #f59e0b; color: #fbbf24; }
+    .diagram-node.worker.active { box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+
+    .diagram-node.db { border-color: #a855f7; color: #c084fc; border-radius: 10px; }
+    .diagram-node.db.active { box-shadow: 0 0 10px rgba(168, 85, 247, 0.5); }
+
+    .diagram-node.puppeteer { border-color: #ef4444; color: #f87171; }
+    .diagram-node.puppeteer.active { box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+
+    .diagram-node.taxes { border-color: #64748b; color: #cbd5e1; }
+    .diagram-node.taxes.active { border-color: #3b82f6; color: #ffffff; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+
+    .diagram-connector {
+      text-align: center;
+      font-size: 9px;
+      color: #475569;
+      padding: 1px;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      opacity: 0.45;
+      transition: all 0.3s ease;
+    }
+
+    .diagram-connector.active {
+      color: #38bdf8;
+      font-weight: bold;
+      opacity: 1;
+      text-shadow: 0 0 6px rgba(56, 189, 248, 0.5);
+    }
+
+    .diagram-connector::before {
+      content: "↓";
+      font-size: 12px;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .diagram-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .diagram-row > * {
+      flex: 1;
+    }
+
     .tutorial-hint-banner {
       background: #1e3a8a;
       border: 1px solid #3b82f6;
       border-radius: 8px;
       padding: 10px;
-      font-size: 12px;
+      font-size: 11px;
       color: #93c5fd;
       display: flex;
       align-items: center;
@@ -323,22 +434,18 @@
     }
 
     /* Responsive behaviors */
-    @media (max-width: 900px) {
+    @media (max-width: 1100px) {
       body.demo-page {
         flex-direction: column !important;
         overflow-y: auto !important;
       }
-      .demo-sidebar {
+      .demo-sidebar, .demo-diagram-panel {
         width: 100% !important;
         height: auto !important;
         min-height: auto !important;
       }
-      .demo-terminal {
-        height: 180px !important;
-        min-height: 180px !important;
-      }
       .demo-viewport {
-        padding: 40px 0 !important;
+        padding: 30px 0 !important;
       }
     }
   </style>
@@ -351,7 +458,7 @@
       <span class="material-icons demo-logo-icon">troubleshoot</span>
       <div>
         <h2>Inspector de Procesos</h2>
-        <small style="color: #64748b;">Inspección en tiempo real del taller</small>
+        <small style="color: #64748b;">Inspección en tiempo real</small>
       </div>
     </div>
 
@@ -360,18 +467,18 @@
       <!-- Card: Last user activity inspector -->
       <div class="inspector-card">
         <h3>
-          <span class="material-icons" style="font-size: 16px;">radar</span>
+          <span class="material-icons" style="font-size: 14px;">radar</span>
           Actividad Detectada
         </h3>
         <div class="inspector-action-box" id="inspect-action-desc">
-          Esperando que interactúes con el teléfono simulado. Prueba abrir el formulario de orden o iniciar un cronómetro.
+          Esperando que interactúes con el teléfono simulado. Para comenzar, haz clic en el banner "Crear Orden de Trabajo" en la pantalla del celular.
         </div>
       </div>
 
       <!-- Card: System Components Status -->
       <div class="inspector-card">
         <h3>
-          <span class="material-icons" style="font-size: 16px;">settings_suggest</span>
+          <span class="material-icons" style="font-size: 14px;">settings_suggest</span>
           Componentes del Sistema
         </h3>
         
@@ -404,10 +511,10 @@
       <!-- Card: LocalStorage Database Viewer -->
       <div class="inspector-card">
         <h3>
-          <span class="material-icons" style="font-size: 16px;">storage</span>
+          <span class="material-icons" style="font-size: 14px;">storage</span>
           Estado de Base de Datos Local
         </h3>
-        <div style="font-family: monospace; font-size: 11px; background: rgba(15, 23, 42, 0.7); padding: 10px; border-radius: 6px; max-height: 140px; overflow-y: auto;">
+        <div style="font-family: monospace; font-size: 11px; background: rgba(15, 23, 42, 0.7); padding: 10px; border-radius: 6px; max-height: 120px; overflow-y: auto;">
           <strong>Órdenes en Memoria (Local):</strong>
           <pre id="inspect-db-json" style="margin: 4px 0 0 0; color: #38bdf8;">[]</pre>
         </div>
@@ -425,7 +532,7 @@
     </div>
   </div>
 
-  <!-- RIGHT PANEL: PORTABLE SMARTPHONE SCREEN -->
+  <!-- CENTER PANEL: PORTABLE SMARTPHONE SCREEN -->
   <div class="demo-viewport">
     <div class="phone-frame">
       <div class="phone-notch"><div class="phone-camera"></div></div>
@@ -450,10 +557,9 @@
 
           <!-- VIEW 1: HOME (DASHBOARD) -->
           <section id="view-home" class="app-view active">
-            <!-- Hint to guide user -->
             <div class="tutorial-hint-banner">
               <span class="material-icons" style="font-size: 18px;">info</span>
-              <span>¡Pruébalo! Presiona el botón de abajo para registrar un ingreso de taller.</span>
+              <span>¡Crea tu primera orden! Presiona "Crear Orden de Trabajo" abajo.</span>
             </div>
 
             <div class="create-order-banner" onclick="openNewOrderModalDirect()" id="banner-create-ot">
@@ -488,7 +594,7 @@
                 <span>Tareas en Pausa (<span id="count-paused">0</span>)</span>
               </div>
               <div class="dashboard-grid paused" id="grid-paused">
-                <div class="empty-dashboard-state">No hay tareas en pausa.</div>
+                <div class="empty-dashboard-state">No hay tareas pendientes/en pausa.</div>
               </div>
 
               <!-- Mecánicos Libres -->
@@ -578,7 +684,7 @@
                 <label>Contraseña de Taxes</label>
                 <input type="password" value="••••••••" disabled>
               </div>
-              <button type="button" class="btn btn-primary btn-block" onclick="showToastDirect('Credenciales y URL de Taxes guardadas con éxito', 'success')">
+              <button type="button" class="btn btn-primary btn-block" onclick="showToastDirect('Credenciales guardadas con éxito', 'success')">
                 <span class="material-icons">save</span> Guardar Configuración
               </button>
             </div>
@@ -636,7 +742,7 @@
                   <label for="form-rodado">Rodado *</label>
                   <select id="form-rodado" required>
                     <option value="">Seleccionar Rodado...</option>
-                    <option value="Volvo FH 420" selected>Volvo FH 420 - Int 22</option>
+                    <option value="Volvo FH 420">Volvo FH 420 - Int 22</option>
                     <option value="Scania R450">Scania R450 - Int 14</option>
                     <option value="Mercedes Accelo">Mercedes Benz Accelo - Int 8</option>
                   </select>
@@ -645,12 +751,13 @@
                 <div class="form-row">
                   <div class="form-group col-6">
                     <label for="form-interno">Interno Unidad *</label>
-                    <input type="text" id="form-interno" value="22" required>
+                    <input type="text" id="form-interno" placeholder="Ej: 22" required>
                   </div>
                   <div class="form-group col-6">
                     <label for="form-clasificacion">Clasificación *</label>
                     <select id="form-clasificacion" required>
-                      <option value="Preventivo" selected>Preventivo</option>
+                      <option value="">Seleccionar...</option>
+                      <option value="Preventivo">Preventivo</option>
                       <option value="Auxilio">Auxilio</option>
                       <option value="Correctivo">Correctivo</option>
                     </select>
@@ -659,7 +766,7 @@
 
                 <div class="form-group">
                   <label for="form-incidente">Incidente o Requisito</label>
-                  <textarea id="form-incidente" placeholder="Describa el incidente..." rows="2">Control de frenos y lubricantes</textarea>
+                  <textarea id="form-incidente" placeholder="Describa el incidente..." rows="2"></textarea>
                 </div>
               </div>
 
@@ -714,6 +821,69 @@
     </div>
   </div>
 
+  <!-- RIGHT PANEL: INTERACTIVE ARCHITECTURE DIAGRAM -->
+  <div class="demo-diagram-panel">
+    <div class="demo-sidebar-header" style="background: #090d1a;">
+      <span class="material-icons demo-logo-icon" style="color: #a855f7;">schema</span>
+      <div>
+        <h2>Flujo de Arquitectura</h2>
+        <small style="color: #64748b;">Visualización en tiempo real del dato</small>
+      </div>
+    </div>
+
+    <div class="diagram-scroll-content">
+      <div class="diagram-container">
+        
+        <!-- Box 1: Cliente -->
+        <div class="diagram-box">
+          <div class="diagram-box-title">Cliente (Móvil / PC)</div>
+          <div class="diagram-node supervisor" id="node-supervisor">Supervisor (Celular)</div>
+          <div class="diagram-connector" id="conn-load" style="opacity:0.35;">1. Carga Orden / Controla Tiempos</div>
+          <div class="diagram-node app-web" id="node-app">App Web Móvil (Frontend)</div>
+        </div>
+
+        <!-- Connection: HTTP Petición -->
+        <div class="diagram-connector" id="conn-http" style="margin: 4px 0;">
+          2. Peticiones HTTP (GET, POST, PUT, DELETE)
+        </div>
+
+        <!-- Box 2: Servidor en la Nube -->
+        <div class="diagram-box">
+          <div class="diagram-box-title">Servidor en la Nube (Railway)</div>
+          
+          <div class="diagram-row">
+            <div class="diagram-node express" id="node-express">Servidor Express (API REST)</div>
+            <div class="diagram-node worker" id="node-worker">syncWorker.js (Background)</div>
+          </div>
+
+          <div style="display:flex; justify-content:space-around; font-size:9.5px; font-family:monospace; margin: 4px 0;">
+            <div class="diagram-connector" id="conn-db-write" style="flex:1;">3. Lee/Escribe</div>
+            <div class="diagram-connector" id="conn-worker-monitor" style="flex:1;">4. Monitorea</div>
+            <div class="diagram-connector" id="conn-worker-status" style="flex:1;">7. Actualiza Estado</div>
+            <div class="diagram-connector" id="conn-worker-spawn" style="flex:1;">5. Instancia</div>
+          </div>
+
+          <div class="diagram-row">
+            <div class="diagram-node db" id="node-db">Base de Datos (db.json)</div>
+            <div class="diagram-node puppeteer" id="node-puppeteer">Puppeteer (Chromium)</div>
+          </div>
+        </div>
+
+        <!-- Connection: Simula clics -->
+        <div class="diagram-connector" id="conn-puppeteer-sync" style="margin: 4px 0;">
+          6. Simula clics, escribe datos, activa switches
+        </div>
+
+        <!-- Box 3: Taxes Portal -->
+        <div class="diagram-box">
+          <div class="diagram-box-title">Portal Externo</div>
+          <div class="diagram-node taxes" id="node-taxes">Web Taxes.com.ar</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- DEMO ENGINE JAVASCRIPT -->
   <script>
     // 17 authorized mechanics
@@ -744,31 +914,8 @@
       "Alvarez, Roberto Carlos"
     ];
 
-    // Mock Database in memory
-    let activeOrders = [
-      {
-        id: "order-1",
-        rodado: "Volvo FH 420",
-        interno: "22",
-        clasificacion: "Preventivo",
-        incidente: "Control preventivo de frenos",
-        fechaEntrega: new Date().toISOString().split('T')[0],
-        horario: "08:00",
-        syncStatus: "local", // local, success, syncing, pending, error
-        syncDate: null,
-        tasks: [
-          {
-            id: "task-1-1",
-            centroCosto: "15", // MECANICA
-            empleado: "Monzon, Carlos Agustin",
-            horasEstimadas: 1.5,
-            status: "Pendiente",
-            descripcion: "Cambio de pastillas delanteras",
-            timerStart: null
-          }
-        ]
-      }
-    ];
+    // Starts completely empty as requested ("la idea es que yo escriba todo de cero")
+    let activeOrders = [];
 
     let activeMechanicsList = [...MECANICA_EMPLOYEES];
     let activeIntervalTimers = {};
@@ -779,7 +926,7 @@
       renderActiveMechanicsList();
       renderOrdersDirect();
       updateDBInspector();
-      updateComponentsStatus();
+      setDiagramState(0);
     });
 
     // Helper: log message in live terminal
@@ -796,11 +943,14 @@
     // Helper: update DB representation card
     function updateDBInspector() {
       const el = document.getElementById("inspect-db-json");
+      if (activeOrders.length === 0) {
+        el.textContent = "[] (Base de datos vacía)";
+        return;
+      }
       const cleanOrders = activeOrders.map(o => ({
         interno: o.interno,
         rodado: o.rodado,
         status: o.syncStatus,
-        tasksCount: o.tasks.length,
         tasks: o.tasks.map(t => ({
           emp: t.empleado.split(',')[0],
           hrs: t.horasEstimadas,
@@ -822,52 +972,103 @@
       }
     }
 
-    // Helper: update component statuses
-    function updateComponentsStatus() {
+    // INTERACTIVE ARCHITECTURE STATE MACHINE
+    function setDiagramState(stateNum) {
+      // Clear all active classes
+      document.querySelectorAll('.diagram-node, .diagram-connector').forEach(el => {
+        el.classList.remove('active');
+      });
+
       const autoForm = document.getElementById("status-auto-form");
       const empFilter = document.getElementById("status-emp-filter");
       const timers = document.getElementById("status-timers");
       const conflicts = document.getElementById("status-conflicts");
-      const sync = document.getElementById("status-sync");
+      const syncBadge = document.getElementById("status-sync");
 
-      // 1. Auto form status
-      const modal = document.getElementById("new-order-modal");
-      if (modal.classList.contains("open") && !modal.classList.contains("readonly-mode")) {
-        autoForm.className = "status-badge active";
-        autoForm.textContent = "Activo";
-      } else {
-        autoForm.className = "status-badge inactive";
-        autoForm.textContent = "Inactivo";
-      }
+      // Reset core component badges
+      autoForm.className = "status-badge inactive"; autoForm.textContent = "Inactivo";
+      empFilter.className = "status-badge inactive"; empFilter.textContent = "Inactivo";
+      timers.className = "status-badge inactive"; timers.textContent = "Inactivo";
+      conflicts.className = "status-badge inactive"; conflicts.textContent = "Inactivo";
+      syncBadge.className = "status-badge inactive"; syncBadge.textContent = "Inactivo";
 
-      // 2. Emp Filter
-      let mecSelected = false;
-      if (modal.classList.contains("open") && !modal.classList.contains("readonly-mode")) {
-        const selectCc = document.querySelectorAll(".task-cc");
-        selectCc.forEach(s => {
-          if (s.value === "15") mecSelected = true;
-        });
-      }
-      if (mecSelected) {
-        empFilter.className = "status-badge active";
-        empFilter.textContent = "Activo";
-      } else {
-        empFilter.className = "status-badge inactive";
-        empFilter.textContent = "Inactivo";
-      }
-
-      // 3. Timers status
-      const runningCount = Object.keys(activeIntervalTimers).length;
-      if (runningCount > 0) {
+      // Keep timers badge updated if running
+      const timersRunningCount = Object.keys(activeIntervalTimers).length;
+      if (timersRunningCount > 0) {
         timers.className = "status-badge active";
-        timers.textContent = `${runningCount} Activo(s)`;
-      } else {
-        timers.className = "status-badge inactive";
-        timers.textContent = "Inactivo";
+        timers.textContent = `${timersRunningCount} Activos`;
       }
 
-      // 4. Conflicts
-      // We trigger alert class on conflict when popup is active
+      if (stateNum === 0) { // Idle / Home
+        setInspectorDesc("Esperando que interactúes con el teléfono simulado. Para comenzar, haz clic en el banner 'Crear Orden de Trabajo' en la pantalla del celular.");
+      }
+      else if (stateNum === 1) { // Formulario abierto / Escribiendo
+        document.getElementById('node-supervisor').classList.add('active');
+        document.getElementById('node-app').classList.add('active');
+        document.getElementById('conn-load').classList.add('active');
+        autoForm.className = "status-badge active"; autoForm.textContent = "Activo";
+        setInspectorDesc("Formulario abierto. Observa que Fecha, Hora y Responsable están ocultos y se resuelven automáticamente al guardar.");
+      }
+      else if (stateNum === 2) { // Filtrando mecánicos
+        document.getElementById('node-supervisor').classList.add('active');
+        document.getElementById('node-app').classList.add('active');
+        document.getElementById('conn-load').classList.add('active');
+        autoForm.className = "status-badge active"; autoForm.textContent = "Activo";
+        empFilter.className = "status-badge active"; empFilter.textContent = "Activo";
+        setInspectorDesc("Filtrando mecánicos: Al seleccionar Centro de Costo MECANICA, se activa la lógica para limitar el listado de empleados a los 17 mecánicos autorizados.");
+      }
+      else if (stateNum === 3) { // Petición HTTP (GET/POST/PUT)
+        document.getElementById('node-app').classList.add('active');
+        document.getElementById('conn-http').classList.add('active');
+        document.getElementById('node-express').classList.add('active');
+        setInspectorDesc("Enviando orden de trabajo al Servidor Express a través de peticiones HTTP en formato JSON.");
+      }
+      else if (stateNum === 4) { // Guardando en DB local
+        document.getElementById('node-express').classList.add('active');
+        document.getElementById('conn-db-write').classList.add('active');
+        document.getElementById('node-db').classList.add('active');
+        setInspectorDesc("El Servidor Express procesa la petición y escribe los cambios físicamente en el archivo de base de datos local db.json.");
+      }
+      else if (stateNum === 5) { // Timer activo (Taller)
+        document.getElementById('node-supervisor').classList.add('active');
+        document.getElementById('node-app').classList.add('active');
+        document.getElementById('node-express').classList.add('active');
+        document.getElementById('conn-db-write').classList.add('active');
+        document.getElementById('node-db').classList.add('active');
+        timers.className = "status-badge active"; timers.textContent = "Corriendo";
+        setInspectorDesc("Cronómetro activo en taller. Cada segundo, la app envía actualizaciones al Servidor Express para registrar el tiempo en db.json.");
+      }
+      else if (stateNum === 6) { // Conflicto detectado
+        document.getElementById('node-supervisor').classList.add('active');
+        document.getElementById('node-app').classList.add('active');
+        conflicts.className = "status-badge alert"; conflicts.textContent = "Alerta";
+        setInspectorDesc("¡Validación de Conflicto! El sistema detecta que el operario ya tiene un cronómetro activo en otra unidad. Al aceptar, se pausará automáticamente la anterior para registrar los tiempos.", true);
+      }
+      else if (stateNum === 7) { // Worker monitoreando DB
+        document.getElementById('node-worker').classList.add('active');
+        document.getElementById('conn-worker-monitor').classList.add('active');
+        document.getElementById('node-db').classList.add('active');
+        setInspectorDesc("El proceso syncWorker.js en segundo plano lee la base de datos y detecta una orden en estado pendiente para ser enviada.");
+      }
+      else if (stateNum === 8) { // Spawning Puppeteer Chromium
+        document.getElementById('node-worker').classList.add('active');
+        document.getElementById('conn-worker-spawn').classList.add('active');
+        document.getElementById('node-puppeteer').classList.add('active');
+        setInspectorDesc("El worker lanza Puppeteer en segundo plano para abrir un navegador Chromium y simular las acciones del operador.");
+      }
+      else if (stateNum === 9) { // Puppeteer interactuando con Taxes
+        document.getElementById('node-puppeteer').classList.add('active');
+        document.getElementById('conn-puppeteer-sync').classList.add('active');
+        document.getElementById('node-taxes').classList.add('active');
+        syncBadge.className = "status-badge active"; syncBadge.textContent = "Sincronizando";
+        setInspectorDesc("Sincronización en curso. Puppeteer navega en Taxes, loguea, carga la orden, y activa el switch 'Tarea Completada' para las tareas finalizadas.");
+      }
+      else if (stateNum === 10) { // Sync success (write state back to DB)
+        document.getElementById('node-worker').classList.add('active');
+        document.getElementById('conn-worker-status').classList.add('active');
+        document.getElementById('node-db').classList.add('active');
+        setInspectorDesc("Sincronización completada. El worker actualiza el estado de la orden en db.json como exitosa (success).");
+      }
     }
 
     // Tab Switching
@@ -888,18 +1089,22 @@
       let viewDesc = "";
       if (viewName === 'home') {
         viewDesc = "Viendo el INICIO. Aquí el jefe de taller controla en tiempo real qué operarios están ocupados y cuáles están disponibles.";
+        setDiagramState(0);
       } else if (viewName === 'orders') {
         viewDesc = "Viendo solapa ÓRDENES. Muestra la lista de vehículos en el taller con botones rápidos para Editar, Eliminar o Subir de forma manual a Taxes.";
+        setDiagramState(0);
       } else if (viewName === 'history') {
         viewDesc = "Viendo solapa SUBIDAS. Muestra el historial completo de órdenes que el robot ya ingresó con éxito a Taxes. El lápiz se desactiva y se cambia por un ojo 👁️ de solo lectura.";
+        setDiagramState(0);
       } else if (viewName === 'sync') {
         viewDesc = "Viendo MONITOR DE SYNC. Aquí se visualiza la cola de subidas y las tareas automáticas del sincronizador.";
+        setDiagramState(0);
       } else if (viewName === 'settings') {
         viewDesc = "Viendo AJUSTES. Permite simular credenciales del portal.";
+        setDiagramState(0);
       }
 
       setInspectorDesc(viewDesc);
-      updateComponentsStatus();
     }
 
     // Toast System
@@ -933,24 +1138,18 @@
       modal.classList.add('open');
       document.getElementById('work-order-form').reset();
       
-      // Default inputs
-      document.getElementById('form-interno').value = "22";
-      document.getElementById('form-incidente').value = "Control preventivo de frenos";
-
       const container = document.getElementById('modal-tasks-list');
       container.innerHTML = "";
       addTaskFieldDirect();
 
-      setInspectorDesc("Formulario de Orden Abierto. Los campos Fecha, Hora y Responsable han sido removidos de la pantalla móvil y se resuelven automáticamente al enviar.");
-      updateComponentsStatus();
+      setDiagramState(1);
     }
 
     function closeNewOrderModalDirect() {
       const modal = document.getElementById('new-order-modal');
       modal.classList.remove('open', 'readonly-mode');
       currentEditingOrderId = null;
-      setInspectorDesc("Formulario de Orden Cerrado.");
-      updateComponentsStatus();
+      setDiagramState(0);
     }
 
     // Add Task Card in Modal
@@ -1021,7 +1220,7 @@
 
           <div class="form-group" style="margin-top: 12px;">
             <label>Descripción de Actividades</label>
-            <textarea rows="2" class="task-desc" placeholder="Describa el trabajo...">${taskData ? taskData.descripcion : 'Cambio preventivo y control'}</textarea>
+            <textarea rows="2" class="task-desc" placeholder="Describa el trabajo...">${taskData ? taskData.descripcion : ''}</textarea>
           </div>
         </div>
       `;
@@ -1031,14 +1230,14 @@
       container.appendChild(div.firstElementChild);
       updateTaskCount();
 
-      // Auto assign a default mechanic for step convenience
+      // Auto assign a default mechanic for convenience
       if (!taskData) {
+        const firstCcSelect = container.querySelector(`#${taskId} .task-cc`);
+        firstCcSelect.value = "15";
         const firstEmpSelect = container.querySelector(`#${taskId} .task-emp`);
         firstEmpSelect.value = "Monzon, Carlos Agustin";
+        setDiagramState(2);
       }
-
-      setInspectorDesc("Nueva tarea agregada. El Centro de Costo por defecto es MECANICA, lo que limita la lista de personal a solo los 17 mecánicos autorizados.");
-      updateComponentsStatus();
     }
 
     function filterEmployeeDropdown(taskId) {
@@ -1055,12 +1254,11 @@
 
       if (cc === "15") {
         logTerminal(`[MECANICOS] Centro de costo MECANICA detectado. Cargando los 17 operarios.`, 'info');
-        setInspectorDesc("Centro de Costo MECANICA detectado. Filtro aplicado: el listado de Empleado Asignado se limita a los 17 mecánicos habilitados.");
+        setDiagramState(2);
       } else {
         logTerminal(`[MECANICOS] Otro Centro de costo. Cargando nómina completa de operarios.`, 'info');
-        setInspectorDesc("Otro Centro de Costo detectado. Filtro removido: se carga la nómina completa de operarios del taller.");
+        setDiagramState(1);
       }
-      updateComponentsStatus();
     }
 
     function updateTaskCount() {
@@ -1075,7 +1273,7 @@
       const clasificacion = document.getElementById('form-clasificacion').value;
       const incidente = document.getElementById('form-incidente').value;
 
-      if (!rodado || !interno) {
+      if (!rodado || !interno || !clasificacion) {
         showToastDirect("Por favor, rellene los campos obligatorios.", "danger");
         return;
       }
@@ -1111,45 +1309,54 @@
 
       if (!allValid) return;
 
-      if (currentEditingOrderId) {
-        // Save edit
-        const orderIndex = activeOrders.findIndex(o => o.id === currentEditingOrderId);
-        if (orderIndex > -1) {
-          activeOrders[orderIndex].rodado = rodado;
-          activeOrders[orderIndex].interno = interno;
-          activeOrders[orderIndex].clasificacion = clasificacion;
-          activeOrders[orderIndex].incidente = incidente;
-          activeOrders[orderIndex].tasks = tasks;
-          // Re-queue sync
-          if (activeOrders[orderIndex].syncStatus === 'error') {
-            activeOrders[orderIndex].syncStatus = 'local';
-          }
-        }
-        showToastDirect("Orden de Trabajo actualizada localmente", "success");
-        setInspectorDesc(`Se guardaron los cambios de la orden #${interno} en la base de datos local db.json.`);
-      } else {
-        // Create new
-        const newOrder = {
-          id: `order-${Date.now()}`,
-          rodado,
-          interno,
-          clasificacion,
-          incidente,
-          fechaEntrega: new Date().toISOString().split('T')[0],
-          horario: new Date().toLocaleTimeString().slice(0, 5),
-          syncStatus: "local",
-          syncDate: null,
-          tasks
-        };
-        activeOrders.push(newOrder);
-        showToastDirect("Orden de Trabajo guardada localmente", "success");
-        setInspectorDesc(`Orden creada con éxito. Interno #${interno} guardado localmente en db.json.`);
-      }
+      // Diagram Flow simulation: Send -> Write -> Finish
+      setDiagramState(3); // Send HTTP
+      
+      setTimeout(() => {
+        setDiagramState(4); // Write to local DB
 
-      closeNewOrderModalDirect();
-      renderOrdersDirect();
-      updateDBInspector();
-      updateComponentsStatus();
+        if (currentEditingOrderId) {
+          // Save edit
+          const orderIndex = activeOrders.findIndex(o => o.id === currentEditingOrderId);
+          if (orderIndex > -1) {
+            activeOrders[orderIndex].rodado = rodado;
+            activeOrders[orderIndex].interno = interno;
+            activeOrders[orderIndex].clasificacion = clasificacion;
+            activeOrders[orderIndex].incidente = incidente;
+            activeOrders[orderIndex].tasks = tasks;
+            // Re-queue sync
+            if (activeOrders[orderIndex].syncStatus === 'error') {
+              activeOrders[orderIndex].syncStatus = 'local';
+            }
+          }
+          showToastDirect("Orden de Trabajo actualizada localmente", "success");
+        } else {
+          // Create new
+          const newOrder = {
+            id: `order-${Date.now()}`,
+            rodado,
+            interno,
+            clasificacion,
+            incidente,
+            fechaEntrega: new Date().toISOString().split('T')[0],
+            horario: new Date().toLocaleTimeString().slice(0, 5),
+            syncStatus: "local",
+            syncDate: null,
+            tasks
+          };
+          activeOrders.push(newOrder);
+          showToastDirect("Orden de Trabajo guardada localmente", "success");
+        }
+
+        closeNewOrderModalDirect();
+        renderOrdersDirect();
+        updateDBInspector();
+
+        setTimeout(() => {
+          setDiagramState(0); // Return to idle/dashboard state
+        }, 1200);
+
+      }, 800);
     }
 
     // Render Lists
@@ -1291,7 +1498,7 @@
       let busyMecs = new Set();
 
       activeOrders.forEach(order => {
-        if (order.syncStatus === 'success') return; // ignore synced ones
+        if (order.syncStatus === 'success') return;
 
         order.tasks.forEach(t => {
           const isTimerRunning = activeIntervalTimers[t.id] !== undefined;
@@ -1304,7 +1511,7 @@
                 <div class="dashboard-card-info">
                   <h4>${t.empleado}</h4>
                   <p>${order.rodado} (Int ${order.interno})</p>
-                  <small>${t.descripcion}</small>
+                  <small>${t.descripcion || 'Sin descripción'}</small>
                 </div>
                 <div class="dashboard-card-timer" id="dash-timer-${t.id}">00:00:00</div>
                 <div class="dashboard-card-actions">
@@ -1318,19 +1525,16 @@
               </div>
             `;
           } else {
-            // Check if timer was paused
-            const timerVal = localStorage.getItem(`timer_start_${t.id}`);
             const accumulatedVal = parseFloat(t.horasEstimadas) || 0;
             
             if (t.status === "Pendiente") {
-              // If not running but has accumulated or was touched
               pausedCount++;
               pausedHtml += `
                 <div class="dashboard-card paused">
                   <div class="dashboard-card-info">
                     <h4>${t.empleado}</h4>
                     <p>${order.rodado} (Int ${order.interno})</p>
-                    <small>${t.descripcion}</small>
+                    <small>${t.descripcion || 'Sin descripción'}</small>
                   </div>
                   <div class="dashboard-card-timer">${accumulatedVal.toFixed(2)} hrs registradas</div>
                   <div class="dashboard-card-actions">
@@ -1395,29 +1599,19 @@
       });
 
       if (conflictTask) {
-        // Activate warning in system status
-        const confBadge = document.getElementById("status-conflicts");
-        confBadge.className = "status-badge alert";
-        confBadge.textContent = "ALERTA";
+        setDiagramState(6); // Alert state
 
         const msg = `El mecánico ${currentMechanic} ya está trabajando en otra tarea activa para el rodado: ${conflictOrder.rodado} (Interno ${conflictOrder.interno}).\n\n¿Desea pausar esa tarea automáticamente para iniciar esta?`;
-        
-        setInspectorDesc(`¡Conflicto Detectado! Se intentó iniciar cronómetro para ${currentMechanic}, quien ya posee una tarea corriendo en la unidad #${conflictOrder.interno}.`, true);
         
         if (confirm(msg)) {
           // Pause previous task
           pauseTaskTimer(conflictOrder.id, conflictTask.id);
           logTerminal(`[CONFLICTO] Se pausó automáticamente la tarea anterior de ${currentMechanic} en OT #${conflictOrder.interno}.`, 'warn');
-          setInspectorDesc(`Conflicto Resuelto: El sistema pausó la tarea anterior de ${currentMechanic} automáticamente antes de iniciar el nuevo timer.`);
         } else {
           logTerminal(`[CONFLICTO] Cancelado el inicio del timer de ${currentMechanic} para evitar horas duplicadas.`, 'info');
-          setInspectorDesc(`Conflicto Evitado: El usuario canceló la acción. No se inició el cronómetro.`);
-          confBadge.className = "status-badge inactive";
-          confBadge.textContent = "Inactivo";
+          setDiagramState(0);
           return;
         }
-        confBadge.className = "status-badge inactive";
-        confBadge.textContent = "Inactivo";
       }
 
       // Start timer
@@ -1434,11 +1628,10 @@
       }, 1000);
 
       logTerminal(`[CRONÓMETRO] Timer INICIADO para ${currentMechanic} (OT #${order.interno}).`, 'info');
-      setInspectorDesc(`Cronómetro Activo: Registrando horas en tiempo real para ${currentMechanic}. Guardando timestamp timer_start_${taskId} en LocalStorage.`);
+      setDiagramState(5); // Active timer
       
       renderOrdersDirect();
       updateDBInspector();
-      updateComponentsStatus();
     }
 
     function pauseTaskTimer(orderId, taskId) {
@@ -1457,16 +1650,18 @@
       if (order) {
         const task = order.tasks.find(t => t.id === taskId);
         if (task) {
-          // Fix precision
           task.horasEstimadas = parseFloat((task.horasEstimadas + elapsedHrs).toFixed(2));
           logTerminal(`[CRONÓMETRO] Timer PAUSADO para ${task.empleado}. Tiempo acumulado: +${elapsedHrs.toFixed(4)} hrs. Total: ${task.horasEstimadas} hrs.`, 'info');
-          setInspectorDesc(`Cronómetro Pausado: Se calcularon +${elapsedHrs.toFixed(4)} horas y se sumaron al total acumulado en el archivo db.json.`);
+          
+          setDiagramState(4); // DB Write state
+          setTimeout(() => {
+            setDiagramState(0);
+          }, 1200);
         }
       }
 
       renderOrdersDirect();
       updateDBInspector();
-      updateComponentsStatus();
     }
 
     function finishTaskDirect(orderId, taskId) {
@@ -1479,24 +1674,17 @@
         const task = order.tasks.find(t => t.id === taskId);
         if (task) {
           task.status = "Finalizada";
-          logTerminal(`[TAREA] Tarea "${task.descripcion}" marcada como FINALIZADA por ${task.empleado}.`, 'info');
-          setInspectorDesc(`Tarea Completada: La tarea de ${task.empleado} cambió a 'Finalizada'. Cuando todas las tareas de la orden estén listas, podrás sincronizarla.`);
+          logTerminal(`[TAREA] Tarea "${task.descripcion || 'Sin descripción'}" marcada como FINALIZADA por ${task.empleado}.`, 'info');
+          
+          setDiagramState(4); // Write to db
+          setTimeout(() => {
+            setDiagramState(0);
+          }, 1200);
         }
       }
 
       renderOrdersDirect();
       updateDBInspector();
-      updateComponentsStatus();
-    }
-
-    function updateTimerDisplay(taskId, elapsedSec) {
-      const hrs = String(Math.floor(elapsedSec / 3600)).padStart(2, '0');
-      const mins = String(Math.floor((elapsedSec % 3600) / 60)).padStart(2, '0');
-      const secs = String(elapsedSec % 60).padStart(2, '0');
-      const timeStr = `${hrs}:${mins}:${secs}`;
-
-      const el = document.getElementById(`dash-timer-${taskId}`);
-      if (el) el.textContent = timeStr;
     }
 
     // Edit Order
@@ -1522,8 +1710,7 @@
         addTaskFieldDirect(t);
       });
 
-      setInspectorDesc(`Editando orden #${order.interno}. El formulario cargó los datos previos.`);
-      updateComponentsStatus();
+      setDiagramState(1);
     }
 
     // View Order (Read Only)
@@ -1548,8 +1735,9 @@
         addTaskFieldDirect(t);
       });
 
-      setInspectorDesc(`Visualización de solo lectura. El botón "Enviar", "Agregar Tarea", eliminadores y cronómetros están ocultos por CSS.`);
-      updateComponentsStatus();
+      // View mode is visual only, keep state 0
+      setDiagramState(0);
+      setInspectorDesc("Visualización de solo lectura del historial. Los botones de acción y cronómetros se ocultan.");
     }
 
     // Delete Order
@@ -1564,16 +1752,16 @@
       if (confirm(msg)) {
         activeOrders = activeOrders.filter(o => o.id !== orderId);
         showToastDirect("Orden eliminada localmente", "success");
-        setInspectorDesc(`Se eliminó la orden de la base de datos local db.json.`);
+        setDiagramState(4); // Update DB state
+        setTimeout(() => setDiagramState(0), 1000);
         renderOrdersDirect();
         updateDBInspector();
-        updateComponentsStatus();
       }
     }
 
     // Active Mechanics List Modal
     function renderActiveMechanicsList() {
-      // Just loaded in background
+      // Prepared in background
     }
 
     function openActiveMechanicsModalDirect() {
@@ -1588,12 +1776,10 @@
         `;
       }).join('');
       document.getElementById('active-mechanics-modal').classList.add('open');
-      setInspectorDesc("Filtro de asistencia: Selecciona los mecánicos activos hoy.");
     }
 
     function closeActiveMechanicsModalDirect() {
       document.getElementById('active-mechanics-modal').classList.remove('open');
-      setInspectorDesc("Cerrado listado de asistencia.");
     }
 
     function saveActiveMechanicsListDirect() {
@@ -1602,7 +1788,6 @@
       closeActiveMechanicsModalDirect();
       renderDashboardDirect();
       showToastDirect("Lista de mecánicos activos guardada", "success");
-      setInspectorDesc("La lista de mecánicos libres disponibles fue actualizada.");
     }
 
     // SIMULATED BACKGROUND ROBOT SYNC SEQUENCE
@@ -1615,7 +1800,6 @@
       if (!allCompleted) {
         showToastDirect("No se puede subir. Hay tareas pendientes o en curso.", "warning");
         logTerminal(`[SYNC WORKER ERROR] Intento de sincronización cancelado para la unidad #${order.interno}. Motivo: Contiene tareas pendientes.`, 'error');
-        setInspectorDesc(`Error de validación: No puedes sincronizar una orden que tiene tareas en curso o pendientes.`, true);
         return;
       }
 
@@ -1623,18 +1807,20 @@
       renderOrdersDirect();
       switchViewDirect('sync');
 
-      // Update sync component badge
-      const syncBadge = document.getElementById("status-sync");
-      syncBadge.className = "status-badge active";
-      syncBadge.textContent = "Sincronizando";
-
+      // 1. Worker detects DB change
+      setDiagramState(7);
       logTerminal(`=== INICIANDO SINCRONIZACIÓN DE OT #${order.interno} (ID: ${order.id}) ===`, 'info');
-      setInspectorDesc("Sincronización en curso: El servidor detectó una orden marcada como Completada y lanzó el worker Puppeteer en segundo plano.");
 
       setTimeout(() => {
+        // 2. Worker launches Puppeteer
+        setDiagramState(8);
         logTerminal(`[PUPPETEER] Lanzando instancia de Chromium sin cabeza (headless)...`);
+        
         setTimeout(() => {
+          // 3. Puppeteer signs in and synchronizes with Taxes
+          setDiagramState(9);
           logTerminal(`[PUPPETEER] Navegando directamente a la URL de listado: https://taxes.com.ar/tms/produccion/ot`);
+          
           setTimeout(() => {
             logTerminal(`[PUPPETEER] Sesión expirada. Redirigiendo a Login: https://taxes.com.ar/admin`);
             setTimeout(() => {
@@ -1653,7 +1839,7 @@
                         // Sync each task
                         order.tasks.forEach((t, idx) => {
                           setTimeout(() => {
-                            logTerminal(`[PUPPETEER] Agregando Tarea #${idx+1} en Taxes: "${t.descripcion}"`);
+                            logTerminal(`[PUPPETEER] Agregando Tarea #${idx+1} en Taxes: "${t.descripcion || 'Sin descripción'}"`);
                             logTerminal(`[PUPPETEER] Centro de costo: MECANICA (15) · Empleado: ${t.empleado} · Horas: ${t.horasEstimadas}`);
                             logTerminal(`[PUPPETEER] La tarea está FINALIZADA localmente. Activando switch reactivo a 'Tarea Completada'.`);
                             logTerminal(`[PUPPETEER] Verificando estado del switch en Taxes: checked=true, label="Tarea Completada" ✅`);
@@ -1667,15 +1853,18 @@
                           setTimeout(() => {
                             logTerminal(`[PUPPETEER] ¡Orden sincronizada con éxito en el portal Taxes!`, 'success');
                             
+                            // 4. Update status back to DB
+                            setDiagramState(10);
                             order.syncStatus = 'success';
                             order.syncDate = new Date().toISOString();
                             renderOrdersDirect();
                             updateDBInspector();
                             showToastDirect("Orden de Trabajo sincronizada con Taxes!", "success");
-                            setInspectorDesc(`Sincronización Exitosa: La orden #${order.interno} fue guardada en Taxes y se movió al historial de 'Subidas'.`);
 
-                            syncBadge.className = "status-badge inactive";
-                            syncBadge.textContent = "Inactivo";
+                            setTimeout(() => {
+                              setDiagramState(0);
+                            }, 2000);
+
                           }, 1000);
                         }, finalDelay);
 
