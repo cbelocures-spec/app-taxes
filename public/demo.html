@@ -440,6 +440,178 @@
       flex: 1;
     }
 
+    /* Horizontal diagram styles */
+    .h-diagram-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: 10px;
+      box-sizing: border-box;
+      gap: 4px;
+    }
+
+    .h-diagram-box {
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 6px;
+      background: rgba(30, 41, 59, 0.15);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      width: 95px;
+    }
+
+    .h-diagram-box-title {
+      font-size: 8px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #94a3b8;
+      text-align: center;
+      margin-bottom: 2px;
+    }
+
+    .h-diagram-node {
+      background: #1e293b;
+      border: 1.5px solid #475569;
+      border-radius: 6px;
+      padding: 5px;
+      font-size: 9px;
+      text-align: center;
+      font-weight: 700;
+      color: #94a3b8;
+      width: 75px;
+      transition: all 0.3s ease;
+      opacity: 0.35;
+      box-sizing: border-box;
+    }
+
+    .h-diagram-node.active {
+      opacity: 1 !important;
+    }
+
+    .h-diagram-node.cellphone { border-color: #3b82f6; color: #60a5fa; }
+    .h-diagram-node.cellphone.active { box-shadow: 0 0 10px rgba(59, 130, 246, 0.6); background: rgba(59,130,246,0.1); }
+    
+    .h-diagram-node.express { border-color: #10b981; color: #34d399; }
+    .h-diagram-node.express.active { box-shadow: 0 0 10px rgba(16, 185, 129, 0.6); background: rgba(16,185,129,0.1); }
+    
+    .h-diagram-node.db { border-color: #f59e0b; color: #fbbf24; }
+    .h-diagram-node.db.active { box-shadow: 0 0 10px rgba(245, 158, 11, 0.6); background: rgba(245,158,11,0.1); }
+    
+    .h-diagram-node.worker { border-color: #fb923c; color: #fdba74; }
+    .h-diagram-node.worker.active { box-shadow: 0 0 10px rgba(251, 146, 60, 0.6); background: rgba(251,146,60,0.1); }
+
+    .h-diagram-node.taxes { border-color: #ea580c; color: #ffedd5; }
+    .h-diagram-node.taxes.active { box-shadow: 0 0 10px rgba(234, 88, 12, 0.6); background: rgba(234,88,12,0.1); }
+
+    .h-diagram-connector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 7.5px;
+      color: #475569;
+      font-family: monospace;
+      opacity: 0.35;
+      text-align: center;
+      transition: all 0.3s ease;
+      width: 45px;
+      gap: 2px;
+    }
+
+    .h-diagram-connector.active {
+      color: #38bdf8;
+      opacity: 1;
+      text-shadow: 0 0 5px rgba(56, 189, 248, 0.5);
+    }
+
+    .h-diagram-connector.active-reverse {
+      color: #10b981;
+      opacity: 1;
+      text-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+    }
+
+    .connector-line-horizontal {
+      height: 3px;
+      width: 40px;
+      background-image: linear-gradient(to right, #475569 50%, transparent 50%);
+      background-size: 8px 100%;
+      background-repeat: repeat-x;
+      transition: all 0.3s ease;
+      border-radius: 2px;
+    }
+
+    .h-diagram-connector.active .connector-line-horizontal {
+      background-image: linear-gradient(to right, #38bdf8 50%, transparent 50%);
+      animation: flowDashesHorizontal 0.5s linear infinite;
+      box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+    }
+
+    .h-diagram-connector.active-reverse .connector-line-horizontal {
+      background-image: linear-gradient(to right, #10b981 50%, transparent 50%);
+      animation: flowDashesHorizontalReverse 0.5s linear infinite;
+      box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+    }
+
+    @keyframes flowDashesHorizontal {
+      from { background-position: 0 0; }
+      to { background-position: 8px 0; }
+    }
+
+    @keyframes flowDashesHorizontalReverse {
+      from { background-position: 8px 0; }
+      to { background-position: 0 0; }
+    }
+
+    /* Custom active colors for connectors to match the reference diagram colors */
+    #conn-db-write.active,
+    #conn-worker-monitor.active,
+    #conn-worker-spawn.active,
+    #conn-worker-status.active,
+    #h-conn-db.active,
+    #h-conn-trigger.active,
+    #h-conn-status.active,
+    #h-conn-status.active-reverse {
+      color: #34d399 !important;
+      text-shadow: 0 0 6px rgba(16, 185, 129, 0.6) !important;
+    }
+    #conn-db-write.active .connector-line,
+    #conn-worker-monitor.active .connector-line,
+    #conn-worker-spawn.active .connector-line,
+    #conn-worker-status.active .connector-line,
+    #h-conn-db.active .connector-line {
+      background-image: linear-gradient(to bottom, #10b981 50%, transparent 50%) !important;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.8) !important;
+    }
+    #h-conn-trigger.active .connector-line-horizontal,
+    #h-conn-status.active .connector-line-horizontal,
+    #h-conn-status.active-reverse .connector-line-horizontal {
+      background-image: linear-gradient(to right, #10b981 50%, transparent 50%) !important;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.8) !important;
+    }
+
+    #conn-puppeteer-sync.active,
+    #h-conn-sync.active {
+      color: #fb923c !important;
+      text-shadow: 0 0 6px rgba(251, 146, 60, 0.6) !important;
+    }
+    #conn-puppeteer-sync.active .connector-line {
+      background-image: linear-gradient(to bottom, #fb923c 50%, transparent 50%) !important;
+      box-shadow: 0 0 8px rgba(251, 146, 60, 0.8) !important;
+    }
+    #h-conn-sync.active .connector-line-horizontal {
+      background-image: linear-gradient(to right, #fb923c 50%, transparent 50%) !important;
+      box-shadow: 0 0 8px rgba(251, 146, 60, 0.8) !important;
+    }
+
+    .h-connector-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      justify-content: center;
+    }
+
     .tutorial-hint-banner {
       background: #1e3a8a;
       border: 1px solid #3b82f6;
@@ -918,6 +1090,73 @@
         </div>
 
       </div>
+      <div style="margin: 20px 0; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 15px;">
+        <h3 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #a855f7; margin-bottom: 8px;">Diagrama de Arquitectura (Alto Nivel)</h3>
+      </div>
+      <div class="h-diagram-container">
+        
+        <!-- Column 1: Cellphone -->
+        <div class="h-diagram-node cellphone" id="h-node-cellphone">
+          <div style="font-size: 12px; margin-bottom: 3px;"><span class="material-icons" style="font-size:14px; vertical-align:middle;">smartphone</span></div>
+          SUPERVISOR / CELLPHONE
+        </div>
+
+        <!-- Column 2: User Interactions / API Requests Connector -->
+        <div class="h-diagram-connector" id="h-conn-api">
+          <span style="font-size: 6px;">User Interactions / API Requests</span>
+          <div class="connector-line-horizontal"></div>
+        </div>
+
+        <!-- Column 3: Backend Box -->
+        <div class="h-diagram-box" id="h-box-backend">
+          <div class="h-diagram-box-title" style="font-size: 6px;">Centralized Backend</div>
+          
+          <div class="h-diagram-node express" id="h-node-express">
+            EXPRESS SERVER
+          </div>
+          
+          <!-- Vertical internal connection -->
+          <div class="diagram-connector" id="h-conn-db" style="padding:0; gap:0;">
+            <span style="font-size: 6px;">Read/Write Data</span>
+            <div class="connector-line" style="height: 10px;"></div>
+          </div>
+          
+          <div class="h-diagram-node db" id="h-node-db">
+            db.json DATABASE
+          </div>
+        </div>
+
+        <!-- Column 4: Connector Stack (Trigger / Status Update) -->
+        <div class="h-connector-stack">
+          <div class="h-diagram-connector" id="h-conn-trigger">
+            <span style="font-size: 6.5px;">Trigger Sync Tasks</span>
+            <div class="connector-line-horizontal"></div>
+          </div>
+          <div class="h-diagram-connector" id="h-conn-status">
+            <span style="font-size: 6.5px;">Sync Status Update</span>
+            <div class="connector-line-horizontal"></div>
+          </div>
+        </div>
+
+        <!-- Column 5: Sync Worker -->
+        <div class="h-diagram-node worker" id="h-node-worker">
+          <div style="font-size: 12px; margin-bottom: 3px;"><span class="material-icons" style="font-size:14px; vertical-align:middle;">sync</span></div>
+          BACKGROUND SYNC WORKER
+        </div>
+
+        <!-- Column 6: Syncs Data / Extracts Information Connector -->
+        <div class="h-diagram-connector" id="h-conn-sync">
+          <span style="font-size: 6px;">Syncs Data / Extracts Info</span>
+          <div class="connector-line-horizontal"></div>
+        </div>
+
+        <!-- Column 7: External web portal -->
+        <div class="h-diagram-node taxes" id="h-node-taxes">
+          <div style="font-size: 12px; margin-bottom: 3px;"><span class="material-icons" style="font-size:14px; vertical-align:middle;">cloud</span></div>
+          TAXES.COM.AR
+        </div>
+
+      </div>
     </div>
   </div>
 
@@ -1012,8 +1251,9 @@
     // INTERACTIVE ARCHITECTURE STATE MACHINE
     function setDiagramState(stateNum) {
       // Clear all active classes
-      document.querySelectorAll('.diagram-node, .diagram-connector').forEach(el => {
+      document.querySelectorAll('.diagram-node, .diagram-connector, .h-diagram-node, .h-diagram-connector').forEach(el => {
         el.classList.remove('active');
+        el.classList.remove('active-reverse');
       });
 
       const autoForm = document.getElementById("status-auto-form");
@@ -1043,6 +1283,9 @@
         document.getElementById('node-supervisor').classList.add('active');
         document.getElementById('node-app').classList.add('active');
         document.getElementById('conn-load').classList.add('active');
+        
+        document.getElementById('h-node-cellphone').classList.add('active');
+        
         autoForm.className = "status-badge active"; autoForm.textContent = "Activo";
         setInspectorDesc("Formulario abierto. Observa que Fecha, Hora y Responsable están ocultos y se resuelven automáticamente al guardar.");
       }
@@ -1050,6 +1293,9 @@
         document.getElementById('node-supervisor').classList.add('active');
         document.getElementById('node-app').classList.add('active');
         document.getElementById('conn-load').classList.add('active');
+        
+        document.getElementById('h-node-cellphone').classList.add('active');
+        
         autoForm.className = "status-badge active"; autoForm.textContent = "Activo";
         empFilter.className = "status-badge active"; empFilter.textContent = "Activo";
         setInspectorDesc("Filtrando mecánicos: Al seleccionar Centro de Costo MECANICA, se activa la lógica para limitar el listado de empleados a los 17 mecánicos autorizados.");
@@ -1058,12 +1304,22 @@
         document.getElementById('node-app').classList.add('active');
         document.getElementById('conn-http').classList.add('active');
         document.getElementById('node-express').classList.add('active');
+        
+        document.getElementById('h-node-cellphone').classList.add('active');
+        document.getElementById('h-conn-api').classList.add('active');
+        document.getElementById('h-node-express').classList.add('active');
+        
         setInspectorDesc("Enviando orden de trabajo al Servidor Express a través de peticiones HTTP en formato JSON.");
       }
       else if (stateNum === 4) { // Guardando en DB local
         document.getElementById('node-express').classList.add('active');
         document.getElementById('conn-db-write').classList.add('active');
         document.getElementById('node-db').classList.add('active');
+        
+        document.getElementById('h-node-express').classList.add('active');
+        document.getElementById('h-conn-db').classList.add('active');
+        document.getElementById('h-node-db').classList.add('active');
+        
         setInspectorDesc("El Servidor Express procesa la petición y escribe los cambios físicamente en el archivo de base de datos local db.json.");
       }
       else if (stateNum === 5) { // Timer activo (Taller)
@@ -1072,12 +1328,22 @@
         document.getElementById('node-express').classList.add('active');
         document.getElementById('conn-db-write').classList.add('active');
         document.getElementById('node-db').classList.add('active');
+        
+        document.getElementById('h-node-cellphone').classList.add('active');
+        document.getElementById('h-conn-api').classList.add('active');
+        document.getElementById('h-node-express').classList.add('active');
+        document.getElementById('h-conn-db').classList.add('active');
+        document.getElementById('h-node-db').classList.add('active');
+        
         timers.className = "status-badge active"; timers.textContent = "Corriendo";
         setInspectorDesc("Cronómetro activo en taller. Cada segundo, la app envía actualizaciones al Servidor Express para registrar el tiempo en db.json.");
       }
       else if (stateNum === 6) { // Conflicto detectado
         document.getElementById('node-supervisor').classList.add('active');
         document.getElementById('node-app').classList.add('active');
+        
+        document.getElementById('h-node-cellphone').classList.add('active');
+        
         conflicts.className = "status-badge alert"; conflicts.textContent = "Alerta";
         setInspectorDesc("¡Validación de Conflicto! El sistema detecta que el operario ya tiene un cronómetro activo en otra unidad. Al aceptar, se pausará automáticamente la anterior para registrar los tiempos.", true);
       }
@@ -1085,18 +1351,32 @@
         document.getElementById('node-worker').classList.add('active');
         document.getElementById('conn-worker-monitor').classList.add('active');
         document.getElementById('node-db').classList.add('active');
+        
+        document.getElementById('h-node-db').classList.add('active');
+        document.getElementById('h-conn-trigger').classList.add('active');
+        document.getElementById('h-node-worker').classList.add('active');
+        
         setInspectorDesc("El proceso syncWorker.js en segundo plano lee la base de datos y detecta una orden en estado pendiente para ser enviada.");
       }
       else if (stateNum === 8) { // Spawning Puppeteer Chromium
         document.getElementById('node-worker').classList.add('active');
         document.getElementById('conn-worker-spawn').classList.add('active');
         document.getElementById('node-puppeteer').classList.add('active');
+        
+        document.getElementById('h-node-worker').classList.add('active');
+        document.getElementById('h-conn-trigger').classList.add('active');
+        
         setInspectorDesc("El worker lanza Puppeteer en segundo plano para abrir un navegador Chromium y simular las acciones del operador.");
       }
       else if (stateNum === 9) { // Puppeteer interactuando con Taxes
         document.getElementById('node-puppeteer').classList.add('active');
         document.getElementById('conn-puppeteer-sync').classList.add('active');
         document.getElementById('node-taxes').classList.add('active');
+        
+        document.getElementById('h-node-worker').classList.add('active');
+        document.getElementById('h-conn-sync').classList.add('active');
+        document.getElementById('h-node-taxes').classList.add('active');
+        
         syncBadge.className = "status-badge active"; syncBadge.textContent = "Sincronizando";
         setInspectorDesc("Sincronización en curso. Puppeteer navega en Taxes, loguea, carga la orden, y activa el switch 'Tarea Completada' para las tareas finalizadas.");
       }
@@ -1104,9 +1384,17 @@
         document.getElementById('node-worker').classList.add('active');
         document.getElementById('conn-worker-status').classList.add('active');
         document.getElementById('node-db').classList.add('active');
+        
+        document.getElementById('h-node-worker').classList.add('active');
+        document.getElementById('h-conn-status').classList.add('active-reverse');
+        document.getElementById('h-node-express').classList.add('active');
+        document.getElementById('h-conn-db').classList.add('active');
+        document.getElementById('h-node-db').classList.add('active');
+        
         setInspectorDesc("Sincronización completada. El worker actualiza el estado de la orden en db.json como exitosa (success).");
       }
     }
+
 
     // Tab Switching
     function switchViewDirect(viewName) {
