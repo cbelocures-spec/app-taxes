@@ -315,7 +315,7 @@ function closeErrorModal() {
 // 3. FETCH CONFIGURATION & SETTINGS
 async function fetchSettings() {
   try {
-    const res = await fetch('/api/settings');
+    const res = await fetch(`/api/settings?_=${Date.now()}`);
     if (!res.ok) throw new Error("Error fetching settings");
     const data = await res.json();
     
@@ -378,7 +378,7 @@ async function triggerCatalogSync() {
 async function fetchSettingsPolling() {
   // Only update connection UI status, don't overwrite input values while user is typing
   try {
-    const res = await fetch('/api/settings');
+    const res = await fetch(`/api/settings?_=${Date.now()}`);
     if (res.ok) {
       const data = await res.json();
       updateCatalogSyncUI(data);
@@ -736,7 +736,7 @@ function removeTaskField(cardId) {
 // 7. GET AND RENDER WORK ORDERS
 async function fetchOrders() {
   try {
-    const res = await fetch('/api/orders');
+    const res = await fetch(`/api/orders?_=${Date.now()}`);
     if (!res.ok) throw new Error("Error fetching orders");
     const data = await res.json();
     
@@ -1919,7 +1919,7 @@ async function markDashboardTaskFinished(orderId, taskId) {
 
 async function fetchActiveMechanics() {
   try {
-    const res = await fetch('/api/active-mechanics');
+    const res = await fetch(`/api/active-mechanics?_=${Date.now()}`);
     if (res.ok) {
       activeMechanicsList = await res.json();
       // If we are currently on home view, render it

@@ -12,9 +12,9 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Disable caching for JS and CSS files so browsers always load the latest version
+// Disable caching for API endpoints, JS and CSS files so browsers always load the latest version/data
 app.use((req, res, next) => {
-  if (req.path.endsWith('.js') || req.path.endsWith('.css')) {
+  if (req.path.startsWith('/api') || req.path.endsWith('.js') || req.path.endsWith('.css')) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
