@@ -1637,6 +1637,13 @@ function renderDashboard() {
 
   if (!gridWorking || !gridPaused || !listFree) return;
 
+  // IMPORTANT: Clear ALL existing dashboard timer intervals before re-rendering
+  // This prevents ghost intervals from keeping dead timers alive after pause/finish
+  for (const key in activeDashboardIntervals) {
+    clearInterval(activeDashboardIntervals[key]);
+    delete activeDashboardIntervals[key];
+  }
+
   // Active tasks from all orders (including local, error, pending, syncing, success)
   const activeLocalOrders = activeOrders;
   
@@ -1811,14 +1818,14 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
   const order = activeOrders.find(o => o.id === orderId);
   if (!order) return;
 
-  const tasks = [...order.tasks];
-  const task = tasks.find(t => t.id === taskId);
+  // Find the actual task object inside order.tasks (by reference)
+  const task = order.tasks.find(t => t.id === taskId);
   if (!task) return;
 
   const isRunning = task.timerStart !== null && task.timerStart > 0;
 
   if (!isRunning) {
-    // Check for conflict
+    // --- START TIMER ---
     const employeeVal = task.empleado;
     if (employeeVal) {
       const conflict = getConflictForEmployee(employeeVal, taskId);
@@ -1831,7 +1838,7 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
         if (confirm(confirmMsg)) {
           await pauseTask(conflict);
         } else {
-          return; // User cancelled
+          return;
         }
       }
     }
@@ -1840,6 +1847,7 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
     localStorage.setItem(`timer_start_${taskId}`, task.timerStart);
     showToast("Cronómetro iniciado", "info");
   } else {
+    // --- PAUSE TIMER ---
     const elapsedMs = Date.now() - task.timerStart;
     const addedHours = parseFloat((elapsedMs / (1000 * 60 * 60)).toFixed(2));
     const currentHours = parseFloat(task.horasEstimadas) || 0;
@@ -1848,16 +1856,33 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
     task.timerStart = null;
     localStorage.removeItem(`timer_start_${taskId}`);
 
+    // Kill the dashboard interval for this task immediately
+    if (activeDashboardIntervals[taskId]) {
+      clearInterval(activeDashboardIntervals[taskId]);
+      delete activeDashboardIntervals[taskId];
+    }
+
     showToast(`Tiempo sumado: +${addedHours.toFixed(2)} hrs.`, "success");
   }
 
+  // OPTIMISTIC UPDATE: re-render dashboard immediately with in-memory changes
+  // so the user sees the timer stop/start without waiting for the server
+  renderDashboard();
+
+  // Then persist to server in background
   try {
     const res = await fetch(`/api/orders/${orderId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...order,
-        tasks: tasks
+        rodado: order.rodado,
+        responsable: order.responsable,
+        fechaEntrega: order.fechaEntrega,
+        horario: order.horario,
+        interno: order.interno,
+        clasificacion: order.clasificacion,
+        incidente: order.incidente,
+        tasks: order.tasks
       })
     });
 
@@ -1875,8 +1900,8 @@ async function markDashboardTaskFinished(orderId, taskId) {
 
   if (!confirm("¿Estás seguro de marcar esta tarea como FINALIZADA?")) return;
 
-  const tasks = [...order.tasks];
-  const task = tasks.find(t => t.id === taskId);
+  // Find the actual task object inside order.tasks (by reference)
+  const task = order.tasks.find(t => t.id === taskId);
   if (!task) return;
 
   if (task.timerStart !== null && task.timerStart > 0) {
@@ -1889,17 +1914,33 @@ async function markDashboardTaskFinished(orderId, taskId) {
   }
 
   task.status = "Finalizada";
+
+  // Kill the dashboard interval for this task immediately
+  if (activeDashboardIntervals[taskId]) {
+    clearInterval(activeDashboardIntervals[taskId]);
+    delete activeDashboardIntervals[taskId];
+  }
+
+  // OPTIMISTIC UPDATE: re-render dashboard immediately so user sees the task disappear
+  renderDashboard();
   showToast("Tarea finalizada", "success");
 
-  const allCompleted = tasks.every(t => t.status === "Finalizada");
+  const allCompleted = order.tasks.every(t => t.status === "Finalizada");
 
+  // Then persist to server in background
   try {
     const res = await fetch(`/api/orders/${orderId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...order,
-        tasks: tasks
+        rodado: order.rodado,
+        responsable: order.responsable,
+        fechaEntrega: order.fechaEntrega,
+        horario: order.horario,
+        interno: order.interno,
+        clasificacion: order.clasificacion,
+        incidente: order.incidente,
+        tasks: order.tasks
       })
     });
 
