@@ -293,15 +293,35 @@ async function fillSearchableSelect(page, labelText, searchValue) {
 async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
   console.log(`Filling Employee for Task #${index} with: "${employeeName}"`);
   try {
-    const searchSelector = `#empleado_${index} input.searchable-input`;
-    const hiddenSelector = `#empleado_${index} input[type="hidden"]`;
+    // Resolve searchable input and hidden input dynamically
+    const inputInfo = await page.evaluate((idx) => {
+      const hiddenInput = document.querySelector(`input[name="syj_empleado_id_tarea_${idx}"], input[name$="empleado_id_tarea_${idx}"], input[name*="empleado_id_tarea_${idx}"]`);
+      if (hiddenInput) {
+        const parent = hiddenInput.closest('.searchable-select-wrapper') || hiddenInput.parentElement;
+        const searchInput = parent ? parent.querySelector('.searchable-input, input[type="text"]') : null;
+        if (searchInput) {
+          const searchId = 'tmp_emp_search_' + idx + '_' + Date.now();
+          const hiddenId = 'tmp_emp_hidden_' + idx + '_' + Date.now();
+          searchInput.setAttribute('id', searchId);
+          hiddenInput.setAttribute('id', hiddenId);
+          return { searchId, hiddenId, found: true };
+        }
+      }
+      return { found: false };
+    }, index);
 
-    // Try queries one by one
+    if (!inputInfo.found) {
+      console.log(`Could not find searchable employee input for task index: ${index}`);
+      return false;
+    }
+
+    const searchSelector = `#${inputInfo.searchId}`;
+    const hiddenSelector = `#${inputInfo.hiddenId}`;
+
+    // Try queries one by one via dropdown UI
     const queriesToTry = [employeeName];
     if (employeeName.includes(' ')) {
       const words = employeeName.split(/\s+/).filter(w => w.length > 2);
-      // For "Cuba Orosco, Kevin Genaro", words would be ["Cuba", "Orosco,", "Kevin", "Genaro"]
-      // Let's add individual words as search options
       queriesToTry.push(...words.map(w => w.replace(/[^a-zA-Z0-9]/g, '')));
     }
 
@@ -354,7 +374,7 @@ async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
         const targetClean = clean(targetVal);
         const filteredOptions = visibleOptions.filter(el => {
           const text = el.textContent.trim().toLowerCase();
-          return text.length > 0 && !text.includes('opciones') && !text.includes('cargando') && !text.includes('no hay');
+          return text.length > 0 && !text.includes('opciones') && !text.includes('cargando') && !text.includes('no hay') && !text.includes('no se encontraron');
         });
 
         if (filteredOptions.length === 0) return { success: false };
@@ -393,13 +413,74 @@ async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
       }
     }
 
-    console.log(`Failed to select employee after all search queries.`);
-    return false;
+    // =====================================================================
+    // FALLBACK: Direct injection when dropdown is empty / AJAX didn't load
+    // The Taxes portal filters employees by Centro de Costo via AJAX,
+    // but our DOM-based CC selection doesn't always trigger Vue's watcher.
+    // So we directly set the hidden input value and visible text.
+    // =====================================================================
+    console.log(`Dropdown search failed. Attempting DIRECT INJECTION fallback...`);
+    
+    // Resolve the employee ID from our local catalog
+    const employeeCatalog = db.getCatalogs().empleados || [];
+    const employeeObj = employeeCatalog.find(e => {
+      const clean = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      return clean(e.label).includes(clean(employeeName)) || clean(employeeName).includes(clean(e.label));
+    });
+
+    if (!employeeObj) {
+      console.log(`Could not find employee "${employeeName}" in local catalog for direct injection.`);
+      return false;
+    }
+
+    console.log(`   Found employee in catalog: ID=${employeeObj.value}, Label="${employeeObj.label}"`);
+
+    const injected = await page.evaluate((hiddenSel, searchSel, empId, empLabel) => {
+      const hiddenInput = document.querySelector(hiddenSel);
+      const searchInput = document.querySelector(searchSel);
+      
+      if (!hiddenInput) return { success: false, error: 'Hidden input not found' };
+
+      // Set hidden input value (this is what gets submitted)
+      const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      nativeSetter.call(hiddenInput, empId);
+      hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+      hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+      // Set visible text input to show the employee name
+      if (searchInput) {
+        nativeSetter.call(searchInput, empLabel);
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      // Also try to update Vue's internal state if the component has a __vue__ reference
+      const wrapper = hiddenInput.closest('.searchable-select-wrapper');
+      if (wrapper && wrapper.__vue__) {
+        try {
+          wrapper.__vue__.$emit('input', empId);
+          wrapper.__vue__.$emit('change', empId);
+        } catch(e) { /* ignore */ }
+      }
+
+      return { success: true, hiddenValue: hiddenInput.value, displayValue: searchInput ? searchInput.value : '' };
+    }, hiddenSelector, searchSelector, employeeObj.value, employeeObj.label);
+
+    if (injected.success) {
+      console.log(`   ✓ DIRECT INJECTION success: hidden="${injected.hiddenValue}", display="${injected.displayValue}"`);
+      await delay(500);
+      return true;
+    } else {
+      console.log(`   ✗ DIRECT INJECTION failed: ${injected.error}`);
+      return false;
+    }
+
   } catch (error) {
     console.error(`Error filling task employee searchable select:`, error);
     return false;
   }
 }
+
 
 
 // Automate login to Taxes.com.ar

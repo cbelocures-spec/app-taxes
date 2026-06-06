@@ -334,6 +334,11 @@
     </button>
   </nav>
 
+  <!-- FLOATING VOICE BUTTON -->
+  <button class="voice-fab" id="voice-fab" onclick="openVoiceModal()" title="Crear orden por voz">
+    <span class="material-icons">mic</span>
+  </button>
+
   <!-- FULLSCREEN NEW ORDER MODAL -->
   <div class="fullscreen-modal" id="new-order-modal">
     <div class="modal-header">
@@ -492,6 +497,86 @@
         <button class="btn btn-secondary" onclick="closeActiveMechanicsModal()">Cancelar</button>
         <button class="btn btn-primary" onclick="saveActiveMechanicsList()">
           <span class="material-icons">save</span> Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VOICE ORDER MODAL -->
+  <div class="modal-overlay" id="voice-modal">
+    <div class="dialog-modal voice-dialog">
+      <div class="dialog-header voice-header">
+        <div class="voice-header-left">
+          <span class="material-icons" style="color: var(--primary);">mic</span>
+          <h3>Asistente de Voz</h3>
+        </div>
+        <button class="dialog-close" onclick="closeVoiceModal()">&#x2715;</button>
+      </div>
+      <div class="dialog-body voice-body">
+
+        <!-- Status ring -->
+        <div class="voice-ring-container" id="voice-ring-container">
+          <div class="voice-ring" id="voice-ring">
+            <span class="material-icons voice-ring-icon" id="voice-ring-icon">mic_none</span>
+          </div>
+          <p class="voice-status-label" id="voice-status-label">Presioná el botón para hablar</p>
+        </div>
+
+        <!-- Transcript display -->
+        <div class="voice-transcript-box" id="voice-transcript-box">
+          <p class="voice-transcript-text" id="voice-transcript-text">—</p>
+        </div>
+
+        <!-- Parsed preview -->
+        <div class="voice-parsed-preview" id="voice-parsed-preview" style="display:none;">
+          <div class="parsed-row" id="parsed-interno-row" style="display:none;">
+            <span class="parsed-label">Interno:</span>
+            <span class="parsed-value" id="parsed-interno">—</span>
+          </div>
+          <div class="parsed-row" id="parsed-clasificacion-row" style="display:none;">
+            <span class="parsed-label">Tipo:</span>
+            <span class="parsed-value" id="parsed-clasificacion">—</span>
+          </div>
+          <div class="parsed-row" id="parsed-tasks-row" style="display:none;">
+            <span class="parsed-label">Tareas:</span>
+            <span class="parsed-value" id="parsed-tasks">—</span>
+          </div>
+        </div>
+
+        <!-- Help text -->
+        <div class="voice-help">
+          <p><strong>¿Cómo usar?</strong> Ejemplo:</p>
+          <p class="voice-example">"Crear orden · interno 98 · correctivo · crear tarea a Canaviri · reparar frenos · enviar"</p>
+          <p class="voice-tip">Palabras clave: <em>interno</em>, <em>correctivo / preventivo / auxilio</em>, <em>crear tarea a [nombre]</em>, <em>enviar</em></p>
+        </div>
+
+      </div>
+      <div class="dialog-footer" style="justify-content: center; gap: 12px;">
+        <button class="btn btn-secondary" onclick="closeVoiceModal()">Cancelar</button>
+        <button class="btn voice-listen-btn" id="voice-listen-btn" onclick="toggleVoiceListening()">
+          <span class="material-icons" id="voice-btn-icon">mic</span>
+          <span id="voice-btn-label">Escuchar</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VOICE CONFIRMATION MODAL -->
+  <div class="modal-overlay" id="voice-confirm-modal">
+    <div class="dialog-modal">
+      <div class="dialog-header" style="background: linear-gradient(135deg, var(--success) 0%, #059669 100%);">
+        <h3 style="color:#fff;">✅ Confirmar Orden por Voz</h3>
+        <button class="dialog-close" style="color:#fff;" onclick="closeVoiceConfirmModal()">&#x2715;</button>
+      </div>
+      <div class="dialog-body" id="voice-confirm-body">
+        <!-- populated dynamically -->
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="closeVoiceConfirmModal()">
+          <span class="material-icons">edit</span> Modificar
+        </button>
+        <button class="btn btn-success" onclick="confirmVoiceOrder()">
+          <span class="material-icons">send</span> Confirmar y Enviar
         </button>
       </div>
     </div>

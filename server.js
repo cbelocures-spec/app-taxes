@@ -2,11 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const https = require('https');
+const http = require('http');
+const selfsigned = require('selfsigned');
 const db = require('./database');
 const worker = require('./syncWorker');
+let localtunnel = null;
+try { localtunnel = require('localtunnel'); } catch(e) {}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 
 // Middleware
 app.use(cors());
@@ -483,12 +488,117 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Start Express Server and Background Worker
-app.listen(PORT, () => {
-  console.log(`\n======================================================`);
-  console.log(`Taller App Server running at: http://localhost:${PORT}`);
-  console.log(`======================================================`);
-  
+// Start Express Server and Background Worker (HTTP + HTTPS)
+function getLocalIP() {
+  const { networkInterfaces } = require('os');
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
+
+// Generate self-signed certificate with SANs required by Chrome/modern browsers
+let httpsServer = null;
+try {
+  const localIP = getLocalIP();
+
+  const attrs = [
+    { name: 'commonName', value: localIP },
+    { name: 'organizationName', value: 'Taller Taxes Local' }
+  ];
+
+  const pems = selfsigned.generate(attrs, {
+    days: 365,
+    algorithm: 'sha256',
+    keySize: 2048,
+    extensions: [
+      {
+        name: 'basicConstraints',
+        cA: true
+      },
+      {
+        name: 'keyUsage',
+        keyCertSign: true,
+        digitalSignature: true,
+        nonRepudiation: true,
+        keyEncipherment: true,
+        dataEncipherment: true
+      },
+      {
+        name: 'extKeyUsage',
+        serverAuth: true,
+        clientAuth: true
+      },
+      {
+        name: 'subjectAltName',
+        altNames: [
+          { type: 7, ip: localIP },       // IP de la red local
+          { type: 7, ip: '127.0.0.1' },   // localhost IP
+          { type: 2, value: 'localhost' }  // localhost hostname
+        ]
+      }
+    ]
+  });
+
+  const tlsOptions = {
+    key: pems.private,
+    cert: pems.cert,
+    minVersion: 'TLSv1.2'
+  };
+
+  httpsServer = https.createServer(tlsOptions, app);
+
+  httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
+    console.log(`\n======================================================`);
+    console.log(`  Taller App - HTTP  : http://localhost:${PORT}`);
+    console.log(`  Taller App - HTTPS : https://localhost:${HTTPS_PORT}`);
+    console.log(`  Celular / Red local: https://${localIP}:${HTTPS_PORT}`);
+    console.log(`======================================================`);
+    console.log(`  En el celular (Chrome Android):`);
+    console.log(`  1) Abri: https://${localIP}:${HTTPS_PORT}`);
+    console.log(`  2) Toca "Avanzado" > "Continuar" (cert. autofirmado)`);
+    console.log(`  3) El microfono del boton de voz funcionara`);
+    console.log(`======================================================\n`);
+  });
+} catch (e) {
+  console.error('[HTTPS] No se pudo iniciar HTTPS:', e.message);
+  console.error(e.stack);
+}
+
+// HTTP server
+http.createServer(app).listen(PORT, '0.0.0.0', async () => {
+  const localIP = getLocalIP();
+  console.log(`[HTTP] Escuchando en http://localhost:${PORT}`);
+  console.log(`[HTTP] Red local:      http://${localIP}:${PORT}`);
+
   // Start the Puppeteer background sync worker
   worker.startWorker();
+
+  // Start localtunnel for HTTPS access from mobile (no cert issues)
+  if (localtunnel) {
+    try {
+      console.log('[Tunnel] Iniciando tunel HTTPS publico...');
+      const tunnel = await localtunnel({ port: PORT });
+      console.log(`\n${'='.repeat(56)}`);
+      console.log(`  *** URL PARA EL CELULAR (HTTPS real) ***`);
+      console.log(`  ${tunnel.url}`);
+      console.log(`  Abrila en Chrome del celular - sin errores SSL`);
+      console.log(`${'='.repeat(56)}\n`);
+
+      tunnel.on('close', () => {
+        console.log('[Tunnel] Tunel cerrado.');
+      });
+      tunnel.on('error', (err) => {
+        console.error('[Tunnel] Error en tunel:', err.message);
+      });
+    } catch (tunnelErr) {
+      console.error('[Tunnel] No se pudo crear el tunel:', tunnelErr.message);
+      console.log(`  => Usa la IP local: http://${localIP}:${PORT}`);
+    }
+  }
 });

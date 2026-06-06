@@ -2533,3 +2533,467 @@ function handleNoveltyClick(n) {
   
   showToast("Tarea creada a partir de novedad", "success");
 }
+
+// =============================================
+// VOICE ORDER MODULE
+// =============================================
+
+let voiceRecognition = null;
+let voiceIsListening = false;
+let voiceParsedOrder = null; // { interno, clasificacion, tasks: [{empleadoName, descripcion}] }
+let voiceFullTranscript = '';
+
+function openVoiceModal() {
+  resetVoiceState();
+  document.getElementById('voice-modal').classList.add('open');
+}
+
+function closeVoiceModal() {
+  stopVoiceListening();
+  document.getElementById('voice-modal').classList.remove('open');
+}
+
+function resetVoiceState() {
+  voiceParsedOrder = null;
+  voiceFullTranscript = '';
+  voiceIsListening = false;
+
+  const ring = document.getElementById('voice-ring');
+  const icon = document.getElementById('voice-ring-icon');
+  const label = document.getElementById('voice-status-label');
+  const transcript = document.getElementById('voice-transcript-text');
+  const preview = document.getElementById('voice-parsed-preview');
+  const btnIcon = document.getElementById('voice-btn-icon');
+  const btnLabel = document.getElementById('voice-btn-label');
+  const btn = document.getElementById('voice-listen-btn');
+  const fab = document.getElementById('voice-fab');
+
+  if (ring) ring.classList.remove('active');
+  if (icon) { icon.textContent = 'mic_none'; }
+  if (label) label.textContent = 'Presioná el botón para hablar';
+  if (transcript) { transcript.textContent = '—'; transcript.style.color = ''; }
+  if (preview) preview.style.display = 'none';
+  if (btnIcon) btnIcon.textContent = 'mic';
+  if (btnLabel) btnLabel.textContent = 'Escuchar';
+  if (btn) btn.classList.remove('recording');
+  if (fab) fab.classList.remove('listening');
+}
+
+function toggleVoiceListening() {
+  if (voiceIsListening) {
+    stopVoiceListening();
+  } else {
+    startVoiceListening();
+  }
+}
+
+function startVoiceListening() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showToast('Tu navegador no soporta reconocimiento de voz. Usá Chrome.', 'warning');
+    return;
+  }
+
+  // Reset previous transcript but keep parsed preview if there was one
+  voiceFullTranscript = '';
+  const transcriptEl = document.getElementById('voice-transcript-text');
+  if (transcriptEl) { transcriptEl.textContent = 'Escuchando...'; transcriptEl.style.color = '#ef4444'; }
+
+  voiceRecognition = new SpeechRecognition();
+  voiceRecognition.lang = 'es-AR';
+  voiceRecognition.continuous = true;
+  voiceRecognition.interimResults = true;
+  voiceRecognition.maxAlternatives = 1;
+
+  voiceRecognition.onstart = () => {
+    voiceIsListening = true;
+    document.getElementById('voice-ring').classList.add('active');
+    document.getElementById('voice-ring-icon').textContent = 'mic';
+    document.getElementById('voice-status-label').textContent = 'Escuchando... hablá ahora';
+    document.getElementById('voice-btn-icon').textContent = 'stop';
+    document.getElementById('voice-btn-label').textContent = 'Detener';
+    document.getElementById('voice-listen-btn').classList.add('recording');
+    document.getElementById('voice-fab').classList.add('listening');
+  };
+
+  voiceRecognition.onresult = (event) => {
+    let interim = '';
+    let finalChunk = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const t = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        finalChunk += t + ' ';
+      } else {
+        interim += t;
+      }
+    }
+    if (finalChunk) voiceFullTranscript += finalChunk;
+    const display = (voiceFullTranscript + interim).trim();
+    const transcriptEl = document.getElementById('voice-transcript-text');
+    if (transcriptEl) {
+      transcriptEl.textContent = display || 'Escuchando...';
+      transcriptEl.style.color = display ? '' : '#ef4444';
+    }
+
+    // Parse in real time to show preview
+    if (voiceFullTranscript.trim()) {
+      const parsed = parseVoiceCommand(voiceFullTranscript.trim());
+      showVoiceParsedPreview(parsed);
+    }
+
+    // Auto-stop on "enviar"
+    const lower = (voiceFullTranscript + interim).toLowerCase();
+    if (lower.includes('enviar') || lower.includes('envíar') || lower.includes('mandar') || lower.includes('grabar')) {
+      stopVoiceListening(true);
+    }
+  };
+
+  voiceRecognition.onerror = (event) => {
+    console.error('[Voice] Error:', event.error);
+    if (event.error === 'not-allowed') {
+      showToast('Permiso de micrófono denegado. Habilitá el micrófono en tu navegador.', 'warning');
+    } else if (event.error !== 'no-speech') {
+      showToast('Error de micrófono: ' + event.error, 'warning');
+    }
+    stopVoiceListening(false);
+  };
+
+  voiceRecognition.onend = () => {
+    // If stopped manually and there's content, process it
+    if (!voiceIsListening && voiceFullTranscript.trim()) {
+      processVoiceTranscript(voiceFullTranscript.trim());
+    }
+    voiceIsListening = false;
+    document.getElementById('voice-ring').classList.remove('active');
+    document.getElementById('voice-ring-icon').textContent = 'mic_none';
+    document.getElementById('voice-status-label').textContent = 'Presioná el botón para hablar';
+    document.getElementById('voice-btn-icon').textContent = 'mic';
+    document.getElementById('voice-btn-label').textContent = 'Escuchar';
+    document.getElementById('voice-listen-btn').classList.remove('recording');
+    document.getElementById('voice-fab').classList.remove('listening');
+  };
+
+  voiceRecognition.start();
+}
+
+function stopVoiceListening(andProcess = true) {
+  voiceIsListening = false;
+  if (voiceRecognition) {
+    try { voiceRecognition.stop(); } catch(e) {}
+    voiceRecognition = null;
+  }
+  if (andProcess && voiceFullTranscript.trim()) {
+    processVoiceTranscript(voiceFullTranscript.trim());
+  }
+}
+
+/**
+ * Parses a voice transcript into an order object.
+ * Example: "crear orden interno 98 correctivo crear tarea a canaviri reparar frenos"
+ */
+function parseVoiceCommand(text) {
+  const lower = text.toLowerCase()
+    .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u')
+    .replace(/ñ/g,'n');
+
+  const result = {
+    interno: null,
+    clasificacion: null,
+    tasks: []
+  };
+
+  // --- Extract interno ---
+  // "interno 98", "el interno es 98", "unidad 98"
+  const internoMatch = lower.match(/(?:interno|unidad)\s+([0-9a-z\-]+)/i);
+  if (internoMatch) {
+    result.interno = internoMatch[1].trim();
+  }
+
+  // --- Extract clasificacion ---
+  if (lower.includes('correctivo') || lower.includes('corrector')) {
+    result.clasificacion = 'Correctivo';
+  } else if (lower.includes('preventivo') || lower.includes('preventivo')) {
+    result.clasificacion = 'Preventivo';
+  } else if (lower.includes('auxilio') || lower.includes('auxilo')) {
+    result.clasificacion = 'Auxilio';
+  } else if (lower.includes('herreria') || lower.includes('herrera')) {
+    result.clasificacion = 'Herrería';
+  }
+
+  // --- Extract tasks ---
+  // Pattern: "crear tarea a [nombre] [descripcion]" until next task or end/enviar
+  // Split by common separators: dots, "crear tarea", "enviar"
+  const taskKeywords = ['crear tarea a ', 'tarea a ', 'asignar tarea a ', 'asignar a '];
+
+  // Find all positions of task keywords
+  const taskSegments = [];
+  let searchText = lower;
+  let offset = 0;
+
+  // Try to split by "crear tarea a" or "tarea a"
+  // We'll use a regex to find all occurrences
+  const taskPattern = /(?:crear\s+tarea\s+a|tarea\s+a|asignar(?:\s+tarea)?\s+a)\s+([a-z]+)\s+([^]+?)(?=(?:crear\s+tarea\s+a|tarea\s+a|asignar(?:\s+tarea)?\s+a)|enviar|mandar|grabar|$)/gi;
+  let taskMatch;
+  const normalizedLower = lower;
+  
+  while ((taskMatch = taskPattern.exec(normalizedLower)) !== null) {
+    const employeeFragment = taskMatch[1].trim();
+    const descFragment = taskMatch[2].trim()
+      .replace(/\s*enviar\s*$/, '')
+      .replace(/\s*mandar\s*$/, '')
+      .replace(/\s*grabar\s*$/, '')
+      .trim();
+    
+    // Resolve employee by partial name match
+    const resolvedEmployee = resolveEmployeeByName(employeeFragment);
+    
+    if (descFragment) {
+      taskSegments.push({
+        empleadoName: resolvedEmployee ? resolvedEmployee.label : capitalizeFirst(employeeFragment),
+        empleadoValue: resolvedEmployee ? resolvedEmployee.value : '',
+        descripcion: capitalizeFirst(descFragment)
+      });
+    }
+  }
+
+  result.tasks = taskSegments;
+  return result;
+}
+
+/**
+ * Resolves an employee from cachedCatalogs.empleados using fuzzy name matching.
+ * Searches by last name/first name fragment.
+ */
+function resolveEmployeeByName(fragment) {
+  if (!fragment || !cachedCatalogs.empleados || cachedCatalogs.empleados.length === 0) return null;
+  
+  const frag = fragment.toLowerCase()
+    .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u')
+    .replace(/ñ/g,'n');
+
+  // Try exact prefix match on last name (before comma)
+  for (const emp of cachedCatalogs.empleados) {
+    const labelNorm = emp.label.toLowerCase()
+      .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u')
+      .replace(/ñ/g,'n');
+    if (labelNorm.startsWith(frag) || labelNorm.includes(', ' + frag) || labelNorm.includes(' ' + frag)) {
+      return emp;
+    }
+  }
+
+  // Fallback: any word includes frag
+  for (const emp of cachedCatalogs.empleados) {
+    const labelNorm = emp.label.toLowerCase()
+      .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u')
+      .replace(/ñ/g,'n');
+    if (labelNorm.includes(frag)) {
+      return emp;
+    }
+  }
+
+  // Also try MECANICA_EMPLOYEES list
+  for (const name of MECANICA_EMPLOYEES) {
+    const normName = name.toLowerCase()
+      .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u')
+      .replace(/ñ/g,'n');
+    if (normName.includes(frag) || normName.startsWith(frag)) {
+      // Try to find in catalog
+      const inCatalog = cachedCatalogs.empleados.find(e => e.label === name);
+      if (inCatalog) return inCatalog;
+    }
+  }
+  return null;
+}
+
+function capitalizeFirst(str) {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function showVoiceParsedPreview(parsed) {
+  const preview = document.getElementById('voice-parsed-preview');
+  if (!preview) return;
+
+  const internoRow = document.getElementById('parsed-interno-row');
+  const clasificacionRow = document.getElementById('parsed-clasificacion-row');
+  const tasksRow = document.getElementById('parsed-tasks-row');
+
+  let hasContent = false;
+
+  if (parsed.interno) {
+    document.getElementById('parsed-interno').textContent = parsed.interno;
+    internoRow.style.display = 'flex';
+    hasContent = true;
+  } else {
+    internoRow.style.display = 'none';
+  }
+
+  if (parsed.clasificacion) {
+    document.getElementById('parsed-clasificacion').textContent = parsed.clasificacion;
+    clasificacionRow.style.display = 'flex';
+    hasContent = true;
+  } else {
+    clasificacionRow.style.display = 'none';
+  }
+
+  if (parsed.tasks && parsed.tasks.length > 0) {
+    const tasksList = parsed.tasks.map(t => `${t.empleadoName}: ${t.descripcion}`).join(' | ');
+    document.getElementById('parsed-tasks').textContent = tasksList;
+    tasksRow.style.display = 'flex';
+    hasContent = true;
+  } else {
+    tasksRow.style.display = 'none';
+  }
+
+  preview.style.display = hasContent ? 'flex' : 'none';
+}
+
+function processVoiceTranscript(text) {
+  const parsed = parseVoiceCommand(text);
+  voiceParsedOrder = parsed;
+  showVoiceParsedPreview(parsed);
+
+  // Validate minimum requirements
+  if (!parsed.interno) {
+    showToast('No se detectó el número de interno. Intentá de nuevo.', 'warning');
+    const statusLabel = document.getElementById('voice-status-label');
+    if (statusLabel) statusLabel.textContent = 'No se detectó el interno. Intentá de nuevo.';
+    return;
+  }
+
+  // Show confirmation modal
+  showVoiceConfirmModal(parsed, text);
+}
+
+function showVoiceConfirmModal(parsed, originalText) {
+  const body = document.getElementById('voice-confirm-body');
+  if (!body) return;
+
+  const clasificacion = parsed.clasificacion || 'Correctivo';
+  const interno = parsed.interno || '—';
+
+  let html = `
+    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; font-style: italic;">
+      "${escapeHtml(originalText.substring(0, 120))}${originalText.length > 120 ? '...' : ''}"
+    </p>
+    <table class="voice-confirm-table">
+      <tr>
+        <th>Interno</th>
+        <td><strong style="color: var(--primary); font-size: 16px;">${escapeHtml(interno)}</strong></td>
+      </tr>
+      <tr>
+        <th>Clasificación</th>
+        <td>${escapeHtml(clasificacion)}</td>
+      </tr>
+      <tr>
+        <th>Rodado</th>
+        <td style="color: var(--text-muted); font-size: 12px;">(se buscará automáticamente por interno)</td>
+      </tr>
+    </table>
+  `;
+
+  if (parsed.tasks && parsed.tasks.length > 0) {
+    html += `
+      <div class="voice-confirm-tasks">
+        <p style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">
+          TAREAS (${parsed.tasks.length})
+        </p>
+    `;
+    parsed.tasks.forEach((t, i) => {
+      html += `
+        <div class="voice-confirm-task-item">
+          <div class="task-emp-name">👷 ${escapeHtml(t.empleadoName)}</div>
+          <div class="task-desc">${escapeHtml(t.descripcion)}</div>
+          ${!t.empleadoValue ? '<div style="font-size: 11px; color: var(--warning); margin-top: 2px;">⚠️ Mecánico no encontrado en el sistema — se ingresará como texto</div>' : ''}
+        </div>
+      `;
+    });
+    html += `</div>`;
+  } else {
+    html += `<p style="color: var(--warning); font-size: 13px; margin-top: 10px;">⚠️ No se detectaron tareas. La orden se creará sin tareas.</p>`;
+  }
+
+  body.innerHTML = html;
+
+  // Close voice modal and open confirm modal
+  document.getElementById('voice-modal').classList.remove('open');
+  document.getElementById('voice-confirm-modal').classList.add('open');
+}
+
+function closeVoiceConfirmModal() {
+  document.getElementById('voice-confirm-modal').classList.remove('open');
+  // Re-open voice modal so they can re-try or keep editing
+  document.getElementById('voice-modal').classList.add('open');
+}
+
+async function confirmVoiceOrder() {
+  if (!voiceParsedOrder) return;
+
+  document.getElementById('voice-confirm-modal').classList.remove('open');
+  document.getElementById('voice-modal').classList.remove('open');
+
+  const { interno, clasificacion, tasks } = voiceParsedOrder;
+
+  // Find rodado by interno
+  let rodadoValue = '';
+  let rodadoLabel = '';
+  const internoNum = String(interno).trim();
+  const rodadoOpt = cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === internoNum);
+  if (rodadoOpt) {
+    rodadoValue = rodadoOpt.value;
+    rodadoLabel = rodadoOpt.label;
+  }
+
+  // Build tasks
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const hh = String(today.getHours()).padStart(2, '0');
+  const min = String(today.getMinutes()).padStart(2, '0');
+
+  const builtTasks = (tasks || []).map((t, idx) => ({
+    id: `voice-${Date.now()}-${idx}`,
+    centroCosto: '15', // default MECANICA
+    empleado: t.empleadoValue || '',
+    horasEstimadas: 0,
+    descripcion: t.descripcion,
+    status: 'Pendiente',
+    timerStart: null
+  }));
+
+  const payload = {
+    rodado: rodadoLabel || `Interno ${interno}`,
+    responsable: 'AUTO',
+    fechaEntrega: `${yyyy}-${mm}-${dd}`,
+    horario: `${hh}:${min}`,
+    interno: internoNum,
+    clasificacion: clasificacion || 'Correctivo',
+    incidente: '',
+    tasks: builtTasks
+  };
+
+  try {
+    showToast('Creando orden por voz...', 'info');
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Error al crear la orden');
+    }
+    const newOrder = await res.json();
+    showToast(`✅ Orden creada (Interno ${interno})`, 'success');
+    fetchOrders();
+
+    // Switch to orders view
+    switchView('orders');
+  } catch (err) {
+    console.error('[Voice] Error creating order:', err);
+    showToast('Error al crear la orden: ' + err.message, 'warning');
+    // Re-open confirm modal so user can retry
+    document.getElementById('voice-confirm-modal').classList.add('open');
+  }
+}
