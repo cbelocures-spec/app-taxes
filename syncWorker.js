@@ -56,7 +56,7 @@ async function clickByText(page, text, elementType = '*') {
         return style && style.display !== 'none' && style.visibility !== 'hidden' && el.offsetWidth > 0;
       }, element);
       if (isVisible) {
-        await element.click();
+        await page.evaluate(el => el.click(), element);
         return true;
       }
     }
