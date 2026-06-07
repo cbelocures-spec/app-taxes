@@ -652,7 +652,8 @@ function addTaskField(taskData = null) {
       <div class="form-row">
         <div class="form-group col-6">
           <label>Horas Estimadas</label>
-          <input type="number" step="0.25" min="0" value="${taskData ? taskData.horasEstimadas : '0.00'}" class="task-hours">
+          <input type="number" step="0.01" min="0" value="${taskData ? taskData.horasEstimadas : '0.00'}" class="task-hours" oninput="updateHoursReadable(this)">
+          <small class="hours-readable" style="color:var(--primary);font-size:11px;margin-top:2px;display:block;">${taskData && taskData.horasEstimadas ? formatDecimalHours(taskData.horasEstimadas) : ''}</small>
         </div>
         <div class="form-group col-6">
           <label>Estado Inicial</label>
@@ -1450,6 +1451,7 @@ async function toggleTaskTimer(taskId) {
         const currentHours = parseFloat(hoursInput.value) || 0;
         totalHours = parseFloat((currentHours + addedHours).toFixed(2));
         hoursInput.value = totalHours.toFixed(2);
+        updateHoursReadable(hoursInput);
       }
     }
 
@@ -1458,8 +1460,23 @@ async function toggleTaskTimer(taskId) {
     btn.querySelector('.material-icons').textContent = 'play_arrow';
     btn.querySelector('.btn-text').textContent = 'Iniciar';
     display.textContent = '00:00:00';
-    showToast(`Tiempo sumado: +${addedHours.toFixed(2)} hrs. Total: ${totalHours.toFixed(2)} hrs.`, "success");
+    showToast(`Tiempo sumado: +${formatDecimalHours(addedHours)}. Total: ${formatDecimalHours(totalHours)}`, "success");
   }
+}
+
+function formatDecimalHours(decimalHours) {
+  const h = Math.floor(decimalHours);
+  const m = Math.round((decimalHours - h) * 60);
+  if (h === 0) return `${m}min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${String(m).padStart(2, '0')}min`;
+}
+
+function updateHoursReadable(inputEl) {
+  const readableEl = inputEl.parentElement.querySelector('.hours-readable');
+  if (!readableEl) return;
+  const val = parseFloat(inputEl.value) || 0;
+  readableEl.textContent = val > 0 ? formatDecimalHours(val) : '';
 }
 
 function startTimerInterval(taskId, startTime) {
