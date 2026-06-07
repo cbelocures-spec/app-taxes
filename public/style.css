@@ -82,9 +82,10 @@ body {
   gap: 8px;
 }
 
-.logo-icon {
-  font-size: 32px;
-  color: var(--primary);
+.header-logo-img {
+  height: 36px;
+  max-width: 140px;
+  object-fit: contain;
 }
 
 .logo-text h1 {
