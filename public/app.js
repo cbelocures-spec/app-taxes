@@ -1689,160 +1689,173 @@ function convertSelectToSearchable(selectEl) {
 let activeDashboardIntervals = {};
 
 function renderDashboard() {
-  const gridWorking = document.getElementById('grid-working');
-  const gridPaused = document.getElementById('grid-paused');
-  const listFree = document.getElementById('list-free-employees');
+  try {
+    const gridWorking = document.getElementById('grid-working');
+    const gridPaused = document.getElementById('grid-paused');
+    const listFree = document.getElementById('list-free-employees');
 
-  if (!gridWorking || !gridPaused || !listFree) return;
+    if (!gridWorking || !gridPaused || !listFree) return;
 
-  // IMPORTANT: Clear ALL existing dashboard timer intervals before re-rendering
-  // This prevents ghost intervals from keeping dead timers alive after pause/finish
-  for (const key in activeDashboardIntervals) {
-    clearInterval(activeDashboardIntervals[key]);
-    delete activeDashboardIntervals[key];
-  }
+    // IMPORTANT: Clear ALL existing dashboard timer intervals before re-rendering
+    // This prevents ghost intervals from keeping dead timers alive after pause/finish
+    for (const key in activeDashboardIntervals) {
+      clearInterval(activeDashboardIntervals[key]);
+      delete activeDashboardIntervals[key];
+    }
 
-  // Active tasks from all orders (including local, error, pending, syncing, success)
-  const activeLocalOrders = activeOrders;
-  
-  const workingTasks = [];
-  const pausedTasks = [];
+    // Active tasks from all orders (including local, error, pending, syncing, success)
+    const activeLocalOrders = activeOrders || [];
+    
+    const workingTasks = [];
+    const pausedTasks = [];
 
-  const workingEmployeeLabels = new Set();
-  const pausedEmployeeLabels = new Set();
+    const workingEmployeeLabels = new Set();
+    const pausedEmployeeLabels = new Set();
 
-  activeLocalOrders.forEach(order => {
-    (order.tasks || []).forEach(task => {
-      if (task.status !== 'Finalizada') {
-        const empOpt = cachedCatalogs.empleados.find(e => e.value === task.empleado);
-        const empLabel = empOpt ? empOpt.label : task.empleado;
-        const isTimerRunning = task.timerStart !== null && task.timerStart > 0;
+    activeLocalOrders.forEach(order => {
+      (order.tasks || []).forEach(task => {
+        if (task && task.status !== 'Finalizada') {
+          const empOpt = (cachedCatalogs && cachedCatalogs.empleados)
+            ? cachedCatalogs.empleados.find(e => e.value === task.empleado)
+            : null;
+          const empLabel = (empOpt ? empOpt.label : task.empleado) || 'Desconocido';
+          const isTimerRunning = task.timerStart !== null && task.timerStart > 0;
 
-        const taskInfo = {
-          orderId: order.id,
-          interno: order.interno,
-          rodado: order.rodado,
-          taskId: task.id,
-          empleadoValue: task.empleado,
-          empleadoLabel: empLabel,
-          centroCosto: task.centroCosto,
-          horasEstimadas: parseFloat(task.horasEstimadas) || 0,
-          descripcion: task.descripcion || '(Sin descripción)',
-          timerStart: task.timerStart,
-          isTimerRunning: isTimerRunning
-        };
+          const taskInfo = {
+            orderId: order.id,
+            interno: order.interno || '',
+            rodado: order.rodado || '',
+            taskId: task.id,
+            empleadoValue: task.empleado || '',
+            empleadoLabel: empLabel,
+            centroCosto: task.centroCosto || '',
+            horasEstimadas: parseFloat(task.horasEstimadas) || 0,
+            descripcion: task.descripcion || '(Sin descripción)',
+            timerStart: task.timerStart,
+            isTimerRunning: isTimerRunning
+          };
 
-        if (isTimerRunning) {
-          workingTasks.push(taskInfo);
-          workingEmployeeLabels.add(empLabel.toLowerCase().trim());
-        } else {
-          pausedTasks.push(taskInfo);
-          pausedEmployeeLabels.add(empLabel.toLowerCase().trim());
+          if (isTimerRunning) {
+            workingTasks.push(taskInfo);
+            workingEmployeeLabels.add(String(empLabel).toLowerCase().trim());
+          } else {
+            pausedTasks.push(taskInfo);
+            pausedEmployeeLabels.add(String(empLabel).toLowerCase().trim());
+          }
         }
-      }
+      });
     });
-  });
 
-  // Render count badges
-  document.getElementById('count-working').textContent = workingTasks.length;
-  document.getElementById('count-paused').textContent = pausedTasks.length;
+    // Render count badges
+    const countWorkingEl = document.getElementById('count-working');
+    if (countWorkingEl) countWorkingEl.textContent = workingTasks.length;
+    
+    const countPausedEl = document.getElementById('count-paused');
+    if (countPausedEl) countPausedEl.textContent = pausedTasks.length;
 
-  // 1. Render working grid
-  if (workingTasks.length === 0) {
-    gridWorking.innerHTML = `<div class="empty-dashboard-state">No hay operarios trabajando actualmente.</div>`;
-  } else {
-    gridWorking.innerHTML = workingTasks.map(t => {
-      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - t.timerStart) / 1000));
-      const hh = Math.floor(elapsedSeconds / 3600);
-      const mm = Math.floor((elapsedSeconds % 3600) / 60);
-      const ss = elapsedSeconds % 60;
-      const displayTime = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    // 1. Render working grid
+    if (workingTasks.length === 0) {
+      gridWorking.innerHTML = `<div class="empty-dashboard-state">No hay operarios trabajando actualmente.</div>`;
+    } else {
+      gridWorking.innerHTML = workingTasks.map(t => {
+        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - t.timerStart) / 1000));
+        const hh = Math.floor(elapsedSeconds / 3600);
+        const mm = Math.floor((elapsedSeconds % 3600) / 60);
+        const ss = elapsedSeconds % 60;
+        const displayTime = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 
-      return `
-        <div class="dashboard-card working" id="dash-card-${t.taskId}">
-          <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
-          <div class="dashboard-card-subtitle">Int. ${t.interno} | ${t.rodado.split(' - ')[0]}</div>
-          <div class="dashboard-card-desc">${t.descripcion}</div>
-          <div class="dashboard-card-timer" id="dash-timer-${t.taskId}">${displayTime}</div>
-          <div class="dashboard-card-actions">
-            <button type="button" class="btn btn-warning btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')">
-              <span class="material-icons" style="font-size:12px;">pause</span> Pausar
-            </button>
-            <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
-              <span class="material-icons" style="font-size:12px;">check</span> Fin
-            </button>
+        return `
+          <div class="dashboard-card working" id="dash-card-${t.taskId}">
+            <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
+            <div class="dashboard-card-subtitle">Int. ${t.interno} | ${(t.rodado || '').split(' - ')[0]}</div>
+            <div class="dashboard-card-desc">${t.descripcion}</div>
+            <div class="dashboard-card-timer" id="dash-timer-${t.taskId}">${displayTime}</div>
+            <div class="dashboard-card-actions">
+              <button type="button" class="btn btn-warning btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')">
+                <span class="material-icons" style="font-size:12px;">pause</span> Pausar
+              </button>
+              <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
+                <span class="material-icons" style="font-size:12px;">check</span> Fin
+              </button>
+            </div>
           </div>
-        </div>
-      `;
-    }).join('');
+        `;
+      }).join('');
 
-    workingTasks.forEach(t => {
-      startDashboardTimerUpdate(t.taskId, t.timerStart);
-    });
-  }
+      workingTasks.forEach(t => {
+        startDashboardTimerUpdate(t.taskId, t.timerStart);
+      });
+    }
 
-  // 2. Render paused grid
-  if (pausedTasks.length === 0) {
-    gridPaused.innerHTML = `<div class="empty-dashboard-state">No hay tareas en pausa.</div>`;
-  } else {
-    gridPaused.innerHTML = pausedTasks.map(t => {
-      return `
-        <div class="dashboard-card paused">
-          <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
-          <div class="dashboard-card-subtitle">Int. ${t.interno} | ${t.rodado.split(' - ')[0]}</div>
-          <div class="dashboard-card-desc">${t.descripcion}</div>
-          <div class="dashboard-card-timer">${t.horasEstimadas.toFixed(2)} hrs</div>
-          <div class="dashboard-card-actions">
-            <button type="button" class="btn btn-primary btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
-              <span class="material-icons" style="font-size:12px;">play_arrow</span> Reanudar
-            </button>
-            <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')">
-              <span class="material-icons" style="font-size:12px;">check</span> Fin
-            </button>
+    // 2. Render paused grid
+    if (pausedTasks.length === 0) {
+      gridPaused.innerHTML = `<div class="empty-dashboard-state">No hay tareas en pausa.</div>`;
+    } else {
+      gridPaused.innerHTML = pausedTasks.map(t => {
+        return `
+          <div class="dashboard-card paused">
+            <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
+            <div class="dashboard-card-subtitle">Int. ${t.interno} | ${(t.rodado || '').split(' - ')[0]}</div>
+            <div class="dashboard-card-desc">${t.descripcion}</div>
+            <div class="dashboard-card-timer">${t.horasEstimadas.toFixed(2)} hrs</div>
+            <div class="dashboard-card-actions">
+              <button type="button" class="btn btn-primary btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
+                <span class="material-icons" style="font-size:12px;">play_arrow</span> Reanudar
+              </button>
+              <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')">
+                <span class="material-icons" style="font-size:12px;">check</span> Fin
+              </button>
+            </div>
           </div>
-        </div>
-      `;
-    }).join('');
-  }
+        `;
+      }).join('');
+    }
 
-  // 3. Render Free Mechanics
-  const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    // 3. Render Free Mechanics
+    const cleanName = (str) => {
+      if (!str) return '';
+      return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    };
 
-  const activeBaseList = activeMechanicsList && activeMechanicsList.length > 0 ? activeMechanicsList : MECANICA_EMPLOYEES;
+    const activeBaseList = activeMechanicsList && activeMechanicsList.length > 0 ? activeMechanicsList : MECANICA_EMPLOYEES;
 
-  const freeMechanics = activeBaseList.filter(name => {
-    const cleaned = cleanName(name);
-    let isWorking = false;
-    workingEmployeeLabels.forEach(label => {
-      if (cleanName(label).includes(cleaned) || cleaned.includes(cleanName(label))) {
-        isWorking = true;
-      }
+    const freeMechanics = activeBaseList.filter(name => {
+      const cleaned = cleanName(name);
+      let isWorking = false;
+      workingEmployeeLabels.forEach(label => {
+        if (cleanName(label).includes(cleaned) || cleaned.includes(cleanName(label))) {
+          isWorking = true;
+        }
+      });
+
+      let isPaused = false;
+      pausedEmployeeLabels.forEach(label => {
+        if (cleanName(label).includes(cleaned) || cleaned.includes(cleanName(label))) {
+          isPaused = true;
+        }
+      });
+
+      return !isWorking && !isPaused;
     });
 
-    let isPaused = false;
-    pausedEmployeeLabels.forEach(label => {
-      if (cleanName(label).includes(cleaned) || cleaned.includes(cleanName(label))) {
-        isPaused = true;
-      }
-    });
+    const countFreeEl = document.getElementById('count-free');
+    if (countFreeEl) countFreeEl.textContent = freeMechanics.length;
 
-    return !isWorking && !isPaused;
-  });
-
-  document.getElementById('count-free').textContent = freeMechanics.length;
-
-  if (freeMechanics.length === 0) {
-    listFree.innerHTML = `<div class="empty-dashboard-state">Todos los mecánicos están ocupados.</div>`;
-  } else {
-    listFree.innerHTML = freeMechanics.map(name => {
-      const shortName = name.split(',')[0].trim();
-      return `
-        <div class="free-employee-tag">
-          <span class="material-icons">check_circle</span>
-          <span>${shortName}</span>
-        </div>
-      `;
-    }).join('');
+    if (freeMechanics.length === 0) {
+      listFree.innerHTML = `<div class="empty-dashboard-state">Todos los mecánicos están ocupados.</div>`;
+    } else {
+      listFree.innerHTML = freeMechanics.map(name => {
+        const shortName = name.split(',')[0].trim();
+        return `
+          <div class="free-employee-tag">
+            <span class="material-icons">check_circle</span>
+            <span>${shortName}</span>
+          </div>
+        `;
+      }).join('');
+    }
+  } catch (err) {
+    console.error("Error rendering dashboard:", err);
   }
 }
 
