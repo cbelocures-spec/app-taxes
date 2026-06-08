@@ -26,6 +26,7 @@
     </div>
 
     <div class="header-actions">
+      <span class="material-icons logout-btn" id="header-logout-btn" onclick="logoutUser()" title="Cerrar Sesión" style="margin-right: 8px;">logout</span>
       <span class="material-icons refresh-btn" id="header-refresh-btn" onclick="location.reload()" title="Refrescar Pantalla">refresh</span>
       <span class="material-icons sync-indicator idle" id="global-sync-icon">sync</span>
     </div>
@@ -213,6 +214,7 @@
             <div class="form-group col-12">
               <label for="bulk-clasificacion">Clasificación *</label>
               <select id="bulk-clasificacion" required>
+                <option value="" selected disabled>Seleccionar...</option>
                 <option value="Preventivo">Preventivo</option>
                 <option value="Auxilio">Auxilio</option>
                 <option value="Correctivo">Correctivo</option>
@@ -398,6 +400,7 @@
               <div class="form-group col-6">
                 <label for="form-clasificacion">Clasificación *</label>
                 <select id="form-clasificacion" required>
+                  <option value="" selected disabled>Seleccionar...</option>
                   <option value="Preventivo">Preventivo</option>
                   <option value="Auxilio">Auxilio</option>
                   <option value="Correctivo">Correctivo</option>
@@ -580,6 +583,44 @@
         </button>
         <button class="btn btn-success" onclick="confirmVoiceOrder()">
           <span class="material-icons">send</span> Confirmar y Enviar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN OVERLAY -->
+  <div class="login-overlay" id="login-overlay">
+    <div class="login-card">
+      <img src="logo.jpg" alt="Contenedores Hugo" class="login-logo">
+      <h2>Gestión de Mantenimiento</h2>
+      <p>Inicie sesión con su usuario de Taxes</p>
+      
+      <form id="login-form" onsubmit="event.preventDefault(); submitLoginForm();">
+        <div class="form-group">
+          <label for="login-username">Usuario / Email de Taxes</label>
+          <input type="text" id="login-username" placeholder="ejemplo@correo.com" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Contraseña de Taxes</label>
+          <input type="password" id="login-password" placeholder="••••••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 24px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <span class="material-icons">login</span>
+          <span>Iniciar Sesión</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- FLOATING BULK SYNC ACTION BAR -->
+  <div class="bulk-sync-bar" id="bulk-sync-bar">
+    <div class="bulk-sync-bar-content">
+      <span class="bulk-sync-count" id="bulk-sync-count">0 seleccionadas</span>
+      <div class="bulk-sync-actions">
+        <button type="button" class="btn-xs" onclick="toggleSelectAllOrdersList(true)">Todo</button>
+        <button type="button" class="btn-xs" onclick="toggleSelectAllOrdersList(false)">Ninguno</button>
+        <button type="button" class="btn btn-success btn-xs" onclick="syncSelectedOrders()" style="display:flex; align-items:center; gap:4px; background-color: var(--success); color: white; border-color: var(--success);">
+          <span class="material-icons" style="font-size:14px;">cloud_upload</span> Subir a Taxes
         </button>
       </div>
     </div>

@@ -565,17 +565,29 @@ async function autoLogin(page, username, password, portalUrl) {
 }
 
 // 1. SCRAPE CATALOGS FUNCTION
-async function scrapeCatalogs() {
+async function scrapeCatalogs(triggerUsername = null) {
   if (isScraping) return { success: false, message: "Catalog scraping is already running." };
   isScraping = true;
   
   const settings = db.getSettings();
-  if (!settings.username || !settings.password) {
-    isScraping = false;
-    return { success: false, message: "Faltan configurar las credenciales en Ajustes." };
+  let username = settings.username;
+  let password = settings.password;
+
+  if (triggerUsername) {
+    const user = db.getUser(triggerUsername);
+    if (user && user.password) {
+      username = user.username;
+      password = user.password;
+    }
   }
 
-  console.log("Starting automatic catalog extraction from Taxes.com.ar...");
+  if (!username || !password) {
+    isScraping = false;
+    db.saveSettings({ catalogSyncStatus: "error", catalogSyncError: "Faltan configurar las credenciales de Taxes." });
+    return { success: false, message: "Faltan configurar las credenciales de Taxes." };
+  }
+
+  console.log(`Starting automatic catalog extraction from Taxes.com.ar using user: ${username}...`);
   let browser = null;
 
   try {
@@ -590,7 +602,7 @@ async function scrapeCatalogs() {
     await page.setViewport({ width: 1280, height: 800 });
 
     // Login
-    await autoLogin(page, settings.username, settings.password, settings.portalUrl);
+    await autoLogin(page, username, password, settings.portalUrl);
 
     // ============================================================
     // STEP A: SCRAPE ALL RODADOS FROM FLOTA > FLOTA (limit 999)
@@ -908,15 +920,28 @@ async function syncWorkOrder(orderId) {
   if (!order) return { success: false, message: "Order not found" };
 
   const settings = db.getSettings();
-  if (!settings.username || !settings.password) {
+  
+  // Resolve user credentials for this order
+  let username = settings.username;
+  let password = settings.password;
+
+  if (order.createdBy) {
+    const user = db.getUser(order.createdBy);
+    if (user && user.password) {
+      username = user.username;
+      password = user.password;
+    }
+  }
+
+  if (!username || !password) {
     db.updateWorkOrder(orderId, {
       syncStatus: "error",
-      syncError: "Faltan configurar las credenciales en Ajustes."
+      syncError: "Faltan configurar las credenciales del supervisor."
     });
     return { success: false, message: "Missing credentials" };
   }
 
-  console.log(`\n=== Starting Background Sync for OT #${order.interno} (ID: ${order.id}) ===`);
+  console.log(`\n=== Starting Background Sync for OT #${order.interno} (ID: ${order.id}) using user: ${username} ===`);
   db.updateWorkOrder(orderId, { syncStatus: "syncing", syncError: null });
 
   let browser = null;
@@ -933,7 +958,7 @@ async function syncWorkOrder(orderId) {
     await page.setViewport({ width: 1280, height: 900 });
 
     // 1. LOGIN
-    await autoLogin(page, settings.username, settings.password, settings.portalUrl);
+    await autoLogin(page, username, password, settings.portalUrl);
 
     // 2. NAVIGATE TO NEW WORK ORDER FORM
     console.log("Navigating directly to Ordenes de Trabajo list page...");
@@ -994,8 +1019,8 @@ async function syncWorkOrder(orderId) {
         });
       }
       
-      if (!matched && settings.username) {
-        const prefix = settings.username.split('@')[0].toLowerCase();
+      if (!matched && username) {
+        const prefix = username.split('@')[0].toLowerCase();
         const cleanedPrefix = cleanText(prefix);
         matched = list.find(r => cleanText(r.label).includes(cleanedPrefix));
       }

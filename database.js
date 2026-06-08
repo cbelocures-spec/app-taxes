@@ -40,7 +40,8 @@ const DEFAULT_DB = {
     centrosCosto: []  // array of { value, label }
   },
   workOrders: [],
-  activeMechanics: DEFAULT_MECHANICS
+  activeMechanics: DEFAULT_MECHANICS,
+  users: {}
 };
 
 // Thread-safe read/write helper
@@ -108,6 +109,27 @@ class LocalDB {
     return db.settings;
   }
 
+  // --- Users Methods ---
+  getUser(username) {
+    if (!username) return null;
+    const db = this.read();
+    const key = username.toLowerCase().trim();
+    return db.users ? db.users[key] : null;
+  }
+
+  saveUser(username, password) {
+    if (!username) return null;
+    const db = this.read();
+    if (!db.users) db.users = {};
+    const key = username.toLowerCase().trim();
+    db.users[key] = {
+      username: username.trim(),
+      password: password
+    };
+    this.write(db);
+    return db.users[key];
+  }
+
   // --- Catalogs Methods ---
   getCatalogs() {
     const db = this.read();
@@ -161,13 +183,14 @@ class LocalDB {
       fechaEntrega: orderData.fechaEntrega || "",
       horario: orderData.horario || "",
       interno: orderData.interno || "",
-      clasificacion: orderData.clasificacion || "Preventivo",
+      clasificacion: orderData.clasificacion || "",
       incidente: orderData.incidente || "",
       syncStatus: "local",
       syncError: null,
       syncDate: null,
       createdAt: new Date().toISOString(),
-      tasks: tasks
+      tasks: tasks,
+      createdBy: orderData.createdBy || null
     };
 
     db.workOrders.push(newOrder);

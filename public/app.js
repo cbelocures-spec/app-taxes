@@ -1,3 +1,18 @@
+// Intercept fetch to automatically include supervisor username header
+const originalFetch = window.fetch;
+window.fetch = function(url, options = {}) {
+  const username = localStorage.getItem('currentUserUsername');
+  if (username) {
+    options.headers = options.headers || {};
+    if (options.headers instanceof Headers) {
+      options.headers.set('X-User-Username', username);
+    } else {
+      options.headers['X-User-Username'] = username;
+    }
+  }
+  return originalFetch(url, options);
+};
+
 // Global State
 let cachedCatalogs = { rodados: [], responsables: [], empleados: [], centrosCosto: [] };
 let cachedNovelties = [];
@@ -6,6 +21,7 @@ let currentRetryOrderId = null;
 let currentEditingOrderId = null;
 let catalogSyncInterval = null;
 let activeMechanicsList = [];
+let selectedOrderIds = new Set();
 
 const MECANICA_EMPLOYEES = [
   "Canaviri Fernandez, Jesús",
@@ -40,11 +56,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const min = String(today.getMinutes()).padStart(2, '0');
   document.getElementById('form-hora').value = `${hh}:${min}`;
 
-  // Initial Fetches
-  fetchSettings();
-  fetchCatalogs();
-  fetchOrders();
-  fetchActiveMechanics();
+  // Check user session first
+  checkUserSession();
+
+  // If logged in, fetch initial data
+  if (localStorage.getItem('currentUserUsername')) {
+    fetchSettings();
+    fetchCatalogs();
+    fetchOrders();
+    fetchActiveMechanics();
+  }
 
   // Setup Event Listeners
   document.getElementById('settings-form').addEventListener('submit', saveSettings);
@@ -798,6 +819,15 @@ function renderOrders() {
   
   if (!container) return;
 
+  // Clean up selected IDs that are no longer local or error
+  const syncableIds = new Set(activeOrders.filter(o => o.syncStatus === 'local' || o.syncStatus === 'error').map(o => o.id));
+  for (const id of selectedOrderIds) {
+    if (!syncableIds.has(id)) {
+      selectedOrderIds.delete(id);
+    }
+  }
+  updateBulkSyncActionBar();
+
   // Apply search filtering for active (non-synced) orders
   const query = document.getElementById('order-search').value.toLowerCase();
   const activeLocalOrders = activeOrders.filter(o => o.syncStatus !== 'success');
@@ -918,14 +948,20 @@ function createOrderCardHtml(order) {
     }
   }
 
+  const isChecked = selectedOrderIds.has(order.id) ? 'checked' : '';
   const dateFormatted = order.fechaEntrega ? order.fechaEntrega.split('-').reverse().join('/') : '-';
 
   return `
     <div class="order-card">
       <div class="order-card-header">
-        <div>
-          <div class="order-card-title">${order.rodado}</div>
-          <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion}</strong></div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          ${(order.syncStatus === 'local' || order.syncStatus === 'error') ? `
+            <input type="checkbox" class="order-select-checkbox" data-id="${order.id}" onchange="onOrderSelectionChange(event)" ${isChecked} style="margin: 0; width: 18px; height: 18px; cursor: pointer;">
+          ` : ''}
+          <div>
+            <div class="order-card-title">${order.rodado}</div>
+            <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion || 'Sin Clasificar'}</strong></div>
+          </div>
         </div>
         ${statusBadge}
       </div>
@@ -3025,5 +3061,155 @@ async function confirmVoiceOrder() {
     showToast('Error al crear la orden: ' + err.message, 'warning');
     // Re-open confirm modal so user can retry
     document.getElementById('voice-confirm-modal').classList.add('open');
+  }
+}
+
+// --- AUTHENTICATION & MULTIUSER SESSION FUNCTIONS ---
+function checkUserSession() {
+  const username = localStorage.getItem('currentUserUsername');
+  const loginOverlay = document.getElementById('login-overlay');
+  
+  if (!username) {
+    if (loginOverlay) loginOverlay.classList.remove('hidden');
+  } else {
+    if (loginOverlay) loginOverlay.classList.add('hidden');
+    const userDisplay = document.getElementById('current-user');
+    if (userDisplay) {
+      userDisplay.textContent = username;
+    }
+  }
+}
+
+async function submitLoginForm() {
+  const usernameEl = document.getElementById('login-username');
+  const passwordEl = document.getElementById('login-password');
+  
+  const username = usernameEl.value.trim();
+  const password = passwordEl.value;
+
+  if (!username || !password) {
+    showToast("Por favor complete todos los campos", "danger");
+    return;
+  }
+
+  try {
+    const res = await originalFetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Usuario o contraseña inválidos");
+    }
+
+    const data = await res.json();
+    
+    // Save to localStorage
+    localStorage.setItem('currentUserUsername', data.username);
+    showToast("Sesión iniciada correctamente", "success");
+    
+    // Hide overlay & refresh everything
+    checkUserSession();
+    
+    // Trigger initial data fetches
+    fetchSettings();
+    fetchCatalogs();
+    fetchOrders();
+    fetchActiveMechanics();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Error al iniciar sesión", "danger");
+  }
+}
+
+function logoutUser() {
+  if (confirm("¿Está seguro que desea cerrar sesión?")) {
+    localStorage.removeItem('currentUserUsername');
+    location.reload();
+  }
+}
+
+// --- BULK SELECTION SYNC FUNCTIONS ---
+function onOrderSelectionChange(event) {
+  const checkbox = event.target;
+  const orderId = checkbox.getAttribute('data-id');
+  
+  if (checkbox.checked) {
+    selectedOrderIds.add(orderId);
+  } else {
+    selectedOrderIds.delete(orderId);
+  }
+  
+  updateBulkSyncActionBar();
+}
+
+function updateBulkSyncActionBar() {
+  const bar = document.getElementById('bulk-sync-bar');
+  const countEl = document.getElementById('bulk-sync-count');
+  
+  if (!bar || !countEl) return;
+  
+  const totalSelected = selectedOrderIds.size;
+  
+  if (totalSelected > 0) {
+    countEl.textContent = `${totalSelected} seleccionada${totalSelected > 1 ? 's' : ''}`;
+    bar.classList.add('active');
+  } else {
+    bar.classList.remove('active');
+  }
+}
+
+function toggleSelectAllOrdersList(select) {
+  const checkboxes = document.querySelectorAll('.order-select-checkbox');
+  checkboxes.forEach(chk => {
+    chk.checked = select;
+    const orderId = chk.getAttribute('data-id');
+    if (select) {
+      selectedOrderIds.add(orderId);
+    } else {
+      selectedOrderIds.delete(orderId);
+    }
+  });
+  
+  updateBulkSyncActionBar();
+}
+
+async function syncSelectedOrders() {
+  if (selectedOrderIds.size === 0) {
+    showToast("No hay órdenes seleccionadas", "warning");
+    return;
+  }
+  
+  const count = selectedOrderIds.size;
+  showToast(`Encolando ${count} órdenes para subir a Taxes...`, "warning");
+  
+  let successCount = 0;
+  const idsToSync = Array.from(selectedOrderIds);
+  
+  // Clear selection first
+  selectedOrderIds.clear();
+  updateBulkSyncActionBar();
+  
+  // Uncheck all checkboxes
+  document.querySelectorAll('.order-select-checkbox').forEach(chk => chk.checked = false);
+
+  for (const orderId of idsToSync) {
+    try {
+      const res = await fetch(`/api/orders/retry/${orderId}`, { method: 'POST' });
+      if (res.ok) {
+        successCount++;
+      }
+    } catch (e) {
+      console.error(`Error syncing order ${orderId}:`, e);
+    }
+  }
+  
+  if (successCount > 0) {
+    showToast(`Se encolaron ${successCount} de ${count} órdenes correctamente.`, "success");
+    fetchOrders(); // reload
+  } else {
+    showToast("Error al encolar las órdenes", "danger");
   }
 }

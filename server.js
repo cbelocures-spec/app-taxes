@@ -31,6 +31,29 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
 
+// User Login (saves credentials locally for worker lookup)
+app.post('/api/login', (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: "Usuario y contraseña son requeridos." });
+    }
+    
+    // Save or update user credentials in db.json
+    const user = db.saveUser(username, password);
+    
+    // Also save to global settings as a fallback if no settings exist yet
+    const currentSettings = db.getSettings();
+    if (!currentSettings.username || !currentSettings.password) {
+      db.saveSettings({ username, password });
+    }
+
+    res.json({ success: true, username: user.username });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get all work orders
 app.get('/api/orders', (req, res) => {
   try {
@@ -52,6 +75,8 @@ app.post('/api/orders', (req, res) => {
       return res.status(400).json({ error: "Faltan campos obligatorios: rodado, responsable, interno, clasificacion son requeridos." });
     }
 
+    const createdBy = req.headers['x-user-username'] || null;
+
     const newOrder = db.createWorkOrder({
       rodado,
       responsable,
@@ -60,7 +85,8 @@ app.post('/api/orders', (req, res) => {
       interno,
       clasificacion,
       incidente,
-      tasks
+      tasks,
+      createdBy
     });
 
     // Trigger Google Sheets update asynchronously for any finalized tasks
@@ -82,6 +108,7 @@ app.put('/api/orders/:id', (req, res) => {
       return res.status(404).json({ error: "Orden no encontrada" });
     }
 
+    const createdBy = req.headers['x-user-username'] || existing.createdBy;
     const allTasksCompleted = (tasks || []).length > 0 && (tasks || []).every(t => t.status === "Finalizada");
 
     const updated = db.updateWorkOrder(req.params.id, {
@@ -92,6 +119,7 @@ app.put('/api/orders/:id', (req, res) => {
       interno,
       clasificacion,
       incidente,
+      createdBy,
       syncStatus: (existing.syncStatus === "pending" || existing.syncStatus === "syncing") ? existing.syncStatus : "local",
       syncError: null,
       syncDate: null,
@@ -242,8 +270,9 @@ app.get('/api/catalogs', (req, res) => {
 // Trigger manual catalog extraction from website
 app.post('/api/catalogs/sync', async (req, res) => {
   try {
+    const username = req.headers['x-user-username'] || null;
     // Run catalog scraping asynchronously so response is fast
-    worker.scrapeCatalogs().then(result => {
+    worker.scrapeCatalogs(username).then(result => {
       console.log("Async Catalog sync complete:", result);
     }).catch(e => {
       console.error("Async Catalog sync error:", e);
