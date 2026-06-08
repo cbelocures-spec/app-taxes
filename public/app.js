@@ -832,9 +832,9 @@ function renderOrders() {
   const query = document.getElementById('order-search').value.toLowerCase();
   const activeLocalOrders = activeOrders.filter(o => o.syncStatus !== 'success');
   const filtered = activeLocalOrders.filter(o => 
-    o.rodado.toLowerCase().includes(query) || 
-    o.interno.toLowerCase().includes(query) || 
-    o.clasificacion.toLowerCase().includes(query)
+    (o.rodado || '').toLowerCase().includes(query) || 
+    (o.interno || '').toLowerCase().includes(query) || 
+    (o.clasificacion || '').toLowerCase().includes(query)
   );
 
   // Render Orders Tab
@@ -856,9 +856,9 @@ function renderOrders() {
     
     const syncedOrders = activeOrders.filter(o => o.syncStatus === 'success');
     const filteredHistory = syncedOrders.filter(o => 
-      o.rodado.toLowerCase().includes(historyQuery) || 
-      o.interno.toLowerCase().includes(historyQuery) || 
-      o.clasificacion.toLowerCase().includes(historyQuery)
+      (o.rodado || '').toLowerCase().includes(historyQuery) || 
+      (o.interno || '').toLowerCase().includes(historyQuery) || 
+      (o.clasificacion || '').toLowerCase().includes(historyQuery)
     );
 
     if (filteredHistory.length === 0) {
@@ -1231,10 +1231,13 @@ let activeIntervalTimers = {};
 
 // --- HELPER FUNCTIONS FOR MECHANIC CONFLICT CHECKING ---
 async function resolveDatabaseConflicts() {
+  if (!activeOrders || !Array.isArray(activeOrders)) return;
   const runningByEmployee = {};
 
   activeOrders.forEach(order => {
+    if (!order) return;
     (order.tasks || []).forEach(task => {
+      if (!task) return;
       const localStart = localStorage.getItem(`timer_start_${task.id}`);
       const isRunning = (localStart !== null) || (task.timerStart !== null && task.timerStart > 0);
       if (isRunning && task.status !== 'Finalizada' && task.empleado) {
