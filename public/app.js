@@ -2234,17 +2234,68 @@ function filterBulkVehicles() {
   const searchInput = document.getElementById('bulk-vehicle-search');
   if (!searchInput) return;
 
-  const query = searchInput.value.toLowerCase().trim();
+  const query = searchInput.value.trim();
   const items = document.querySelectorAll('#bulk-vehicle-list .bulk-vehicle-item');
 
+  if (!query) {
+    items.forEach(item => {
+      item.style.display = 'flex';
+    });
+    return;
+  }
+
+  // Split query by commas, dots, semicolons, or spaces
+  const parts = query.split(/[,\.\s;]+/).map(p => p.trim().toLowerCase()).filter(p => p.length > 0);
+  const isMultiple = parts.length > 1;
+
+  let checkedAny = false;
+
   items.forEach(item => {
-    const text = item.textContent.toLowerCase();
-    if (text.includes(query)) {
+    const checkbox = item.querySelector('input[type="checkbox"]');
+    const value = checkbox ? checkbox.value : '';
+    const rodado = cachedCatalogs.rodados.find(r => r.value === value);
+
+    if (!rodado) {
+      item.style.display = 'none';
+      return;
+    }
+
+    const label = (rodado.label || '').toLowerCase();
+    const interno = String(rodado.interno || '').toLowerCase().trim();
+    const patente = (rodado.patente || '').toLowerCase();
+
+    let isMatched = false;
+
+    if (isMultiple) {
+      // If multiple parts, match exactly by internal number
+      isMatched = parts.includes(interno);
+    } else {
+      // Standard search for single term
+      const singlePart = parts[0];
+      isMatched = interno.includes(singlePart) || label.includes(singlePart) || patente.includes(singlePart);
+    }
+
+    // Auto-check on exact internal number match
+    if (isMatched && checkbox && !checkbox.checked) {
+      parts.forEach(part => {
+        if (interno === part) {
+          checkbox.checked = true;
+          item.classList.add('selected');
+          checkedAny = true;
+        }
+      });
+    }
+
+    if (isMatched) {
       item.style.display = 'flex';
     } else {
       item.style.display = 'none';
     }
   });
+
+  if (checkedAny) {
+    updateBulkSummary();
+  }
 }
 
 function formatMinutesToHMM(totalMinutes) {
