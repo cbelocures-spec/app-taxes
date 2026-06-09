@@ -27,6 +27,24 @@ app.use((req, res, next) => {
   next();
 });
 
+// Middleware to validate session (check if user exists in db when x-user-username is present)
+app.use((req, res, next) => {
+  // Allow login and static assets
+  if (req.path === '/api/login' || !req.path.startsWith('/api')) {
+    return next();
+  }
+
+  const username = req.headers['x-user-username'];
+  if (username) {
+    const user = db.getUser(username);
+    if (!user || !user.password) {
+      console.log(`[Auth Check] User "${username}" not found or has no password in DB. Returning 401.`);
+      return res.status(401).json({ error: "Session expired or invalid user." });
+    }
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
@@ -205,6 +223,10 @@ app.get('/api/settings', (req, res) => {
       if (userRecord && userRecord.username) {
         displayUsername = userRecord.username;
         displayPassword = userRecord.password ? "••••••••••••" : "";
+      } else {
+        // If user record doesn't exist for the requesting user, do NOT bleed the global settings
+        displayUsername = requestingUser;
+        displayPassword = "";
       }
     }
 

@@ -1,6 +1,6 @@
-// Intercept fetch to automatically include supervisor username header
+// Intercept fetch to automatically include supervisor username header and handle 401s
 const originalFetch = window.fetch;
-window.fetch = function(url, options = {}) {
+window.fetch = async function(url, options = {}) {
   const username = localStorage.getItem('currentUserUsername');
   if (username) {
     options.headers = options.headers || {};
@@ -10,7 +10,20 @@ window.fetch = function(url, options = {}) {
       options.headers['X-User-Username'] = username;
     }
   }
-  return originalFetch(url, options);
+  try {
+    const response = await originalFetch(url, options);
+    // If server returns 401 and it's not a login request, the session is stale/invalid.
+    // Clear the storage and force login.
+    if (response.status === 401 && !url.includes('/api/login')) {
+      console.warn('Session invalid or expired (401 from server). Logging out...');
+      localStorage.removeItem('currentUserUsername');
+      checkUserSession();
+      showToast("Su sesión ha expirado o el servidor se reinició. Por favor, inicie sesión de nuevo.", "danger");
+    }
+    return response;
+  } catch (err) {
+    throw err;
+  }
 };
 
 // Global State
