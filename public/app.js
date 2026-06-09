@@ -197,11 +197,16 @@ function openNewOrderModal() {
   const min = String(today.getMinutes()).padStart(2, '0');
   document.getElementById('form-hora').value = `${hh}:${min}`;
 
-  // Clear task fields and prefill with two empty tasks by default
+  // Clear task fields
   const container = document.getElementById('modal-tasks-list');
-  container.innerHTML = "";
-  addTaskField();
-  addTaskField();
+  container.innerHTML = `
+    <div class="tasks-empty-state" id="tasks-empty-state">
+      <span class="material-icons">assignment_late</span>
+      <p>No hay tareas asignadas.</p>
+      <small>Haz clic en "AGREGAR TAREA" para crear la primera tarea.</small>
+    </div>
+  `;
+  updateTaskCountBadge();
   
   // Hide novelties panel
   showNoveltiesForInterno("");
