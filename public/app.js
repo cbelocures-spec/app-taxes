@@ -12,11 +12,31 @@ window.fetch = async function(url, options = {}) {
   }
   try {
     const response = await originalFetch(url, options);
-    // If server returns 401 and it's not a login request, the session is stale/invalid.
-    // Clear the storage and force login.
+    
+    // If server returns 401 and it's not a login request, check if we can auto-login
     if (response.status === 401 && !url.includes('/api/login')) {
-      console.warn('Session invalid or expired (401 from server). Logging out...');
+      const savedPassword = localStorage.getItem('currentUserPassword');
+      if (savedPassword && username) {
+        console.warn('Session invalid or expired (401 from server). Attempting automatic background re-login...');
+        try {
+          const loginRes = await originalFetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password: savedPassword })
+          });
+          if (loginRes.ok) {
+            console.log('Background re-login successful. Retrying original request...');
+            // Retry the original request
+            return await originalFetch(url, options);
+          }
+        } catch (loginErr) {
+          console.error('Background re-login failed:', loginErr);
+        }
+      }
+      
+      console.warn('Could not recover session. Logging out...');
       localStorage.removeItem('currentUserUsername');
+      localStorage.removeItem('currentUserPassword');
       checkUserSession();
       showToast("Su sesión ha expirado o el servidor se reinició. Por favor, inicie sesión de nuevo.", "danger");
     }
@@ -393,6 +413,9 @@ async function saveSettings(e) {
     if (!res.ok) throw new Error("Failed to save settings");
     const data = await res.json();
     
+    if (password && password !== "••••••••••••") {
+      localStorage.setItem('currentUserPassword', password);
+    }
     showToast("Ajustes guardados correctamente", "success");
     // NOTE: DO NOT overwrite current-user here — header always shows localStorage user
     
@@ -3193,6 +3216,7 @@ async function submitLoginForm() {
     
     // Save to localStorage
     localStorage.setItem('currentUserUsername', data.username);
+    localStorage.setItem('currentUserPassword', password);
     showToast("Sesión iniciada correctamente", "success");
     
     // Hide overlay & refresh everything
@@ -3220,6 +3244,7 @@ async function submitLoginForm() {
 function logoutUser() {
   if (confirm("¿Está seguro que desea cerrar sesión?")) {
     localStorage.removeItem('currentUserUsername');
+    localStorage.removeItem('currentUserPassword');
     location.reload();
   }
 }
