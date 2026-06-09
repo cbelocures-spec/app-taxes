@@ -2158,7 +2158,7 @@ body {
   gap: 6px;
 }
 
-.btn-xs {
+.bulk-sync-actions .btn-xs {
   padding: 6px 10px;
   font-size: 11px;
   height: auto;
@@ -2172,7 +2172,7 @@ body {
   color: white;
 }
 
-.btn-xs:hover {
+.bulk-sync-actions .btn-xs:hover {
   background-color: rgba(255,255,255,0.25);
 }
 
