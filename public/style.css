@@ -185,7 +185,9 @@ body {
   margin-bottom: var(--nav-height);
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 16px;
+  padding-bottom: 120px; /* Extra bottom padding so last items aren't cut off by fixed bottom nav */
 }
 
 /* APP VIEWS */
@@ -1341,12 +1343,17 @@ body {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr); /* 2 columns on mobile */
+  grid-template-columns: 1fr; /* 1 column on mobile for better readability */
   gap: 10px;
 }
 
 /* Landscape/Tablet grid */
 @media (min-width: 600px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 900px) {
   .dashboard-grid {
     grid-template-columns: repeat(3, 1fr);
   }
