@@ -39,21 +39,33 @@ app.post('/api/login', (req, res) => {
       return res.status(400).json({ error: "Usuario y contrase\u00f1a son requeridos." });
     }
 
-    // Save credentials immediately — login is always instant
+    // Save this user's credentials in per-user store (used by syncWorkOrder per order)
     const user = db.saveUser(username, password);
 
-    // Update global settings and clear any stale sync error
-    db.saveSettings({ username, password, catalogSyncStatus: 'idle', catalogSyncError: null });
-
-    console.log(`[Login] User ${username} logged in. Triggering background catalog sync.`);
-
-    // Trigger catalog sync in background (validates credentials implicitly)
-    // If credentials are wrong, scrapeCatalogs will set error in settings UI
-    worker.scrapeCatalogs(username).then(result => {
-      console.log(`[Login] Catalog sync for ${username}:`, result.message);
-    }).catch(e => {
-      console.error(`[Login] Catalog sync error for ${username}:`, e.message);
-    });
+    // Only update global settings (used for catalog sync fallback) if not already set,
+    // or if this is the same user updating their own credentials.
+    // This prevents user B's login from replacing user A's global settings.
+    const currentSettings = db.getSettings();
+    const isSameUser = currentSettings.username && 
+                       currentSettings.username.toLowerCase().trim() === username.toLowerCase().trim();
+    const noGlobalUser = !currentSettings.username || !currentSettings.password;
+    
+    if (noGlobalUser || isSameUser) {
+      db.saveSettings({ username, password, catalogSyncStatus: 'idle', catalogSyncError: null });
+      console.log(`[Login] Global settings updated for ${username}.`);
+      // Trigger catalog sync in background for this user
+      worker.scrapeCatalogs(username).then(result => {
+        console.log(`[Login] Catalog sync for ${username}:`, result.message);
+      }).catch(e => {
+        console.error(`[Login] Catalog sync error for ${username}:`, e.message);
+      });
+    } else {
+      // Secondary user logging in — clear stale errors but don't overwrite global settings
+      if (currentSettings.catalogSyncError) {
+        db.saveSettings({ catalogSyncStatus: 'idle', catalogSyncError: null });
+      }
+      console.log(`[Login] Secondary user ${username} logged in (global settings kept for ${currentSettings.username}).`);
+    }
 
     res.json({ success: true, username: user.username });
   } catch (error) {

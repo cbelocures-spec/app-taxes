@@ -345,9 +345,9 @@ async function fetchSettings() {
     document.getElementById('set-password').value = data.password || "";
     document.getElementById('set-google-script-url').value = data.googleScriptUrl || "";
     
-    if (data.username) {
-      document.getElementById('current-user').textContent = data.username;
-    }
+    // NOTE: DO NOT set current-user from server settings —
+    // the header always shows the locally logged-in user (from localStorage)
+    // checkUserSession() already handles this correctly on login.
     
     updateCatalogSyncUI(data);
   } catch (error) {
@@ -374,11 +374,9 @@ async function saveSettings(e) {
     const data = await res.json();
     
     showToast("Ajustes guardados correctamente", "success");
-    if (username) {
-      document.getElementById('current-user').textContent = username;
-    }
+    // NOTE: DO NOT overwrite current-user here — header always shows localStorage user
     
-    // Automatically trigger catalog sync on credentials save to help user get started!
+    // Automatically trigger catalog sync on credentials save
     triggerCatalogSync();
   } catch (error) {
     showToast("Error al guardar ajustes", "danger");
@@ -1841,7 +1839,7 @@ function renderDashboard() {
               <button type="button" class="btn btn-primary btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
                 <span class="material-icons" style="font-size:12px;">play_arrow</span> Reanudar
               </button>
-              <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')">
+              <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
                 <span class="material-icons" style="font-size:12px;">check</span> Fin
               </button>
             </div>
