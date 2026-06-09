@@ -32,131 +32,25 @@ app.use(express.static(path.join(__dirname, 'public')));
 // API Routes
 
 // User Login (saves credentials locally for worker lookup)
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
-      return res.status(400).json({ error: "Usuario y contraseña son requeridos." });
+      return res.status(400).json({ error: "Usuario y contrase\u00f1a son requeridos." });
     }
 
-    // Check if we already have this user saved with valid credentials (skip re-validation)
-    const existingUser = db.getUser(username);
-    if (existingUser && existingUser.password === password) {
-      // Known user with same password — skip re-validation to keep login fast
-      console.log(`[Login] Known user ${username} re-authenticated from cache.`);
-      res.json({ success: true, username: existingUser.username });
-      return;
-    }
-
-    // Validate credentials against Taxes.com.ar using a quick Puppeteer login check
-    const settings = db.getSettings();
-    const portalUrl = settings.portalUrl || 'https://taxes.com.ar';
-    console.log(`[Login] Validating credentials for ${username} against ${portalUrl}...`);
-
-    let puppeteer;
-    try { puppeteer = require('puppeteer'); } catch(e) {
-      // If puppeteer not available, skip validation and trust user
-      console.warn('[Login] Puppeteer not available, skipping credential validation.');
-      const user = db.saveUser(username, password);
-      const currentSettings = db.getSettings();
-      if (!currentSettings.username || !currentSettings.password) {
-        db.saveSettings({ username, password });
-      }
-      return res.json({ success: true, username: user.username });
-    }
-
-    let browser = null;
-    try {
-      browser = await puppeteer.launch({
-        headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-      });
-
-      const page = await browser.newPage();
-      await page.setViewport({ width: 1280, height: 800 });
-
-      // Go to login page
-      await page.goto(`${portalUrl}/admin`, { waitUntil: 'networkidle2', timeout: 30000 });
-
-      // If already on dashboard (not login page), navigate to logout first
-      const isOnLoginPage = await page.evaluate(() => {
-        const inputs = Array.from(document.querySelectorAll('input'));
-        return inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
-      });
-
-      if (!isOnLoginPage) {
-        // Try to logout first
-        await page.goto(`${portalUrl}/logout`, { waitUntil: 'networkidle2', timeout: 10000 }).catch(() => {});
-        await page.goto(`${portalUrl}/admin`, { waitUntil: 'networkidle2', timeout: 30000 });
-      }
-
-      // Fill in credentials
-      await page.waitForSelector('input', { timeout: 10000 }).catch(() => {});
-      const inputs = await page.$$('input');
-      let usernameFilled = false, passwordFilled = false;
-      for (const input of inputs) {
-        const type = await page.evaluate(el => el.type, input);
-        const name = await page.evaluate(el => el.name || '', input);
-        if ((type === 'text' || type === 'email' || name.includes('email') || name.includes('user')) && !usernameFilled) {
-          await page.evaluate(el => el.value = '', input);
-          await input.type(username);
-          usernameFilled = true;
-        } else if ((type === 'password' || name.includes('pass')) && !passwordFilled) {
-          await page.evaluate(el => el.value = '', input);
-          await input.type(password);
-          passwordFilled = true;
-        }
-      }
-
-      // Click login
-      const clicked = await page.evaluate(() => {
-        const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
-        const loginBtn = btns.find(b => {
-          const t = b.textContent.trim().toLowerCase();
-          return t.includes('iniciar') || t.includes('ingresar') || t.includes('login');
-        }) || btns.find(b => b.type === 'submit');
-        if (loginBtn) { loginBtn.click(); return true; }
-        return false;
-      });
-      if (!clicked) await page.keyboard.press('Enter');
-
-      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {});
-      await new Promise(r => setTimeout(r, 2000));
-
-      // Check if login succeeded (not on login page anymore)
-      const stillOnLogin = await page.evaluate(() => {
-        const inputs = Array.from(document.querySelectorAll('input'));
-        const hasPasswordInput = inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
-        const bodyText = document.body.textContent.toLowerCase();
-        const hasError = bodyText.includes('credenciales') || bodyText.includes('inv\u00e1lido') || bodyText.includes('incorrecta');
-        return hasPasswordInput || hasError;
-      });
-
-      await browser.close();
-      browser = null;
-
-      if (stillOnLogin) {
-        return res.status(401).json({ error: "Credenciales inv\u00e1lidas o error al iniciar sesi\u00f3n en Taxes.com.ar" });
-      }
-
-      console.log(`[Login] Credentials valid for ${username}. Saving user.`);
-    } catch (puppeteerError) {
-      if (browser) await browser.close().catch(() => {});
-      console.error('[Login] Puppeteer validation error:', puppeteerError.message);
-      // If validation itself crashed (network error etc.), reject
-      return res.status(401).json({ error: "No se pudo verificar las credenciales: " + puppeteerError.message });
-    }
-
-    // Credentials are valid — save user
+    // Save credentials immediately — login is always instant
     const user = db.saveUser(username, password);
-    
-    // Also save to global settings so catalog sync always works
-    db.saveSettings({ username, password });
 
-    // Trigger catalog sync in background using this user's credentials
+    // Update global settings and clear any stale sync error
+    db.saveSettings({ username, password, catalogSyncStatus: 'idle', catalogSyncError: null });
+
+    console.log(`[Login] User ${username} logged in. Triggering background catalog sync.`);
+
+    // Trigger catalog sync in background (validates credentials implicitly)
+    // If credentials are wrong, scrapeCatalogs will set error in settings UI
     worker.scrapeCatalogs(username).then(result => {
-      console.log(`[Login] Catalog sync triggered for ${username}:`, result.message);
+      console.log(`[Login] Catalog sync for ${username}:`, result.message);
     }).catch(e => {
       console.error(`[Login] Catalog sync error for ${username}:`, e.message);
     });
