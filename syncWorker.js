@@ -488,20 +488,76 @@ async function autoLogin(page, username, password, portalUrl) {
   console.log(`Navigating to ${portalUrl}/admin ...`);
   await page.goto(`${portalUrl}/admin`, { waitUntil: 'networkidle2', timeout: 30000 });
 
-  // Check if we are already logged in (look for user profile or logout button)
-  const isLoggedIn = await page.evaluate(() => {
-    return document.body.textContent.includes('BELOCURES') || 
-           document.body.textContent.includes('Inicio') || 
-           document.querySelector('.profile-user') !== null;
+  // Check if we are on a login page (has password input visible)
+  const isOnLoginPage = await page.evaluate(() => {
+    const inputs = Array.from(document.querySelectorAll('input'));
+    return inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
   });
 
-  if (isLoggedIn) {
-    console.log("Already logged in to Taxes portal.");
-    return true;
+  if (!isOnLoginPage) {
+    // We are on a dashboard/admin page - check if the correct user is logged in
+    const loggedInEmail = await page.evaluate(() => {
+      // Look for displayed email/username in nav or profile area
+      const candidates = [
+        document.querySelector('.user-profile-toggle'),
+        document.querySelector('.user-profile-name'),
+        document.querySelector('.profile-user'),
+        document.querySelector('.nav-item .nav-link span'),
+        document.querySelector('.dropdown-toggle'),
+      ];
+      for (const el of candidates) {
+        if (el && el.textContent.trim()) return el.textContent.trim().toLowerCase();
+      }
+      // Fallback: search body text for email pattern
+      const bodyText = document.body.textContent;
+      const emailMatch = bodyText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g);
+      return emailMatch ? emailMatch[0].toLowerCase() : '';
+    });
+
+    const targetUser = username.toLowerCase().trim();
+    const alreadyCorrectUser = loggedInEmail && (
+      loggedInEmail.includes(targetUser.split('@')[0]) ||
+      targetUser.includes(loggedInEmail.split('@')[0]) ||
+      loggedInEmail === targetUser
+    );
+
+    if (alreadyCorrectUser) {
+      console.log(`Already logged in as correct user (${loggedInEmail}). Skipping login.`);
+      return true;
+    }
+
+    // Different user is logged in — need to logout first
+    console.log(`Different user logged in (${loggedInEmail}), need to logout and re-login as ${username}.`);
+    const logoutClicked = await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll('a, button'));
+      const logout = links.find(el => {
+        const text = el.textContent.trim().toLowerCase();
+        return text.includes('salir') || text.includes('logout') || text.includes('cerrar sesión') || text.includes('cerrar session');
+      });
+      if (logout) { logout.click(); return true; }
+      return false;
+    });
+    if (logoutClicked) {
+      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000 }).catch(() => {});
+      await delay(2000);
+    } else {
+      // Force navigate to logout URL
+      await page.goto(`${portalUrl}/logout`, { waitUntil: 'networkidle2', timeout: 10000 }).catch(() => {});
+      await delay(2000);
+    }
   }
 
-  console.log("Not logged in. Attempting credentials entry...");
+  console.log(`Not logged in (or logged out). Attempting login as ${username}...`);
   
+  // Navigate to login page if not there already
+  const stillOnLogin = await page.evaluate(() => {
+    const inputs = Array.from(document.querySelectorAll('input'));
+    return inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
+  });
+  if (!stillOnLogin) {
+    await page.goto(`${portalUrl}/admin`, { waitUntil: 'networkidle2', timeout: 30000 });
+  }
+
   // Wait for login fields
   await page.waitForSelector('input', { timeout: 10000 }).catch(() => {});
 
@@ -516,10 +572,12 @@ async function autoLogin(page, username, password, portalUrl) {
     
     if ((type === 'text' || type === 'email' || name.includes('email') || name.includes('user')) && !usernameFilled) {
       await input.focus();
+      await page.evaluate(el => el.value = '', input);
       await input.type(username);
       usernameFilled = true;
     } else if ((type === 'password' || name.includes('pass')) && !passwordFilled) {
       await input.focus();
+      await page.evaluate(el => el.value = '', input);
       await input.type(password);
       passwordFilled = true;
     }
@@ -549,18 +607,21 @@ async function autoLogin(page, username, password, portalUrl) {
   await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {});
   await delay(3000);
 
-  // Check if login succeeded
-  const loginSuccess = await page.evaluate(() => {
-    return document.body.textContent.includes('Inicio') || 
-           document.body.textContent.includes('Bienvenido') ||
-           document.body.textContent.includes('Taller');
+  // Check if login succeeded: we should NOT be on login page anymore
+  const stillOnLoginPage = await page.evaluate(() => {
+    const inputs = Array.from(document.querySelectorAll('input'));
+    const hasPasswordInput = inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
+    // Also check for typical error messages
+    const bodyText = document.body.textContent.toLowerCase();
+    const hasError = bodyText.includes('credenciales') || bodyText.includes('inválido') || bodyText.includes('incorrecta');
+    return hasPasswordInput || hasError;
   });
 
-  if (!loginSuccess) {
+  if (stillOnLoginPage) {
     throw new Error("Credenciales inválidas o error al iniciar sesión en Taxes.com.ar");
   }
 
-  console.log("Login successful!");
+  console.log(`Login successful as ${username}!`);
   return true;
 }
 

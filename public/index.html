@@ -591,7 +591,7 @@
   <!-- LOGIN OVERLAY -->
   <div class="login-overlay" id="login-overlay">
     <div class="login-card">
-      <img src="login_logo.jpg" alt="Contenedores Hugo" class="login-logo">
+      <img src="logo.jpg" alt="Contenedores Hugo" class="login-logo">
       <h2>Gestión de Mantenimiento</h2>
       <p>Inicie sesión con su usuario de Taxes</p>
       
@@ -604,10 +604,14 @@
           <label for="login-password">Contraseña de Taxes</label>
           <input type="password" id="login-password" placeholder="••••••••••••" required autocomplete="current-password">
         </div>
-        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 24px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-          <span class="material-icons">login</span>
-          <span>Iniciar Sesión</span>
+        <button type="submit" id="login-submit-btn" class="btn btn-primary btn-block" style="margin-top: 24px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <span class="material-icons" id="login-btn-icon">login</span>
+          <span id="login-btn-text">Iniciar Sesión</span>
         </button>
+        <p id="login-waiting-msg" style="display:none; font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 10px;">
+          <span class="material-icons" style="font-size: 14px; vertical-align: middle; animation: spin 1.5s linear infinite;">sync</span>
+          Verificando credenciales en Taxes.com.ar... (puede tardar hasta 30 segundos)
+        </p>
       </form>
     </div>
   </div>

@@ -3146,6 +3146,19 @@ async function submitLoginForm() {
     return;
   }
 
+  // Show loading state
+  const submitBtn = document.getElementById('login-submit-btn');
+  const btnIcon = document.getElementById('login-btn-icon');
+  const btnText = document.getElementById('login-btn-text');
+  const waitingMsg = document.getElementById('login-waiting-msg');
+  
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    if (btnIcon) btnIcon.style.animation = 'spin 1s linear infinite';
+    if (btnText) btnText.textContent = 'Verificando...';
+    if (waitingMsg) waitingMsg.style.display = 'block';
+  }
+
   try {
     const res = await originalFetch('/api/login', {
       method: 'POST',
@@ -3175,6 +3188,14 @@ async function submitLoginForm() {
   } catch (error) {
     console.error(error);
     showToast(error.message || "Error al iniciar sesión", "danger");
+  } finally {
+    // Restore button state
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      if (btnIcon) { btnIcon.style.animation = ''; btnIcon.textContent = 'login'; }
+      if (btnText) btnText.textContent = 'Iniciar Sesión';
+      if (waitingMsg) waitingMsg.style.display = 'none';
+    }
   }
 }
 
