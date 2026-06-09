@@ -194,10 +194,23 @@ app.post('/api/orders/retry/:id', async (req, res) => {
 app.get('/api/settings', (req, res) => {
   try {
     const settings = db.getSettings();
-    // Mask password for security
+    const requestingUser = req.query.username || null;
+
+    // If a specific user is requesting, show THEIR credentials (not the global ones)
+    let displayUsername = settings.username;
+    let displayPassword = settings.password ? "••••••••••••" : "";
+
+    if (requestingUser) {
+      const userRecord = db.getUser(requestingUser);
+      if (userRecord && userRecord.username) {
+        displayUsername = userRecord.username;
+        displayPassword = userRecord.password ? "••••••••••••" : "";
+      }
+    }
+
     const responseSettings = {
-      username: settings.username,
-      password: settings.password ? "••••••••••••" : "",
+      username: displayUsername,
+      password: displayPassword,
       portalUrl: settings.portalUrl || "https://taxes.com.ar",
       googleScriptUrl: settings.googleScriptUrl || "",
       catalogSyncStatus: settings.catalogSyncStatus || "idle",
@@ -209,21 +222,33 @@ app.get('/api/settings', (req, res) => {
   }
 });
 
+
 // Save connection settings
 app.post('/api/settings', (req, res) => {
   try {
     const { username, password, portalUrl, googleScriptUrl } = req.body;
+    const requestingUser = req.headers['x-user-username'] || null;
     const current = db.getSettings();
     
+    // If we have the requesting user, update their personal credentials in db.users
+    if (requestingUser && username && password && password !== "••••••••••••") {
+      db.saveUser(username, password);
+      console.log(`[Settings] Updated credentials for user ${requestingUser} -> ${username}`);
+    }
+
     const updates = {
-      username: username !== undefined ? username : current.username,
       portalUrl: portalUrl !== undefined ? portalUrl : current.portalUrl,
       googleScriptUrl: googleScriptUrl !== undefined ? googleScriptUrl : current.googleScriptUrl
     };
 
-    // Only update password if a new one is provided (not masked)
-    if (password && password !== "••••••••••••") {
-      updates.password = password;
+    // Only update global username/password if this is the global/primary user
+    const isPrimaryUser = !current.username || 
+                          (requestingUser && current.username.toLowerCase().trim() === (username || '').toLowerCase().trim());
+    if (isPrimaryUser) {
+      updates.username = username !== undefined ? username : current.username;
+      if (password && password !== "••••••••••••") {
+        updates.password = password;
+      }
     }
 
     const saved = db.saveSettings(updates);

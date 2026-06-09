@@ -336,7 +336,10 @@ function closeErrorModal() {
 // 3. FETCH CONFIGURATION & SETTINGS
 async function fetchSettings() {
   try {
-    const res = await fetch(`/api/settings?_=${Date.now()}`);
+    // Pass current user so server returns THIS user's credentials, not global ones
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const qs = currentUsername ? `?username=${encodeURIComponent(currentUsername)}&_=${Date.now()}` : `?_=${Date.now()}`;
+    const res = await fetch(`/api/settings${qs}`);
     if (!res.ok) throw new Error("Error fetching settings");
     const data = await res.json();
     
@@ -362,11 +365,15 @@ async function saveSettings(e) {
   const username = document.getElementById('set-username').value;
   const password = document.getElementById('set-password').value;
   const googleScriptUrl = document.getElementById('set-google-script-url').value;
+  const currentUsername = localStorage.getItem('currentUserUsername') || '';
 
   try {
     const res = await fetch('/api/settings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-username': currentUsername  // Tell server which user is saving
+      },
       body: JSON.stringify({ portalUrl, username, password, googleScriptUrl })
     });
 
