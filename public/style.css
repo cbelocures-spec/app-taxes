@@ -555,12 +555,16 @@ body {
   font-size: 15px;
   font-weight: 700;
   color: #0d233a;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .order-card-subtitle {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 2px;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .badge-status {

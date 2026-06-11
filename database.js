@@ -4,20 +4,27 @@ const path = require('path');
 const DB_PATH = path.join(__dirname, 'db.json');
 
 const DEFAULT_MECHANICS = [
+  "CALOMINO DARIO",
   "Canaviri Fernandez, Jesús",
   "Cuba Orosco, Kevín Genaro",
+  "DOMINIC DYLAN",
   "GERRY CRISTIAN MARCELO",
+  "GODOY DAVID",
   "Gustavo Javier Benitez",
+  "LOPEZ GUSTAVO",
   "Monzon, Carlos Agustin",
   "Morel, Luis Maximiliano",
+  "MUSDALINO FRANCO",
   "OJEDA FERNANDEZ JOSE ENRIQUE",
   "Ojeda Fernández, Miguel",
   "Olivera, Diego",
   "PANETTA ALBARRACIN FEDERICO",
+  "PEREZ FACUNDO",
   "Perino Martin Adrian",
   "Ríos, Cesar Damián",
   "Rocha, Ariel Maximiliano",
   "RODRIGUEZ CARLOS FERNANDO",
+  "RODRIGUEZ MARCELO",
   "RODRIGUEZ NICOLAS",
   "Sosa, Alejandro Damian",
   "Vera, Domingo Sergio"
@@ -138,10 +145,30 @@ class LocalDB {
 
   saveCatalogs(catalogs) {
     const db = this.read();
+    
+    // Auto-merge custom mechanics into the synced catalog
+    const customEmps = [
+      "DOMINIC DYLAN",
+      "PEREZ FACUNDO",
+      "LOPEZ GUSTAVO",
+      "CALOMINO DARIO",
+      "MUSDALINO FRANCO",
+      "RODRIGUEZ MARCELO",
+      "GODOY DAVID"
+    ].map(name => ({ value: name, label: name }));
+    
+    const incomingEmps = catalogs.empleados || [];
+    const mergedEmps = [...incomingEmps];
+    for (const cEmp of customEmps) {
+      if (!mergedEmps.some(e => String(e.value).toLowerCase() === cEmp.value.toLowerCase())) {
+        mergedEmps.push(cEmp);
+      }
+    }
+
     db.catalogs = {
       rodados: catalogs.rodados || [],
       responsables: catalogs.responsables || [],
-      empleados: catalogs.empleados || [],
+      empleados: mergedEmps,
       centrosCosto: catalogs.centrosCosto || []
     };
     this.write(db);

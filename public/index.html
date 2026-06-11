@@ -630,6 +630,20 @@
     </div>
   </div>
 
+  <!-- FLOATING BULK DELETE ACTION BAR -->
+  <div class="bulk-sync-bar" id="history-bulk-delete-bar" style="background: rgba(239, 68, 68, 0.95); box-shadow: 0 8px 25px rgba(239, 68, 68, 0.2);">
+    <div class="bulk-sync-bar-content">
+      <span class="bulk-sync-count" id="history-bulk-delete-count" style="background-color: var(--danger);">0 seleccionadas</span>
+      <div class="bulk-sync-actions">
+        <button type="button" class="btn-xs" onclick="toggleSelectAllHistoryOrdersList(true)">Todo</button>
+        <button type="button" class="btn-xs" onclick="toggleSelectAllHistoryOrdersList(false)">Ninguno</button>
+        <button type="button" class="btn btn-danger btn-xs" onclick="deleteSelectedHistoryOrders()" style="display:flex; align-items:center; gap:4px; background-color: var(--danger); color: white; border-color: var(--danger);">
+          <span class="material-icons" style="font-size:14px;">delete</span> Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

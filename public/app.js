@@ -55,22 +55,30 @@ let currentEditingOrderId = null;
 let catalogSyncInterval = null;
 let activeMechanicsList = [];
 let selectedOrderIds = new Set();
+let selectedHistoryOrderIds = new Set();
 
 const MECANICA_EMPLOYEES = [
+  "CALOMINO DARIO",
   "Canaviri Fernandez, Jesús",
   "Cuba Orosco, Kevín Genaro",
+  "DOMINIC DYLAN",
   "GERRY CRISTIAN MARCELO",
+  "GODOY DAVID",
   "Gustavo Javier Benitez",
+  "LOPEZ GUSTAVO",
   "Monzon, Carlos Agustin",
   "Morel, Luis Maximiliano",
+  "MUSDALINO FRANCO",
   "OJEDA FERNANDEZ JOSE ENRIQUE",
   "Ojeda Fernández, Miguel",
   "Olivera, Diego",
   "PANETTA ALBARRACIN FEDERICO",
+  "PEREZ FACUNDO",
   "Perino Martin Adrian",
   "Ríos, Cesar Damián",
   "Rocha, Ariel Maximiliano",
   "RODRIGUEZ CARLOS FERNANDO",
+  "RODRIGUEZ MARCELO",
   "RODRIGUEZ NICOLAS",
   "Sosa, Alejandro Damian",
   "Vera, Domingo Sergio"
@@ -193,6 +201,18 @@ function switchView(viewId) {
 
   const navEl = document.getElementById(`nav-${viewId}`);
   if (navEl) navEl.classList.add('active');
+
+  // Clear selections when changing views to avoid floating bar leaks
+  if (viewId !== 'orders') {
+    selectedOrderIds.clear();
+    updateBulkSyncActionBar();
+    document.querySelectorAll('.order-select-checkbox').forEach(chk => chk.checked = false);
+  }
+  if (viewId !== 'history') {
+    selectedHistoryOrderIds.clear();
+    updateHistoryBulkDeleteActionBar();
+    document.querySelectorAll('.history-order-select-checkbox').forEach(chk => chk.checked = false);
+  }
 }
 
 // 2. MODAL CONTROLLERS
@@ -869,6 +889,15 @@ function renderOrders() {
   }
   updateBulkSyncActionBar();
 
+  // Clean up selected history IDs that are no longer success synced
+  const syncedIds = new Set(activeOrders.filter(o => o.syncStatus === 'success').map(o => o.id));
+  for (const id of selectedHistoryOrderIds) {
+    if (!syncedIds.has(id)) {
+      selectedHistoryOrderIds.delete(id);
+    }
+  }
+  updateHistoryBulkDeleteActionBar();
+
   // Apply search filtering for active (non-synced) orders
   const query = document.getElementById('order-search').value.toLowerCase();
   const activeLocalOrders = activeOrders.filter(o => o.syncStatus !== 'success');
@@ -933,12 +962,16 @@ function renderOrders() {
 
 function createHistoryCardHtml(order) {
   const syncDate = order.syncDate ? new Date(order.syncDate).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha desconocida';
+  const isChecked = selectedHistoryOrderIds.has(order.id) ? 'checked' : '';
   return `
     <div class="order-card">
       <div class="order-card-header">
-        <div>
-          <div class="order-card-title">${order.rodado}</div>
-          <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion}</strong></div>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; margin-right: 8px;">
+          <input type="checkbox" class="history-order-select-checkbox" data-id="${order.id}" onchange="onHistoryOrderSelectionChange(event)" ${isChecked} style="margin: 0; width: 18px; height: 18px; cursor: pointer;">
+          <div style="min-width: 0; flex: 1;">
+            <div class="order-card-title">${order.rodado}</div>
+            <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion}</strong></div>
+          </div>
         </div>
         <span class="badge-status success"><span class="material-icons">check_circle</span> Sincronizado</span>
       </div>
@@ -995,11 +1028,11 @@ function createOrderCardHtml(order) {
   return `
     <div class="order-card">
       <div class="order-card-header">
-        <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; margin-right: 8px;">
           ${(order.syncStatus === 'local' || order.syncStatus === 'error') ? `
             <input type="checkbox" class="order-select-checkbox" data-id="${order.id}" onchange="onOrderSelectionChange(event)" ${isChecked} style="margin: 0; width: 18px; height: 18px; cursor: pointer;">
           ` : ''}
-          <div>
+          <div style="min-width: 0; flex: 1;">
             <div class="order-card-title">${order.rodado}</div>
             <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion || 'Sin Clasificar'}</strong></div>
           </div>
@@ -1072,7 +1105,7 @@ function createQueueCardHtml(order) {
   return `
     <div class="order-card">
       <div class="order-card-header">
-        <div>
+        <div style="min-width: 0; flex: 1; margin-right: 8px;">
           <div class="order-card-title">OT #${order.interno} - ${order.rodado}</div>
           <div class="order-card-subtitle" style="color:var(--text-muted); font-size:11px;">Creada: ${new Date(order.createdAt).toLocaleString()}</div>
         </div>
@@ -1312,9 +1345,10 @@ async function resolveDatabaseConflicts() {
 
         // Calculate elapsed time and update hours
         const elapsedMs = Date.now() - startVal;
-        const addedHours = parseFloat((elapsedMs / (1000 * 60 * 60)).toFixed(2));
+        const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
         const currentHours = parseFloat(task.horasEstimadas) || 0;
-        const newHours = parseFloat((currentHours + addedHours).toFixed(2));
+        const currentMinutes = hmmToMinutes(currentHours);
+        const newHours = minutesToHmm(currentMinutes + elapsedMinutes);
 
         // Clean up local storage and update database task
         localStorage.removeItem(`timer_start_${task.id}`);
@@ -1518,18 +1552,20 @@ async function toggleTaskTimer(taskId) {
       delete activeIntervalTimers[taskId];
     }
 
-    // Calculate decimal hours
+    // Calculate elapsed minutes
     const elapsedMs = Date.now() - startTime;
-    const addedHours = parseFloat((elapsedMs / (1000 * 60 * 60)).toFixed(2));
+    const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
+    const addedHoursHmm = minutesToHmm(elapsedMinutes);
 
     // Find and update hours input in this task card
     const card = document.getElementById(taskId) || btn.closest('.task-item-card');
-    let totalHours = addedHours;
+    let totalHours = addedHoursHmm;
     if (card) {
       const hoursInput = card.querySelector('.task-hours');
       if (hoursInput) {
         const currentHours = parseFloat(hoursInput.value) || 0;
-        totalHours = parseFloat((currentHours + addedHours).toFixed(2));
+        const currentMinutes = hmmToMinutes(currentHours);
+        totalHours = minutesToHmm(currentMinutes + elapsedMinutes);
         hoursInput.value = totalHours.toFixed(2);
         updateHoursReadable(hoursInput);
       }
@@ -1540,13 +1576,27 @@ async function toggleTaskTimer(taskId) {
     btn.querySelector('.material-icons').textContent = 'play_arrow';
     btn.querySelector('.btn-text').textContent = 'Iniciar';
     display.textContent = '00:00:00';
-    showToast(`Tiempo sumado: +${formatDecimalHours(addedHours)}. Total: ${formatDecimalHours(totalHours)}`, "success");
+    showToast(`Tiempo sumado: +${formatDecimalHours(addedHoursHmm)}. Total: ${formatDecimalHours(totalHours)}`, "success");
   }
 }
 
-function formatDecimalHours(decimalHours) {
-  const h = Math.floor(decimalHours);
-  const m = Math.round((decimalHours - h) * 60);
+function hmmToMinutes(hmmVal) {
+  const h = Math.floor(hmmVal);
+  const m = Math.round((hmmVal - h) * 100);
+  return h * 60 + m;
+}
+
+function minutesToHmm(totalMinutes) {
+  const h = Math.floor(totalMinutes / 60);
+  const m = Math.round(totalMinutes % 60);
+  const val = h + m / 100;
+  return parseFloat(val.toFixed(2));
+}
+
+function formatDecimalHours(hmmVal) {
+  const totalMinutes = hmmToMinutes(hmmVal);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
   if (h === 0) return `${m}min`;
   if (m === 0) return `${h}h`;
   return `${h}h ${String(m).padStart(2, '0')}min`;
@@ -2000,10 +2050,12 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
   } else {
     // --- PAUSE TIMER ---
     const elapsedMs = Date.now() - task.timerStart;
-    const addedHours = parseFloat((elapsedMs / (1000 * 60 * 60)).toFixed(2));
+    const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
+    const addedHoursHmm = minutesToHmm(elapsedMinutes);
     const currentHours = parseFloat(task.horasEstimadas) || 0;
+    const currentMinutes = hmmToMinutes(currentHours);
     
-    task.horasEstimadas = parseFloat((currentHours + addedHours).toFixed(2));
+    task.horasEstimadas = minutesToHmm(currentMinutes + elapsedMinutes);
     task.timerStart = null;
     localStorage.removeItem(`timer_start_${taskId}`);
 
@@ -2013,7 +2065,7 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
       delete activeDashboardIntervals[taskId];
     }
 
-    showToast(`Tiempo sumado: +${addedHours.toFixed(2)} hrs.`, "success");
+    showToast(`Tiempo sumado: +${formatDecimalHours(addedHoursHmm)}.`, "success");
   }
 
   // OPTIMISTIC UPDATE: re-render dashboard immediately with in-memory changes
@@ -2057,9 +2109,10 @@ async function markDashboardTaskFinished(orderId, taskId) {
 
   if (task.timerStart !== null && task.timerStart > 0) {
     const elapsedMs = Date.now() - task.timerStart;
-    const addedHours = parseFloat((elapsedMs / (1000 * 60 * 60)).toFixed(2));
+    const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
     const currentHours = parseFloat(task.horasEstimadas) || 0;
-    task.horasEstimadas = parseFloat((currentHours + addedHours).toFixed(2));
+    const currentMinutes = hmmToMinutes(currentHours);
+    task.horasEstimadas = minutesToHmm(currentMinutes + elapsedMinutes);
     task.timerStart = null;
     localStorage.removeItem(`timer_start_${taskId}`);
   }
@@ -3329,5 +3382,86 @@ async function syncSelectedOrders() {
     fetchOrders(); // reload
   } else {
     showToast("Error al encolar las órdenes", "danger");
+  }
+}
+
+// --- BULK SELECTION DELETE FUNCTIONS ---
+function onHistoryOrderSelectionChange(event) {
+  const checkbox = event.target;
+  const orderId = checkbox.getAttribute('data-id');
+  
+  if (checkbox.checked) {
+    selectedHistoryOrderIds.add(orderId);
+  } else {
+    selectedHistoryOrderIds.delete(orderId);
+  }
+  
+  updateHistoryBulkDeleteActionBar();
+}
+
+function updateHistoryBulkDeleteActionBar() {
+  const bar = document.getElementById('history-bulk-delete-bar');
+  const countEl = document.getElementById('history-bulk-delete-count');
+  
+  if (!bar || !countEl) return;
+  
+  const totalSelected = selectedHistoryOrderIds.size;
+  
+  if (totalSelected > 0) {
+    countEl.textContent = `${totalSelected} seleccionada${totalSelected > 1 ? 's' : ''}`;
+    bar.classList.add('active');
+  } else {
+    bar.classList.remove('active');
+  }
+}
+
+function toggleSelectAllHistoryOrdersList(select) {
+  const checkboxes = document.querySelectorAll('.history-order-select-checkbox');
+  checkboxes.forEach(chk => {
+    chk.checked = select;
+    const orderId = chk.getAttribute('data-id');
+    if (select) {
+      selectedHistoryOrderIds.add(orderId);
+    } else {
+      selectedHistoryOrderIds.delete(orderId);
+    }
+  });
+  
+  updateHistoryBulkDeleteActionBar();
+}
+
+async function deleteSelectedHistoryOrders() {
+  if (selectedHistoryOrderIds.size === 0) {
+    showToast("No hay órdenes seleccionadas", "warning");
+    return;
+  }
+  
+  const count = selectedHistoryOrderIds.size;
+  if (confirm(`¿Estás seguro de eliminar las ${count} órdenes seleccionadas localmente? No se borrarán del portal de Taxes.`)) {
+    showToast(`Eliminando ${count} órdenes...`, "warning");
+    
+    let successCount = 0;
+    const idsToDelete = Array.from(selectedHistoryOrderIds);
+    
+    // Clear selection first
+    selectedHistoryOrderIds.clear();
+    updateHistoryBulkDeleteActionBar();
+    
+    // Uncheck all checkboxes
+    document.querySelectorAll('.history-order-select-checkbox').forEach(chk => chk.checked = false);
+
+    for (const orderId of idsToDelete) {
+      try {
+        const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+        if (res.ok) {
+          successCount++;
+        }
+      } catch (error) {
+        console.error(`Error deleting order ${orderId}:`, error);
+      }
+    }
+    
+    showToast(`${successCount} de ${count} órdenes eliminadas localmente`, "success");
+    fetchOrders(); // Refresh lists
   }
 }

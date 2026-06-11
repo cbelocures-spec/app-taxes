@@ -42,8 +42,23 @@ function initMockCatalogs() {
 let isWorkerRunning = false;
 let isScraping = false;
 
-// Helper to wait
 const delay = ms => new Promise(res => setTimeout(res, ms));
+
+// Helper to navigate safely using 'load' instead of 'networkidle2' and catch timeout errors
+async function safeGoto(page, url, options = {}) {
+  const defaultOptions = { waitUntil: 'load', timeout: 30000 };
+  const mergedOptions = { ...defaultOptions, ...options };
+  try {
+    console.log(`[safeGoto] Navigating to ${url} ...`);
+    return await page.goto(url, mergedOptions);
+  } catch (err) {
+    if (err.message.includes('Timeout') || err.message.includes('timeout')) {
+      console.warn(`[safeGoto] Navigation timeout hit for ${url}. Attempting to continue...`);
+      return null;
+    }
+    throw err;
+  }
+}
 
 // Helper: Semantic text click in Puppeteer
 async function clickByText(page, text, elementType = '*') {
@@ -486,7 +501,7 @@ async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
 // Automate login to Taxes.com.ar
 async function autoLogin(page, username, password, portalUrl) {
   console.log(`Navigating to ${portalUrl}/admin ...`);
-  await page.goto(`${portalUrl}/admin`, { waitUntil: 'networkidle2', timeout: 30000 });
+  await safeGoto(page, `${portalUrl}/admin`, { timeout: 30000 });
 
   // Check if we are on a login page (has password input visible)
   const isOnLoginPage = await page.evaluate(() => {
@@ -538,11 +553,11 @@ async function autoLogin(page, username, password, portalUrl) {
       return false;
     });
     if (logoutClicked) {
-      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000 }).catch(() => {});
+      await page.waitForNavigation({ waitUntil: 'load', timeout: 10000 }).catch(() => {});
       await delay(2000);
     } else {
       // Force navigate to logout URL
-      await page.goto(`${portalUrl}/logout`, { waitUntil: 'networkidle2', timeout: 10000 }).catch(() => {});
+      await safeGoto(page, `${portalUrl}/logout`, { timeout: 10000 }).catch(() => {});
       await delay(2000);
     }
   }
@@ -555,7 +570,7 @@ async function autoLogin(page, username, password, portalUrl) {
     return inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
   });
   if (!stillOnLogin) {
-    await page.goto(`${portalUrl}/admin`, { waitUntil: 'networkidle2', timeout: 30000 });
+    await safeGoto(page, `${portalUrl}/admin`, { timeout: 30000 });
   }
 
   // Wait for login fields
@@ -604,7 +619,7 @@ async function autoLogin(page, username, password, portalUrl) {
   }
 
   // Wait for navigation or welcome dashboard
-  await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {});
+  await page.waitForNavigation({ waitUntil: 'load', timeout: 15000 }).catch(() => {});
   await delay(3000);
 
   // Check if login succeeded: we should NOT be on login page anymore
@@ -670,7 +685,7 @@ async function scrapeCatalogs(triggerUsername = null) {
     // ============================================================
     console.log("=== PASO 1/3: Scrapeando FLOTA completa ===");
     console.log("Navigating to Flota > Flota page...");
-    await page.goto(`${settings.portalUrl}/tms/produccion/flota`, { waitUntil: 'networkidle2', timeout: 30000 });
+    await safeGoto(page, `${settings.portalUrl}/tms/produccion/flota`, { timeout: 30000 });
     await delay(3000);
 
     // Set limit to 999 to show all vehicles
@@ -850,7 +865,7 @@ async function scrapeCatalogs(triggerUsername = null) {
     // ============================================================
     console.log("=== PASO 2/3: Scrapeando Empleados y Centros de Costo ===");
     console.log("Navigating to Ordenes de Trabajo list page...");
-    await page.goto(`${settings.portalUrl}/tms/produccion/ot`, { waitUntil: 'networkidle2', timeout: 30000 });
+    await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
     
     console.log("Waiting for selects to load...");
     await page.waitForSelector('select', { timeout: 10000 });
@@ -1023,7 +1038,7 @@ async function syncWorkOrder(orderId) {
 
     // 2. NAVIGATE TO NEW WORK ORDER FORM
     console.log("Navigating directly to Ordenes de Trabajo list page...");
-    await page.goto(`${settings.portalUrl}/tms/produccion/ot`, { waitUntil: 'networkidle2', timeout: 30000 });
+    await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
     await delay(3000);
 
     console.log("Clicking NUEVO button to open create form modal...");
@@ -1202,8 +1217,35 @@ async function syncWorkOrder(orderId) {
       // Resolve employee name from local catalog to match dynamically on portal
       const employeeCatalog = db.getCatalogs().empleados || [];
       const employeeObj = employeeCatalog.find(e => e.value === task.empleado);
-      const employeeLabel = employeeObj ? employeeObj.label : task.empleado;
+      let employeeLabel = employeeObj ? employeeObj.label : task.empleado;
       console.log(`Resolved employee ID "${task.empleado}" to label: "${employeeLabel}"`);
+
+      // Map custom mechanics to Vera, Domingo Sergio
+      const customMechanicNames = [
+        "DOMINIC DYLAN",
+        "PEREZ FACUNDO",
+        "LOPEZ GUSTAVO",
+        "CALOMINO DARIO",
+        "MUSDALINO FRANCO",
+        "RODRIGUEZ MARCELO",
+        "GODOY DAVID"
+      ];
+      
+      let finalDescription = task.descripcion || '';
+      const matchedCustomName = customMechanicNames.find(
+        name => name.toLowerCase() === employeeLabel.toLowerCase().trim()
+      );
+      
+      if (matchedCustomName) {
+        console.log(`Mapping custom employee "${employeeLabel}" to "Vera, Domingo Sergio"`);
+        employeeLabel = "Vera, Domingo Sergio";
+        
+        // Append suffix to description if not already present
+        const suffix = `. Realizó: ${matchedCustomName}`;
+        if (!finalDescription.endsWith(suffix)) {
+          finalDescription = `${finalDescription}${suffix}`;
+        }
+      }
 
       // Resolve centro costo label to match dynamically on portal
       const ccCatalog = db.getCatalogs().centrosCosto || [];
@@ -1265,14 +1307,14 @@ async function syncWorkOrder(orderId) {
       await page.type(hoursSelector, String(task.horasEstimadas), { delay: 50 });
 
       // 4. Fill Description
-      console.log(`Setting Descripción: "${task.descripcion}"`);
+      console.log(`Setting Descripción: "${finalDescription}"`);
       const descSelector = `textarea#descripcion_${i}`;
       await page.focus(descSelector);
       await page.keyboard.down('Control');
       await page.keyboard.press('A');
       await page.keyboard.up('Control');
       await page.keyboard.press('Backspace');
-      await page.type(descSelector, task.descripcion, { delay: 50 });
+      await page.type(descSelector, finalDescription, { delay: 50 });
 
       await delay(1000);
 
@@ -1357,7 +1399,7 @@ async function syncWorkOrder(orderId) {
     }
 
     // Wait for submission response
-    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {});
+    await page.waitForNavigation({ waitUntil: 'load', timeout: 15000 }).catch(() => {});
     await delay(5000); // 5 seconds wait to let backend finish writing and redirecting
 
     // 6. VERIFY SUCCESS
