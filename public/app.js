@@ -1999,27 +1999,21 @@ function renderDashboard() {
   }
 }
 
-function toggleFreeMechanicsVisibility() {
-  const isHidden = localStorage.getItem('hideFreeMechanicsList') === 'true';
-  localStorage.setItem('hideFreeMechanicsList', !isHidden);
+function toggleFreeMechanicsVisibility(checked) {
+  localStorage.setItem('hideFreeMechanicsList', checked ? 'true' : 'false');
   applyFreeMechanicsVisibility();
 }
 
 function applyFreeMechanicsVisibility() {
   const isHidden = localStorage.getItem('hideFreeMechanicsList') === 'true';
   const listFree = document.getElementById('list-free-employees');
-  const btnToggle = document.getElementById('btn-toggle-free-visibility');
-  const iconToggle = document.getElementById('icon-toggle-free-visibility');
-  const textToggle = document.getElementById('text-toggle-free-visibility');
+  const chkHide = document.getElementById('chk-hide-free-dashboard');
 
   if (listFree) {
     listFree.style.display = isHidden ? 'none' : 'flex';
   }
-  if (iconToggle) {
-    iconToggle.textContent = isHidden ? 'visibility' : 'visibility_off';
-  }
-  if (textToggle) {
-    textToggle.textContent = isHidden ? 'Mostrar Todos' : 'Ocultar Todos';
+  if (chkHide) {
+    chkHide.checked = isHidden;
   }
 }
 
@@ -2226,6 +2220,11 @@ function openActiveMechanicsModal() {
       </label>
     `;
   }).join('');
+
+  const chkHide = document.getElementById('chk-hide-free-dashboard');
+  if (chkHide) {
+    chkHide.checked = localStorage.getItem('hideFreeMechanicsList') === 'true';
+  }
 
   document.getElementById('active-mechanics-modal').classList.add('open');
 }

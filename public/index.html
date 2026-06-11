@@ -82,15 +82,9 @@
             <span class="indicator free"></span>
             <span>Mecánicos Libres / Disponibles (<span id="count-free">0</span>)</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <button type="button" class="btn btn-secondary btn-xs" id="btn-toggle-free-visibility" onclick="toggleFreeMechanicsVisibility()" style="padding: 2px 6px; font-size: 10px; height: auto; display: flex; align-items: center; gap: 2px;">
-              <span class="material-icons" id="icon-toggle-free-visibility" style="font-size: 12px;">visibility_off</span>
-              <span id="text-toggle-free-visibility">Ocultar Todos</span>
-            </button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="openActiveMechanicsModal()" style="padding: 2px 6px; font-size: 10px; height: auto; display: flex; align-items: center; gap: 2px;">
-              <span class="material-icons" style="font-size: 12px;">playlist_add_check</span> Activos Hoy
-            </button>
-          </div>
+          <button type="button" class="btn btn-secondary btn-xs" onclick="openActiveMechanicsModal()" style="padding: 2px 6px; font-size: 10px; height: auto; display: flex; align-items: center; gap: 2px;">
+            <span class="material-icons" style="font-size: 12px;">playlist_add_check</span> Activos Hoy
+          </button>
         </div>
         <div class="free-employees-list" id="list-free-employees">
           <!-- List of tags for free employees -->
@@ -495,9 +489,15 @@
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
           Selecciona los mecánicos que están trabajando hoy en este turno. Solo los que estén marcados aparecerán en la lista de "Disponibles".
         </p>
-        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-          <button type="button" class="btn btn-secondary btn-xs" onclick="toggleAllActiveMechanics(true)" style="padding: 4px 8px; font-size: 11px;">Marcar Todos</button>
-          <button type="button" class="btn btn-secondary btn-xs" onclick="toggleAllActiveMechanics(false)" style="padding: 4px 8px; font-size: 11px;">Desmarcar Todos</button>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-secondary btn-xs" onclick="toggleAllActiveMechanics(true)" style="padding: 4px 8px; font-size: 11px;">Marcar Todos</button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="toggleAllActiveMechanics(false)" style="padding: 4px 8px; font-size: 11px;">Desmarcar Todos</button>
+          </div>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-color); cursor: pointer; margin-top: 4px; user-select: none;">
+            <input type="checkbox" id="chk-hide-free-dashboard" onchange="toggleFreeMechanicsVisibility(this.checked)" style="width: 14px; height: 14px;">
+            <span>Ocultar todos en la pantalla principal (mantener activos)</span>
+          </label>
         </div>
         <form id="active-mechanics-form">
           <div class="active-mechanics-checklist" id="active-mechanics-checklist-container">
