@@ -875,7 +875,7 @@ function addTaskField(taskData = null) {
           const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
           const hoursInput = cardElement.querySelector('.task-hours');
           if (hoursInput) {
-            const currentHours = parseFloat(hoursInput.value) || 0;
+            const currentHours = parseFloat(String(hoursInput.value).replace(',', '.')) || 0;
             const currentMinutes = hmmToMinutes(currentHours);
             const totalHours = minutesToHmm(currentMinutes + elapsedMinutes);
             hoursInput.value = totalHours.toFixed(2);
@@ -1541,7 +1541,7 @@ async function pauseTask(taskInfo) {
       const order = activeOrders.find(o => o.id === taskInfo.orderId);
       if (order) {
         const hoursInput = card.querySelector('.task-hours');
-        const updatedHours = hoursInput ? parseFloat(hoursInput.value) : 0;
+        const updatedHours = hoursInput ? parseFloat(String(hoursInput.value).replace(',', '.')) : 0;
         
         const tasks = order.tasks.map(t => {
           if (t.id === taskId) {
@@ -1643,7 +1643,7 @@ async function toggleTaskTimer(taskId) {
     if (card) {
       const hoursInput = card.querySelector('.task-hours');
       if (hoursInput) {
-        const currentHours = parseFloat(hoursInput.value) || 0;
+        const currentHours = parseFloat(String(hoursInput.value).replace(',', '.')) || 0;
         const currentMinutes = hmmToMinutes(currentHours);
         totalHours = minutesToHmm(currentMinutes + elapsedMinutes);
         hoursInput.value = totalHours.toFixed(2);
@@ -1685,7 +1685,7 @@ function formatDecimalHours(hmmVal) {
 function updateHoursReadable(inputEl) {
   const readableEl = inputEl.parentElement.querySelector('.hours-readable');
   if (!readableEl) return;
-  const val = parseFloat(inputEl.value) || 0;
+  const val = parseFloat(String(inputEl.value).replace(',', '.')) || 0;
   readableEl.textContent = val > 0 ? formatDecimalHours(val) : '';
 }
 
@@ -3655,6 +3655,33 @@ function getTaskInfoForAlert(taskId) {
   return null;
 }
 
+function isSameEmployee(val1, val2) {
+  if (!val1 || !val2) return false;
+  val1 = String(val1).trim();
+  val2 = String(val2).trim();
+  
+  if (val1 === val2) return true;
+
+  const emp1 = (cachedCatalogs && cachedCatalogs.empleados) ? cachedCatalogs.empleados.find(e => e.value === val1 || e.label === val1) : null;
+  const emp2 = (cachedCatalogs && cachedCatalogs.empleados) ? cachedCatalogs.empleados.find(e => e.value === val2 || e.label === val2) : null;
+
+  const label1 = emp1 ? emp1.label : val1;
+  const label2 = emp2 ? emp2.label : val2;
+
+  const clean = (str) => {
+    return str.normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .toLowerCase()
+              .trim()
+              .replace(/[^a-z0-9]/g, "");
+  };
+
+  const c1 = clean(label1);
+  const c2 = clean(label2);
+
+  return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+}
+
 function getEmployeeTotalHours(employeeValue) {
   let totalMinutes = 0;
   const domTaskIds = new Set();
@@ -3666,11 +3693,11 @@ function getEmployeeTotalHours(employeeValue) {
       const empSelect = card.querySelector('.task-emp');
       const empVal = empSelect ? empSelect.value : '';
       
-      if (empVal === employeeValue) {
+      if (isSameEmployee(empVal, employeeValue)) {
         domTaskIds.add(card.id);
         
         const hoursInput = card.querySelector('.task-hours');
-        const savedHours = hoursInput ? (parseFloat(hoursInput.value) || 0) : 0;
+        const savedHours = hoursInput ? (parseFloat(String(hoursInput.value).replace(',', '.')) || 0) : 0;
         totalMinutes += hmmToMinutes(savedHours);
         
         const timerKey = `timer_start_${card.id}`;
@@ -3689,12 +3716,12 @@ function getEmployeeTotalHours(employeeValue) {
     }
     
     (order.tasks || []).forEach(task => {
-      if (task.empleado === employeeValue) {
+      if (isSameEmployee(task.empleado, employeeValue)) {
         if (task.id && domTaskIds.has(task.id)) {
           return;
         }
         
-        const savedHours = parseFloat(task.horasEstimadas) || 0;
+        const savedHours = parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0;
         totalMinutes += hmmToMinutes(savedHours);
         
         if (task.timerStart !== null && task.timerStart > 0) {
@@ -3719,7 +3746,7 @@ function getEmployeeTasksDetailsToday(employeeValue) {
       const empSelect = card.querySelector('.task-emp');
       const empVal = empSelect ? empSelect.value : '';
       
-      if (empVal === employeeValue) {
+      if (isSameEmployee(empVal, employeeValue)) {
         domTaskIds.add(card.id);
         
         const rodadoEl = document.getElementById('form-rodado');
@@ -3728,7 +3755,7 @@ function getEmployeeTasksDetailsToday(employeeValue) {
         const internoVal = internoEl ? internoEl.value : '';
         
         const hoursInput = card.querySelector('.task-hours');
-        const savedHours = hoursInput ? (parseFloat(hoursInput.value) || 0) : 0;
+        const savedHours = hoursInput ? (parseFloat(String(hoursInput.value).replace(',', '.')) || 0) : 0;
         
         const timerKey = `timer_start_${card.id}`;
         const timerStartVal = localStorage.getItem(timerKey) ? parseInt(localStorage.getItem(timerKey)) : null;
@@ -3758,12 +3785,12 @@ function getEmployeeTasksDetailsToday(employeeValue) {
     }
     
     (order.tasks || []).forEach(task => {
-      if (task.empleado === employeeValue) {
+      if (isSameEmployee(task.empleado, employeeValue)) {
         if (task.id && domTaskIds.has(task.id)) {
           return;
         }
         
-        const savedHours = parseFloat(task.horasEstimadas) || 0;
+        const savedHours = parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0;
         let runningMins = 0;
         if (task.timerStart !== null && task.timerStart > 0) {
           runningMins = (Date.now() - task.timerStart) / (1000 * 60);
