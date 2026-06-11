@@ -228,6 +228,13 @@ function openNewOrderModal() {
   modal.classList.add('open');
   // Reset form
   document.getElementById('work-order-form').reset();
+  const rodadoSelect = document.getElementById('form-rodado');
+  if (rodadoSelect) {
+    rodadoSelect.value = "";
+    if (rodadoSelect.rebuildSearchable) {
+      rodadoSelect.rebuildSearchable();
+    }
+  }
   
   // Reset dates
   const today = new Date();
@@ -835,6 +842,50 @@ function addTaskField(taskData = null) {
     }
   }
 
+  const statusSelect = cardElement.querySelector('.task-status');
+  const timerBtn = cardElement.querySelector('.btn-timer-toggle');
+  
+  if (statusSelect && timerBtn) {
+    const handleStatusChange = () => {
+      if (statusSelect.value === 'Finalizada') {
+        timerBtn.disabled = true;
+        // Stop stopwatch if it was running
+        const timerKey = `timer_start_${taskId}`;
+        if (localStorage.getItem(timerKey)) {
+          const startTime = parseInt(localStorage.getItem(timerKey));
+          localStorage.removeItem(timerKey);
+          localStorage.removeItem(`warned_8h_${taskId}`);
+          localStorage.removeItem(`authorized_12h_${taskId}`);
+          if (activeIntervalTimers[taskId]) {
+            clearInterval(activeIntervalTimers[taskId]);
+            delete activeIntervalTimers[taskId];
+          }
+          const elapsedMs = Date.now() - startTime;
+          const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
+          const hoursInput = cardElement.querySelector('.task-hours');
+          if (hoursInput) {
+            const currentHours = parseFloat(hoursInput.value) || 0;
+            const currentMinutes = hmmToMinutes(currentHours);
+            const totalHours = minutesToHmm(currentMinutes + elapsedMinutes);
+            hoursInput.value = totalHours.toFixed(2);
+            updateHoursReadable(hoursInput);
+            showToast(`Cronómetro detenido por finalización. Se sumaron: +${formatDecimalHours(minutesToHmm(elapsedMinutes))}`, "info");
+          }
+          const display = cardElement.querySelector(`#timer-display-${taskId}`);
+          if (display) display.textContent = '00:00:00';
+          timerBtn.classList.remove('running');
+          timerBtn.querySelector('.material-icons').textContent = 'play_arrow';
+          timerBtn.querySelector('.btn-text').textContent = 'Iniciar';
+        }
+      } else {
+        timerBtn.disabled = false;
+      }
+    };
+    statusSelect.addEventListener('change', handleStatusChange);
+    // Initial run
+    handleStatusChange();
+  }
+
   updateTaskCountBadge();
 }
 
@@ -1226,6 +1277,19 @@ async function submitWorkOrder() {
  
     if (!res.ok) throw new Error("Error submitting work order");
     
+    // Clean up task timers from localStorage for finished tasks
+    taskCards.forEach(card => {
+      if (card.querySelector('.task-status').value === 'Finalizada') {
+        localStorage.removeItem(`timer_start_${card.id}`);
+        localStorage.removeItem(`warned_8h_${card.id}`);
+        localStorage.removeItem(`authorized_12h_${card.id}`);
+        if (activeIntervalTimers[card.id]) {
+          clearInterval(activeIntervalTimers[card.id]);
+          delete activeIntervalTimers[card.id];
+        }
+      }
+    });
+    
     const msg = currentEditingOrderId ? "Orden de Trabajo actualizada y encolada" : "Orden de Trabajo guardada y encolada para Taxes";
     showToast(msg, "success");
     closeNewOrderModal();
@@ -1548,6 +1612,8 @@ async function toggleTaskTimer(taskId) {
     // Stop stopwatch
     const startTime = parseInt(localStorage.getItem(timerKey));
     localStorage.removeItem(timerKey);
+    localStorage.removeItem(`warned_8h_${taskId}`);
+    localStorage.removeItem(`authorized_12h_${taskId}`);
 
     // Clear interval
     if (activeIntervalTimers[taskId]) {
@@ -1626,6 +1692,7 @@ function startTimerInterval(taskId, startTime) {
     const mm = Math.floor((elapsedSeconds % 3600) / 60);
     const ss = elapsedSeconds % 60;
     display.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    checkTimerThresholds(taskId, startTime);
   }
 
   update();
@@ -2033,6 +2100,7 @@ function startDashboardTimerUpdate(taskId, startTime) {
     const el = document.getElementById(`dash-timer-${taskId}`);
     if (el) {
       el.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+      checkTimerThresholds(taskId, startTime);
     } else {
       clearInterval(activeDashboardIntervals[taskId]);
       delete activeDashboardIntervals[taskId];
@@ -2086,6 +2154,8 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
     task.horasEstimadas = minutesToHmm(currentMinutes + elapsedMinutes);
     task.timerStart = null;
     localStorage.removeItem(`timer_start_${taskId}`);
+    localStorage.removeItem(`warned_8h_${taskId}`);
+    localStorage.removeItem(`authorized_12h_${taskId}`);
 
     // Kill the dashboard interval for this task immediately
     if (activeDashboardIntervals[taskId]) {
@@ -2143,6 +2213,8 @@ async function markDashboardTaskFinished(orderId, taskId) {
     task.horasEstimadas = minutesToHmm(currentMinutes + elapsedMinutes);
     task.timerStart = null;
     localStorage.removeItem(`timer_start_${taskId}`);
+    localStorage.removeItem(`warned_8h_${taskId}`);
+    localStorage.removeItem(`authorized_12h_${taskId}`);
   }
 
   task.status = "Finalizada";
@@ -3497,4 +3569,189 @@ async function deleteSelectedHistoryOrders() {
     showToast(`${successCount} de ${count} órdenes eliminadas localmente`, "success");
     fetchOrders(); // Refresh lists
   }
+}
+
+// --- TIMER THRESHOLD & SUPERVISOR AUTHORIZATION LOGIC ---
+let currentAlertTaskId = null;
+
+function findOrderAndTaskByTaskId(taskId) {
+  for (const order of activeOrders) {
+    const task = (order.tasks || []).find(t => t.id === taskId);
+    if (task) {
+      return { order, task };
+    }
+  }
+  return null;
+}
+
+function getTaskInfoForAlert(taskId) {
+  const found = findOrderAndTaskByTaskId(taskId);
+  if (found) {
+    const empOpt = cachedCatalogs.empleados.find(e => e.value === found.task.empleado);
+    return {
+      orderId: found.order.id,
+      rodado: found.order.rodado,
+      interno: found.order.interno,
+      empleado: empOpt ? empOpt.label : found.task.empleado,
+      descripcion: found.task.descripcion || '(Sin descripción)',
+      isLocal: false
+    };
+  }
+
+  const card = document.getElementById(taskId);
+  if (card) {
+    const rodadoEl = document.getElementById('form-rodado');
+    const rodadoVal = rodadoEl ? rodadoEl.options[rodadoEl.selectedIndex]?.text : '';
+    const internoEl = document.getElementById('form-interno');
+    const internoVal = internoEl ? internoEl.value : '';
+    
+    const empSelect = card.querySelector('.task-emp');
+    const empVal = empSelect ? empSelect.value : '';
+    const empOpt = cachedCatalogs.empleados.find(e => e.value === empVal);
+    const empLabel = empOpt ? empOpt.label : empVal;
+    
+    const descEl = card.querySelector('.task-desc');
+    const descVal = descEl ? descEl.value : '';
+
+    return {
+      orderId: currentEditingOrderId,
+      rodado: rodadoVal || 'Rodado no guardado',
+      interno: internoVal || 'Interno no guardado',
+      empleado: empLabel || 'No asignado',
+      descripcion: descVal || '(Sin descripción)',
+      isLocal: true
+    };
+  }
+
+  return null;
+}
+
+function checkTimerThresholds(taskId, startTime) {
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+  const elapsedHours = elapsedSeconds / 3600;
+
+  // Prevent opening overlapping modals
+  const modal = document.getElementById('supervisor-auth-modal');
+  if (modal && modal.classList.contains('open')) {
+    if (currentAlertTaskId === taskId) {
+      return;
+    }
+    return;
+  }
+
+  if (elapsedHours >= 8 && elapsedHours < 12) {
+    if (localStorage.getItem(`warned_8h_${taskId}`) !== 'true') {
+      localStorage.setItem(`warned_8h_${taskId}`, 'true');
+      showSupervisorAuthModal(taskId, 8, elapsedSeconds);
+    }
+  } else if (elapsedHours >= 12) {
+    if (localStorage.getItem(`authorized_12h_${taskId}`) !== 'true') {
+      showSupervisorAuthModal(taskId, 12, elapsedSeconds);
+    }
+  }
+}
+
+function showSupervisorAuthModal(taskId, hoursThreshold, elapsedSeconds) {
+  const info = getTaskInfoForAlert(taskId);
+  if (!info) return;
+
+  currentAlertTaskId = taskId;
+
+  const modal = document.getElementById('supervisor-auth-modal');
+  const titleEl = document.getElementById('supervisor-auth-title');
+  const msgEl = document.getElementById('supervisor-auth-message');
+  const headerEl = document.getElementById('supervisor-auth-header');
+  const btnAuth = document.getElementById('btn-supervisor-authorize');
+
+  if (!modal || !titleEl || !msgEl || !headerEl || !btnAuth) return;
+
+  const formattedTime = formatElapsedSecondsToHMS(elapsedSeconds);
+
+  if (hoursThreshold === 8) {
+    headerEl.style.backgroundColor = '#f59e0b'; // warning orange
+    titleEl.innerHTML = `<span class="material-icons" style="color: white;">warning</span> Advertencia de Tiempo (8h+)`;
+    msgEl.innerHTML = `
+      <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 12px; border-radius: 4px; color: #b45309; font-weight: bold;">
+        Advertencia de Tiempo Excedido
+      </div>
+      <p>La siguiente tarea lleva activa más de <strong>8 horas</strong>:</p>
+      <div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 13px; margin-top: 10px; line-height: 1.6;">
+        <div><strong>Rodado:</strong> ${info.rodado} (Int. ${info.interno})</div>
+        <div><strong>Operario:</strong> ${info.empleado}</div>
+        <div><strong>Tarea:</strong> ${info.descripcion}</div>
+        <div style="margin-top: 8px; font-weight: bold; color: #d97706; font-size: 14px;">Tiempo Transcurrido: ${formattedTime}</div>
+      </div>
+    `;
+    btnAuth.textContent = "Entendido";
+    btnAuth.onclick = () => {
+      closeSupervisorAuthModal();
+    };
+  } else {
+    headerEl.style.backgroundColor = '#ef4444'; // danger red
+    titleEl.innerHTML = `<span class="material-icons" style="color: white;">error</span> Alerta de Límite (12h+)`;
+    msgEl.innerHTML = `
+      <div style="background: #fee2e2; border-left: 4px solid #ef4444; padding: 12px; margin-bottom: 12px; border-radius: 4px; color: #991b1b; font-weight: bold;">
+        Límite de 12 Horas Alcanzado
+      </div>
+      <p>La siguiente tarea ha alcanzado o superado las <strong>12 horas</strong> de ejecución:</p>
+      <div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 13px; margin-top: 10px; line-height: 1.6;">
+        <div><strong>Rodado:</strong> ${info.rodado} (Int. ${info.interno})</div>
+        <div><strong>Operario:</strong> ${info.empleado}</div>
+        <div><strong>Tarea:</strong> ${info.descripcion}</div>
+        <div style="margin-top: 8px; font-weight: bold; color: #dc2626; font-size: 14px;">Tiempo Transcurrido: ${formattedTime}</div>
+      </div>
+      <p style="margin-top: 12px; font-size: 13px; color: var(--text-muted);">
+        El cronómetro no puede continuar sin la autorización expresa del supervisor.
+      </p>
+    `;
+    btnAuth.textContent = "Autorizar Continuar";
+    btnAuth.onclick = () => {
+      approveSupervisorAuth(taskId);
+    };
+  }
+
+  modal.classList.add('open');
+}
+
+function closeSupervisorAuthModal() {
+  const modal = document.getElementById('supervisor-auth-modal');
+  if (modal) modal.classList.remove('open');
+  currentAlertTaskId = null;
+}
+
+function approveSupervisorAuth(taskId) {
+  if (!taskId && currentAlertTaskId) taskId = currentAlertTaskId;
+  if (!taskId) return;
+
+  localStorage.setItem(`authorized_12h_${taskId}`, 'true');
+  closeSupervisorAuthModal();
+  showToast("Continuación autorizada por el supervisor.", "success");
+}
+
+async function rejectSupervisorAuth() {
+  if (!currentAlertTaskId) return;
+  const taskId = currentAlertTaskId;
+  closeSupervisorAuthModal();
+
+  const info = getTaskInfoForAlert(taskId);
+  if (!info) return;
+
+  if (info.isLocal) {
+    // Local task in modal: toggle timer to stop it
+    const timerKey = `timer_start_${taskId}`;
+    if (localStorage.getItem(timerKey)) {
+      await toggleTaskTimer(taskId);
+    }
+  } else {
+    // Saved task on dashboard: toggle timer to pause it
+    await toggleDashboardTaskTimer(info.orderId, taskId);
+  }
+  showToast("Tarea pausada por límite de tiempo.", "warning");
+}
+
+function formatElapsedSecondsToHMS(elapsedSeconds) {
+  const hh = Math.floor(elapsedSeconds / 3600);
+  const mm = Math.floor((elapsedSeconds % 3600) / 60);
+  const ss = elapsedSeconds % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 }

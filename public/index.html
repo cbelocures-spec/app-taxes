@@ -594,6 +594,29 @@
     </div>
   </div>
 
+  <!-- SUPERVISOR AUTHORIZATION MODAL -->
+  <div class="modal-overlay" id="supervisor-auth-modal">
+    <div class="dialog-modal" style="max-width: 450px;">
+      <div class="dialog-header" id="supervisor-auth-header" style="background-color: var(--warning); color: white;">
+        <h3 id="supervisor-auth-title" style="color: white; margin: 0; display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons">warning</span> Alerta de Cronómetro
+        </h3>
+        <button class="dialog-close" onclick="closeSupervisorAuthModal()" style="color: white;">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <div id="supervisor-auth-message" style="margin-bottom: 15px; font-size: 14px; line-height: 1.5; color: var(--text-color);">
+          <!-- Dynamic warning message goes here -->
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="rejectSupervisorAuth()">Pausar Tarea</button>
+        <button class="btn btn-primary" id="btn-supervisor-authorize" onclick="approveSupervisorAuth()">
+          Autorizar Continuar
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- LOGIN OVERLAY -->
   <div class="login-overlay" id="login-overlay">
     <div class="login-card">
