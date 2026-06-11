@@ -236,7 +236,8 @@ app.get('/api/settings', (req, res) => {
       portalUrl: settings.portalUrl || "https://taxes.com.ar",
       googleScriptUrl: settings.googleScriptUrl || "",
       catalogSyncStatus: settings.catalogSyncStatus || "idle",
-      catalogSyncError: settings.catalogSyncError || null
+      catalogSyncError: settings.catalogSyncError || null,
+      isSupervisor: requestingUser ? (requestingUser.toLowerCase().trim() === (settings.username || "").toLowerCase().trim()) : true
     };
     res.json(responseSettings);
   } catch (error) {

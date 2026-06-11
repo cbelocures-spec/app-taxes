@@ -56,6 +56,7 @@ let catalogSyncInterval = null;
 let activeMechanicsList = [];
 let selectedOrderIds = new Set();
 let selectedHistoryOrderIds = new Set();
+let isCurrentUserSupervisor = false;
 
 const MECANICA_EMPLOYEES = [
   "CALOMINO DARIO",
@@ -215,6 +216,10 @@ function switchView(viewId) {
     selectedHistoryOrderIds.clear();
     updateHistoryBulkDeleteActionBar();
     document.querySelectorAll('.history-order-select-checkbox').forEach(chk => chk.checked = false);
+  }
+
+  if (viewId === 'settings') {
+    renderEmployeeHoursSummary();
   }
 }
 
@@ -411,6 +416,12 @@ async function fetchSettings() {
     document.getElementById('set-password').value = data.password || "";
     document.getElementById('set-google-script-url').value = data.googleScriptUrl || "";
     
+    isCurrentUserSupervisor = !!data.isSupervisor;
+    const hoursSection = document.getElementById('supervisor-hours-section');
+    if (hoursSection) {
+      hoursSection.style.display = isCurrentUserSupervisor ? 'block' : 'none';
+    }
+
     // NOTE: DO NOT set current-user from server settings —
     // the header always shows the locally logged-in user (from localStorage)
     // checkUserSession() already handles this correctly on login.
@@ -1693,6 +1704,7 @@ function startTimerInterval(taskId, startTime) {
     const ss = elapsedSeconds % 60;
     display.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
     checkTimerThresholds(taskId, startTime);
+    renderEmployeeHoursSummary();
   }
 
   update();
@@ -2061,6 +2073,7 @@ function renderDashboard() {
       }).join('');
     }
     applyFreeMechanicsVisibility();
+    renderEmployeeHoursSummary();
   } catch (err) {
     console.error("Error rendering dashboard:", err);
   }
@@ -2101,6 +2114,7 @@ function startDashboardTimerUpdate(taskId, startTime) {
     if (el) {
       el.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
       checkTimerThresholds(taskId, startTime);
+      renderEmployeeHoursSummary();
     } else {
       clearInterval(activeDashboardIntervals[taskId]);
       delete activeDashboardIntervals[taskId];
@@ -3924,4 +3938,79 @@ function formatElapsedSecondsToHMS(elapsedSeconds) {
   const mm = Math.floor((elapsedSeconds % 3600) / 60);
   const ss = elapsedSeconds % 60;
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+}
+
+function renderEmployeeHoursSummary() {
+  const container = document.getElementById('employee-hours-summary-container');
+  if (!container) return;
+
+  const settingsView = document.getElementById('view-settings');
+  if (!settingsView || !settingsView.classList.contains('active') || !isCurrentUserSupervisor) {
+    return;
+  }
+
+  // Compile a unique list of mechanics that are either in activeMechanicsList or have accumulated hours today > 0
+  const uniqueMechanics = new Set();
+  
+  if (Array.isArray(activeMechanicsList)) {
+    activeMechanicsList.forEach(m => {
+      if (m && m.trim()) uniqueMechanics.add(m.trim());
+    });
+  }
+  
+  MECANICA_EMPLOYEES.forEach(emp => {
+    const totalMinutes = getEmployeeTotalHours(emp);
+    if (totalMinutes > 0) {
+      uniqueMechanics.add(emp.trim());
+    }
+  });
+
+  const sortedMechanics = Array.from(uniqueMechanics).sort();
+
+  if (sortedMechanics.length === 0) {
+    container.innerHTML = `<div class="empty-dashboard-state" style="padding: 16px; text-align: center; color: var(--text-muted);">No hay operarios activos o con tareas registradas hoy.</div>`;
+    return;
+  }
+
+  let rowsHtml = '';
+  sortedMechanics.forEach(mechanic => {
+    const totalMinutes = getEmployeeTotalHours(mechanic);
+    const totalHours = totalMinutes / 60;
+    const totalHmm = minutesToHmm(Math.round(totalMinutes));
+    const formattedTime = formatDecimalHours(totalHmm);
+
+    let badgeHtml = '';
+    if (totalHours < 8) {
+      badgeHtml = `<span class="status-badge" style="background-color: var(--success-light); color: var(--success); padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; display: inline-block; min-width: 70px; text-align: center;">Normal</span>`;
+    } else if (totalHours < 12) {
+      badgeHtml = `<span class="status-badge" style="background-color: var(--warning-light); color: var(--warning); padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; display: inline-block; min-width: 70px; text-align: center;">8h+ Exc.</span>`;
+    } else {
+      badgeHtml = `<span class="status-badge" style="background-color: var(--danger-light); color: var(--danger); padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; display: inline-block; min-width: 70px; text-align: center;">12h+ Lím.</span>`;
+    }
+
+    rowsHtml += `
+      <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-main);">
+        <td style="padding: 10px 8px; font-weight: 500;">${escapeHtml(mechanic)}</td>
+        <td style="padding: 10px 8px; text-align: right; font-weight: 600; white-space: nowrap;">${formattedTime}</td>
+        <td style="padding: 10px 8px; text-align: center; white-space: nowrap;">${badgeHtml}</td>
+      </tr>
+    `;
+  });
+
+  container.innerHTML = `
+    <div class="table-responsive" style="margin-top: 8px; overflow-x: auto;">
+      <table class="employee-hours-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-weight: 600;">
+            <th style="padding: 10px 8px; text-align: left;">Operario</th>
+            <th style="padding: 10px 8px; text-align: right;">Total Hoy</th>
+            <th style="padding: 10px 8px; text-align: center;">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
