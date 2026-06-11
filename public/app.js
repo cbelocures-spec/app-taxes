@@ -187,6 +187,9 @@ document.addEventListener('DOMContentLoaded', () => {
       showNoveltiesForInterno(internoInput.value.trim());
     });
   }
+
+  // Restore free mechanics visibility from localStorage
+  applyFreeMechanicsVisibility();
 });
 
 // 1. SPA ROUTING
@@ -1990,8 +1993,33 @@ function renderDashboard() {
         `;
       }).join('');
     }
+    applyFreeMechanicsVisibility();
   } catch (err) {
     console.error("Error rendering dashboard:", err);
+  }
+}
+
+function toggleFreeMechanicsVisibility() {
+  const isHidden = localStorage.getItem('hideFreeMechanicsList') === 'true';
+  localStorage.setItem('hideFreeMechanicsList', !isHidden);
+  applyFreeMechanicsVisibility();
+}
+
+function applyFreeMechanicsVisibility() {
+  const isHidden = localStorage.getItem('hideFreeMechanicsList') === 'true';
+  const listFree = document.getElementById('list-free-employees');
+  const btnToggle = document.getElementById('btn-toggle-free-visibility');
+  const iconToggle = document.getElementById('icon-toggle-free-visibility');
+  const textToggle = document.getElementById('text-toggle-free-visibility');
+
+  if (listFree) {
+    listFree.style.display = isHidden ? 'none' : 'flex';
+  }
+  if (iconToggle) {
+    iconToggle.textContent = isHidden ? 'visibility' : 'visibility_off';
+  }
+  if (textToggle) {
+    textToggle.textContent = isHidden ? 'Mostrar Todos' : 'Ocultar Todos';
   }
 }
 

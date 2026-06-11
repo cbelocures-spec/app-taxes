@@ -82,9 +82,15 @@
             <span class="indicator free"></span>
             <span>Mecánicos Libres / Disponibles (<span id="count-free">0</span>)</span>
           </div>
-          <button type="button" class="btn btn-secondary btn-xs" onclick="openActiveMechanicsModal()" style="padding: 2px 6px; font-size: 10px; height: auto; display: flex; align-items: center; gap: 2px;">
-            <span class="material-icons" style="font-size: 12px;">playlist_add_check</span> Activos Hoy
-          </button>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button type="button" class="btn btn-secondary btn-xs" id="btn-toggle-free-visibility" onclick="toggleFreeMechanicsVisibility()" style="padding: 2px 6px; font-size: 10px; height: auto; display: flex; align-items: center; gap: 2px;">
+              <span class="material-icons" id="icon-toggle-free-visibility" style="font-size: 12px;">visibility_off</span>
+              <span id="text-toggle-free-visibility">Ocultar Todos</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="openActiveMechanicsModal()" style="padding: 2px 6px; font-size: 10px; height: auto; display: flex; align-items: center; gap: 2px;">
+              <span class="material-icons" style="font-size: 12px;">playlist_add_check</span> Activos Hoy
+            </button>
+          </div>
         </div>
         <div class="free-employees-list" id="list-free-employees">
           <!-- List of tags for free employees -->
