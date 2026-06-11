@@ -230,6 +230,18 @@ app.get('/api/settings', (req, res) => {
       }
     }
 
+    const isMainSupervisor = requestingUser ? (
+      requestingUser.toLowerCase().includes("paniol") || 
+      requestingUser.toLowerCase().includes("belocures") || 
+      requestingUser.toLowerCase().includes("cesar")
+    ) : (
+      settings.username && (
+        settings.username.toLowerCase().includes("paniol") ||
+        settings.username.toLowerCase().includes("belocures") ||
+        settings.username.toLowerCase().includes("cesar")
+      )
+    );
+
     const responseSettings = {
       username: displayUsername,
       password: displayPassword,
@@ -237,7 +249,7 @@ app.get('/api/settings', (req, res) => {
       googleScriptUrl: settings.googleScriptUrl || "",
       catalogSyncStatus: settings.catalogSyncStatus || "idle",
       catalogSyncError: settings.catalogSyncError || null,
-      isSupervisor: requestingUser ? (requestingUser.toLowerCase().trim() === (settings.username || "").toLowerCase().trim()) : true
+      isSupervisor: !!isMainSupervisor
     };
     res.json(responseSettings);
   } catch (error) {
