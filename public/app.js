@@ -3732,6 +3732,28 @@ function getEmployeeTotalHours(employeeValue) {
     });
   });
 
+  const totalHours = totalMinutes / 60;
+  if (totalHours < 8) {
+    const warnedPrefix = `warned_8h_${employeeValue}_`;
+    const authPrefix = `authorized_12h_${employeeValue}_`;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith(warnedPrefix) || key.startsWith(authPrefix))) {
+        localStorage.removeItem(key);
+        i--;
+      }
+    }
+  } else if (totalHours < 12) {
+    const authPrefix = `authorized_12h_${employeeValue}_`;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(authPrefix)) {
+        localStorage.removeItem(key);
+        i--;
+      }
+    }
+  }
+
   return totalMinutes;
 }
 
@@ -3832,13 +3854,13 @@ function checkTimerThresholds(taskId, startTime) {
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
 
   if (totalHours >= 8 && totalHours < 12) {
-    const warnedKey = `warned_8h_${employeeValue}_${dateStr}`;
+    const warnedKey = `warned_8h_${employeeValue}_${taskId}_${dateStr}`;
     if (localStorage.getItem(warnedKey) !== 'true') {
       localStorage.setItem(warnedKey, 'true');
       showSupervisorAuthModal(taskId, 8, elapsedSeconds, totalMinutes);
     }
   } else if (totalHours >= 12) {
-    const authKey = `authorized_12h_${employeeValue}_${dateStr}`;
+    const authKey = `authorized_12h_${employeeValue}_${taskId}_${dateStr}`;
     if (localStorage.getItem(authKey) !== 'true') {
       showSupervisorAuthModal(taskId, 12, elapsedSeconds, totalMinutes);
     }
@@ -3935,7 +3957,7 @@ function approveSupervisorAuth(taskId) {
   const info = getTaskInfoForAlert(taskId);
   if (info && info.empleadoValue) {
     const dateStr = getTodayDateString();
-    localStorage.setItem(`authorized_12h_${info.empleadoValue}_${dateStr}`, 'true');
+    localStorage.setItem(`authorized_12h_${info.empleadoValue}_${taskId}_${dateStr}`, 'true');
   }
   closeSupervisorAuthModal();
   showToast("Continuación autorizada por el supervisor.", "success");
