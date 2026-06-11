@@ -1896,6 +1896,9 @@ function renderDashboard() {
 
         return `
           <div class="dashboard-card working" id="dash-card-${t.taskId}">
+            <button type="button" class="dashboard-card-add-task-btn" onclick="editOrder('${t.orderId}')" title="Agregar tarea a esta orden">
+              <span class="material-icons" style="font-size:18px;">add</span>
+            </button>
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
             <div class="dashboard-card-subtitle">Int. ${t.interno} | ${(t.rodado || '').split(' - ')[0]}</div>
             <div class="dashboard-card-desc">${t.descripcion}</div>
@@ -1924,6 +1927,9 @@ function renderDashboard() {
       gridPaused.innerHTML = pausedTasks.map(t => {
         return `
           <div class="dashboard-card paused">
+            <button type="button" class="dashboard-card-add-task-btn" onclick="editOrder('${t.orderId}')" title="Agregar tarea a esta orden">
+              <span class="material-icons" style="font-size:18px;">add</span>
+            </button>
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
             <div class="dashboard-card-subtitle">Int. ${t.interno} | ${(t.rodado || '').split(' - ')[0]}</div>
             <div class="dashboard-card-desc">${t.descripcion}</div>
