@@ -3594,7 +3594,8 @@ function getTaskInfoForAlert(taskId) {
       interno: found.order.interno,
       empleado: empOpt ? empOpt.label : found.task.empleado,
       descripcion: found.task.descripcion || '(Sin descripción)',
-      isLocal: false
+      isLocal: false,
+      accumulatedHours: parseFloat(found.task.horasEstimadas) || 0
     };
   }
 
@@ -3613,13 +3614,17 @@ function getTaskInfoForAlert(taskId) {
     const descEl = card.querySelector('.task-desc');
     const descVal = descEl ? descEl.value : '';
 
+    const hoursInput = card.querySelector('.task-hours');
+    const accumulatedHours = hoursInput ? (parseFloat(hoursInput.value) || 0) : 0;
+
     return {
       orderId: currentEditingOrderId,
       rodado: rodadoVal || 'Rodado no guardado',
       interno: internoVal || 'Interno no guardado',
       empleado: empLabel || 'No asignado',
       descripcion: descVal || '(Sin descripción)',
-      isLocal: true
+      isLocal: true,
+      accumulatedHours: accumulatedHours
     };
   }
 
@@ -3627,8 +3632,13 @@ function getTaskInfoForAlert(taskId) {
 }
 
 function checkTimerThresholds(taskId, startTime) {
-  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
-  const elapsedHours = elapsedSeconds / 3600;
+  const info = getTaskInfoForAlert(taskId);
+  if (!info) return;
+
+  const accumulatedMinutes = hmmToMinutes(info.accumulatedHours);
+  const runningMinutes = (Date.now() - startTime) / (1000 * 60);
+  const totalMinutes = accumulatedMinutes + runningMinutes;
+  const totalHours = totalMinutes / 60;
 
   // Prevent opening overlapping modals
   const modal = document.getElementById('supervisor-auth-modal');
@@ -3639,19 +3649,21 @@ function checkTimerThresholds(taskId, startTime) {
     return;
   }
 
-  if (elapsedHours >= 8 && elapsedHours < 12) {
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+
+  if (totalHours >= 8 && totalHours < 12) {
     if (localStorage.getItem(`warned_8h_${taskId}`) !== 'true') {
       localStorage.setItem(`warned_8h_${taskId}`, 'true');
-      showSupervisorAuthModal(taskId, 8, elapsedSeconds);
+      showSupervisorAuthModal(taskId, 8, elapsedSeconds, totalMinutes);
     }
-  } else if (elapsedHours >= 12) {
+  } else if (totalHours >= 12) {
     if (localStorage.getItem(`authorized_12h_${taskId}`) !== 'true') {
-      showSupervisorAuthModal(taskId, 12, elapsedSeconds);
+      showSupervisorAuthModal(taskId, 12, elapsedSeconds, totalMinutes);
     }
   }
 }
 
-function showSupervisorAuthModal(taskId, hoursThreshold, elapsedSeconds) {
+function showSupervisorAuthModal(taskId, hoursThreshold, elapsedSeconds, totalMinutes) {
   const info = getTaskInfoForAlert(taskId);
   if (!info) return;
 
@@ -3665,7 +3677,9 @@ function showSupervisorAuthModal(taskId, hoursThreshold, elapsedSeconds) {
 
   if (!modal || !titleEl || !msgEl || !headerEl || !btnAuth) return;
 
-  const formattedTime = formatElapsedSecondsToHMS(elapsedSeconds);
+  const formattedSessionTime = formatElapsedSecondsToHMS(elapsedSeconds);
+  const totalHmm = minutesToHmm(Math.round(totalMinutes));
+  const formattedTotalTime = formatDecimalHours(totalHmm);
 
   if (hoursThreshold === 8) {
     headerEl.style.backgroundColor = '#f59e0b'; // warning orange
@@ -3674,12 +3688,13 @@ function showSupervisorAuthModal(taskId, hoursThreshold, elapsedSeconds) {
       <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 12px; border-radius: 4px; color: #b45309; font-weight: bold;">
         Advertencia de Tiempo Excedido
       </div>
-      <p>La siguiente tarea lleva activa más de <strong>8 horas</strong>:</p>
+      <p>La siguiente tarea ha superado las <strong>8 horas acumuladas</strong> de trabajo:</p>
       <div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 13px; margin-top: 10px; line-height: 1.6;">
         <div><strong>Rodado:</strong> ${info.rodado} (Int. ${info.interno})</div>
         <div><strong>Operario:</strong> ${info.empleado}</div>
         <div><strong>Tarea:</strong> ${info.descripcion}</div>
-        <div style="margin-top: 8px; font-weight: bold; color: #d97706; font-size: 14px;">Tiempo Transcurrido: ${formattedTime}</div>
+        <div style="margin-top: 8px; font-size: 13px; color: var(--text-muted);">Tiempo de la sesión actual: ${formattedSessionTime}</div>
+        <div style="font-weight: bold; color: #d97706; font-size: 14px; margin-top: 4px;">Tiempo Total Acumulado: ${formattedTotalTime}</div>
       </div>
     `;
     btnAuth.textContent = "Entendido";
@@ -3693,12 +3708,13 @@ function showSupervisorAuthModal(taskId, hoursThreshold, elapsedSeconds) {
       <div style="background: #fee2e2; border-left: 4px solid #ef4444; padding: 12px; margin-bottom: 12px; border-radius: 4px; color: #991b1b; font-weight: bold;">
         Límite de 12 Horas Alcanzado
       </div>
-      <p>La siguiente tarea ha alcanzado o superado las <strong>12 horas</strong> de ejecución:</p>
+      <p>La siguiente tarea ha alcanzado o superado las <strong>12 horas acumuladas</strong> de trabajo:</p>
       <div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 13px; margin-top: 10px; line-height: 1.6;">
         <div><strong>Rodado:</strong> ${info.rodado} (Int. ${info.interno})</div>
         <div><strong>Operario:</strong> ${info.empleado}</div>
         <div><strong>Tarea:</strong> ${info.descripcion}</div>
-        <div style="margin-top: 8px; font-weight: bold; color: #dc2626; font-size: 14px;">Tiempo Transcurrido: ${formattedTime}</div>
+        <div style="margin-top: 8px; font-size: 13px; color: var(--text-muted);">Tiempo de la sesión actual: ${formattedSessionTime}</div>
+        <div style="font-weight: bold; color: #dc2626; font-size: 14px; margin-top: 4px;">Tiempo Total Acumulado: ${formattedTotalTime}</div>
       </div>
       <p style="margin-top: 12px; font-size: 13px; color: var(--text-muted);">
         El cronómetro no puede continuar sin la autorización expresa del supervisor.
