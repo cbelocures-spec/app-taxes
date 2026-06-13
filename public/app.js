@@ -183,6 +183,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const internoInput = document.getElementById('form-interno');
         if (internoInput) {
           internoInput.value = rodadoOpt.interno;
+          if (internoInput.rebuildSearchable) {
+            internoInput.rebuildSearchable();
+          }
           showNoveltiesForInterno(rodadoOpt.interno.trim());
         }
       }
@@ -236,7 +239,13 @@ function switchView(viewId) {
 
 // 2. MODAL CONTROLLERS
 function openPreOrderModal() {
-  document.getElementById('pre-form-interno').value = "";
+  const preInternoSelect = document.getElementById('pre-form-interno');
+  if (preInternoSelect) {
+    preInternoSelect.value = "";
+    if (preInternoSelect.rebuildSearchable) {
+      preInternoSelect.rebuildSearchable();
+    }
+  }
   document.getElementById('pre-form-clasificacion').value = "";
   document.getElementById('pre-order-modal').classList.add('open');
 }
@@ -282,7 +291,20 @@ async function submitPreOrderCheck() {
     }
     
     // Auto-populate interno and clasificacion
-    document.getElementById('form-interno').value = interno;
+    const internoSelect = document.getElementById('form-interno');
+    if (internoSelect) {
+      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === interno);
+      if (!optionExists && interno) {
+        const newOpt = document.createElement('option');
+        newOpt.value = interno;
+        newOpt.textContent = interno;
+        internoSelect.appendChild(newOpt);
+      }
+      internoSelect.value = interno;
+      if (internoSelect.rebuildSearchable) {
+        internoSelect.rebuildSearchable();
+      }
+    }
     document.getElementById('form-clasificacion').value = clasificacion;
   }
 }
@@ -367,7 +389,24 @@ function editOrder(orderId) {
   }
 
   // Populate basic inputs
-  document.getElementById('form-interno').value = order.interno;
+  const internoSelect = document.getElementById('form-interno');
+  if (internoSelect) {
+    if (order.interno) {
+      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === order.interno);
+      if (!optionExists) {
+        const newOpt = document.createElement('option');
+        newOpt.value = order.interno;
+        newOpt.textContent = order.interno;
+        internoSelect.appendChild(newOpt);
+      }
+      internoSelect.value = order.interno;
+    } else {
+      internoSelect.value = "";
+    }
+    if (internoSelect.rebuildSearchable) {
+      internoSelect.rebuildSearchable();
+    }
+  }
   document.getElementById('form-clasificacion').value = order.clasificacion;
   document.getElementById('form-incidente').value = order.incidente;
   document.getElementById('form-fecha').value = order.fechaEntrega;
@@ -425,7 +464,24 @@ function viewOrder(orderId) {
   }
 
   // Populate basic inputs
-  document.getElementById('form-interno').value = order.interno;
+  const internoSelect = document.getElementById('form-interno');
+  if (internoSelect) {
+    if (order.interno) {
+      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === order.interno);
+      if (!optionExists) {
+        const newOpt = document.createElement('option');
+        newOpt.value = order.interno;
+        newOpt.textContent = order.interno;
+        internoSelect.appendChild(newOpt);
+      }
+      internoSelect.value = order.interno;
+    } else {
+      internoSelect.value = "";
+    }
+    if (internoSelect.rebuildSearchable) {
+      internoSelect.rebuildSearchable();
+    }
+  }
   document.getElementById('form-clasificacion').value = order.clasificacion;
   document.getElementById('form-incidente').value = order.incidente || '';
   document.getElementById('form-fecha').value = order.fechaEntrega;
@@ -683,8 +739,25 @@ async function fetchCatalogs() {
     populateSelect('form-rodado', data.rodados, "Seleccionar Rodado...");
     populateSelect('form-responsable', data.responsables, "Seleccionar Responsable...");
 
-    // Convert form-rodado to searchable select
+    // Extract unique internal numbers from rodados catalog
+    const uniqueInternos = [...new Set((data.rodados || []).map(r => String(r.interno || '').trim()).filter(Boolean))];
+    uniqueInternos.sort((a, b) => {
+      const numA = parseInt(a, 10);
+      const numB = parseInt(b, 10);
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return numA - numB;
+      }
+      return a.localeCompare(b);
+    });
+
+    const internoOptions = uniqueInternos.map(int => ({ value: int, label: int }));
+    populateSelect('form-interno', internoOptions, "Seleccionar Interno...");
+    populateSelect('pre-form-interno', internoOptions, "Seleccionar Interno...");
+
+    // Convert select elements to searchable selects
     convertSelectToSearchable(document.getElementById('form-rodado'));
+    convertSelectToSearchable(document.getElementById('form-interno'));
+    convertSelectToSearchable(document.getElementById('pre-form-interno'));
 
     // Populate bulk form dropdowns
     populateSelect('bulk-task-cc', data.centrosCosto, "Seleccionar Centro Costo...");
