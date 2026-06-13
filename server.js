@@ -8,6 +8,30 @@ const db = require('./database');
 const worker = require('./syncWorker');
 let localtunnel = null;
 try { localtunnel = require('localtunnel'); } catch(e) {}
+const { exec } = require('child_process');
+const fs = require('fs');
+
+// Capturar errores inesperados en el servidor y activar agentes de auto-curación
+process.on('uncaughtException', (err) => {
+  const errorLogPath = path.join(__dirname, 'last_error.log');
+  const errorDetails = `Fecha: ${new Date().toISOString()}\nError: ${err.message}\nStack:\n${err.stack}\n`;
+  try {
+    fs.writeFileSync(errorLogPath, errorDetails);
+  } catch (fsErr) {
+    console.error("Failed to write error log:", fsErr);
+  }
+  console.error("❌ Servidor caído. Guardando log y activando Agentes IA...");
+
+  const pyCmd = process.platform === 'win32' ? 'python auto_healer.py' : 'python3 auto_healer.py';
+  exec(pyCmd, (pyErr, stdout, stderr) => {
+    if (pyErr) {
+      console.error("⚠️ Falló la ejecución de los agentes de autoreparación:", pyErr);
+      process.exit(1);
+    }
+    console.log("✅ Agentes de Autoreparación ejecutados:", stdout);
+    process.exit(0);
+  });
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -146,7 +170,7 @@ app.put('/api/orders/:id', (req, res) => {
       return res.status(404).json({ error: "Orden no encontrada" });
     }
 
-    const createdBy = req.headers['x-user-username'] || existing.createdBy;
+    const createdBy = existing.createdBy || req.headers['x-user-username'];
     const allTasksCompleted = (tasks || []).length > 0 && (tasks || []).every(t => t.status === "Finalizada");
 
     const updated = db.updateWorkOrder(req.params.id, {
@@ -165,7 +189,7 @@ app.put('/api/orders/:id', (req, res) => {
         id: t.id || `${Date.now()}-${idx}`,
         centroCosto: t.centroCosto || "",
         empleado: t.empleado || "",
-        horasEstimadas: parseFloat(t.horasEstimadas) || 0,
+        horasEstimadas: parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0,
         descripcion: t.descripcion || "",
         status: t.status || "Pendiente",
         timerStart: t.timerStart || null
@@ -552,12 +576,20 @@ async function checkAndTriggerGoogleSheetUpdates(existingOrder, updatedTasks, su
               const matched = (catalogs.responsables || []).find(r => r.label.toLowerCase().includes("belocures") || r.label.toLowerCase().includes("cesar"));
               if (matched) supervisorName = matched.label;
             } else {
-              // Try prefix match
+              // Try prefix match with part-based matching
               const prefix = email.split('@')[0];
-              if (prefix.length > 2) {
-                const matched = (catalogs.responsables || []).find(r => r.label.toLowerCase().includes(prefix));
-                if (matched) supervisorName = matched.label;
+              const parts = prefix.split(/[\._\-]/).filter(p => p.length >= 3);
+              let matched = null;
+              if (parts.length > 0) {
+                matched = (catalogs.responsables || []).find(r => {
+                  const lbl = r.label.toLowerCase();
+                  return parts.some(part => lbl.includes(part));
+                });
               }
+              if (!matched && prefix.length > 2) {
+                matched = (catalogs.responsables || []).find(r => r.label.toLowerCase().includes(prefix));
+              }
+              if (matched) supervisorName = matched.label;
             }
           }
           if (!supervisorName) {

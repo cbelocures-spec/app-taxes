@@ -1,9 +1,16 @@
 // Intercept fetch to automatically include supervisor username header and handle 401s
 const originalFetch = window.fetch;
 window.fetch = async function(url, options = {}) {
+  options.headers = options.headers || {};
+  if (options.headers instanceof Headers) {
+    options.headers.set('bypass-tunnel-reminder', 'true');
+    options.headers.set('ngrok-skip-browser-warning', 'true');
+  } else {
+    options.headers['bypass-tunnel-reminder'] = 'true';
+    options.headers['ngrok-skip-browser-warning'] = 'true';
+  }
   const username = localStorage.getItem('currentUserUsername');
   if (username) {
-    options.headers = options.headers || {};
     if (options.headers instanceof Headers) {
       options.headers.set('X-User-Username', username);
     } else {
@@ -21,7 +28,11 @@ window.fetch = async function(url, options = {}) {
         try {
           const loginRes = await originalFetch('/api/login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'bypass-tunnel-reminder': 'true',
+              'ngrok-skip-browser-warning': 'true'
+            },
             body: JSON.stringify({ username, password: savedPassword })
           });
           if (loginRes.ok) {
@@ -224,6 +235,58 @@ function switchView(viewId) {
 }
 
 // 2. MODAL CONTROLLERS
+function openPreOrderModal() {
+  document.getElementById('pre-form-interno').value = "";
+  document.getElementById('pre-form-clasificacion').value = "";
+  document.getElementById('pre-order-modal').classList.add('open');
+}
+
+function closePreOrderModal() {
+  document.getElementById('pre-order-modal').classList.remove('open');
+}
+
+async function submitPreOrderCheck() {
+  const interno = document.getElementById('pre-form-interno').value.trim();
+  const clasificacion = document.getElementById('pre-form-clasificacion').value;
+
+  if (!interno || !clasificacion) {
+    showToast("Por favor complete el Interno y la Clasificación", "danger");
+    return;
+  }
+
+  // 1. Search for existing open order with this interno and clasificacion
+  const existingOrder = activeOrders.find(o => 
+    String(o.interno).trim() === String(interno) && 
+    String(o.clasificacion).trim().toLowerCase() === String(clasificacion).trim().toLowerCase() &&
+    o.syncStatus !== 'success'
+  );
+
+  if (existingOrder) {
+    showToast(`Ya existe una orden en curso para el interno ${interno} (${clasificacion}). Abriendo existente...`, "warning");
+    closePreOrderModal();
+    editOrder(existingOrder.id);
+  } else {
+    closePreOrderModal();
+    openNewOrderModal();
+    
+    // Auto-select the rodado based on the interno
+    const rodadoSelect = document.getElementById('form-rodado');
+    const rodadoOpt = cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno));
+    if (rodadoOpt) {
+      rodadoSelect.value = rodadoOpt.value;
+    } else {
+      rodadoSelect.value = "";
+    }
+    if (rodadoSelect.rebuildSearchable) {
+      rodadoSelect.rebuildSearchable();
+    }
+    
+    // Auto-populate interno and clasificacion
+    document.getElementById('form-interno').value = interno;
+    document.getElementById('form-clasificacion').value = clasificacion;
+  }
+}
+
 function openNewOrderModal() {
   currentEditingOrderId = null;
   document.getElementById('modal-order-title').textContent = "Nueva Orden de Trabajo";
@@ -420,6 +483,9 @@ async function fetchSettings() {
     const hoursSection = document.getElementById('supervisor-hours-section');
     if (hoursSection) {
       hoursSection.style.display = isCurrentUserSupervisor ? 'block' : 'none';
+      if (isCurrentUserSupervisor) {
+        renderEmployeeHoursSummary();
+      }
     }
 
     // NOTE: DO NOT set current-user from server settings —
@@ -638,6 +704,11 @@ async function fetchCatalogs() {
     if (data.rodados && data.rodados.length > 5) {
       document.getElementById('catalog-status-text').textContent = "Catálogos cargados desde la web de Taxes.";
     }
+
+    // Refresh UI since catalogs are now available
+    if (activeOrders && activeOrders.length > 0) {
+      renderOrders();
+    }
   } catch (error) {
     console.error("Error loading catalogs:", error);
   }
@@ -793,7 +864,19 @@ function addTaskField(taskData = null) {
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = cardHtml;
   const cardElement = tempDiv.firstElementChild;
-  container.appendChild(cardElement);
+  if (taskData) {
+    container.appendChild(cardElement);
+  } else {
+    container.prepend(cardElement);
+  }
+
+  // Rebuild titles to ensure they match DOM order from top to bottom
+  container.querySelectorAll('.task-item-card').forEach((card, idx) => {
+    const titleEl = card.querySelector('.task-item-title');
+    if (titleEl) {
+      titleEl.textContent = `Tarea #${idx + 1}`;
+    }
+  });
 
   // Set up the initial options inside the Employee dropdown (handles initial filtering if Mecanica)
   const empSelect = cardElement.querySelector('.task-emp');
@@ -3375,7 +3458,11 @@ async function submitLoginForm() {
   try {
     const res = await originalFetch('/api/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'bypass-tunnel-reminder': 'true',
+        'ngrok-skip-browser-warning': 'true'
+      },
       body: JSON.stringify({ username, password })
     });
 

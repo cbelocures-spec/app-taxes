@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, 'db.json');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'db.json');
 
 const DEFAULT_MECHANICS = [
   "CALOMINO DARIO",
@@ -59,6 +59,10 @@ class LocalDB {
 
   // Initialize DB if it doesn't exist
   init() {
+    const dir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     if (!fs.existsSync(DB_PATH)) {
       this.write(DEFAULT_DB);
     } else {
@@ -96,6 +100,10 @@ class LocalDB {
   // Write contents atomically/synchronously to prevent data corruption
   write(data) {
     try {
+      const dir = path.dirname(DB_PATH);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
       const content = JSON.stringify(data, null, 2);
       fs.writeFileSync(DB_PATH, content, 'utf8');
     } catch (e) {
@@ -193,7 +201,7 @@ class LocalDB {
       id: t.id || `${Date.now()}-${idx}`,
       centroCosto: t.centroCosto || "",
       empleado: t.empleado || "",
-      horasEstimadas: parseFloat(t.horasEstimadas) || 0,
+      horasEstimadas: parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0,
       descripcion: t.descripcion || "",
       status: t.status || "Pendiente", // Pendiente, Finalizada
       timerStart: t.timerStart || null

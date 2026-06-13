@@ -38,7 +38,7 @@
     <!-- VIEW 1: HOME (INICIO) -->
     <section id="view-home" class="app-view active">
       <!-- Big Call to Action to Create Order -->
-      <div class="create-order-banner" onclick="switchView('orders'); openNewOrderModal();">
+      <div class="create-order-banner" onclick="switchView('orders'); openPreOrderModal();">
         <div class="banner-content">
           <span class="material-icons banner-icon">add_circle_outline</span>
           <div class="banner-text">
@@ -97,7 +97,7 @@
     <section id="view-orders" class="app-view">
       <div class="view-header">
         <h2>Órdenes de Trabajo</h2>
-        <button class="btn btn-primary btn-sm" onclick="openNewOrderModal()">
+        <button class="btn btn-primary btn-sm" onclick="openPreOrderModal()">
           <span class="material-icons">add</span> Nueva
         </button>
       </div>
@@ -358,6 +358,41 @@
     <span class="material-icons">mic</span>
   </button>
 
+  <!-- PRE-ORDER CHECK MODAL -->
+  <div class="fullscreen-modal" id="pre-order-modal" style="z-index: 1050;">
+    <div class="modal-header">
+      <button class="modal-close-btn" onclick="closePreOrderModal()">
+        <span class="material-icons">close</span>
+      </button>
+      <h2>Identificar Unidad</h2>
+      <button class="btn btn-primary btn-sm" onclick="submitPreOrderCheck()">
+        <span class="material-icons">arrow_forward</span> Continuar
+      </button>
+    </div>
+    <div class="modal-content" style="max-width: 500px; margin: 0 auto; padding: 20px;">
+      <div class="form-section-card">
+        <div class="card-title-header">
+          <span class="material-icons">search</span>
+          <h3>Filtro de Unidad y Tipo</h3>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label for="pre-form-interno">Número de Interno *</label>
+          <input type="text" id="pre-form-interno" placeholder="Ej. 139" required style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label for="pre-form-clasificacion">Clasificación *</label>
+          <select id="pre-form-clasificacion" required style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
+            <option value="">Seleccionar Clasificación...</option>
+            <option value="Correctivo">Correctivo</option>
+            <option value="Preventivo">Preventivo</option>
+            <option value="Auxilio">Auxilio</option>
+            <option value="Herreria">Herrería</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- FULLSCREEN NEW ORDER MODAL -->
   <div class="fullscreen-modal" id="new-order-modal">
     <div class="modal-header">
@@ -423,7 +458,7 @@
               </div>
             </div>
 
-            <div class="form-group">
+            <div class="form-group" style="display: none;">
               <label for="form-incidente">Incidente o Requisito</label>
               <textarea id="form-incidente" placeholder="Describa el incidente o requisito..." rows="3"></textarea>
             </div>

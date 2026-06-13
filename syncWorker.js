@@ -1096,9 +1096,18 @@ async function syncWorkOrder(orderId) {
       }
       
       if (!matched && username) {
-        const prefix = username.split('@')[0].toLowerCase();
-        const cleanedPrefix = cleanText(prefix);
-        matched = list.find(r => cleanText(r.label).includes(cleanedPrefix));
+        const prefix = username.split('@')[0].toLowerCase().trim();
+        const parts = prefix.split(/[\._\-]/).filter(p => p.length >= 3);
+        if (parts.length > 0) {
+          matched = list.find(r => {
+            const cleanedLabel = cleanText(r.label);
+            return parts.some(part => cleanedLabel.includes(cleanText(part)));
+          });
+        }
+        if (!matched) {
+          const cleanedPrefix = cleanText(prefix);
+          matched = list.find(r => cleanText(r.label).includes(cleanedPrefix));
+        }
       }
 
       // Explicit search for Belocures if no match was found yet
@@ -1304,7 +1313,7 @@ async function syncWorkOrder(orderId) {
       await page.keyboard.press('A');
       await page.keyboard.up('Control');
       await page.keyboard.press('Backspace');
-      await page.type(hoursSelector, String(task.horasEstimadas), { delay: 50 });
+      await page.type(hoursSelector, String(task.horasEstimadas).replace(',', '.'), { delay: 50 });
 
       // 4. Fill Description
       console.log(`Setting Descripción: "${finalDescription}"`);
