@@ -879,6 +879,11 @@ body {
   animation: slideDown 0.2s ease-out;
 }
 
+.task-item-card.new-task {
+  background-color: var(--warning-light) !important;
+  border: 2px dashed var(--warning) !important;
+}
+
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }

@@ -800,8 +800,9 @@ function addTaskField(taskData = null) {
     ccOptions += `<option value="${opt.value}" ${isSelected ? "selected" : ""}>${opt.label}</option>`;
   });
 
+  const isNew = taskData === null;
   const cardHtml = `
-    <div class="task-item-card" id="${taskId}">
+    <div class="task-item-card ${isNew ? 'new-task' : ''}" id="${taskId}">
       <div class="task-item-header">
         <span class="task-item-title">Tarea #${taskIndex + 1}</span>
         <button type="button" class="task-delete-btn" onclick="removeTaskField('${taskId}')">
@@ -1387,7 +1388,7 @@ async function submitWorkOrder() {
     const msg = currentEditingOrderId ? "Orden de Trabajo actualizada y encolada" : "Orden de Trabajo guardada y encolada para Taxes";
     showToast(msg, "success");
     closeNewOrderModal();
-    fetchOrders();
+    await fetchOrders();
     switchView('home'); // Go to dashboard (Inicio) to see the tasks and stopwatch
   } catch (error) {
     const msg = currentEditingOrderId ? "Fallo al actualizar la orden" : "Fallo al crear la orden";
