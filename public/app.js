@@ -1507,7 +1507,7 @@ async function resolveDatabaseConflicts() {
         // Calculate elapsed time and update hours
         const elapsedMs = Date.now() - startVal;
         const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
-        const currentHours = parseFloat(task.horasEstimadas) || 0;
+        const currentHours = parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0;
         const currentMinutes = hmmToMinutes(currentHours);
         const newHours = minutesToHmm(currentMinutes + elapsedMinutes);
 
@@ -2024,7 +2024,7 @@ function renderDashboard() {
             empleadoValue: task.empleado || '',
             empleadoLabel: empLabel,
             centroCosto: task.centroCosto || '',
-            horasEstimadas: parseFloat(task.horasEstimadas) || 0,
+            horasEstimadas: parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0,
             descripcion: task.descripcion || '(Sin descripción)',
             timerStart: task.timerStart,
             isTimerRunning: isTimerRunning
@@ -2245,7 +2245,7 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
     const elapsedMs = Date.now() - task.timerStart;
     const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
     const addedHoursHmm = minutesToHmm(elapsedMinutes);
-    const currentHours = parseFloat(task.horasEstimadas) || 0;
+    const currentHours = parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0;
     const currentMinutes = hmmToMinutes(currentHours);
     
     task.horasEstimadas = minutesToHmm(currentMinutes + elapsedMinutes);
@@ -2305,7 +2305,7 @@ async function markDashboardTaskFinished(orderId, taskId) {
   if (task.timerStart !== null && task.timerStart > 0) {
     const elapsedMs = Date.now() - task.timerStart;
     const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
-    const currentHours = parseFloat(task.horasEstimadas) || 0;
+    const currentHours = parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0;
     const currentMinutes = hmmToMinutes(currentHours);
     task.horasEstimadas = minutesToHmm(currentMinutes + elapsedMinutes);
     task.timerStart = null;
@@ -3705,7 +3705,7 @@ function getTaskInfoForAlert(taskId) {
       empleadoValue: found.task.empleado,
       descripcion: found.task.descripcion || '(Sin descripción)',
       isLocal: false,
-      accumulatedHours: parseFloat(found.task.horasEstimadas) || 0
+      accumulatedHours: parseFloat(String(found.task.horasEstimadas).replace(',', '.')) || 0
     };
   }
 
@@ -3769,36 +3769,59 @@ function isSameEmployee(val1, val2) {
   return c1 === c2 || c1.includes(c2) || c2.includes(c1);
 }
 
+const isToday = (dateStr) => {
+  if (!dateStr) return false;
+  try {
+    return new Date(dateStr).toLocaleDateString() === new Date().toLocaleDateString();
+  } catch (e) {
+    return false;
+  }
+};
+
 function getEmployeeTotalHours(employeeValue) {
   let totalMinutes = 0;
   const domTaskIds = new Set();
   
   const modal = document.getElementById('new-order-modal');
   if (modal && modal.classList.contains('open')) {
-    const taskCards = document.querySelectorAll('#modal-tasks-list .task-item-card');
-    taskCards.forEach(card => {
-      const empSelect = card.querySelector('.task-emp');
-      const empVal = empSelect ? empSelect.value : '';
-      
-      if (isSameEmployee(empVal, employeeValue)) {
-        domTaskIds.add(card.id);
-        
-        const hoursInput = card.querySelector('.task-hours');
-        const savedHours = hoursInput ? (parseFloat(String(hoursInput.value).replace(',', '.')) || 0) : 0;
-        totalMinutes += hmmToMinutes(savedHours);
-        
-        const timerKey = `timer_start_${card.id}`;
-        const timerStartVal = localStorage.getItem(timerKey) ? parseInt(localStorage.getItem(timerKey)) : null;
-        if (timerStartVal) {
-          const elapsedMs = Date.now() - timerStartVal;
-          totalMinutes += elapsedMs / (1000 * 60);
-        }
+    let modalOrderIsToday = true;
+    if (currentEditingOrderId) {
+      const editingOrder = activeOrders.find(o => o.id === currentEditingOrderId);
+      if (editingOrder && !isToday(editingOrder.createdAt)) {
+        modalOrderIsToday = false;
       }
-    });
+    }
+
+    if (modalOrderIsToday) {
+      const taskCards = document.querySelectorAll('#modal-tasks-list .task-item-card');
+      taskCards.forEach(card => {
+        const empSelect = card.querySelector('.task-emp');
+        const empVal = empSelect ? empSelect.value : '';
+        
+        if (isSameEmployee(empVal, employeeValue)) {
+          domTaskIds.add(card.id);
+          
+          const hoursInput = card.querySelector('.task-hours');
+          const savedHours = hoursInput ? (parseFloat(String(hoursInput.value).replace(',', '.')) || 0) : 0;
+          totalMinutes += hmmToMinutes(savedHours);
+          
+          const timerKey = `timer_start_${card.id}`;
+          const timerStartVal = localStorage.getItem(timerKey) ? parseInt(localStorage.getItem(timerKey)) : null;
+          if (timerStartVal) {
+            const elapsedMs = Date.now() - timerStartVal;
+            totalMinutes += elapsedMs / (1000 * 60);
+          }
+        }
+      });
+    }
   }
 
   activeOrders.forEach(order => {
     if (currentEditingOrderId && order.id === currentEditingOrderId) {
+      return;
+    }
+    
+    if (!isToday(order.createdAt)) {
       return;
     }
     
@@ -3850,46 +3873,60 @@ function getEmployeeTasksDetailsToday(employeeValue) {
 
   const modal = document.getElementById('new-order-modal');
   if (modal && modal.classList.contains('open')) {
-    const taskCards = document.querySelectorAll('#modal-tasks-list .task-item-card');
-    taskCards.forEach(card => {
-      const empSelect = card.querySelector('.task-emp');
-      const empVal = empSelect ? empSelect.value : '';
-      
-      if (isSameEmployee(empVal, employeeValue)) {
-        domTaskIds.add(card.id);
-        
-        const rodadoEl = document.getElementById('form-rodado');
-        const rodadoVal = rodadoEl ? rodadoEl.options[rodadoEl.selectedIndex]?.text : '';
-        const internoEl = document.getElementById('form-interno');
-        const internoVal = internoEl ? internoEl.value : '';
-        
-        const hoursInput = card.querySelector('.task-hours');
-        const savedHours = hoursInput ? (parseFloat(String(hoursInput.value).replace(',', '.')) || 0) : 0;
-        
-        const timerKey = `timer_start_${card.id}`;
-        const timerStartVal = localStorage.getItem(timerKey) ? parseInt(localStorage.getItem(timerKey)) : null;
-        let runningMins = 0;
-        if (timerStartVal) {
-          runningMins = (Date.now() - timerStartVal) / (1000 * 60);
-        }
-
-        const descEl = card.querySelector('.task-desc');
-        const descVal = descEl ? descEl.value : '';
-
-        const totalMinsForTask = hmmToMinutes(savedHours) + runningMins;
-        
-        tasksDetails.push({
-          rodado: rodadoVal || 'Rodado no guardado',
-          interno: internoVal || 'Interno no guardado',
-          descripcion: descVal || '(Sin descripción)',
-          durationFormatted: formatDecimalHours(minutesToHmm(Math.round(totalMinsForTask)))
-        });
+    let modalOrderIsToday = true;
+    if (currentEditingOrderId) {
+      const editingOrder = activeOrders.find(o => o.id === currentEditingOrderId);
+      if (editingOrder && !isToday(editingOrder.createdAt)) {
+        modalOrderIsToday = false;
       }
-    });
+    }
+
+    if (modalOrderIsToday) {
+      const taskCards = document.querySelectorAll('#modal-tasks-list .task-item-card');
+      taskCards.forEach(card => {
+        const empSelect = card.querySelector('.task-emp');
+        const empVal = empSelect ? empSelect.value : '';
+        
+        if (isSameEmployee(empVal, employeeValue)) {
+          domTaskIds.add(card.id);
+          
+          const rodadoEl = document.getElementById('form-rodado');
+          const rodadoVal = rodadoEl ? rodadoEl.options[rodadoEl.selectedIndex]?.text : '';
+          const internoEl = document.getElementById('form-interno');
+          const internoVal = internoEl ? internoEl.value : '';
+          
+          const hoursInput = card.querySelector('.task-hours');
+          const savedHours = hoursInput ? (parseFloat(String(hoursInput.value).replace(',', '.')) || 0) : 0;
+          
+          const timerKey = `timer_start_${card.id}`;
+          const timerStartVal = localStorage.getItem(timerKey) ? parseInt(localStorage.getItem(timerKey)) : null;
+          let runningMins = 0;
+          if (timerStartVal) {
+            runningMins = (Date.now() - timerStartVal) / (1000 * 60);
+          }
+
+          const descEl = card.querySelector('.task-desc');
+          const descVal = descEl ? descEl.value : '';
+
+          const totalMinsForTask = hmmToMinutes(savedHours) + runningMins;
+          
+          tasksDetails.push({
+            rodado: rodadoVal || 'Rodado no guardado',
+            interno: internoVal || 'Interno no guardado',
+            descripcion: descVal || '(Sin descripción)',
+            durationFormatted: formatDecimalHours(minutesToHmm(Math.round(totalMinsForTask)))
+          });
+        }
+      });
+    }
   }
 
   activeOrders.forEach(order => {
     if (currentEditingOrderId && order.id === currentEditingOrderId) {
+      return;
+    }
+    
+    if (!isToday(order.createdAt)) {
       return;
     }
     
