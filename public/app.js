@@ -573,7 +573,10 @@ async function saveSettings(e) {
       body: JSON.stringify({ portalUrl, username, password, googleScriptUrl })
     });
 
-    if (!res.ok) throw new Error("Failed to save settings");
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || "Error al comunicarse con el servidor");
+    }
     const data = await res.json();
     
     if (password && password !== "••••••••••••") {
@@ -585,7 +588,7 @@ async function saveSettings(e) {
     // Automatically trigger catalog sync on credentials save
     triggerCatalogSync();
   } catch (error) {
-    showToast("Error al guardar ajustes", "danger");
+    showToast(`Error al guardar ajustes: ${error.message}`, "danger");
     console.error(error);
   }
 }
@@ -1443,7 +1446,10 @@ async function submitWorkOrder() {
       body: JSON.stringify(payload)
     });
  
-    if (!res.ok) throw new Error("Error submitting work order");
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || (currentEditingOrderId ? "Error al actualizar la orden" : "Error al crear la orden"));
+    }
     
     // Clean up task timers from localStorage for finished tasks
     taskCards.forEach(card => {
@@ -1464,8 +1470,8 @@ async function submitWorkOrder() {
     await fetchOrders();
     switchView('home'); // Go to dashboard (Inicio) to see the tasks and stopwatch
   } catch (error) {
-    const msg = currentEditingOrderId ? "Fallo al actualizar la orden" : "Fallo al crear la orden";
-    showToast(msg, "danger");
+    const prefixMsg = currentEditingOrderId ? "Fallo al actualizar la orden" : "Fallo al crear la orden";
+    showToast(`${prefixMsg}: ${error.message}`, "danger");
     console.error(error);
   }
 }
@@ -2358,10 +2364,13 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
       })
     });
 
-    if (!res.ok) throw new Error("Error updating task timer");
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || "Error al comunicarse con el servidor");
+    }
     fetchOrders();
   } catch (error) {
-    showToast("Error al guardar el cronómetro", "danger");
+    showToast(`Error al guardar el cronómetro: ${error.message}`, "danger");
     console.error(error);
   }
 }
@@ -2419,14 +2428,17 @@ async function markDashboardTaskFinished(orderId, taskId) {
       })
     });
 
-    if (!res.ok) throw new Error("Error updating task status");
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || "Error al comunicarse con el servidor");
+    }
     fetchOrders();
     
     if (allCompleted) {
       showToast("¡Todas las tareas finalizadas! Puedes subir la orden a Taxes manualmente desde el listado de órdenes.", "success");
     }
   } catch (error) {
-    showToast("Error al finalizar la tarea", "danger");
+    showToast(`Error al finalizar la tarea: ${error.message}`, "danger");
     console.error(error);
   }
 }
@@ -2492,18 +2504,19 @@ async function saveActiveMechanicsList() {
       body: JSON.stringify({ list: selectedList })
     });
 
-    if (res.ok) {
-      const data = await res.json();
-      activeMechanicsList = data.list;
-      showToast("Lista de mecánicos activos actualizada", "success");
-      closeActiveMechanicsModal();
-      renderDashboard();
-    } else {
-      throw new Error("Error saving active mechanics");
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || "Error al comunicarse con el servidor");
     }
+
+    const data = await res.json();
+    activeMechanicsList = data.list;
+    showToast("Lista de mecánicos activos actualizada", "success");
+    closeActiveMechanicsModal();
+    renderDashboard();
   } catch (error) {
     console.error(error);
-    showToast("Error al guardar la lista de mecánicos activos", "danger");
+    showToast(`Error al guardar la lista de mecánicos activos: ${error.message}`, "danger");
   }
 }
 

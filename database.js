@@ -59,15 +59,15 @@ class LocalDB {
 
   // Initialize DB if it doesn't exist
   init() {
-    const dir = path.dirname(DB_PATH);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(DB_PATH)) {
-      this.write(DEFAULT_DB);
-    } else {
-      // Ensure all root keys exist
-      try {
+    try {
+      const dir = path.dirname(DB_PATH);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      if (!fs.existsSync(DB_PATH)) {
+        this.write(DEFAULT_DB);
+      } else {
+        // Ensure all root keys exist
         const data = this.read();
         let changed = false;
         for (const key of Object.keys(DEFAULT_DB)) {
@@ -79,20 +79,27 @@ class LocalDB {
         if (changed) {
           this.write(data);
         }
-      } catch (e) {
-        console.error("Error reading database, resetting to default:", e);
-        this.write(DEFAULT_DB);
       }
+    } catch (e) {
+      console.error("⚠️ ADVERTENCIA de inicialización de base de datos:", e.message);
+      console.error(`No se pudo inicializar la base de datos en ${DB_PATH}. Si estás usando Railway con un volumen persistente, por favor añade la variable de entorno RAILWAY_RUN_UID = 0 en los ajustes de tu servicio para permitir acceso de escritura.`);
     }
   }
 
   // Read raw DB contents synchronously to prevent async race conditions in Node event loop
   read() {
     try {
+      if (!fs.existsSync(DB_PATH)) {
+        return JSON.parse(JSON.stringify(DEFAULT_DB));
+      }
       const content = fs.readFileSync(DB_PATH, 'utf8');
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      if (!parsed || typeof parsed !== 'object') {
+        return JSON.parse(JSON.stringify(DEFAULT_DB));
+      }
+      return parsed;
     } catch (e) {
-      console.error("Error parsing db.json, returning default structure:", e);
+      console.error("Error parsing db.json, returning default structure:", e.message);
       return JSON.parse(JSON.stringify(DEFAULT_DB));
     }
   }
@@ -107,7 +114,8 @@ class LocalDB {
       const content = JSON.stringify(data, null, 2);
       fs.writeFileSync(DB_PATH, content, 'utf8');
     } catch (e) {
-      console.error("Error writing to db.json:", e);
+      console.error("Error writing to db.json:", e.message);
+      throw new Error(`Permisos insuficientes para escribir en ${DB_PATH} (${e.message}). Si estás usando Railway con un volumen persistente en /data, por favor añade la variable de entorno RAILWAY_RUN_UID = 0 en los ajustes de tu servicio para permitir acceso de escritura.`);
     }
   }
 
