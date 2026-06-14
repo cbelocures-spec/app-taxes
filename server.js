@@ -53,8 +53,8 @@ app.use((req, res, next) => {
 
 // Middleware to validate session (check if user exists in db when x-user-username is present)
 app.use((req, res, next) => {
-  // Allow login and static assets
-  if (req.path === '/api/login' || !req.path.startsWith('/api')) {
+  // Allow login, settings, and static assets
+  if (req.path === '/api/login' || req.path === '/api/settings' || !req.path.startsWith('/api')) {
     return next();
   }
 
