@@ -1169,16 +1169,18 @@ function renderOrders() {
   }
 
   // Render Sync Queue (only pending, syncing, or error ones)
-  const queueOrders = activeOrders.filter(o => o.syncStatus !== 'success');
-  if (queueOrders.length === 0) {
-    queueContainer.innerHTML = `
-      <div class="empty-state">
-        <span class="material-icons">cloud_done</span>
-        <p>Todas las órdenes están sincronizadas.</p>
-      </div>
-    `;
-  } else {
-    queueContainer.innerHTML = queueOrders.map(order => createQueueCardHtml(order)).join('');
+  if (queueContainer) {
+    const queueOrders = activeOrders.filter(o => o.syncStatus !== 'success');
+    if (queueOrders.length === 0) {
+      queueContainer.innerHTML = `
+        <div class="empty-state">
+          <span class="material-icons">cloud_done</span>
+          <p>Todas las órdenes están sincronizadas.</p>
+        </div>
+      `;
+    } else {
+      queueContainer.innerHTML = queueOrders.map(order => createQueueCardHtml(order)).join('');
+    }
   }
 
   // Render the Operator/Tasks active dashboard on home page
