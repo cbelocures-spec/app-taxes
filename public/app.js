@@ -2147,15 +2147,15 @@ function renderDashboard() {
               <span class="material-icons" style="font-size:18px;">add</span>
             </button>
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
-            <div class="dashboard-card-subtitle">Int. ${t.interno} | ${(t.rodado || '').split(' - ')[0]}</div>
+            <div class="dashboard-card-subtitle">Interno ${t.interno}</div>
             <div class="dashboard-card-desc">${t.descripcion}</div>
             <div class="dashboard-card-timer" id="dash-timer-${t.taskId}">${displayTime}</div>
             <div class="dashboard-card-actions">
               <button type="button" class="btn btn-warning btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')">
-                <span class="material-icons" style="font-size:12px;">pause</span> Pausar
+                <span class="material-icons" style="font-size:14px;">pause</span> Pausar
               </button>
               <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
-                <span class="material-icons" style="font-size:12px;">check</span> Fin
+                <span class="material-icons" style="font-size:14px;">check</span> Fin
               </button>
             </div>
           </div>
@@ -2178,15 +2178,15 @@ function renderDashboard() {
               <span class="material-icons" style="font-size:18px;">add</span>
             </button>
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
-            <div class="dashboard-card-subtitle">Int. ${t.interno} | ${(t.rodado || '').split(' - ')[0]}</div>
+            <div class="dashboard-card-subtitle">Interno ${t.interno}</div>
             <div class="dashboard-card-desc">${t.descripcion}</div>
             <div class="dashboard-card-timer">${t.horasEstimadas.toFixed(2)} hrs</div>
             <div class="dashboard-card-actions">
               <button type="button" class="btn btn-primary btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
-                <span class="material-icons" style="font-size:12px;">play_arrow</span> Reanudar
+                <span class="material-icons" style="font-size:14px;">play_arrow</span> Reanudar
               </button>
               <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
-                <span class="material-icons" style="font-size:12px;">check</span> Fin
+                <span class="material-icons" style="font-size:14px;">check</span> Fin
               </button>
             </div>
           </div>

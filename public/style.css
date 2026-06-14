@@ -1420,10 +1420,10 @@ body {
 
 .dashboard-card-timer {
   font-family: monospace;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
   text-align: center;
-  padding: 3px 6px;
+  padding: 5px 8px;
   border-radius: 6px;
   background-color: #e2e8f0;
   color: #0f172a;
@@ -1447,13 +1447,13 @@ body {
 
 .dashboard-card-actions button {
   flex: 1;
-  font-size: 10px;
-  padding: 6px;
+  font-size: 12px;
+  padding: 8px 6px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 4px;
   border-radius: 6px;
 }
 
