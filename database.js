@@ -6,12 +6,17 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'db.json');
 function normalizeEmail(email) {
   if (!email) return email;
   let normalized = String(email).trim().toLowerCase();
-  // Correct common domain spelling mistakes
-  normalized = normalized.replace('@contrnedoreshugo.com.ar', '@contenedoreshugo.com.ar');
-  normalized = normalized.replace('@contenedoreshugo.com.a', '@contenedoreshugo.com.ar');
-  normalized = normalized.replace('@contenedoreshugo.co.ar', '@contenedoreshugo.com.ar');
-  normalized = normalized.replace('@contenedoreshugo.com.ar.', '@contenedoreshugo.com.ar');
-  return normalized;
+  const parts = normalized.split('@');
+  if (parts.length !== 2) {
+    return normalized;
+  }
+  const localPart = parts[0];
+  let domain = parts[1];
+  // Correct any variations of contenedoreshugo or contrnedoreshugo
+  if (domain.includes('contenedoreshugo') || domain.includes('contrnedoreshugo')) {
+    domain = 'contenedoreshugo.com.ar';
+  }
+  return `${localPart}@${domain}`;
 }
 
 const DEFAULT_MECHANICS = [
