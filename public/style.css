@@ -2262,10 +2262,11 @@ body {
 
 /* Exact match highlighting inside searchable selects */
 .searchable-select-option.exact-match-highlight {
-  background-color: var(--primary-light) !important;
-  color: var(--primary) !important;
-  font-weight: 600;
-  border-left: 4px solid var(--primary) !important;
+  background-color: #e8f0fe !important;
+  color: #1a73e8 !important;
+  font-weight: 700 !important;
+  border: 2px solid #1a73e8 !important;
+  border-radius: 4px !important;
 }
 
 /* Colored fields inside pre-order-card */

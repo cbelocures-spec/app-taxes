@@ -165,7 +165,41 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectEl = e.target;
         const card = selectEl.closest('.task-item-card');
         if (card && selectEl.value === 'Finalizada') {
+          const taskId = card.id;
+          const timerKey = `timer_start_${taskId}`;
+          const isRunning = localStorage.getItem(timerKey) !== null;
+          if (isRunning) {
+            localStorage.removeItem(timerKey);
+            localStorage.removeItem(`warned_8h_${taskId}`);
+            localStorage.removeItem(`authorized_12h_${taskId}`);
+            if (activeIntervalTimers[taskId]) {
+              clearInterval(activeIntervalTimers[taskId]);
+              delete activeIntervalTimers[taskId];
+            }
+            // Reset button UI
+            const btn = document.getElementById(`timer-btn-${taskId}`);
+            if (btn) {
+              btn.classList.remove('running');
+              btn.querySelector('.material-icons').textContent = 'play_arrow';
+              btn.querySelector('.btn-text').textContent = 'Iniciar';
+            }
+            const display = document.getElementById(`timer-display-${taskId}`);
+            if (display) {
+              display.textContent = '00:00:00';
+            }
+          }
+
           addTaskTimerEvent(card, 'Fin');
+
+          const history = JSON.parse(card.dataset.timerHistory || '[]');
+          const totalMinutes = Math.round(calculateTotalElapsedSeconds(history, null) / 60);
+          const totalHours = minutesToHmm(totalMinutes);
+          const hoursInput = card.querySelector('.task-hours');
+          if (hoursInput) {
+            hoursInput.value = totalHours.toFixed(2);
+            updateHoursReadable(hoursInput);
+          }
+
           promptDiagnosis().then(diagnosis => {
             if (diagnosis) {
               const descTextarea = card.querySelector('.task-desc');
@@ -965,6 +999,12 @@ function addTaskField(taskData = null) {
   const timerStarted = taskData && (taskData.timerStarted === true || taskData.timerStarted === 'true' || (Array.isArray(taskData.timerHistory) && taskData.timerHistory.length > 0)) ? 'true' : 'false';
   const timerHistoryJson = taskData && taskData.timerHistory ? JSON.stringify(taskData.timerHistory) : '[]';
 
+  let displayHours = taskData ? parseFloat(String(taskData.horasEstimadas).replace(',', '.')) || 0 : 0;
+  if (taskData && Array.isArray(taskData.timerHistory) && taskData.timerHistory.length > 0) {
+    const totalSeconds = calculateTotalElapsedSeconds(taskData.timerHistory, null);
+    displayHours = minutesToHmm(Math.round(totalSeconds / 60));
+  }
+
   const cardHtml = `
     <div class="task-item-card ${isNew ? 'new-task' : ''}" id="${taskId}" data-timer-started="${timerStarted}" data-timer-history='${timerHistoryJson}'>
       <div class="task-item-header">
@@ -991,8 +1031,8 @@ function addTaskField(taskData = null) {
       <div class="form-row">
         <div class="form-group col-6">
           <label>Horas Estimadas</label>
-          <input type="number" step="0.01" min="0" value="${taskData ? taskData.horasEstimadas : '0.00'}" class="task-hours" oninput="updateHoursReadable(this)">
-          <small class="hours-readable" style="color:var(--primary);font-size:11px;margin-top:2px;display:block;">${taskData && taskData.horasEstimadas ? formatDecimalHours(taskData.horasEstimadas) : ''}</small>
+          <input type="number" step="0.01" min="0" value="${displayHours.toFixed(2)}" class="task-hours" oninput="updateHoursReadable(this)">
+          <small class="hours-readable" style="color:var(--primary);font-size:11px;margin-top:2px;display:block;">${displayHours > 0 ? formatDecimalHours(displayHours) : ''}</small>
         </div>
         <div class="form-group col-6">
           <label>Estado Inicial</label>
@@ -1115,36 +1155,6 @@ function addTaskField(taskData = null) {
 
       if (statusSelect.value === 'Finalizada') {
         timerBtn.disabled = true;
-        // Stop stopwatch if it was running (only if NOT in read-only mode)
-        if (!isReadOnly) {
-          const timerKey = `timer_start_${taskId}`;
-          if (localStorage.getItem(timerKey)) {
-            const startTime = parseInt(localStorage.getItem(timerKey));
-            localStorage.removeItem(timerKey);
-            localStorage.removeItem(`warned_8h_${taskId}`);
-            localStorage.removeItem(`authorized_12h_${taskId}`);
-            if (activeIntervalTimers[taskId]) {
-              clearInterval(activeIntervalTimers[taskId]);
-              delete activeIntervalTimers[taskId];
-            }
-            const elapsedMs = Date.now() - startTime;
-            const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
-            const hoursInput = cardElement.querySelector('.task-hours');
-            if (hoursInput) {
-              const currentHours = parseFloat(String(hoursInput.value).replace(',', '.')) || 0;
-              const currentMinutes = hmmToMinutes(currentHours);
-              const totalHours = minutesToHmm(currentMinutes + elapsedMinutes);
-              hoursInput.value = totalHours.toFixed(2);
-              updateHoursReadable(hoursInput);
-              showToast(`Cronómetro detenido por finalización. Se sumaron: +${formatDecimalHours(minutesToHmm(elapsedMinutes))}`, "info");
-            }
-            const display = cardElement.querySelector(`#timer-display-${taskId}`);
-            if (display) display.textContent = '00:00:00';
-            timerBtn.classList.remove('running');
-            timerBtn.querySelector('.material-icons').textContent = 'play_arrow';
-            timerBtn.querySelector('.btn-text').textContent = 'Iniciar';
-          }
-        }
       } else {
         timerBtn.disabled = isReadOnly;
       }
@@ -1923,11 +1933,11 @@ async function toggleTaskTimer(taskId) {
     let totalHours = addedHoursHmm;
     if (card) {
       addTaskTimerEvent(card, 'Pausó');
+      const history = JSON.parse(card.dataset.timerHistory || '[]');
+      const totalMinutes = Math.round(calculateTotalElapsedSeconds(history, null) / 60);
+      totalHours = minutesToHmm(totalMinutes);
       const hoursInput = card.querySelector('.task-hours');
       if (hoursInput) {
-        const currentHours = parseFloat(String(hoursInput.value).replace(',', '.')) || 0;
-        const currentMinutes = hmmToMinutes(currentHours);
-        totalHours = minutesToHmm(currentMinutes + elapsedMinutes);
         hoursInput.value = totalHours.toFixed(2);
         updateHoursReadable(hoursInput);
       }
@@ -1955,6 +1965,28 @@ function minutesToHmm(totalMinutes) {
   return parseFloat(val.toFixed(2));
 }
 
+function calculateTotalElapsedSeconds(timerHistory, timerStart) {
+  let totalMs = 0;
+  if (Array.isArray(timerHistory) && timerHistory.length > 0) {
+    const sorted = [...timerHistory].sort((a, b) => a.timestamp - b.timestamp);
+    let currentStart = null;
+    sorted.forEach(event => {
+      if (event.type === 'Inició' || event.type === 'Reanudó') {
+        currentStart = event.timestamp;
+      } else if (event.type === 'Pausó' || event.type === 'Fin') {
+        if (currentStart !== null) {
+          totalMs += (event.timestamp - currentStart);
+          currentStart = null;
+        }
+      }
+    });
+  }
+  if (timerStart !== null && timerStart > 0) {
+    totalMs += (Date.now() - timerStart);
+  }
+  return Math.max(0, Math.floor(totalMs / 1000));
+}
+
 function formatDecimalHours(hmmVal) {
   const totalMinutes = hmmToMinutes(hmmVal);
   const h = Math.floor(totalMinutes / 60);
@@ -1979,11 +2011,14 @@ function startTimerInterval(taskId, startTime) {
     clearInterval(activeIntervalTimers[taskId]);
   }
 
+  const card = document.getElementById(taskId);
+  const history = card ? JSON.parse(card.dataset.timerHistory || '[]') : [];
+
   function update() {
-    const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-    const hh = Math.floor(elapsedSeconds / 3600);
-    const mm = Math.floor((elapsedSeconds % 3600) / 60);
-    const ss = elapsedSeconds % 60;
+    const totalSeconds = calculateTotalElapsedSeconds(history, startTime);
+    const hh = Math.floor(totalSeconds / 3600);
+    const mm = Math.floor((totalSeconds % 3600) / 60);
+    const ss = totalSeconds % 60;
     display.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
     checkTimerThresholds(taskId, startTime);
     renderEmployeeHoursSummary();
@@ -2275,7 +2310,7 @@ function renderDashboard() {
       gridWorking.innerHTML = `<div class="empty-dashboard-state">No hay operarios trabajando actualmente.</div>`;
     } else {
       gridWorking.innerHTML = workingTasks.map(t => {
-        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - t.timerStart) / 1000));
+        const elapsedSeconds = calculateTotalElapsedSeconds(t.timerHistory, t.timerStart);
         const hh = Math.floor(elapsedSeconds / 3600);
         const mm = Math.floor((elapsedSeconds % 3600) / 60);
         const ss = elapsedSeconds % 60;
@@ -2315,6 +2350,11 @@ function renderDashboard() {
       gridPaused.innerHTML = `<div class="empty-dashboard-state">No hay tareas en pausa.</div>`;
     } else {
       gridPaused.innerHTML = pausedTasks.map(t => {
+        let displayHours = t.horasEstimadas;
+        if (Array.isArray(t.timerHistory) && t.timerHistory.length > 0) {
+          const totalSeconds = calculateTotalElapsedSeconds(t.timerHistory, null);
+          displayHours = minutesToHmm(Math.round(totalSeconds / 60));
+        }
         return `
           <div class="dashboard-card paused">
             <button type="button" class="dashboard-card-add-task-btn" onclick="editOrder('${t.orderId}')" title="Agregar tarea a esta orden">
@@ -2326,7 +2366,7 @@ function renderDashboard() {
             <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
               ${renderTimerHistoryHtml(t.timerHistory)}
             </div>
-            <div class="dashboard-card-timer">${t.horasEstimadas.toFixed(2)} hrs</div>
+            <div class="dashboard-card-timer">${displayHours.toFixed(2)} hrs</div>
             <div class="dashboard-card-actions">
               <button type="button" class="btn btn-primary btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
                 <span class="material-icons" style="font-size:14px;">play_arrow</span> Reanudar
@@ -2416,11 +2456,20 @@ function startDashboardTimerUpdate(taskId, startTime) {
     clearInterval(activeDashboardIntervals[taskId]);
   }
 
+  let history = [];
+  activeOrders.forEach(order => {
+    (order.tasks || []).forEach(task => {
+      if (task.id === taskId) {
+        history = task.timerHistory || [];
+      }
+    });
+  });
+
   function update() {
-    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
-    const hh = Math.floor(elapsedSeconds / 3600);
-    const mm = Math.floor((elapsedSeconds % 3600) / 60);
-    const ss = elapsedSeconds % 60;
+    const totalSeconds = calculateTotalElapsedSeconds(history, startTime);
+    const hh = Math.floor(totalSeconds / 3600);
+    const mm = Math.floor((totalSeconds % 3600) / 60);
+    const ss = totalSeconds % 60;
     const el = document.getElementById(`dash-timer-${taskId}`);
     if (el) {
       el.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
@@ -2492,12 +2541,13 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
     const elapsedMs = Date.now() - task.timerStart;
     const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
     const addedHoursHmm = minutesToHmm(elapsedMinutes);
-    const currentHours = parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0;
-    const currentMinutes = hmmToMinutes(currentHours);
-    
-    task.horasEstimadas = minutesToHmm(currentMinutes + elapsedMinutes);
+
     task.timerStart = null;
     addTimerEventToTask(task, 'Pausó');
+
+    const totalMinutes = Math.round(calculateTotalElapsedSeconds(task.timerHistory, null) / 60);
+    task.horasEstimadas = minutesToHmm(totalMinutes);
+
     localStorage.removeItem(`timer_start_${taskId}`);
     localStorage.removeItem(`warned_8h_${taskId}`);
     localStorage.removeItem(`authorized_12h_${taskId}`);
@@ -2561,11 +2611,6 @@ async function markDashboardTaskFinished(orderId, taskId) {
   }
 
   if (task.timerStart !== null && task.timerStart > 0) {
-    const elapsedMs = Date.now() - task.timerStart;
-    const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
-    const currentHours = parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0;
-    const currentMinutes = hmmToMinutes(currentHours);
-    task.horasEstimadas = minutesToHmm(currentMinutes + elapsedMinutes);
     task.timerStart = null;
     localStorage.removeItem(`timer_start_${taskId}`);
     localStorage.removeItem(`warned_8h_${taskId}`);
@@ -2573,6 +2618,10 @@ async function markDashboardTaskFinished(orderId, taskId) {
   }
 
   addTimerEventToTask(task, 'Fin');
+
+  const totalMinutes = Math.round(calculateTotalElapsedSeconds(task.timerHistory, null) / 60);
+  task.horasEstimadas = minutesToHmm(totalMinutes);
+
   task.status = "Finalizada";
 
   // Kill the dashboard interval for this task immediately
