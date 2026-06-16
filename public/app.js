@@ -283,7 +283,7 @@ function promptDiagnosis() {
     }
 
     textarea.value = '';
-    modal.style.display = 'flex';
+    modal.classList.add('open');
 
     // Clear any previous event listeners by cloning buttons
     const newBtnSave = btnSave.cloneNode(true);
@@ -292,7 +292,7 @@ function promptDiagnosis() {
     btnSkip.parentNode.replaceChild(newBtnSkip, btnSkip);
 
     const closeModal = () => {
-      modal.style.display = 'none';
+      modal.classList.remove('open');
     };
 
     newBtnSave.addEventListener('click', () => {
