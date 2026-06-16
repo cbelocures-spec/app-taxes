@@ -161,7 +161,13 @@ async function fillSearchableSelect(page, labelText, searchValue) {
       try {
         const catalogs = db.getCatalogs();
         const rodados = catalogs.rodados || [];
-        const matching = rodados.find(r => r.label === searchValue || r.value === searchValue || (r.interno && searchValue.includes(`Interno ${r.interno}`)));
+        const internoMatch = searchValue.match(/Interno\s+(\S+)/i);
+        const searchInterno = internoMatch ? internoMatch[1].toLowerCase().trim() : '';
+        const matching = rodados.find(r => 
+          r.label === searchValue || 
+          r.value === searchValue || 
+          (r.interno && searchInterno && r.interno.toLowerCase().trim() === searchInterno)
+        );
         if (matching) {
           rodadoInfo = {
             patente: matching.patente || '',
@@ -283,11 +289,22 @@ async function fillSearchableSelect(page, labelText, searchValue) {
           }
         }
 
-        // B. Match by interno
+        // B. Match by interno (extract and compare exact internal number)
         if (!matched && rodadoInfo && rodadoInfo.interno) {
           const cleanInterno = clean(rodadoInfo.interno);
           if (cleanInterno) {
-            matched = filteredOptions.find(el => clean(el.textContent).includes(cleanInterno));
+            matched = filteredOptions.find(el => {
+              const text = el.textContent.toLowerCase();
+              const match = text.match(/interno\s+(\S+)/);
+              if (match) {
+                return clean(match[1]) === cleanInterno;
+              }
+              // Fallback to substring only if "interno" word is not present in the option text
+              if (!text.includes('interno')) {
+                return clean(text).includes(cleanInterno);
+              }
+              return false;
+            });
           }
         }
 
@@ -1513,6 +1530,17 @@ async function syncWorkOrder(orderId) {
 
   } catch (error) {
     console.error(`Sync failed for OT #${order.interno}:`, error);
+    if (browser) {
+      try {
+        const pages = await browser.pages();
+        if (pages.length > 0) {
+          await pages[0].screenshot({ path: 'public/last_sync_error.png', fullPage: true });
+          console.log("Saved debug screenshot to public/last_sync_error.png");
+        }
+      } catch (screenshotErr) {
+        console.error("Failed to take error screenshot:", screenshotErr.message);
+      }
+    }
     db.updateWorkOrder(orderId, {
       syncStatus: "error",
       syncError: error.message
