@@ -2240,6 +2240,7 @@ function renderDashboard() {
             orderId: order.id,
             interno: order.interno || '',
             rodado: order.rodado || '',
+            clasificacion: order.clasificacion || '',
             taskId: task.id,
             empleadoValue: task.empleado || '',
             empleadoLabel: empLabel,
@@ -2286,7 +2287,7 @@ function renderDashboard() {
               <span class="material-icons" style="font-size:18px;">add</span>
             </button>
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
-            <div class="dashboard-card-subtitle">Interno ${t.interno}</div>
+            <div class="dashboard-card-subtitle">Interno ${t.interno} ${t.clasificacion ? ' - ' + t.clasificacion : ''}</div>
             <div class="dashboard-card-desc">${t.descripcion}</div>
             <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
               ${renderTimerHistoryHtml(t.timerHistory)}
@@ -2320,7 +2321,7 @@ function renderDashboard() {
               <span class="material-icons" style="font-size:18px;">add</span>
             </button>
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
-            <div class="dashboard-card-subtitle">Interno ${t.interno}</div>
+            <div class="dashboard-card-subtitle">Interno ${t.interno} ${t.clasificacion ? ' - ' + t.clasificacion : ''}</div>
             <div class="dashboard-card-desc">${t.descripcion}</div>
             <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
               ${renderTimerHistoryHtml(t.timerHistory)}
