@@ -1050,12 +1050,14 @@ async function syncWorkOrder(orderId) {
   // Resolve user credentials for this order
   let username = settings.username;
   let password = settings.password;
+  let usingCreatorCredentials = false;
 
   if (order.createdBy) {
     const user = db.getUser(order.createdBy);
     if (user && user.password) {
       username = user.username;
       password = user.password;
+      usingCreatorCredentials = true;
     }
   }
 
@@ -1084,7 +1086,21 @@ async function syncWorkOrder(orderId) {
     await page.setViewport({ width: 1280, height: 900 });
 
     // 1. LOGIN
-    await autoLogin(page, username, password, settings.portalUrl);
+    try {
+      await autoLogin(page, username, password, settings.portalUrl);
+    } catch (loginError) {
+      // If creator credentials failed, fallback to global settings supervisor credentials
+      if (usingCreatorCredentials && settings.username && settings.password && settings.username !== username) {
+        console.warn(`[Sync Warning] Failed to log in with creator credentials (${username}). Falling back to global supervisor credentials (${settings.username})...`);
+        await safeGoto(page, `${settings.portalUrl}/logout`, { timeout: 10000 }).catch(() => {});
+        await delay(2000);
+        await autoLogin(page, settings.username, settings.password, settings.portalUrl);
+        // Update username so the rest of the flow resolves responsible accordingly
+        username = settings.username;
+      } else {
+        throw loginError;
+      }
+    }
 
     // 2. NAVIGATE TO NEW WORK ORDER FORM
     console.log("Navigating directly to Ordenes de Trabajo list page...");
