@@ -2219,3 +2219,52 @@ body {
   transform: scale(1.1);
 }
 
+/* Pre-order modal card styling */
+.pre-order-card {
+  border-top: 4px solid var(--primary) !important;
+  background: linear-gradient(145deg, #ffffff, #f8fafc) !important;
+}
+
+.pre-order-card .card-title-header {
+  border-bottom: 1px dashed var(--primary-light) !important;
+}
+
+.pre-order-card .card-title-header h3 {
+  color: var(--primary) !important;
+}
+
+.pre-order-card .card-title-header .material-icons {
+  color: var(--primary) !important;
+}
+
+.pre-order-card label {
+  color: var(--text-main) !important;
+  font-weight: 600;
+}
+
+/* Exact match highlighting inside searchable selects */
+.searchable-select-option.exact-match-highlight {
+  background-color: var(--primary-light) !important;
+  color: var(--primary) !important;
+  font-weight: 600;
+  border-left: 4px solid var(--primary) !important;
+}
+
+/* Colored fields inside pre-order-card */
+.pre-order-card select,
+.pre-order-card .searchable-select-trigger {
+  background-color: #f0f7ff !important;
+  border-color: #b3d7ff !important;
+  color: #0056b3 !important;
+  font-weight: 600 !important;
+}
+
+.pre-order-card select:focus,
+.pre-order-card .searchable-select-trigger:focus,
+.pre-order-card .searchable-select-trigger.active {
+  background-color: #e1f0ff !important;
+  border-color: #80bdff !important;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25) !important;
+}
+
+

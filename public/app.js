@@ -166,6 +166,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = selectEl.closest('.task-item-card');
         if (card && selectEl.value === 'Finalizada') {
           addTaskTimerEvent(card, 'Fin');
+          promptDiagnosis().then(diagnosis => {
+            if (diagnosis) {
+              const descTextarea = card.querySelector('.task-desc');
+              if (descTextarea) {
+                const prefix = descTextarea.value.trim() ? ' - ' : '';
+                descTextarea.value = descTextarea.value.trim() + prefix + 'Diagnóstico: ' + diagnosis;
+                descTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+            }
+          });
         }
       }
     });
@@ -259,6 +269,45 @@ function openPreOrderModal() {
 function closePreOrderModal() {
   document.getElementById('pre-order-modal').classList.remove('open');
 }
+
+function promptDiagnosis() {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('diagnosis-modal');
+    const textarea = document.getElementById('diagnosis-text');
+    const btnSave = document.getElementById('btn-diagnosis-save');
+    const btnSkip = document.getElementById('btn-diagnosis-skip');
+
+    if (!modal || !textarea) {
+      resolve(null);
+      return;
+    }
+
+    textarea.value = '';
+    modal.style.display = 'flex';
+
+    // Clear any previous event listeners by cloning buttons
+    const newBtnSave = btnSave.cloneNode(true);
+    const newBtnSkip = btnSkip.cloneNode(true);
+    btnSave.parentNode.replaceChild(newBtnSave, btnSave);
+    btnSkip.parentNode.replaceChild(newBtnSkip, btnSkip);
+
+    const closeModal = () => {
+      modal.style.display = 'none';
+    };
+
+    newBtnSave.addEventListener('click', () => {
+      const val = textarea.value.trim();
+      closeModal();
+      resolve(val || null);
+    });
+
+    newBtnSkip.addEventListener('click', () => {
+      closeModal();
+      resolve(null);
+    });
+  });
+}
+
 
 async function submitPreOrderCheck() {
   const interno = document.getElementById('pre-form-interno').value.trim();
@@ -2109,6 +2158,27 @@ function convertSelectToSearchable(selectEl) {
       const isMatch = text.includes(term);
       item.style.display = isMatch ? 'block' : 'none';
       if (isMatch) matchCount++;
+
+      // Exact match highlighting
+      let isExact = false;
+      if (term) {
+        const textClean = text.trim();
+        if (textClean === term) {
+          isExact = true;
+        } else {
+          // Check for "interno [term]" pattern in the option text
+          const match = textClean.match(/interno\s+(\S+)/);
+          if (match && match[1] === term) {
+            isExact = true;
+          }
+        }
+      }
+
+      if (isExact) {
+        item.classList.add('exact-match-highlight');
+      } else {
+        item.classList.remove('exact-match-highlight');
+      }
     });
 
     let noResultsMsg = listContainer.querySelector('.no-results');
@@ -2481,6 +2551,13 @@ async function markDashboardTaskFinished(orderId, taskId) {
   // Find the actual task object inside order.tasks (by reference)
   const task = order.tasks.find(t => t.id === taskId);
   if (!task) return;
+
+  // Prompt for optional diagnosis
+  const diagnosis = await promptDiagnosis();
+  if (diagnosis) {
+    const prefix = task.descripcion ? ' - ' : '';
+    task.descripcion = (task.descripcion || '').trim() + prefix + 'Diagnóstico: ' + diagnosis;
+  }
 
   if (task.timerStart !== null && task.timerStart > 0) {
     const elapsedMs = Date.now() - task.timerStart;
