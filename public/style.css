@@ -803,6 +803,22 @@ body {
   color: var(--primary);
 }
 
+#nav-home.active {
+  color: #1a73e8 !important;
+}
+#nav-orders.active {
+  color: #ff9800 !important;
+}
+#nav-history.active {
+  color: #10b981 !important;
+}
+#nav-bulk.active {
+  color: #8b5cf6 !important;
+}
+#nav-settings.active {
+  color: #64748b !important;
+}
+
 .nav-item .material-icons {
   font-size: 24px;
 }
@@ -2221,26 +2237,26 @@ body {
 
 /* Pre-order modal card styling */
 .pre-order-card {
-  border: 1px solid #b3d7ff !important;
-  border-top: 4px solid var(--primary) !important;
-  background: linear-gradient(145deg, #eef5fc, #e1effe) !important;
-  box-shadow: 0 10px 25px rgba(0, 86, 179, 0.1) !important;
+  border: 1px solid #5591f5 !important;
+  border-top: 4px solid #004596 !important;
+  background: linear-gradient(145deg, #99c2ff, #73a8f7) !important;
+  box-shadow: 0 10px 25px rgba(0, 86, 179, 0.15) !important;
 }
 
 .pre-order-card .card-title-header {
-  border-bottom: 1px dashed var(--primary-light) !important;
+  border-bottom: 1px dashed rgba(0, 86, 179, 0.2) !important;
 }
 
 .pre-order-card .card-title-header h3 {
-  color: var(--primary) !important;
+  color: #00224d !important;
 }
 
 .pre-order-card .card-title-header .material-icons {
-  color: var(--primary) !important;
+  color: #00224d !important;
 }
 
 .pre-order-card label {
-  color: var(--text-main) !important;
+  color: #00224d !important;
   font-weight: 600;
 }
 
@@ -2256,8 +2272,8 @@ body {
 .pre-order-card select,
 .pre-order-card .searchable-select-trigger {
   background-color: #ffffff !important;
-  border-color: #b3d7ff !important;
-  color: #0056b3 !important;
+  border-color: #5591f5 !important;
+  color: #00224d !important;
   font-weight: 600 !important;
 }
 
@@ -2265,7 +2281,7 @@ body {
 .pre-order-card .searchable-select-trigger:focus,
 .pre-order-card .searchable-select-trigger.active {
   background-color: #ffffff !important;
-  border-color: #80bdff !important;
+  border-color: #5591f5 !important;
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25) !important;
 }
 
