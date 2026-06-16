@@ -3,6 +3,17 @@ const path = require('path');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'db.json');
 
+function normalizeEmail(email) {
+  if (!email) return email;
+  let normalized = String(email).trim().toLowerCase();
+  // Correct common domain spelling mistakes
+  normalized = normalized.replace('@contrnedoreshugo.com.ar', '@contenedoreshugo.com.ar');
+  normalized = normalized.replace('@contenedoreshugo.com.a', '@contenedoreshugo.com.ar');
+  normalized = normalized.replace('@contenedoreshugo.co.ar', '@contenedoreshugo.com.ar');
+  normalized = normalized.replace('@contenedoreshugo.com.ar.', '@contenedoreshugo.com.ar');
+  return normalized;
+}
+
 const DEFAULT_MECHANICS = [
   "CALOMINO DARIO",
   "Canaviri Fernandez, Jesús",
@@ -97,6 +108,55 @@ class LocalDB {
       if (!parsed || typeof parsed !== 'object') {
         return JSON.parse(JSON.stringify(DEFAULT_DB));
       }
+
+      // Migration: Normalize email usernames and createdBy fields in memory
+      let migrated = false;
+      if (parsed.users) {
+        const cleanUsers = {};
+        for (const rawKey of Object.keys(parsed.users)) {
+          const normalizedKey = normalizeEmail(rawKey);
+          if (normalizedKey !== rawKey) {
+            migrated = true;
+          }
+          const userObj = parsed.users[rawKey];
+          if (userObj) {
+            userObj.username = normalizedKey;
+            cleanUsers[normalizedKey] = userObj;
+          }
+        }
+        parsed.users = cleanUsers;
+      }
+
+      if (parsed.settings && parsed.settings.username) {
+        const normalizedSettingUser = normalizeEmail(parsed.settings.username);
+        if (normalizedSettingUser !== parsed.settings.username) {
+          parsed.settings.username = normalizedSettingUser;
+          migrated = true;
+        }
+      }
+
+      if (Array.isArray(parsed.workOrders)) {
+        parsed.workOrders.forEach(order => {
+          if (order.createdBy) {
+            const normalizedCreatedBy = normalizeEmail(order.createdBy);
+            if (normalizedCreatedBy !== order.createdBy) {
+              order.createdBy = normalizedCreatedBy;
+              migrated = true;
+            }
+          }
+        });
+      }
+
+      // If any migration took place, write it back to disk immediately
+      if (migrated) {
+        console.log("Database migration: Normalized typo email addresses in users/settings/workOrders.");
+        try {
+          fs.writeFileSync(DB_PATH, JSON.stringify(parsed, null, 2), 'utf8');
+        } catch (writeErr) {
+          console.error("Failed to persist database migration to disk:", writeErr.message);
+        }
+      }
+
       return parsed;
     } catch (e) {
       console.error("Error parsing db.json, returning default structure:", e.message);
@@ -122,12 +182,20 @@ class LocalDB {
   // --- Settings Methods ---
   getSettings() {
     const db = this.read();
-    return { ...DEFAULT_DB.settings, ...(db.settings || {}) };
+    const settings = { ...DEFAULT_DB.settings, ...(db.settings || {}) };
+    if (settings.username) {
+      settings.username = normalizeEmail(settings.username);
+    }
+    return settings;
   }
 
   saveSettings(settings) {
     const db = this.read();
-    db.settings = { ...db.settings, ...settings };
+    const cleanSettings = { ...settings };
+    if (cleanSettings.username) {
+      cleanSettings.username = normalizeEmail(cleanSettings.username);
+    }
+    db.settings = { ...db.settings, ...cleanSettings };
     this.write(db);
     return db.settings;
   }
@@ -136,7 +204,7 @@ class LocalDB {
   getUser(username) {
     if (!username) return null;
     const db = this.read();
-    const key = username.toLowerCase().trim();
+    const key = normalizeEmail(username);
     return db.users ? db.users[key] : null;
   }
 
@@ -144,13 +212,17 @@ class LocalDB {
     if (!username) return null;
     const db = this.read();
     if (!db.users) db.users = {};
-    const key = username.toLowerCase().trim();
+    const key = normalizeEmail(username);
     db.users[key] = {
-      username: username.trim(),
+      username: key,
       password: password
     };
     this.write(db);
     return db.users[key];
+  }
+
+  normalizeEmail(email) {
+    return normalizeEmail(email);
   }
 
   // --- Catalogs Methods ---
@@ -235,7 +307,7 @@ class LocalDB {
       syncDate: null,
       createdAt: new Date().toISOString(),
       tasks: tasks,
-      createdBy: orderData.createdBy || null
+      createdBy: orderData.createdBy ? normalizeEmail(orderData.createdBy) : null
     };
 
     db.workOrders.push(newOrder);
@@ -247,7 +319,11 @@ class LocalDB {
     const db = this.read();
     const idx = db.workOrders.findIndex(o => o.id === id);
     if (idx !== -1) {
-      db.workOrders[idx] = { ...db.workOrders[idx], ...updates };
+      const cleanUpdates = { ...updates };
+      if (cleanUpdates.createdBy) {
+        cleanUpdates.createdBy = normalizeEmail(cleanUpdates.createdBy);
+      }
+      db.workOrders[idx] = { ...db.workOrders[idx], ...cleanUpdates };
       this.write(db);
       return db.workOrders[idx];
     }

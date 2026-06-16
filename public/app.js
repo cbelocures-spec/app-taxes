@@ -913,7 +913,7 @@ function addTaskField(taskData = null) {
   });
 
   const isNew = taskData === null;
-  const timerStarted = taskData && (taskData.timerStarted === true || taskData.timerStarted === 'true') ? 'true' : 'false';
+  const timerStarted = taskData && (taskData.timerStarted === true || taskData.timerStarted === 'true' || (Array.isArray(taskData.timerHistory) && taskData.timerHistory.length > 0)) ? 'true' : 'false';
   const timerHistoryJson = taskData && taskData.timerHistory ? JSON.stringify(taskData.timerHistory) : '[]';
 
   const cardHtml = `
@@ -1761,10 +1761,13 @@ async function pauseTask(taskInfo) {
         
         const tasks = order.tasks.map(t => {
           if (t.id === taskId) {
+            const history = JSON.parse(card.dataset.timerHistory || '[]');
             return {
               ...t,
               timerStart: null,
-              horasEstimadas: updatedHours
+              horasEstimadas: updatedHours,
+              timerStarted: card.dataset.timerStarted === 'true',
+              timerHistory: history
             };
           }
           return t;
@@ -2400,11 +2403,13 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
       }
     }
 
-    if (!task.timerStarted) {
+    const isStarted = task.timerStarted === true || task.timerStarted === 'true' || (Array.isArray(task.timerHistory) && task.timerHistory.length > 0);
+    if (!isStarted) {
       task.horasEstimadas = 0;
       task.timerStarted = true;
       addTimerEventToTask(task, 'Inició');
     } else {
+      task.timerStarted = true;
       addTimerEventToTask(task, 'Reanudó');
     }
 
