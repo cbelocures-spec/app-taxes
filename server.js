@@ -192,7 +192,9 @@ app.put('/api/orders/:id', (req, res) => {
         horasEstimadas: parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0,
         descripcion: t.descripcion || "",
         status: t.status || "Pendiente",
-        timerStart: t.timerStart || null
+        timerStart: t.timerStart || null,
+        timerStarted: t.timerStarted === true || t.timerStarted === 'true',
+        timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : []
       }))
     });
 

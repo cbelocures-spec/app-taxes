@@ -161,6 +161,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
           }
         }
+      } else if (e.target && e.target.classList.contains('task-status')) {
+        const selectEl = e.target;
+        const card = selectEl.closest('.task-item-card');
+        if (card && selectEl.value === 'Finalizada') {
+          addTaskTimerEvent(card, 'Fin');
+        }
       }
     });
   }
@@ -860,6 +866,36 @@ function updateEmployeeDropdownForCard(card) {
   }
 }
 
+function renderTimerHistoryHtml(history) {
+  if (!Array.isArray(history) || history.length === 0) return '';
+  return history.map(item => {
+    let icon = 'play_arrow';
+    if (item.type === 'Pausó') icon = 'pause';
+    if (item.type === 'Reanudó') icon = 'replay';
+    if (item.type === 'Fin') icon = 'stop';
+    return `<span style="display: inline-flex; align-items: center; gap: 2px; background: #e2e8f0; padding: 2px 5px; border-radius: 4px; font-size: 10px; color: var(--text-color);"><span class="material-icons" style="font-size: 10px;">${icon}</span>${item.type}: <strong>${item.formatted}</strong></span>`;
+  }).join(' ');
+}
+
+function addTaskTimerEvent(card, type) {
+  if (!card) return;
+  const history = JSON.parse(card.dataset.timerHistory || '[]');
+  const now = new Date();
+  const formatted = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  history.push({ type, formatted, timestamp: Date.now() });
+  card.dataset.timerHistory = JSON.stringify(history);
+  renderTaskTimerHistory(card);
+}
+
+function renderTaskTimerHistory(card) {
+  if (!card) return;
+  const logEl = card.querySelector('.timer-history-log');
+  if (logEl) {
+    const history = JSON.parse(card.dataset.timerHistory || '[]');
+    logEl.innerHTML = renderTimerHistoryHtml(history);
+  }
+}
+
 function addTaskField(taskData = null) {
   const container = document.getElementById('modal-tasks-list');
   const emptyState = document.getElementById('tasks-empty-state');
@@ -877,8 +913,11 @@ function addTaskField(taskData = null) {
   });
 
   const isNew = taskData === null;
+  const timerStarted = taskData && (taskData.timerStarted === true || taskData.timerStarted === 'true') ? 'true' : 'false';
+  const timerHistoryJson = taskData && taskData.timerHistory ? JSON.stringify(taskData.timerHistory) : '[]';
+
   const cardHtml = `
-    <div class="task-item-card ${isNew ? 'new-task' : ''}" id="${taskId}">
+    <div class="task-item-card ${isNew ? 'new-task' : ''}" id="${taskId}" data-timer-started="${timerStarted}" data-timer-history='${timerHistoryJson}'>
       <div class="task-item-header">
         <span class="task-item-title">Tarea #${taskIndex + 1}</span>
         <button type="button" class="task-delete-btn" onclick="removeTaskField('${taskId}')">
@@ -933,6 +972,10 @@ function addTaskField(taskData = null) {
       <div class="form-group" style="margin-top: 12px;">
         <label>Descripción de Actividades</label>
         <textarea placeholder="Describe las actividades a realizar..." rows="2" class="task-desc">${taskData ? taskData.descripcion : ''}</textarea>
+      </div>
+
+      <div class="timer-history-log" style="font-size: 11px; color: var(--text-muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+        ${renderTimerHistoryHtml(taskData ? taskData.timerHistory : [])}
       </div>
     </div>
   `;
@@ -1018,38 +1061,43 @@ function addTaskField(taskData = null) {
   
   if (statusSelect && timerBtn) {
     const handleStatusChange = () => {
+      const modal = document.getElementById('new-order-modal');
+      const isReadOnly = modal && modal.classList.contains('readonly-mode');
+
       if (statusSelect.value === 'Finalizada') {
         timerBtn.disabled = true;
-        // Stop stopwatch if it was running
-        const timerKey = `timer_start_${taskId}`;
-        if (localStorage.getItem(timerKey)) {
-          const startTime = parseInt(localStorage.getItem(timerKey));
-          localStorage.removeItem(timerKey);
-          localStorage.removeItem(`warned_8h_${taskId}`);
-          localStorage.removeItem(`authorized_12h_${taskId}`);
-          if (activeIntervalTimers[taskId]) {
-            clearInterval(activeIntervalTimers[taskId]);
-            delete activeIntervalTimers[taskId];
+        // Stop stopwatch if it was running (only if NOT in read-only mode)
+        if (!isReadOnly) {
+          const timerKey = `timer_start_${taskId}`;
+          if (localStorage.getItem(timerKey)) {
+            const startTime = parseInt(localStorage.getItem(timerKey));
+            localStorage.removeItem(timerKey);
+            localStorage.removeItem(`warned_8h_${taskId}`);
+            localStorage.removeItem(`authorized_12h_${taskId}`);
+            if (activeIntervalTimers[taskId]) {
+              clearInterval(activeIntervalTimers[taskId]);
+              delete activeIntervalTimers[taskId];
+            }
+            const elapsedMs = Date.now() - startTime;
+            const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
+            const hoursInput = cardElement.querySelector('.task-hours');
+            if (hoursInput) {
+              const currentHours = parseFloat(String(hoursInput.value).replace(',', '.')) || 0;
+              const currentMinutes = hmmToMinutes(currentHours);
+              const totalHours = minutesToHmm(currentMinutes + elapsedMinutes);
+              hoursInput.value = totalHours.toFixed(2);
+              updateHoursReadable(hoursInput);
+              showToast(`Cronómetro detenido por finalización. Se sumaron: +${formatDecimalHours(minutesToHmm(elapsedMinutes))}`, "info");
+            }
+            const display = cardElement.querySelector(`#timer-display-${taskId}`);
+            if (display) display.textContent = '00:00:00';
+            timerBtn.classList.remove('running');
+            timerBtn.querySelector('.material-icons').textContent = 'play_arrow';
+            timerBtn.querySelector('.btn-text').textContent = 'Iniciar';
           }
-          const elapsedMs = Date.now() - startTime;
-          const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
-          const hoursInput = cardElement.querySelector('.task-hours');
-          if (hoursInput) {
-            const currentHours = parseFloat(String(hoursInput.value).replace(',', '.')) || 0;
-            const currentMinutes = hmmToMinutes(currentHours);
-            const totalHours = minutesToHmm(currentMinutes + elapsedMinutes);
-            hoursInput.value = totalHours.toFixed(2);
-            updateHoursReadable(hoursInput);
-            showToast(`Cronómetro detenido por finalización. Se sumaron: +${formatDecimalHours(minutesToHmm(elapsedMinutes))}`, "info");
-          }
-          const display = cardElement.querySelector(`#timer-display-${taskId}`);
-          if (display) display.textContent = '00:00:00';
-          timerBtn.classList.remove('running');
-          timerBtn.querySelector('.material-icons').textContent = 'play_arrow';
-          timerBtn.querySelector('.btn-text').textContent = 'Iniciar';
         }
       } else {
-        timerBtn.disabled = false;
+        timerBtn.disabled = isReadOnly;
       }
     };
     statusSelect.addEventListener('change', handleStatusChange);
@@ -1411,6 +1459,7 @@ async function submitWorkOrder() {
     // Collect timer state
     const timerKey = `timer_start_${card.id}`;
     const timerStartVal = localStorage.getItem(timerKey) ? parseInt(localStorage.getItem(timerKey)) : null;
+    const timerHistoryVal = JSON.parse(card.dataset.timerHistory || '[]');
  
     tasks.push({
       id: taskId,
@@ -1419,7 +1468,9 @@ async function submitWorkOrder() {
       horasEstimadas: hours,
       status: status,
       descripcion: desc,
-      timerStart: timerStartVal
+      timerStart: timerStartVal,
+      timerStarted: card.dataset.timerStarted === 'true',
+      timerHistory: timerHistoryVal
     });
   });
  
@@ -1775,6 +1826,19 @@ async function toggleTaskTimer(taskId) {
       }
     }
 
+    // Clear initial estimate hours on first start of timer
+    if (card && card.dataset.timerStarted !== 'true') {
+      const hoursInput = card.querySelector('.task-hours');
+      if (hoursInput) {
+        hoursInput.value = '0.00';
+        updateHoursReadable(hoursInput);
+      }
+      card.dataset.timerStarted = 'true';
+      addTaskTimerEvent(card, 'Inició');
+    } else if (card) {
+      addTaskTimerEvent(card, 'Reanudó');
+    }
+
     const startTime = Date.now();
     localStorage.setItem(timerKey, startTime);
     startTimerInterval(taskId, startTime);
@@ -1806,6 +1870,7 @@ async function toggleTaskTimer(taskId) {
     const card = document.getElementById(taskId) || btn.closest('.task-item-card');
     let totalHours = addedHoursHmm;
     if (card) {
+      addTaskTimerEvent(card, 'Pausó');
       const hoursInput = card.querySelector('.task-hours');
       if (hoursInput) {
         const currentHours = parseFloat(String(hoursInput.value).replace(',', '.')) || 0;
@@ -2109,7 +2174,8 @@ function renderDashboard() {
             horasEstimadas: parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0,
             descripcion: task.descripcion || '(Sin descripción)',
             timerStart: task.timerStart,
-            isTimerRunning: isTimerRunning
+            isTimerRunning: isTimerRunning,
+            timerHistory: task.timerHistory || []
           };
 
           if (isTimerRunning) {
@@ -2149,6 +2215,9 @@ function renderDashboard() {
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
             <div class="dashboard-card-subtitle">Interno ${t.interno}</div>
             <div class="dashboard-card-desc">${t.descripcion}</div>
+            <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
+              ${renderTimerHistoryHtml(t.timerHistory)}
+            </div>
             <div class="dashboard-card-timer" id="dash-timer-${t.taskId}">${displayTime}</div>
             <div class="dashboard-card-actions">
               <button type="button" class="btn btn-warning btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')">
@@ -2180,6 +2249,9 @@ function renderDashboard() {
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
             <div class="dashboard-card-subtitle">Interno ${t.interno}</div>
             <div class="dashboard-card-desc">${t.descripcion}</div>
+            <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
+              ${renderTimerHistoryHtml(t.timerHistory)}
+            </div>
             <div class="dashboard-card-timer">${t.horasEstimadas.toFixed(2)} hrs</div>
             <div class="dashboard-card-actions">
               <button type="button" class="btn btn-primary btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
@@ -2290,6 +2362,15 @@ function startDashboardTimerUpdate(taskId, startTime) {
   activeDashboardIntervals[taskId] = setInterval(update, 1000);
 }
 
+function addTimerEventToTask(task, type) {
+  if (!task.timerHistory) {
+    task.timerHistory = [];
+  }
+  const now = new Date();
+  const formatted = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  task.timerHistory.push({ type, formatted, timestamp: Date.now() });
+}
+
 async function toggleDashboardTaskTimer(orderId, taskId) {
   const order = activeOrders.find(o => o.id === orderId);
   if (!order) return;
@@ -2319,6 +2400,14 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
       }
     }
 
+    if (!task.timerStarted) {
+      task.horasEstimadas = 0;
+      task.timerStarted = true;
+      addTimerEventToTask(task, 'Inició');
+    } else {
+      addTimerEventToTask(task, 'Reanudó');
+    }
+
     task.timerStart = Date.now();
     localStorage.setItem(`timer_start_${taskId}`, task.timerStart);
     showToast("Cronómetro iniciado", "info");
@@ -2332,6 +2421,7 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
     
     task.horasEstimadas = minutesToHmm(currentMinutes + elapsedMinutes);
     task.timerStart = null;
+    addTimerEventToTask(task, 'Pausó');
     localStorage.removeItem(`timer_start_${taskId}`);
     localStorage.removeItem(`warned_8h_${taskId}`);
     localStorage.removeItem(`authorized_12h_${taskId}`);
@@ -2399,6 +2489,7 @@ async function markDashboardTaskFinished(orderId, taskId) {
     localStorage.removeItem(`authorized_12h_${taskId}`);
   }
 
+  addTimerEventToTask(task, 'Fin');
   task.status = "Finalizada";
 
   // Kill the dashboard interval for this task immediately
@@ -3765,11 +3856,20 @@ async function deleteSelectedHistoryOrders() {
 let currentAlertTaskId = null;
 
 function getTodayDateString() {
-  const today = new Date();
-  const yyyy = today.getFullYear();
-  const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const dd = String(today.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  try {
+    const options = { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' };
+    const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(new Date());
+    const year = parts.find(p => p.type === 'year').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const day = parts.find(p => p.type === 'day').value;
+    return `${year}-${month}-${day}`;
+  } catch (e) {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
 }
 
 function findOrderAndTaskByTaskId(taskId) {
@@ -3861,7 +3961,10 @@ function isSameEmployee(val1, val2) {
 const isToday = (dateStr) => {
   if (!dateStr) return false;
   try {
-    return new Date(dateStr).toLocaleDateString() === new Date().toLocaleDateString();
+    const options = { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: 'numeric', day: 'numeric' };
+    const orderDate = new Date(dateStr).toLocaleDateString('en-CA', options);
+    const currentDate = new Date().toLocaleDateString('en-CA', options);
+    return orderDate === currentDate;
   } catch (e) {
     return false;
   }

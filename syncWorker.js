@@ -155,28 +155,58 @@ async function fillSearchableSelect(page, labelText, searchValue) {
 
     // Generate list of queries to try in sequence
     const queriesToTry = [];
-    
-    // If it contains "Interno X", we try to search by the interno number FIRST as it is highly precise!
-    const internoMatch = searchValue.match(/Interno\s+(\d+)/i);
-    if (internoMatch) {
-      queriesToTry.push(internoMatch[1]); // Try "4" first
-      queriesToTry.push(`Interno ${internoMatch[1]}`); // Try "Interno 4" second
+    let rodadoInfo = null;
+
+    if (labelText.toLowerCase().includes('rodado')) {
+      try {
+        const catalogs = db.getCatalogs();
+        const rodados = catalogs.rodados || [];
+        const matching = rodados.find(r => r.label === searchValue || r.value === searchValue || (r.interno && searchValue.includes(`Interno ${r.interno}`)));
+        if (matching) {
+          rodadoInfo = {
+            patente: matching.patente || '',
+            interno: matching.interno || '',
+            modelo: matching.modelo || ''
+          };
+          if (rodadoInfo.patente) {
+            queriesToTry.push(rodadoInfo.patente.trim());
+          }
+          if (rodadoInfo.interno) {
+            queriesToTry.push(rodadoInfo.interno.trim());
+            queriesToTry.push(`Interno ${rodadoInfo.interno.trim()}`);
+          }
+          if (rodadoInfo.modelo) {
+            queriesToTry.push(rodadoInfo.modelo.trim());
+          }
+        }
+      } catch (catErr) {
+        console.error("Error retrieving matching rodado from local catalogs:", catErr);
+      }
     }
 
-    queriesToTry.push(searchValue);
-    if (searchValue.includes(' - ')) {
-      const parts = searchValue.split(' - ');
-      const brand = parts[0].trim();
-      const rest = parts[1].split('.')[0].trim(); // e.g. "F100" or "SAVEIRO 1.6L"
-      queriesToTry.push(`${brand} ${rest}`);
-      queriesToTry.push(rest);
-      queriesToTry.push(brand);
-    }
-    if (searchValue.includes(' ')) {
-      const words = searchValue.split(/\s+/);
-      queriesToTry.push(words[0]); // Last name (e.g. "BELOCURES")
-      if (words[1]) {
-        queriesToTry.push(words[1]); // First name (e.g. "CESAR")
+    if (queriesToTry.length === 0) {
+      // If it contains "Interno X", we try to search by the interno number FIRST as it is highly precise!
+      const internoMatch = searchValue.match(/Interno\s+(\d+)/i);
+      if (internoMatch) {
+        queriesToTry.push(internoMatch[1]); // Try "4" first
+        queriesToTry.push(`Interno ${internoMatch[1]}`); // Try "Interno 4" second
+      }
+
+      queriesToTry.push(searchValue);
+      if (searchValue.includes(' - ')) {
+        const parts = searchValue.split(' - ');
+        const brand = parts[0].trim();
+        const rest = parts[1].split('.')[0].trim(); // e.g. "F100" or "SAVEIRO 1.6L"
+        queriesToTry.push(`${brand} ${rest}`);
+        queriesToTry.push(rest);
+        queriesToTry.push(brand);
+      }
+      if (searchValue.includes(' ')) {
+        const words = searchValue.split(/\s+/);
+        queriesToTry.push(words[0]); // Last name (e.g. "BELOCURES")
+        if (words[1]) {
+          queriesToTry.push(words[1]); // First name (e.g. "CESAR")
+        }
       }
     }
 
@@ -209,7 +239,7 @@ async function fillSearchableSelect(page, labelText, searchValue) {
       await delay(2000); // Wait for dropdown to appear and filter
 
       // Click the first visible option in the dropdown that matches
-      const optionClicked = await page.evaluate((targetVal) => {
+      const optionClicked = await page.evaluate((targetVal, rodadoInfo) => {
         // Find visible options inside portal dropdown containers (ID starts with "searchable-select-dropdown-")
         const dropdownContainers = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"]'));
         
@@ -243,13 +273,33 @@ async function fillSearchableSelect(page, labelText, searchValue) {
 
         if (filteredOptions.length === 0) return { success: false };
 
-        // 1. Try exact or full match containing targetVal
-        let matched = filteredOptions.find(el => {
-          const textClean = clean(el.textContent);
-          return textClean.includes(targetClean) || targetClean.includes(textClean);
-        });
+        let matched = null;
 
-        // 2. Try partial match: if targetVal contains brand and interno, check both
+        // A. Match by patent (highest priority for vehicles)
+        if (rodadoInfo && rodadoInfo.patente) {
+          const cleanPatent = clean(rodadoInfo.patente);
+          if (cleanPatent) {
+            matched = filteredOptions.find(el => clean(el.textContent).includes(cleanPatent));
+          }
+        }
+
+        // B. Match by interno
+        if (!matched && rodadoInfo && rodadoInfo.interno) {
+          const cleanInterno = clean(rodadoInfo.interno);
+          if (cleanInterno) {
+            matched = filteredOptions.find(el => clean(el.textContent).includes(cleanInterno));
+          }
+        }
+
+        // C. Try exact or full match containing targetVal
+        if (!matched) {
+          matched = filteredOptions.find(el => {
+            const textClean = clean(el.textContent);
+            return textClean.includes(targetClean) || targetClean.includes(textClean);
+          });
+        }
+
+        // D. Try partial match: if targetVal contains brand and interno, check both
         if (!matched && targetVal.includes(' - ')) {
           const parts = targetVal.split(' - ');
           const brand = clean(parts[0]);
@@ -264,7 +314,7 @@ async function fillSearchableSelect(page, labelText, searchValue) {
           });
         }
 
-        // 3. Fallback: click the very first visible option in the dropdown
+        // E. Fallback: click the very first visible option in the dropdown
         if (!matched && filteredOptions.length > 0) {
           matched = filteredOptions[0];
         }
@@ -275,7 +325,7 @@ async function fillSearchableSelect(page, labelText, searchValue) {
         }
 
         return { success: false };
-      }, searchValue);
+      }, searchValue, rodadoInfo);
 
       if (optionClicked.success) {
         console.log(`   ✓ Selected option for "${labelText}": "${optionClicked.text}"`);

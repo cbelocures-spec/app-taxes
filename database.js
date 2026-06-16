@@ -212,7 +212,9 @@ class LocalDB {
       horasEstimadas: parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0,
       descripcion: t.descripcion || "",
       status: t.status || "Pendiente", // Pendiente, Finalizada
-      timerStart: t.timerStart || null
+      timerStart: t.timerStart || null,
+      timerStarted: t.timerStarted === true || t.timerStarted === 'true',
+      timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : []
     }));
 
     // If any task is "Pendiente" or there are no tasks, keep it "local" (do not sync yet)
