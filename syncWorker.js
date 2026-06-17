@@ -1110,7 +1110,18 @@ async function syncWorkOrder(orderId) {
     // 2. NAVIGATE TO NEW WORK ORDER FORM
     console.log("Navigating directly to Ordenes de Trabajo list page...");
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
-    await delay(3000);
+    
+    // Wait for the portal page catalogs/dropdowns to load completely
+    console.log("Waiting for filter selects to load on list page...");
+    await page.waitForSelector('select', { timeout: 10000 }).catch(() => {});
+    
+    console.log("Waiting for catalog select options to populate on list page...");
+    await page.waitForFunction(() => {
+      const selects = Array.from(document.querySelectorAll('select'));
+      return selects.some(s => s.options.length > 50);
+    }, { timeout: 15000 }).catch(e => console.log("Timeout waiting for select options on list page: " + e.message));
+    
+    await delay(1000); // Small extra buffer to be absolutely sure Vue is ready
 
     console.log("Clicking NUEVO button to open create form modal...");
     const nuevoClicked = await page.evaluate(() => {
