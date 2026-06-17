@@ -3727,6 +3727,19 @@ async function confirmVoiceOrder() {
 }
 
 // --- AUTHENTICATION & MULTIUSER SESSION FUNCTIONS ---
+function togglePasswordVisibility(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const toggleIcon = input.nextElementSibling;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (toggleIcon) toggleIcon.textContent = 'visibility';
+  } else {
+    input.type = 'password';
+    if (toggleIcon) toggleIcon.textContent = 'visibility_off';
+  }
+}
+
 function checkUserSession() {
   const username = localStorage.getItem('currentUserUsername');
   const loginOverlay = document.getElementById('login-overlay');
