@@ -9,3 +9,4 @@ sync_test.js
 verify_ot.js
 run_catalog_sync_now.js
 db.json
+*.zip
