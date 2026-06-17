@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 
@@ -261,9 +261,9 @@
         </div>
         <div class="form-group">
           <label for="set-password">Contraseña de Taxes</label>
-          <div class="password-wrapper" style="position: relative; display: flex; align-items: center; width: 100%;">
+          <div class="password-wrapper">
             <input type="password" id="set-password" placeholder="••••••••••••" required style="padding-right: 40px; margin-bottom: 0;">
-            <span class="material-icons password-toggle" onclick="togglePasswordVisibility('set-password')" style="position: absolute; right: 12px; cursor: pointer; color: var(--text-muted); user-select: none;">visibility_off</span>
+            <span class="material-icons password-toggle" onclick="togglePasswordVisibility('set-password')">visibility_off</span>
           </div>
         </div>
         <div class="form-group">
@@ -707,9 +707,9 @@
         </div>
         <div class="form-group">
           <label for="login-password">Contraseña de Taxes</label>
-          <div class="password-wrapper" style="position: relative; display: flex; align-items: center; width: 100%;">
+          <div class="password-wrapper">
             <input type="password" id="login-password" placeholder="••••••••••••" required autocomplete="current-password" style="padding-right: 40px; margin-bottom: 0;">
-            <span class="material-icons password-toggle" onclick="togglePasswordVisibility('login-password')" style="position: absolute; right: 12px; cursor: pointer; color: var(--text-muted); user-select: none;">visibility_off</span>
+            <span class="material-icons password-toggle" onclick="togglePasswordVisibility('login-password')">visibility_off</span>
           </div>
         </div>
         <button type="submit" id="login-submit-btn" class="btn btn-primary btn-block" style="margin-top: 24px; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -752,6 +752,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>

@@ -2307,4 +2307,24 @@ body {
   display: flex !important;
 }
 
+/* Password Visibility Toggle Styles */
+.password-wrapper {
+  position: relative;
+  width: 100%;
+  display: block;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  user-select: none;
+  z-index: 10;
+  font-size: 22px;
+}
+
 
