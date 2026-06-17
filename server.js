@@ -41,9 +41,11 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 app.use(cors());
 app.use(express.json());
 
-// Disable caching for API endpoints, JS and CSS files so browsers always load the latest version/data
+// Disable caching for API, JS, CSS, and HTML files (including /) so browsers always load the latest version/data
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api') || req.path.endsWith('.js') || req.path.endsWith('.css')) {
+  const isApi = req.path.startsWith('/api');
+  const isWebAsset = req.path.endsWith('.js') || req.path.endsWith('.css') || req.path.endsWith('.html') || req.path === '/';
+  if (isApi || isWebAsset) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
