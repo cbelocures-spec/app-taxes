@@ -738,7 +738,8 @@ async function scrapeCatalogs(triggerUsername = null) {
     browser = await puppeteer.launch({
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process', '--no-first-run', '--no-zygote'],
+      protocolTimeout: 120000
     });
 
     const page = await browser.newPage();
@@ -828,6 +829,38 @@ async function scrapeCatalogs(triggerUsername = null) {
       return match ? match[0] : 'Total not found';
     });
     console.log("Fleet page reports:", totalText);
+
+    // Attempt to set DataTable page length to maximum to reduce pagination overhead
+    console.log("Attempting to set DataTable page length to maximum...");
+    const lengthResult = await page.evaluate(() => {
+      const select = document.querySelector('select[name$="_length"], select[class*="length"], .dataTables_length select');
+      if (select) {
+        let bestOpt = null;
+        let maxVal = -1;
+        for (const opt of Array.from(select.options)) {
+          if (opt.value === '-1' || opt.text.toLowerCase().includes('todos')) {
+            bestOpt = opt;
+            break;
+          }
+          const val = parseInt(opt.value, 10);
+          if (val > maxVal) {
+            maxVal = val;
+            bestOpt = opt;
+          }
+        }
+        if (bestOpt) {
+          select.value = bestOpt.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          return { found: true, value: bestOpt.value, text: bestOpt.text };
+        }
+      }
+      return { found: false };
+    }).catch(() => ({ found: false }));
+    console.log("DataTable length adjustment result:", JSON.stringify(lengthResult));
+    
+    if (lengthResult.found) {
+      await delay(3000); // Allow DataTable to redraw
+    }
 
     // Scrape all vehicles from the Flota table using pagination
     console.log("Scraping all vehicles from fleet table...");
@@ -1094,7 +1127,8 @@ async function syncWorkOrder(orderId) {
     browser = await puppeteer.launch({
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process', '--no-first-run', '--no-zygote'],
+      protocolTimeout: 120000
     });
 
     const page = await browser.newPage();
