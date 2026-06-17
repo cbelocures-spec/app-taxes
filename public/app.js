@@ -169,9 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const timerKey = `timer_start_${taskId}`;
           const isRunning = localStorage.getItem(timerKey) !== null;
           if (isRunning) {
-            localStorage.removeItem(timerKey);
-            localStorage.removeItem(`warned_8h_${taskId}`);
-            localStorage.removeItem(`authorized_12h_${taskId}`);
+            clearLocalStorageTimerKeys(taskId);
             if (activeIntervalTimers[taskId]) {
               clearInterval(activeIntervalTimers[taskId]);
               delete activeIntervalTimers[taskId];
@@ -1124,29 +1122,37 @@ function addTaskField(taskData = null) {
   // Convert employee select to searchable select
   convertSelectToSearchable(empSelect);
 
-  // Auto-resume timer if running in database taskData
-  if (taskData && taskData.timerStart) {
+  const statusSelect = cardElement.querySelector('.task-status');
+  const timerBtn = cardElement.querySelector('.btn-timer-toggle');
+  const isFinished = (taskData && taskData.status === 'Finalizada') || (statusSelect && statusSelect.value === 'Finalizada');
+
+  // Auto-resume timer if running in database taskData (and task is not finished)
+  if (taskData && taskData.timerStart && !isFinished) {
     localStorage.setItem(`timer_start_${taskId}`, taskData.timerStart);
   }
 
-  // Auto-resume timer if it is running in localStorage!
+  // Auto-resume timer if it is running in localStorage (and task is not finished)
   const timerKey = `timer_start_${taskId}`;
-  const runningStartTime = localStorage.getItem(timerKey);
-  if (runningStartTime) {
-    const startTime = parseInt(runningStartTime);
-    startTimerInterval(taskId, startTime);
+  if (isFinished) {
+    clearLocalStorageTimerKeys(taskId);
+    if (activeIntervalTimers[taskId]) {
+      clearInterval(activeIntervalTimers[taskId]);
+      delete activeIntervalTimers[taskId];
+    }
+  } else {
+    const runningStartTime = localStorage.getItem(timerKey);
+    if (runningStartTime) {
+      const startTime = parseInt(runningStartTime);
+      startTimerInterval(taskId, startTime);
 
-    // Update Button UI immediately to show running state
-    const btn = cardElement.querySelector('.btn-timer-toggle');
-    if (btn) {
-      btn.classList.add('running');
-      btn.querySelector('.material-icons').textContent = 'stop';
-      btn.querySelector('.btn-text').textContent = 'Detener';
+      // Update Button UI immediately to show running state
+      if (timerBtn) {
+        timerBtn.classList.add('running');
+        timerBtn.querySelector('.material-icons').textContent = 'stop';
+        timerBtn.querySelector('.btn-text').textContent = 'Detener';
+      }
     }
   }
-
-  const statusSelect = cardElement.querySelector('.task-status');
-  const timerBtn = cardElement.querySelector('.btn-timer-toggle');
   
   if (statusSelect && timerBtn) {
     const handleStatusChange = () => {
@@ -1173,7 +1179,7 @@ function removeTaskField(cardId) {
     card.remove();
     
     // Clean up timers from localStorage and interval registry
-    localStorage.removeItem(`timer_start_${cardId}`);
+    clearLocalStorageTimerKeys(cardId);
     if (activeIntervalTimers[cardId]) {
       clearInterval(activeIntervalTimers[cardId]);
       delete activeIntervalTimers[cardId];
@@ -1566,9 +1572,7 @@ async function submitWorkOrder() {
     // Clean up task timers from localStorage for finished tasks
     taskCards.forEach(card => {
       if (card.querySelector('.task-status').value === 'Finalizada') {
-        localStorage.removeItem(`timer_start_${card.id}`);
-        localStorage.removeItem(`warned_8h_${card.id}`);
-        localStorage.removeItem(`authorized_12h_${card.id}`);
+        clearLocalStorageTimerKeys(card.id);
         if (activeIntervalTimers[card.id]) {
           clearInterval(activeIntervalTimers[card.id]);
           delete activeIntervalTimers[card.id];
@@ -1704,7 +1708,7 @@ async function resolveDatabaseConflicts() {
         const newHours = minutesToHmm(currentMinutes + elapsedMinutes);
 
         // Clean up local storage and update database task
-        localStorage.removeItem(`timer_start_${task.id}`);
+        clearLocalStorageTimerKeys(task.id);
 
         task.timerStart = null;
         task.horasEstimadas = newHours;
@@ -1913,9 +1917,7 @@ async function toggleTaskTimer(taskId) {
   } else {
     // Stop stopwatch
     const startTime = parseInt(localStorage.getItem(timerKey));
-    localStorage.removeItem(timerKey);
-    localStorage.removeItem(`warned_8h_${taskId}`);
-    localStorage.removeItem(`authorized_12h_${taskId}`);
+    clearLocalStorageTimerKeys(taskId);
 
     // Clear interval
     if (activeIntervalTimers[taskId]) {
@@ -2001,6 +2003,21 @@ function updateHoursReadable(inputEl) {
   if (!readableEl) return;
   const val = parseFloat(String(inputEl.value).replace(',', '.')) || 0;
   readableEl.textContent = val > 0 ? formatDecimalHours(val) : '';
+}
+
+function clearLocalStorageTimerKeys(taskId) {
+  localStorage.removeItem(`timer_start_${taskId}`);
+  localStorage.removeItem(`warned_8h_${taskId}`);
+  localStorage.removeItem(`authorized_12h_${taskId}`);
+
+  const taskKeyPattern = `_${taskId}_`;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (key.includes(taskKeyPattern) || key.endsWith(`_${taskId}`))) {
+      localStorage.removeItem(key);
+      i--;
+    }
+  }
 }
 
 function startTimerInterval(taskId, startTime) {
@@ -2548,9 +2565,7 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
     const totalMinutes = Math.round(calculateTotalElapsedSeconds(task.timerHistory, null) / 60);
     task.horasEstimadas = minutesToHmm(totalMinutes);
 
-    localStorage.removeItem(`timer_start_${taskId}`);
-    localStorage.removeItem(`warned_8h_${taskId}`);
-    localStorage.removeItem(`authorized_12h_${taskId}`);
+    clearLocalStorageTimerKeys(taskId);
 
     // Kill the dashboard interval for this task immediately
     if (activeDashboardIntervals[taskId]) {
@@ -2610,12 +2625,8 @@ async function markDashboardTaskFinished(orderId, taskId) {
     task.descripcion = (task.descripcion || '').trim() + prefix + 'Diagnóstico: ' + diagnosis;
   }
 
-  if (task.timerStart !== null && task.timerStart > 0) {
-    task.timerStart = null;
-    localStorage.removeItem(`timer_start_${taskId}`);
-    localStorage.removeItem(`warned_8h_${taskId}`);
-    localStorage.removeItem(`authorized_12h_${taskId}`);
-  }
+  task.timerStart = null;
+  clearLocalStorageTimerKeys(taskId);
 
   addTimerEventToTask(task, 'Fin');
 
