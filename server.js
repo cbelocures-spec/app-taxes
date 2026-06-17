@@ -268,12 +268,19 @@ app.get('/api/settings', (req, res) => {
       )
     );
 
+    let catalogStatus = settings.catalogSyncStatus || "idle";
+    if (catalogStatus === "syncing" && !worker.isScraping) {
+      console.log("[Settings] Auto-correcting stuck catalogSyncStatus from 'syncing' to 'idle' because worker is not scraping.");
+      catalogStatus = "idle";
+      db.saveSettings({ catalogSyncStatus: "idle", catalogSyncError: null });
+    }
+
     const responseSettings = {
       username: displayUsername,
       password: displayPassword,
       portalUrl: settings.portalUrl || "https://taxes.com.ar",
       googleScriptUrl: settings.googleScriptUrl || "",
-      catalogSyncStatus: settings.catalogSyncStatus || "idle",
+      catalogSyncStatus: catalogStatus,
       catalogSyncError: settings.catalogSyncError || null,
       isSupervisor: !!isMainSupervisor
     };

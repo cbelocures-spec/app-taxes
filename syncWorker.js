@@ -1558,6 +1558,30 @@ async function startWorker() {
   // Pre-populate mock catalogs on startup
   initMockCatalogs();
 
+  // Reset catalogSyncStatus if stuck in 'syncing' on startup (e.g. due to server crash/restart)
+  try {
+    const currentSettings = db.getSettings();
+    if (currentSettings.catalogSyncStatus === 'syncing') {
+      console.log("Resetting stuck catalog sync status from 'syncing' to 'idle' on worker startup.");
+      db.saveSettings({ catalogSyncStatus: 'idle', catalogSyncError: null });
+    }
+  } catch (err) {
+    console.error("Error resetting stuck catalog sync status on startup:", err);
+  }
+
+  // Reset any orders stuck in 'syncing' back to 'pending' on startup
+  try {
+    const orders = db.getWorkOrders();
+    for (const o of orders) {
+      if (o.syncStatus === 'syncing') {
+        console.log(`Resetting stuck sync status for order ID: ${o.id} to 'pending' on worker startup.`);
+        db.updateWorkOrder(o.id, { syncStatus: 'pending', syncError: 'Sincronización interrumpida por reinicio del servidor.' });
+      }
+    }
+  } catch (err) {
+    console.error("Error resetting stuck orders on startup:", err);
+  }
+
   while (isWorkerRunning) {
     try {
       const orders = db.getWorkOrders();
