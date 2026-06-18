@@ -198,13 +198,39 @@ document.addEventListener('DOMContentLoaded', () => {
             updateHoursReadable(hoursInput);
           }
 
-          promptDiagnosis().then(diagnosis => {
+          const rodadoEl = document.getElementById('form-rodado');
+          const rodadoVal = rodadoEl ? rodadoEl.options[rodadoEl.selectedIndex]?.text : '';
+          const internoEl = document.getElementById('form-interno');
+          const internoVal = internoEl ? internoEl.value : '';
+
+          const empSelect = card.querySelector('.task-emp');
+          const empVal = empSelect ? empSelect.value : '';
+          const empOpt = cachedCatalogs.empleados.find(emp => emp.value === empVal);
+          const empName = empOpt ? empOpt.label : '';
+
+          const ccSelect = card.querySelector('.task-cc');
+          const ccVal = ccSelect ? ccSelect.value : '';
+          const ccOpt = cachedCatalogs.centrosCosto.find(cc => cc.value === ccVal);
+          const ccName = ccOpt ? ccOpt.label : '';
+
+          const descTextarea = card.querySelector('.task-desc');
+          const descVal = descTextarea ? descTextarea.value : '';
+
+          const taskInfo = {
+            interno: internoVal,
+            rodado: rodadoVal,
+            empleado: empName,
+            centroCosto: ccName,
+            descripcion: descVal
+          };
+
+          promptDiagnosis(taskInfo).then(diagnosis => {
             if (diagnosis) {
-              const descTextarea = card.querySelector('.task-desc');
-              if (descTextarea) {
-                const prefix = descTextarea.value.trim() ? ' - ' : '';
-                descTextarea.value = descTextarea.value.trim() + prefix + 'Diagnóstico: ' + diagnosis;
-                descTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+              const textareaEl = card.querySelector('.task-desc');
+              if (textareaEl) {
+                const prefix = textareaEl.value.trim() ? ' - ' : '';
+                textareaEl.value = textareaEl.value.trim() + prefix + 'Diagnóstico: ' + diagnosis;
+                textareaEl.dispatchEvent(new Event('input', { bubbles: true }));
               }
             }
           });
@@ -302,7 +328,7 @@ function closePreOrderModal() {
   document.getElementById('pre-order-modal').classList.remove('open');
 }
 
-function promptDiagnosis() {
+function promptDiagnosis(taskInfo = null) {
   return new Promise((resolve) => {
     const modal = document.getElementById('diagnosis-modal');
     const textarea = document.getElementById('diagnosis-text');
@@ -312,6 +338,21 @@ function promptDiagnosis() {
     if (!modal || !textarea) {
       resolve(null);
       return;
+    }
+
+    const summaryEl = document.getElementById('diagnosis-task-summary');
+    if (summaryEl) {
+      if (taskInfo) {
+        let html = '';
+        if (taskInfo.interno) html += `<div><strong>Interno:</strong> ${taskInfo.interno} ${taskInfo.rodado ? `(${taskInfo.rodado})` : ''}</div>`;
+        if (taskInfo.empleado) html += `<div><strong>Operario:</strong> ${taskInfo.empleado}</div>`;
+        if (taskInfo.centroCosto) html += `<div><strong>Centro de Costo:</strong> ${taskInfo.centroCosto}</div>`;
+        if (taskInfo.descripcion) html += `<div style="margin-top: 4px; border-top: 1px solid #cbd5e1; padding-top: 4px; color: #334155;"><strong>Tarea:</strong> ${taskInfo.descripcion}</div>`;
+        summaryEl.innerHTML = html;
+        summaryEl.style.display = 'block';
+      } else {
+        summaryEl.style.display = 'none';
+      }
     }
 
     textarea.value = '';
@@ -2618,8 +2659,22 @@ async function markDashboardTaskFinished(orderId, taskId) {
   const task = order.tasks.find(t => t.id === taskId);
   if (!task) return;
 
+  const empOpt = cachedCatalogs.empleados.find(e => e.value === task.empleado);
+  const empName = empOpt ? empOpt.label : task.empleado || '';
+
+  const ccOpt = cachedCatalogs.centrosCosto.find(c => c.value === task.centroCosto);
+  const ccName = ccOpt ? ccOpt.label : task.centroCosto || '';
+
+  const taskInfo = {
+    interno: order.interno,
+    rodado: order.rodado,
+    empleado: empName,
+    centroCosto: ccName,
+    descripcion: task.descripcion
+  };
+
   // Prompt for optional diagnosis
-  const diagnosis = await promptDiagnosis();
+  const diagnosis = await promptDiagnosis(taskInfo);
   if (diagnosis) {
     const prefix = task.descripcion ? ' - ' : '';
     task.descripcion = (task.descripcion || '').trim() + prefix + 'Diagnóstico: ' + diagnosis;
