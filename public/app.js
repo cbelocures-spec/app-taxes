@@ -1385,6 +1385,9 @@ function updateStats() {
 }
 
 function createOrderCardHtml(order) {
+  const allCompleted = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t.status === "Finalizada");
+  const hasPendingTasks = !allCompleted;
+
   let statusBadge = '';
   if (order.syncStatus === 'pending') {
     statusBadge = `<span class="badge-status pending"><span class="material-icons">hourglass_empty</span> Pendiente</span>`;
@@ -1395,7 +1398,6 @@ function createOrderCardHtml(order) {
   } else if (order.syncStatus === 'error') {
     statusBadge = `<span class="badge-status error" onclick="openErrorModal(\`${order.syncError.replace(/"/g, '&quot;')}\`, '${order.id}')"><span class="material-icons">error</span> Error</span>`;
   } else if (order.syncStatus === 'local') {
-    const allCompleted = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t.status === "Finalizada");
     if (allCompleted) {
       statusBadge = `<span class="badge-status success" style="background-color:#d1fae5; color:#065f46; border:1px solid rgba(6,95,70,0.2);"><span class="material-icons" style="font-size:12px;">check_circle</span> Completada</span>`;
     } else {
@@ -1410,9 +1412,13 @@ function createOrderCardHtml(order) {
     <div class="order-card">
       <div class="order-card-header">
         <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; margin-right: 8px;">
-          ${(order.syncStatus === 'local' || order.syncStatus === 'error') ? `
-            <input type="checkbox" class="order-select-checkbox" data-id="${order.id}" onchange="onOrderSelectionChange(event)" ${isChecked} style="margin: 0; width: 18px; height: 18px; cursor: pointer;">
-          ` : ''}
+          ${(order.syncStatus === 'local' || order.syncStatus === 'error') ? (
+            hasPendingTasks ? `
+              <input type="checkbox" disabled title="Esta orden tiene tareas en proceso o incompletas" style="margin: 0; width: 18px; height: 18px; cursor: not-allowed; opacity: 0.5;">
+            ` : `
+              <input type="checkbox" class="order-select-checkbox" data-id="${order.id}" onchange="onOrderSelectionChange(event)" ${isChecked} style="margin: 0; width: 18px; height: 18px; cursor: pointer;">
+            `
+          ) : ''}
           <div style="min-width: 0; flex: 1;">
             <div class="order-card-title">${order.rodado}</div>
             <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion || 'Sin Clasificar'}</strong></div>
@@ -1432,11 +1438,17 @@ function createOrderCardHtml(order) {
               <span class="material-icons">edit</span>
             </button>
           ` : ''}
-          ${(order.syncStatus === 'local' || order.syncStatus === 'error') ? `
-            <button class="icon-btn success" onclick="retrySync('${order.id}')" title="Subir a Taxes">
-              <span class="material-icons">cloud_upload</span>
-            </button>
-          ` : ''}
+          ${(order.syncStatus === 'local' || order.syncStatus === 'error') ? (
+            hasPendingTasks ? `
+              <button class="icon-btn success" style="background-color: #cbd5e1; color: #64748b; cursor: not-allowed;" onclick="showToast('No se puede subir: la orden tiene tareas en proceso o incompletas.', 'warning')" title="No se puede subir: tareas en proceso o incompletas">
+                <span class="material-icons">cloud_upload</span>
+              </button>
+            ` : `
+              <button class="icon-btn success" onclick="retrySync('${order.id}')" title="Subir a Taxes">
+                <span class="material-icons">cloud_upload</span>
+              </button>
+            `
+          ) : ''}
           <button class="icon-btn danger" onclick="deleteOrder('${order.id}')" title="Eliminar Localmente">
             <span class="material-icons">delete</span>
           </button>
@@ -1447,22 +1459,30 @@ function createOrderCardHtml(order) {
 }
 
 function createQueueCardHtml(order) {
+  const allCompleted = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t.status === "Finalizada");
+  const hasPendingTasks = !allCompleted;
+
   let statusColor = 'pending';
   let desc = 'En cola de espera';
   let actionBtn = '';
 
   if (order.syncStatus === 'local') {
     statusColor = 'secondary';
-    const allCompleted = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t.status === "Finalizada");
     desc = allCompleted ? 'Lista para subir a Taxes' : 'En Taller (tareas pendientes)';
     actionBtn = `
       <div style="display:flex; gap: 8px;">
         <button class="btn btn-warning btn-sm" onclick="editOrder('${order.id}')" style="display:flex; align-items:center; gap:4px;">
           <span class="material-icons" style="font-size:16px;">edit</span> Editar
         </button>
-        <button class="btn btn-success btn-sm" onclick="retrySync('${order.id}')" style="display:flex; align-items:center; gap:4px; background-color: var(--success); color: white; border-color: var(--success);">
-          <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
-        </button>
+        ${hasPendingTasks ? `
+          <button class="btn btn-secondary btn-sm" onclick="showToast('No se puede subir: la orden tiene tareas en proceso o incompletas.', 'warning')" style="display:flex; align-items:center; gap:4px; cursor: not-allowed; opacity: 0.6;" title="Tareas en proceso o incompletas">
+            <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
+          </button>
+        ` : `
+          <button class="btn btn-success btn-sm" onclick="retrySync('${order.id}')" style="display:flex; align-items:center; gap:4px; background-color: var(--success); color: white; border-color: var(--success);">
+            <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
+          </button>
+        `}
       </div>
     `;
   } else if (order.syncStatus === 'syncing') {
@@ -1476,9 +1496,15 @@ function createQueueCardHtml(order) {
         <button class="btn btn-warning btn-sm" onclick="editOrder('${order.id}')" style="display:flex; align-items:center; gap:4px;">
           <span class="material-icons" style="font-size:16px;">edit</span> Editar
         </button>
-        <button class="btn btn-success btn-sm" onclick="retrySync('${order.id}')" style="display:flex; align-items:center; gap:4px; background-color: var(--success); color: white; border-color: var(--success);">
-          <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
-        </button>
+        ${hasPendingTasks ? `
+          <button class="btn btn-secondary btn-sm" onclick="showToast('No se puede subir: la orden tiene tareas en proceso o incompletas.', 'warning')" style="display:flex; align-items:center; gap:4px; cursor: not-allowed; opacity: 0.6;" title="Tareas en proceso o incompletas">
+            <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
+          </button>
+        ` : `
+          <button class="btn btn-success btn-sm" onclick="retrySync('${order.id}')" style="display:flex; align-items:center; gap:4px; background-color: var(--success); color: white; border-color: var(--success);">
+            <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
+          </button>
+        `}
       </div>
     `;
   }
@@ -1637,12 +1663,15 @@ async function submitWorkOrder() {
 async function retrySync(orderId) {
   try {
     const res = await fetch(`/api/orders/retry/${orderId}`, { method: 'POST' });
-    if (!res.ok) throw new Error("Failed to retry");
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || "Fallo al encolar reintento");
+    }
     
     showToast("Reintento encolado", "warning");
     fetchOrders();
   } catch (error) {
-    showToast("Error al encolar reintento", "danger");
+    showToast(error.message, "danger");
     console.error(error);
   }
 }
@@ -3954,6 +3983,8 @@ async function syncSelectedOrders() {
   showToast(`Encolando ${count} órdenes para subir a Taxes...`, "warning");
   
   let successCount = 0;
+  let skippedCount = 0;
+  let errorMsgs = [];
   const idsToSync = Array.from(selectedOrderIds);
   
   // Clear selection first
@@ -3968,17 +3999,36 @@ async function syncSelectedOrders() {
       const res = await fetch(`/api/orders/retry/${orderId}`, { method: 'POST' });
       if (res.ok) {
         successCount++;
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.error || "";
+        if (res.status === 400 && errMsg.includes("tareas en proceso")) {
+          skippedCount++;
+        } else {
+          errorMsgs.push(errMsg || `Error ${res.status}`);
+        }
       }
     } catch (e) {
       console.error(`Error syncing order ${orderId}:`, e);
+      errorMsgs.push(e.message);
     }
   }
   
   if (successCount > 0) {
-    showToast(`Se encolaron ${successCount} de ${count} órdenes correctamente.`, "success");
+    let msg = `Se encolaron ${successCount} de ${count} órdenes correctamente.`;
+    if (skippedCount > 0) {
+      msg += ` (${skippedCount} omitida${skippedCount > 1 ? 's' : ''} por tareas en proceso).`;
+    }
+    showToast(msg, "success");
     fetchOrders(); // reload
   } else {
-    showToast("Error al encolar las órdenes", "danger");
+    if (skippedCount > 0) {
+      showToast(`No se subió ninguna orden: ${skippedCount} de ${count} órdenes tienen tareas en proceso.`, "warning");
+      fetchOrders(); // reload to refresh buttons if needed
+    } else {
+      const errorDetail = errorMsgs.length > 0 ? `: ${errorMsgs.slice(0, 2).join(', ')}` : "";
+      showToast(`Error al encolar las órdenes${errorDetail}`, "danger");
+    }
   }
 }
 

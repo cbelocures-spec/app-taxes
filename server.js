@@ -227,6 +227,11 @@ app.post('/api/orders/retry/:id', async (req, res) => {
       return res.status(404).json({ error: "Orden no encontrada" });
     }
 
+    const allCompleted = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t.status === "Finalizada");
+    if (!allCompleted) {
+      return res.status(400).json({ error: "No se puede subir a Taxes: la orden tiene tareas en proceso o incompletas." });
+    }
+
     // Reset status to pending so worker picks it up immediately
     db.updateWorkOrder(order.id, { syncStatus: "pending", syncError: null });
     

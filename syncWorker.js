@@ -1095,6 +1095,15 @@ async function syncWorkOrder(orderId) {
   const order = db.getWorkOrderById(orderId);
   if (!order) return { success: false, message: "Order not found" };
 
+  const allCompleted = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t.status === "Finalizada");
+  if (!allCompleted) {
+    db.updateWorkOrder(orderId, {
+      syncStatus: "error",
+      syncError: "No se puede subir a Taxes: la orden tiene tareas en proceso o incompletas."
+    });
+    return { success: false, message: "La orden tiene tareas en proceso o incompletas" };
+  }
+
   const settings = db.getSettings();
   
   // Resolve user credentials for this order
