@@ -490,6 +490,7 @@ body {
 
 .col-6 {
   flex: 0 0 calc(50% - 6px);
+  min-width: 0; /* Prevents long text dropdowns from stretching columns */
 }
 
 /* SEARCH BAR */
@@ -881,7 +882,9 @@ body {
 .modal-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
+  max-width: 100%;
 }
 
 /* DYNAMIC TASK ITEMS IN MODAL */
