@@ -1383,7 +1383,8 @@ function createOrderCardHtml(order) {
   } else if (order.syncStatus === 'syncing') {
     statusBadge = `<span class="badge-status syncing"><span class="material-icons spinner">autorenew</span> Sincronizando</span>`;
   } else if (order.syncStatus === 'success') {
-    statusBadge = `<span class="badge-status success"><span class="material-icons">check_circle</span> Sincronizado</span>`;
+    const otText = order.taxesOrderNumber ? ` O.T.: ${order.taxesOrderNumber}` : '';
+    statusBadge = `<span class="badge-status success"><span class="material-icons">check_circle</span> Sincronizado${otText}</span>`;
   } else if (order.syncStatus === 'error') {
     statusBadge = `<span class="badge-status error" onclick="openErrorModal(\`${order.syncError.replace(/"/g, '&quot;')}\`, '${order.id}')"><span class="material-icons">error</span> Error</span>`;
   } else if (order.syncStatus === 'local') {
