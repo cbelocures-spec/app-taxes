@@ -1103,6 +1103,55 @@ async function scrapeCatalogs(triggerUsername = null) {
   }
 }
 
+// Helper to resolve employee name and handle custom fallbacks (like mapping to Vera)
+function resolveAndMapEmployee(task) {
+  const employeeCatalog = db.getCatalogs().empleados || [];
+  const employeeObj = employeeCatalog.find(e => e.value === task.empleado);
+  let employeeLabel = employeeObj ? employeeObj.label : task.empleado;
+
+  const customMechanicNames = [
+    "DOMINIC DYLAN",
+    "PEREZ FACUNDO",
+    "LOPEZ GUSTAVO",
+    "CALOMINO DARIO",
+    "MUSDALINO FRANCO",
+    "RODRIGUEZ MARCELO",
+    "GODOY DAVID"
+  ];
+
+  const customHerreriaMechanicNames = [
+    "Federico",
+    "Luciano",
+    "Digno"
+  ];
+
+  let finalDescription = task.descripcion || '';
+  const matchedCustomName = customMechanicNames.find(
+    name => name.toLowerCase() === employeeLabel.toLowerCase().trim()
+  );
+  const matchedCustomHerreriaName = customHerreriaMechanicNames.find(
+    name => name.toLowerCase() === employeeLabel.toLowerCase().trim()
+  );
+
+  if (matchedCustomName) {
+    console.log(`Mapping custom employee "${employeeLabel}" to "Vera, Domingo Sergio"`);
+    employeeLabel = "Vera, Domingo Sergio";
+    const suffix = `. Realizó: ${matchedCustomName}`;
+    if (!finalDescription.endsWith(suffix)) {
+      finalDescription = `${finalDescription}${suffix}`;
+    }
+  } else if (matchedCustomHerreriaName) {
+    console.log(`Mapping custom employee "${employeeLabel}" to "García, Yamandú Liborio"`);
+    employeeLabel = "García, Yamandú Liborio";
+    const suffix = `. Realizó: ${matchedCustomHerreriaName}`;
+    if (!finalDescription.endsWith(suffix)) {
+      finalDescription = `${finalDescription}${suffix}`;
+    }
+  }
+
+  return { employeeLabel, finalDescription };
+}
+
 // 2. SYNCHRONIZE SINGLE WORK ORDER
 async function syncWorkOrder(orderId) {
   const order = db.getWorkOrderById(orderId);
@@ -1205,9 +1254,8 @@ async function syncWorkOrder(orderId) {
           if (!ccSelected) throw new Error(`No se pudo seleccionar el Centro de Costo: "${task.centroCosto}"`);
           await delay(1000);
 
-          // Empleado
-          const employeeObj = (db.getCatalogs().empleados || []).find(e => String(e.value) === String(task.empleado));
-          const employeeLabel = employeeObj ? employeeObj.label : task.empleado;
+          // Empleado & Descripcion
+          const { employeeLabel, finalDescription } = resolveAndMapEmployee(task);
           const empFilled = await fillSearchableSelect(page, 'Empleado', employeeLabel);
           if (!empFilled) throw new Error(`No se pudo seleccionar el Empleado: "${employeeLabel}"`);
 
@@ -1234,7 +1282,7 @@ async function syncWorkOrder(orderId) {
               textarea.dispatchEvent(new Event('input', { bubbles: true }));
               textarea.dispatchEvent(new Event('change', { bubbles: true }));
             }
-          }, task.descripcion);
+          }, finalDescription);
 
           // Realizada Toggle (if Finalizada)
           if (task.status && task.status.toLowerCase() === 'finalizada') {
@@ -1620,57 +1668,8 @@ async function syncWorkOrder(orderId) {
       const task = order.tasks[i];
       console.log(`Adding Task #${i+1}: ${task.descripcion}`);
 
-      // Resolve employee name from local catalog to match dynamically on portal
-      const employeeCatalog = db.getCatalogs().empleados || [];
-      const employeeObj = employeeCatalog.find(e => e.value === task.empleado);
-      let employeeLabel = employeeObj ? employeeObj.label : task.empleado;
-      console.log(`Resolved employee ID "${task.empleado}" to label: "${employeeLabel}"`);
-
-      // Map custom mechanics to Vera, Domingo Sergio
-      const customMechanicNames = [
-        "DOMINIC DYLAN",
-        "PEREZ FACUNDO",
-        "LOPEZ GUSTAVO",
-        "CALOMINO DARIO",
-        "MUSDALINO FRANCO",
-        "RODRIGUEZ MARCELO",
-        "GODOY DAVID"
-      ];
-
-      // Map custom mechanics to García, Yamandú Liborio (for Herrería)
-      const customHerreriaMechanicNames = [
-        "Federico",
-        "Luciano",
-        "Digno"
-      ];
-      
-      let finalDescription = task.descripcion || '';
-      const matchedCustomName = customMechanicNames.find(
-        name => name.toLowerCase() === employeeLabel.toLowerCase().trim()
-      );
-      const matchedCustomHerreriaName = customHerreriaMechanicNames.find(
-        name => name.toLowerCase() === employeeLabel.toLowerCase().trim()
-      );
-      
-      if (matchedCustomName) {
-        console.log(`Mapping custom employee "${employeeLabel}" to "Vera, Domingo Sergio"`);
-        employeeLabel = "Vera, Domingo Sergio";
-        
-        // Append suffix to description if not already present
-        const suffix = `. Realizó: ${matchedCustomName}`;
-        if (!finalDescription.endsWith(suffix)) {
-          finalDescription = `${finalDescription}${suffix}`;
-        }
-      } else if (matchedCustomHerreriaName) {
-        console.log(`Mapping custom employee "${employeeLabel}" to "García, Yamandú Liborio"`);
-        employeeLabel = "García, Yamandú Liborio";
-        
-        // Append suffix to description if not already present
-        const suffix = `. Realizó: ${matchedCustomHerreriaName}`;
-        if (!finalDescription.endsWith(suffix)) {
-          finalDescription = `${finalDescription}${suffix}`;
-        }
-      }
+      // Resolve employee name and handle custom fallbacks (like mapping to Vera)
+      const { employeeLabel, finalDescription } = resolveAndMapEmployee(task);
 
       // Resolve centro costo label to match dynamically on portal
       const ccCatalog = db.getCatalogs().centrosCosto || [];
