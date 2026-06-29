@@ -354,9 +354,6 @@ function openPreOrderModal() {
   const preInternoSelect = document.getElementById('pre-form-interno');
   if (preInternoSelect) {
     preInternoSelect.value = "";
-    if (preInternoSelect.rebuildSearchable) {
-      preInternoSelect.rebuildSearchable();
-    }
   }
   document.getElementById('pre-form-clasificacion').value = "";
   document.getElementById('pre-order-modal').classList.add('open');
@@ -429,6 +426,9 @@ async function submitPreOrderCheck() {
     return;
   }
 
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const isCarmona = currentUser === 'jcarmona@contenedoreshugo.com.ar' || currentUser === 'j.carmona@contenedoreshugo.com.ar';
+
   // 1. Search for existing open order with this interno and clasificacion
   const existingOrder = activeOrders.find(o => 
     String(o.interno).trim() === String(interno) && 
@@ -436,7 +436,7 @@ async function submitPreOrderCheck() {
     o.syncStatus !== 'success'
   );
 
-  if (existingOrder) {
+  if (existingOrder && !isCarmona) {
     showToast(`Ya existe una orden en curso para el interno ${interno} (${clasificacion}). Abriendo existente...`, "warning");
     closePreOrderModal();
     editOrder(existingOrder.id);
@@ -459,16 +459,11 @@ async function submitPreOrderCheck() {
     // Auto-populate interno and clasificacion
     const internoSelect = document.getElementById('form-interno');
     if (internoSelect) {
-      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === interno);
-      if (!optionExists && interno) {
-        const newOpt = document.createElement('option');
-        newOpt.value = interno;
-        newOpt.textContent = interno;
-        internoSelect.appendChild(newOpt);
-      }
-      internoSelect.value = interno;
-      if (internoSelect.rebuildSearchable) {
-        internoSelect.rebuildSearchable();
+      const currentUser = localStorage.getItem('currentUserUsername');
+      if (currentUser === 'jcarmona@contenedoreshugo.com.ar' || currentUser === 'j.carmona@contenedoreshugo.com.ar') {
+        internoSelect.value = "";
+      } else {
+        internoSelect.value = interno;
       }
     }
     document.getElementById('form-clasificacion').value = clasificacion;
@@ -557,21 +552,7 @@ function editOrder(orderId) {
   // Populate basic inputs
   const internoSelect = document.getElementById('form-interno');
   if (internoSelect) {
-    if (order.interno) {
-      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === order.interno);
-      if (!optionExists) {
-        const newOpt = document.createElement('option');
-        newOpt.value = order.interno;
-        newOpt.textContent = order.interno;
-        internoSelect.appendChild(newOpt);
-      }
-      internoSelect.value = order.interno;
-    } else {
-      internoSelect.value = "";
-    }
-    if (internoSelect.rebuildSearchable) {
-      internoSelect.rebuildSearchable();
-    }
+    internoSelect.value = order.interno || "";
   }
   document.getElementById('form-clasificacion').value = order.clasificacion;
   document.getElementById('form-incidente').value = order.incidente;
@@ -632,21 +613,7 @@ function viewOrder(orderId) {
   // Populate basic inputs
   const internoSelect = document.getElementById('form-interno');
   if (internoSelect) {
-    if (order.interno) {
-      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === order.interno);
-      if (!optionExists) {
-        const newOpt = document.createElement('option');
-        newOpt.value = order.interno;
-        newOpt.textContent = order.interno;
-        internoSelect.appendChild(newOpt);
-      }
-      internoSelect.value = order.interno;
-    } else {
-      internoSelect.value = "";
-    }
-    if (internoSelect.rebuildSearchable) {
-      internoSelect.rebuildSearchable();
-    }
+    internoSelect.value = order.interno || "";
   }
   document.getElementById('form-clasificacion').value = order.clasificacion;
   document.getElementById('form-incidente').value = order.incidente || '';
@@ -919,14 +886,10 @@ async function fetchCatalogs() {
       return a.localeCompare(b);
     });
 
-    const internoOptions = uniqueInternos.map(int => ({ value: int, label: int }));
-    populateSelect('form-interno', internoOptions, "Seleccionar Interno...");
-    populateSelect('pre-form-interno', internoOptions, "Seleccionar Interno...");
+    populateDatalist('internos-datalist', uniqueInternos.map(int => ({ value: int, label: int })));
 
     // Convert select elements to searchable selects
     convertSelectToSearchable(document.getElementById('form-rodado'));
-    convertSelectToSearchable(document.getElementById('form-interno'));
-    convertSelectToSearchable(document.getElementById('pre-form-interno'));
 
     // Initialize Carga Masiva tasks
     const bulkContainer = document.getElementById('bulk-tasks-container');
