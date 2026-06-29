@@ -2327,4 +2327,27 @@ body {
   font-size: 22px;
 }
 
+/* Badges for selected vehicles */
+.bulk-selected-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e6fcf5;
+  color: #0ca678;
+  border: 1px solid #c3fae8;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.bulk-selected-badge:hover {
+  background-color: #ffe3e3;
+  color: #c92a2a;
+  border-color: #ffc9c9;
+}
+
 

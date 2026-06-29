@@ -279,6 +279,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Restore free mechanics visibility from localStorage
   applyFreeMechanicsVisibility();
+
+  // Search input listeners for Carga Masiva auto-checking on Enter or Blur
+  const bulkSearch = document.getElementById('bulk-vehicle-search');
+  if (bulkSearch) {
+    bulkSearch.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        filterBulkVehicles(true);
+      }
+    });
+    bulkSearch.addEventListener('blur', () => {
+      filterBulkVehicles(true);
+    });
+  }
 });
 
 // 1. SPA ROUTING
@@ -308,6 +322,13 @@ function switchView(viewId) {
 
   if (viewId === 'settings') {
     renderEmployeeHoursSummary();
+  }
+
+  if (viewId === 'bulk') {
+    const container = document.getElementById('bulk-tasks-container');
+    if (container && container.querySelectorAll('.bulk-task-item-card').length === 0) {
+      addBulkTaskField();
+    }
   }
 }
 
@@ -890,15 +911,11 @@ async function fetchCatalogs() {
     convertSelectToSearchable(document.getElementById('form-interno'));
     convertSelectToSearchable(document.getElementById('pre-form-interno'));
 
-    // Populate bulk form dropdowns
-    populateSelect('bulk-task-cc', data.centrosCosto, "Seleccionar Centro Costo...");
-    populateSelect('bulk-task-emp', data.empleados, "Seleccionar Empleado...");
-    
-    // Set default CC for bulk task to "15" (Mecanica) and filter employee list
-    const bulkCc = document.getElementById('bulk-task-cc');
-    if (bulkCc) {
-      bulkCc.value = "15";
-      updateBulkEmployeeDropdown();
+    // Initialize Carga Masiva tasks
+    const bulkContainer = document.getElementById('bulk-tasks-container');
+    if (bulkContainer) {
+      bulkContainer.innerHTML = '';
+      addBulkTaskField();
     }
     
     // Render the bulk vehicle selector list
@@ -2915,7 +2932,51 @@ function handleBulkItemCheckChange() {
     badge.textContent = `${selectedCount} seleccionado${selectedCount === 1 ? '' : 's'}`;
   }
 
+  // Render visual badges of selected vehicles
+  renderSelectedVehicleBadges();
+
   updateBulkSummary();
+}
+
+function renderSelectedVehicleBadges() {
+  const container = document.getElementById('bulk-selected-badges');
+  const wrapper = document.getElementById('bulk-selected-badges-container');
+  if (!container || !wrapper) return;
+
+  const checkboxes = document.querySelectorAll('#bulk-vehicle-list input[type="checkbox"]:checked');
+  if (checkboxes.length === 0) {
+    wrapper.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  wrapper.style.display = 'block';
+
+  const selectedVehicles = [];
+  checkboxes.forEach(chk => {
+    const rodado = cachedCatalogs.rodados.find(r => r.value === chk.value);
+    if (rodado) {
+      selectedVehicles.push(rodado);
+    }
+  });
+
+  // Sort selected vehicles numerically by internal number
+  selectedVehicles.sort((a, b) => {
+    const intA = parseInt(a.interno) || 0;
+    const intB = parseInt(b.interno) || 0;
+    return intA - intB;
+  });
+
+  let html = '';
+  selectedVehicles.forEach(rodado => {
+    html += `
+      <span class="bulk-selected-badge" onclick="toggleBulkItemClick('${rodado.value}')" title="Haga clic para deseleccionar">
+        ${rodado.interno || rodado.label}
+      </span>
+    `;
+  });
+
+  container.innerHTML = html;
 }
 
 function toggleAllBulkVehicles(selectAll) {
@@ -2936,14 +2997,14 @@ function toggleAllBulkVehicles(selectAll) {
   handleBulkItemCheckChange();
 }
 
-function filterBulkVehicles() {
+function filterBulkVehicles(isFinished = false) {
   const searchInput = document.getElementById('bulk-vehicle-search');
   if (!searchInput) return;
 
-  const query = searchInput.value.trim();
+  const query = searchInput.value;
   const items = document.querySelectorAll('#bulk-vehicle-list .bulk-vehicle-item');
 
-  if (!query) {
+  if (!query.trim()) {
     items.forEach(item => {
       item.style.display = 'flex';
     });
@@ -2951,9 +3012,23 @@ function filterBulkVehicles() {
   }
 
   // Split query by commas, dots, semicolons, or spaces
-  const parts = query.split(/[,\.\s;]+/).map(p => p.trim().toLowerCase()).filter(p => p.length > 0);
-  const isMultiple = parts.length > 1;
+  const rawParts = query.split(/[,\.\s;]+/);
+  const parts = rawParts.map(p => p.trim().toLowerCase()).filter(p => p.length > 0);
+  
+  // If typing and query doesn't end with a separator, slice out the last incomplete part
+  let finishedParts = [];
+  if (isFinished) {
+    finishedParts = parts;
+  } else {
+    const endsWithSeparator = /[,\.\s;]$/.test(query);
+    if (endsWithSeparator) {
+      finishedParts = parts;
+    } else {
+      finishedParts = parts.slice(0, -1);
+    }
+  }
 
+  const isMultiple = parts.length > 1;
   let checkedAny = false;
 
   items.forEach(item => {
@@ -2977,19 +3052,17 @@ function filterBulkVehicles() {
       isMatched = parts.includes(interno);
     } else {
       // Standard search for single term
-      const singlePart = parts[0];
+      const singlePart = parts[0] || '';
       isMatched = interno.includes(singlePart) || label.includes(singlePart) || patente.includes(singlePart);
     }
 
-    // Auto-check on exact internal number match
+    // Auto-check on exact internal number match for finished parts only
     if (isMatched && checkbox && !checkbox.checked) {
-      parts.forEach(part => {
-        if (interno === part) {
-          checkbox.checked = true;
-          item.classList.add('selected');
-          checkedAny = true;
-        }
-      });
+      if (finishedParts.includes(interno)) {
+        checkbox.checked = true;
+        item.classList.add('selected');
+        checkedAny = true;
+      }
     }
 
     if (isMatched) {
@@ -3072,23 +3145,98 @@ function updateBulkSummary() {
   }
 }
 
-function updateBulkEmployeeDropdown() {
-  const ccSelect = document.getElementById('bulk-task-cc');
-  const empSelect = document.getElementById('bulk-task-emp');
+let bulkTaskIndexCount = 0;
+
+function addBulkTaskField(initialData = null) {
+  const container = document.getElementById('bulk-tasks-container');
+  if (!container) return;
+
+  const taskIndex = container.querySelectorAll('.bulk-task-item-card').length;
+  const taskId = `bulk-task-card-${Date.now()}-${bulkTaskIndexCount++}`;
+
+  // Build select option strings
+  let ccOptions = `<option value="">Seleccionar Centro Costo...</option>`;
+  cachedCatalogs.centrosCosto.forEach(opt => {
+    const isSelected = initialData ? (opt.value === initialData.centroCosto) : (opt.value === "15");
+    ccOptions += `<option value="${opt.value}" ${isSelected ? "selected" : ""}>${opt.label}</option>`;
+  });
+
+  const cardHtml = `
+    <div class="bulk-task-item-card" id="${taskId}" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 12px; background: var(--card-bg); position: relative;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span style="font-weight: 600; font-size: 13px; color: var(--text-muted);">Tarea #${taskIndex + 1}</span>
+        <button type="button" class="btn btn-danger btn-xs" onclick="removeBulkTaskField('${taskId}')" style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border-radius: 50%;">
+          <span class="material-icons" style="font-size: 16px;">delete</span>
+        </button>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 8px;">
+        <label style="font-size: 12px; font-weight: 500; margin-bottom: 4px; display: block;">Centro de Costo *</label>
+        <select class="bulk-task-cc" required onchange="updateBulkEmployeeDropdownForCard(this.closest('.bulk-task-item-card'))" style="width: 100%;">
+          ${ccOptions}
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 8px;">
+        <label style="font-size: 12px; font-weight: 500; margin-bottom: 4px; display: block;">Empleado Asignado *</label>
+        <select class="bulk-task-emp" required style="width: 100%;">
+          <option value="">Seleccionar Empleado...</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0;">
+        <label style="font-size: 12px; font-weight: 500; margin-bottom: 4px; display: block;">Descripción de la Tarea *</label>
+        <input type="text" class="bulk-task-desc" placeholder="Ej: Control de agua y aceite" required style="width: 100%;">
+      </div>
+    </div>
+  `;
+
+  container.insertAdjacentHTML('beforeend', cardHtml);
+
+  const cardElement = document.getElementById(taskId);
+  updateBulkEmployeeDropdownForCard(cardElement, initialData ? initialData.empleado : null);
+}
+
+function removeBulkTaskField(taskId) {
+  const card = document.getElementById(taskId);
+  if (card) {
+    card.remove();
+    // Renumber remaining tasks
+    const container = document.getElementById('bulk-tasks-container');
+    if (container) {
+      container.querySelectorAll('.bulk-task-item-card').forEach((item, index) => {
+        const titleSpan = item.querySelector('span');
+        if (titleSpan) titleSpan.textContent = `Tarea #${index + 1}`;
+      });
+    }
+  }
+}
+
+function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
+  const ccSelect = card.querySelector('.bulk-task-cc');
+  const empSelect = card.querySelector('.bulk-task-emp');
   if (!ccSelect || !empSelect) return;
 
   const selectedCc = ccSelect.value;
-  const currentValue = empSelect.value;
+  const currentValue = defaultValue || empSelect.value;
 
   let filteredEmployees = cachedCatalogs.empleados;
   if (selectedCc === "15") { // MECANICA
-    const mecanicaNames = new Set(MECANICA_EMPLOYEES.map(name => name.toLowerCase().trim()));
+    const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
     filteredEmployees = cachedCatalogs.empleados.filter(emp => {
-      const empLabel = emp.label.toLowerCase().trim();
-      return mecanicaNames.has(empLabel);
+      const empCleaned = cleanName(emp.label);
+      if (mecanicaNamesCleaned.has(empCleaned)) return true;
+      for (const mName of mecanicaNamesCleaned) {
+        if (empCleaned.includes(mName) || mName.includes(empCleaned)) {
+          return true;
+        }
+      }
+      return false;
     });
   }
 
+  // Populate options
   let empOptions = `<option value="">Seleccionar Empleado...</option>`;
   filteredEmployees.forEach(opt => {
     const isSelected = opt.value === currentValue;
@@ -3102,9 +3250,6 @@ function updateBulkEmployeeDropdown() {
 }
 
 async function submitBulkOrders() {
-  const ccEl = document.getElementById('bulk-task-cc');
-  const empEl = document.getElementById('bulk-task-emp');
-  const descEl = document.getElementById('bulk-task-desc');
   const timeStartEl = document.getElementById('bulk-time-start');
   const timeEndEl = document.getElementById('bulk-time-end');
   const clasificacionEl = document.getElementById('bulk-clasificacion');
@@ -3114,15 +3259,12 @@ async function submitBulkOrders() {
   if (selectedChks.length === 0) {
     return showToast("Selecciona al menos un vehículo.", "danger");
   }
-  if (!ccEl.value) {
-    return showToast("Selecciona un Centro de Costo.", "danger");
+
+  const taskCards = document.querySelectorAll('#bulk-tasks-container .bulk-task-item-card');
+  if (taskCards.length === 0) {
+    return showToast("Agrega al menos una tarea a realizar.", "danger");
   }
-  if (!empEl.value) {
-    return showToast("Selecciona un Operario/Empleado.", "danger");
-  }
-  if (!descEl.value.trim()) {
-    return showToast("Ingresa la descripción de la tarea.", "danger");
-  }
+
   if (!timeStartEl.value || !timeEndEl.value) {
     return showToast("Ingresa las horas de inicio y fin.", "danger");
   }
@@ -3137,6 +3279,34 @@ async function submitBulkOrders() {
   const totalMinutes = endMinutes - startMinutes;
   const minutesPerVehicle = totalMinutes / selectedChks.length;
   const hoursPerVehicleFormatted = formatMinutesToHMM(minutesPerVehicle);
+
+  // Validate tasks first
+  const tasksPayload = [];
+  for (let tIdx = 0; tIdx < taskCards.length; tIdx++) {
+    const card = taskCards[tIdx];
+    const ccSelect = card.querySelector('.bulk-task-cc');
+    const empSelect = card.querySelector('.bulk-task-emp');
+    const descInput = card.querySelector('.bulk-task-desc');
+
+    if (!ccSelect.value) {
+      return showToast(`Selecciona Centro de Costo en Tarea #${tIdx + 1}.`, "danger");
+    }
+    if (!empSelect.value) {
+      return showToast(`Selecciona Operario en Tarea #${tIdx + 1}.`, "danger");
+    }
+    if (!descInput.value.trim()) {
+      return showToast(`Ingresa descripción en Tarea #${tIdx + 1}.`, "danger");
+    }
+
+    tasksPayload.push({
+      centroCosto: ccSelect.value,
+      empleado: empSelect.value,
+      horasEstimadas: hoursPerVehicleFormatted,
+      descripcion: descInput.value.trim(),
+      status: "Finalizada",
+      timerStart: null
+    });
+  }
 
   const confirmMsg = `¿Estás seguro de generar ${selectedChks.length} órdenes de trabajo?\nDuración por unidad: ${hoursPerVehicleFormatted} horas.`;
   if (!confirm(confirmMsg)) return;
@@ -3162,15 +3332,6 @@ async function submitBulkOrders() {
     const rodadoOpt = cachedCatalogs.rodados.find(r => r.value === rodadoId);
     if (!rodadoOpt) continue;
 
-    const task = {
-      centroCosto: ccEl.value,
-      empleado: empEl.value,
-      horasEstimadas: hoursPerVehicleFormatted,
-      descripcion: descEl.value.trim(),
-      status: "Finalizada",
-      timerStart: null
-    };
-
     const payload = {
       rodado: rodadoOpt.label,
       responsable: "AUTO",
@@ -3179,7 +3340,7 @@ async function submitBulkOrders() {
       fechaEntrega: fechaEntrega,
       horario: horario,
       incidente: incidenteEl.value.trim(),
-      tasks: [task]
+      tasks: tasksPayload
     };
 
     try {
@@ -3203,6 +3364,12 @@ async function submitBulkOrders() {
     showToast(`Éxito: Se crearon ${successCount} órdenes correctamente.`, "success");
     toggleAllBulkVehicles(false);
     document.getElementById('bulk-incidente').value = '';
+    // Clear tasks and add one default
+    const container = document.getElementById('bulk-tasks-container');
+    if (container) {
+      container.innerHTML = '';
+      addBulkTaskField();
+    }
     fetchOrders();
     switchView('orders');
   } else if (successCount > 0) {
