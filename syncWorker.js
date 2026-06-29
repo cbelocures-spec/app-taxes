@@ -119,16 +119,29 @@ async function fillSearchableSelect(page, labelText, searchValue) {
   try {
     // Find the correct searchable-input by looking at the label
     const inputInfo = await page.evaluate((label) => {
-      // Find all form-groups or containers that have a label matching the text
+      const clean = (str) => {
+        if (!str) return '';
+        return str.normalize("NFD")
+                  .replace(/[\u0300-\u036f]/g, "")
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]/g, "");
+      };
+      
+      const cleanTarget = clean(label);
       const allLabels = Array.from(document.querySelectorAll('label'));
       for (const lbl of allLabels) {
-        if (lbl.textContent.trim().toLowerCase().includes(label.toLowerCase())) {
+        const cleanLabelText = clean(lbl.textContent);
+        if (cleanLabelText.includes(cleanTarget) || cleanTarget.includes(cleanLabelText)) {
           // Find the parent container
-          const parent = lbl.closest('.form-group') || lbl.closest('.taxes-form-group') || lbl.parentElement;
+          const parent = lbl.closest('.form-group') || 
+                         lbl.closest('.taxes-form-group') || 
+                         lbl.closest('.col') || 
+                         lbl.closest('.row') ||
+                         lbl.parentElement;
           if (parent) {
             // Look for the searchable-input inside this container
             const searchInput = parent.querySelector('.searchable-input, input[type="text"]');
-            // Look for any hidden input in the same container (usually name ends with _id or is rodado_id / syj_empleado_id)
+            // Look for any hidden input in the same container
             const hiddenInput = parent.querySelector('input[type="hidden"], input[name$="_id"], input[name="rodado_id"], input[name="syj_empleado_id"]');
             
             if (searchInput && hiddenInput) {
