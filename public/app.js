@@ -2494,7 +2494,8 @@ function renderDashboard() {
             descripcion: task.descripcion || '(Sin descripción)',
             timerStart: task.timerStart,
             isTimerRunning: isTimerRunning,
-            timerHistory: task.timerHistory || []
+            timerHistory: task.timerHistory || [],
+            taxesOrderNumber: order.taxesOrderNumber || null
           };
 
           if (isTimerRunning) {
@@ -2531,6 +2532,9 @@ function renderDashboard() {
             <button type="button" class="dashboard-card-add-task-btn" onclick="editOrder('${t.orderId}')" title="Agregar tarea a esta orden">
               <span class="material-icons" style="font-size:18px;">add</span>
             </button>
+            <div class="dashboard-card-ot-badge" style="font-size: 11px; font-weight: 700; color: var(--primary); margin-bottom: 4px;">
+              OT #${t.interno}${t.taxesOrderNumber ? ` (Taxes: #${t.taxesOrderNumber})` : ''}
+            </div>
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
             <div class="dashboard-card-subtitle">Interno ${t.interno} ${t.clasificacion ? ' - ' + t.clasificacion : ''}</div>
             <div class="dashboard-card-desc">${t.descripcion}</div>
@@ -2570,6 +2574,9 @@ function renderDashboard() {
             <button type="button" class="dashboard-card-add-task-btn" onclick="editOrder('${t.orderId}')" title="Agregar tarea a esta orden">
               <span class="material-icons" style="font-size:18px;">add</span>
             </button>
+            <div class="dashboard-card-ot-badge" style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px;">
+              OT #${t.interno}${t.taxesOrderNumber ? ` (Taxes: #${t.taxesOrderNumber})` : ''}
+            </div>
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
             <div class="dashboard-card-subtitle">Interno ${t.interno} ${t.clasificacion ? ' - ' + t.clasificacion : ''}</div>
             <div class="dashboard-card-desc">${t.descripcion}</div>
