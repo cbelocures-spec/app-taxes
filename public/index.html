@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
 
@@ -376,7 +376,9 @@
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label for="pre-form-interno">Número de Interno *</label>
-          <input type="text" id="pre-form-interno" list="internos-datalist" required placeholder="Escriba o seleccione interno..." style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
+          <select id="pre-form-interno" required style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
+            <option value="">Seleccionar Interno...</option>
+          </select>
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label for="pre-form-clasificacion">Clasificación *</label>
@@ -474,7 +476,9 @@
             <div class="form-row">
               <div class="form-group col-6">
                 <label for="form-interno">Interno Unidad *</label>
-                <input type="text" id="form-interno" list="internos-datalist" required placeholder="Escriba o seleccione interno...">
+                <select id="form-interno" required>
+                  <option value="">Seleccionar Interno...</option>
+                </select>
               </div>
               <div class="form-group col-6">
                 <label for="form-clasificacion">Clasificación *</label>
@@ -755,10 +759,6 @@
     </div>
   </div>
 
-  <datalist id="internos-datalist">
-    <!-- Populated dynamically from app.js -->
-  </datalist>
-
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

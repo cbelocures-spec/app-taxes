@@ -1312,7 +1312,15 @@ async function syncWorkOrder(orderId) {
       // Classification select (name: inv_ot_clasificacion_id)
       const classSelect = document.querySelector('select[name="inv_ot_clasificacion_id"]');
       if (classSelect) {
-        const option = Array.from(classSelect.options).find(opt => opt.text.toLowerCase().includes(clasificacionVal.toLowerCase()) || opt.value === clasificacionVal);
+        const cleanForCompare = (str) => {
+          if (!str) return '';
+          return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        };
+        const cleanVal = cleanForCompare(clasificacionVal);
+        const option = Array.from(classSelect.options).find(opt => 
+          cleanForCompare(opt.text).includes(cleanVal) || 
+          cleanForCompare(opt.value) === cleanVal
+        );
         if (option) {
           classSelect.value = option.value;
           classSelect.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1429,9 +1437,14 @@ async function syncWorkOrder(orderId) {
       await page.evaluate((sel, taskCC) => {
         const ccSelect = document.querySelector(sel);
         if (ccSelect) {
+          const cleanForCompare = (str) => {
+            if (!str) return '';
+            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+          };
+          const cleanVal = cleanForCompare(taskCC);
           const opt = Array.from(ccSelect.options).find(o => 
-            o.text.toLowerCase().includes(taskCC.toLowerCase()) || 
-            o.value.toLowerCase() === taskCC.toLowerCase()
+            cleanForCompare(o.text).includes(cleanVal) || 
+            cleanForCompare(o.value) === cleanVal
           );
           if (opt) {
             ccSelect.value = opt.value;

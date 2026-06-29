@@ -459,7 +459,17 @@ async function submitPreOrderCheck() {
     // Auto-populate interno and clasificacion
     const internoSelect = document.getElementById('form-interno');
     if (internoSelect) {
-      internoSelect.value = interno || "";
+      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === interno);
+      if (!optionExists && interno) {
+        const newOpt = document.createElement('option');
+        newOpt.value = interno;
+        newOpt.textContent = interno;
+        internoSelect.appendChild(newOpt);
+      }
+      internoSelect.value = interno;
+      if (internoSelect.rebuildSearchable) {
+        internoSelect.rebuildSearchable();
+      }
     }
     document.getElementById('form-clasificacion').value = clasificacion;
   }
@@ -547,7 +557,21 @@ function editOrder(orderId) {
   // Populate basic inputs
   const internoSelect = document.getElementById('form-interno');
   if (internoSelect) {
-    internoSelect.value = order.interno || "";
+    if (order.interno) {
+      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === order.interno);
+      if (!optionExists) {
+        const newOpt = document.createElement('option');
+        newOpt.value = order.interno;
+        newOpt.textContent = order.interno;
+        internoSelect.appendChild(newOpt);
+      }
+      internoSelect.value = order.interno;
+    } else {
+      internoSelect.value = "";
+    }
+    if (internoSelect.rebuildSearchable) {
+      internoSelect.rebuildSearchable();
+    }
   }
   document.getElementById('form-clasificacion').value = order.clasificacion;
   document.getElementById('form-incidente').value = order.incidente;
@@ -608,7 +632,21 @@ function viewOrder(orderId) {
   // Populate basic inputs
   const internoSelect = document.getElementById('form-interno');
   if (internoSelect) {
-    internoSelect.value = order.interno || "";
+    if (order.interno) {
+      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === order.interno);
+      if (!optionExists) {
+        const newOpt = document.createElement('option');
+        newOpt.value = order.interno;
+        newOpt.textContent = order.interno;
+        internoSelect.appendChild(newOpt);
+      }
+      internoSelect.value = order.interno;
+    } else {
+      internoSelect.value = "";
+    }
+    if (internoSelect.rebuildSearchable) {
+      internoSelect.rebuildSearchable();
+    }
   }
   document.getElementById('form-clasificacion').value = order.clasificacion;
   document.getElementById('form-incidente').value = order.incidente || '';
@@ -881,11 +919,14 @@ async function fetchCatalogs() {
       return a.localeCompare(b);
     });
 
-    // Populate datalist for internos
-    populateDatalist('internos-datalist', uniqueInternos.map(int => ({ value: int, label: int })));
+    const internoOptions = uniqueInternos.map(int => ({ value: int, label: int }));
+    populateSelect('form-interno', internoOptions, "Seleccionar Interno...");
+    populateSelect('pre-form-interno', internoOptions, "Seleccionar Interno...");
 
     // Convert select elements to searchable selects
     convertSelectToSearchable(document.getElementById('form-rodado'));
+    convertSelectToSearchable(document.getElementById('form-interno'));
+    convertSelectToSearchable(document.getElementById('pre-form-interno'));
 
     // Initialize Carga Masiva tasks
     const bulkContainer = document.getElementById('bulk-tasks-container');
@@ -1051,10 +1092,20 @@ function addTaskField(taskData = null) {
   // Use task ID from data if editing, else generate a unique card ID
   const taskId = taskData && taskData.id ? taskData.id : `task-card-${Date.now()}-${taskIndex}`;
 
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+  let defaultCcVal = "15"; // default to MECANICA
+  if (userSector === 'Herrería') {
+    const herrOpt = cachedCatalogs.centrosCosto.find(opt => opt.value === "16" || opt.value === "HERRERIA" || opt.label.toLowerCase().includes("herrer"));
+    if (herrOpt) {
+      defaultCcVal = herrOpt.value;
+    }
+  }
+
   // Build select option strings
   let ccOptions = `<option value="">Seleccionar Centro Costo...</option>`;
   cachedCatalogs.centrosCosto.forEach(opt => {
-    const isSelected = taskData ? (opt.value === taskData.centroCosto) : (opt.value === "15");
+    const isSelected = taskData ? (opt.value === taskData.centroCosto) : (opt.value === defaultCcVal);
     ccOptions += `<option value="${opt.value}" ${isSelected ? "selected" : ""}>${opt.label}</option>`;
   });
 
@@ -2342,6 +2393,50 @@ function convertSelectToSearchable(selectEl) {
       noResultsMsg.remove();
     }
 
+    // Clean up any old custom item
+    const oldCustomItem = listContainer.querySelector('.searchable-select-custom-item');
+    if (oldCustomItem) oldCustomItem.remove();
+
+    if (term) {
+      // Check if term already matches an option text exactly
+      const options = Array.from(selectEl.options);
+      const exactExists = options.some(opt => opt.text.toLowerCase().trim() === term);
+
+      if (!exactExists) {
+        const li = document.createElement('li');
+        li.className = 'searchable-select-option searchable-select-custom-item';
+        li.style.borderTop = '1px dashed var(--border-color)';
+        li.style.marginTop = '4px';
+        li.style.color = 'var(--primary)';
+        li.style.fontWeight = 'bold';
+        li.style.display = 'block'; // ensure visible
+        li.innerHTML = `<span class="material-icons" style="font-size:14px; vertical-align:middle; margin-right:4px;">add_circle</span> Usar: "${query}"`;
+        
+        li.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const newOpt = document.createElement('option');
+          newOpt.value = query;
+          newOpt.textContent = query;
+          selectEl.appendChild(newOpt);
+
+          selectEl.value = query;
+          selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+
+          labelSpan.textContent = query;
+          dropdownPanel.classList.remove('open');
+          trigger.classList.remove('active');
+
+          rebuildList();
+        });
+        
+        listContainer.appendChild(li);
+        
+        // If there was a "Sin resultados" message, remove it since we now have the "Usar" custom item
+        const noResultsMsg = listContainer.querySelector('.no-results');
+        if (noResultsMsg) noResultsMsg.remove();
+      }
+    }
+
     countSpan.textContent = `${matchCount} de ${items.length} opciones`;
   }
 
@@ -3174,10 +3269,20 @@ function addBulkTaskField(initialData = null) {
   const taskIndex = container.querySelectorAll('.bulk-task-item-card').length;
   const taskId = `bulk-task-card-${Date.now()}-${bulkTaskIndexCount++}`;
 
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+  let defaultCcVal = "15"; // default to MECANICA
+  if (userSector === 'Herrería') {
+    const herrOpt = cachedCatalogs.centrosCosto.find(opt => opt.value === "16" || opt.value === "HERRERIA" || opt.label.toLowerCase().includes("herrer"));
+    if (herrOpt) {
+      defaultCcVal = herrOpt.value;
+    }
+  }
+
   // Build select option strings
   let ccOptions = `<option value="">Seleccionar Centro Costo...</option>`;
   cachedCatalogs.centrosCosto.forEach(opt => {
-    const isSelected = initialData ? (opt.value === initialData.centroCosto) : (opt.value === "15");
+    const isSelected = initialData ? (opt.value === initialData.centroCosto) : (opt.value === defaultCcVal);
     ccOptions += `<option value="${opt.value}" ${isSelected ? "selected" : ""}>${opt.label}</option>`;
   });
 
@@ -3240,8 +3345,39 @@ function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
   const selectedCc = ccSelect.value;
   const currentValue = defaultValue || empSelect.value;
 
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+
   let filteredEmployees = cachedCatalogs.empleados;
-  if (selectedCc === "15") { // MECANICA
+
+  if (userSector === 'Herrería' || selectedCc === "HERRERIA" || selectedCc === "16") {
+    // Herrería filter
+    const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
+    
+    let matchedEmployees = cachedCatalogs.empleados.filter(emp => {
+      const empCleaned = cleanName(emp.label);
+      if (herreriaNamesCleaned.has(empCleaned)) return true;
+      for (const hName of herreriaNamesCleaned) {
+        if (empCleaned.includes(hName) || hName.includes(empCleaned)) {
+          return true;
+        }
+      }
+      return false;
+    });
+
+    // Add Federico, Luciano, Digno if not present
+    const customHerreriaNames = ["Federico", "Luciano", "Digno"];
+    customHerreriaNames.forEach(name => {
+      const exists = matchedEmployees.some(emp => emp.label.toLowerCase().trim() === name.toLowerCase());
+      if (!exists) {
+        matchedEmployees.push({ value: name, label: name });
+      }
+    });
+
+    filteredEmployees = matchedEmployees;
+
+  } else if (selectedCc === "15" || selectedCc === "MECANICA") { // MECANICA
     const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
     const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
     filteredEmployees = cachedCatalogs.empleados.filter(emp => {

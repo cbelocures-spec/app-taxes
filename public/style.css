@@ -1092,15 +1092,19 @@ body {
 }
 
 .searchable-select-trigger span.trigger-label {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin-right: 8px;
 }
 
 .searchable-select-trigger .material-icons {
   font-size: 20px;
   color: var(--secondary);
   transition: transform 0.2s;
+  flex-shrink: 0;
 }
 
 .searchable-select-trigger.active .material-icons {
@@ -1174,6 +1178,9 @@ body {
   cursor: pointer;
   transition: background-color 0.15s;
   color: var(--text-main);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .searchable-select-option:hover {
