@@ -2207,10 +2207,13 @@ function convertSelectToSearchable(selectEl) {
     labelSpan = trigger.querySelector('.trigger-label');
     searchInput = dropdownPanel.querySelector('.searchable-select-search-input');
     countSpan = dropdownPanel.querySelector('.searchable-select-options-count');
-  } else {
     // Wrap
     wrapper = document.createElement('div');
     wrapper.className = 'searchable-select-container';
+    wrapper.style.width = '100%';
+    wrapper.style.maxWidth = '100%';
+    wrapper.style.boxSizing = 'border-box';
+    wrapper.style.position = 'relative';
     selectEl.parentNode.insertBefore(wrapper, selectEl);
     wrapper.appendChild(selectEl);
 
@@ -2224,12 +2227,28 @@ function convertSelectToSearchable(selectEl) {
     // Create trigger
     trigger = document.createElement('div');
     trigger.className = 'searchable-select-trigger';
+    trigger.style.display = 'flex';
+    trigger.style.justifyContent = 'space-between';
+    trigger.style.alignItems = 'center';
+    trigger.style.width = '100%';
+    trigger.style.maxWidth = '100%';
+    trigger.style.boxSizing = 'border-box';
+
     labelSpan = document.createElement('span');
     labelSpan.className = 'trigger-label';
+    labelSpan.style.flex = '1';
+    labelSpan.style.minWidth = '0';
+    labelSpan.style.overflow = 'hidden';
+    labelSpan.style.textOverflow = 'ellipsis';
+    labelSpan.style.whiteSpace = 'nowrap';
+    labelSpan.style.marginRight = '8px';
     labelSpan.textContent = 'Seleccionar...';
+
     const arrowSpan = document.createElement('span');
     arrowSpan.className = 'material-icons';
     arrowSpan.textContent = 'arrow_drop_down';
+    arrowSpan.style.flexShrink = '0';
+
     trigger.appendChild(labelSpan);
     trigger.appendChild(arrowSpan);
     wrapper.appendChild(trigger);
