@@ -1368,14 +1368,14 @@ body {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr); /* 2 columns on mobile */
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* 2 columns on mobile, handles long text overflow safely */
   gap: 10px;
 }
 
 /* Landscape/Tablet grid */
 @media (min-width: 600px) {
   .dashboard-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

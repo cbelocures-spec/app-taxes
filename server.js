@@ -83,10 +83,10 @@ function getSectorByUsername(username) {
   if (email === 'taller@contenedoreshugo.com.ar' || email === 'paniol@contenedoreshugo.com.ar') {
     return 'Admin';
   }
-  if (email === 'j.carmona@contenedoreshugo.com.ar') {
+  if (email === 'j.carmona@contenedoreshugo.com.ar' || email === 'jcarmona@contenedoreshugo.com.ar') {
     return 'Herrería';
   }
-  if (email === 'ftoledo@contenedoreshugo.com.ar') {
+  if (email === 'ftoledo@contenedoreshugo.com.ar' || email === 'f.toledo@contenedoreshugo.com.ar') {
     return 'Edilicio';
   }
   return 'Taller';

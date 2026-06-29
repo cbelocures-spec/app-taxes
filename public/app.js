@@ -96,6 +96,30 @@ const MECANICA_EMPLOYEES = [
   "Vera, Domingo Sergio"
 ];
 
+const HERRERIA_EMPLOYEES = [
+  "Arando Quispe, Atanacio Félix",
+  "Banegas, Matías Ezequiel",
+  "Carmona González, Juan Manuel",
+  "García, Yamandú Liborio",
+  "GIMENEZ DEOLINDO EMANUEL",
+  "Gonzalez Nicolas Maximiliano",
+  "Lara Gustavo",
+  "LUNA AGUSTIN",
+  "Medina Daniel",
+  "Montiel, Víctor David",
+  "Peñalva, Cristian Germán",
+  "Romero, Juan Manuel",
+  "Federico",
+  "Luciano",
+  "Digno"
+];
+
+function populateDatalist(datalistId, options) {
+  const el = document.getElementById(datalistId);
+  if (!el) return;
+  el.innerHTML = options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+}
+
 // On Page Load
 document.addEventListener('DOMContentLoaded', () => {
   // Set default dates and times
@@ -251,17 +275,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const rodadoSelect = document.getElementById('form-rodado');
   if (rodadoSelect) {
     rodadoSelect.addEventListener('change', () => {
-      const selectedValue = rodadoSelect.value;
-      const rodadoOpt = cachedCatalogs.rodados.find(r => r.value === selectedValue);
-      if (rodadoOpt && rodadoOpt.interno) {
-        const internoInput = document.getElementById('form-interno');
-        if (internoInput) {
-          internoInput.value = rodadoOpt.interno;
-          if (internoInput.rebuildSearchable) {
-            internoInput.rebuildSearchable();
-          }
-          showNoveltiesForInterno(rodadoOpt.interno.trim());
-        }
+      const internoInput = document.getElementById('form-interno');
+      if (internoInput) {
+        internoInput.value = "";
+        showNoveltiesForInterno("");
       }
     });
   }
@@ -442,17 +459,7 @@ async function submitPreOrderCheck() {
     // Auto-populate interno and clasificacion
     const internoSelect = document.getElementById('form-interno');
     if (internoSelect) {
-      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === interno);
-      if (!optionExists && interno) {
-        const newOpt = document.createElement('option');
-        newOpt.value = interno;
-        newOpt.textContent = interno;
-        internoSelect.appendChild(newOpt);
-      }
-      internoSelect.value = interno;
-      if (internoSelect.rebuildSearchable) {
-        internoSelect.rebuildSearchable();
-      }
+      internoSelect.value = interno || "";
     }
     document.getElementById('form-clasificacion').value = clasificacion;
   }
@@ -540,21 +547,7 @@ function editOrder(orderId) {
   // Populate basic inputs
   const internoSelect = document.getElementById('form-interno');
   if (internoSelect) {
-    if (order.interno) {
-      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === order.interno);
-      if (!optionExists) {
-        const newOpt = document.createElement('option');
-        newOpt.value = order.interno;
-        newOpt.textContent = order.interno;
-        internoSelect.appendChild(newOpt);
-      }
-      internoSelect.value = order.interno;
-    } else {
-      internoSelect.value = "";
-    }
-    if (internoSelect.rebuildSearchable) {
-      internoSelect.rebuildSearchable();
-    }
+    internoSelect.value = order.interno || "";
   }
   document.getElementById('form-clasificacion').value = order.clasificacion;
   document.getElementById('form-incidente').value = order.incidente;
@@ -615,21 +608,7 @@ function viewOrder(orderId) {
   // Populate basic inputs
   const internoSelect = document.getElementById('form-interno');
   if (internoSelect) {
-    if (order.interno) {
-      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === order.interno);
-      if (!optionExists) {
-        const newOpt = document.createElement('option');
-        newOpt.value = order.interno;
-        newOpt.textContent = order.interno;
-        internoSelect.appendChild(newOpt);
-      }
-      internoSelect.value = order.interno;
-    } else {
-      internoSelect.value = "";
-    }
-    if (internoSelect.rebuildSearchable) {
-      internoSelect.rebuildSearchable();
-    }
+    internoSelect.value = order.interno || "";
   }
   document.getElementById('form-clasificacion').value = order.clasificacion;
   document.getElementById('form-incidente').value = order.incidente || '';
@@ -902,14 +881,11 @@ async function fetchCatalogs() {
       return a.localeCompare(b);
     });
 
-    const internoOptions = uniqueInternos.map(int => ({ value: int, label: int }));
-    populateSelect('form-interno', internoOptions, "Seleccionar Interno...");
-    populateSelect('pre-form-interno', internoOptions, "Seleccionar Interno...");
+    // Populate datalist for internos
+    populateDatalist('internos-datalist', uniqueInternos.map(int => ({ value: int, label: int })));
 
     // Convert select elements to searchable selects
     convertSelectToSearchable(document.getElementById('form-rodado'));
-    convertSelectToSearchable(document.getElementById('form-interno'));
-    convertSelectToSearchable(document.getElementById('pre-form-interno'));
 
     // Initialize Carga Masiva tasks
     const bulkContainer = document.getElementById('bulk-tasks-container');
@@ -975,8 +951,39 @@ function updateEmployeeDropdownForCard(card) {
   const selectedCc = ccSelect.value;
   const currentValue = empSelect.value;
 
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+
   let filteredEmployees = cachedCatalogs.empleados;
-  if (selectedCc === "15") { // MECANICA
+
+  if (userSector === 'Herrería' || selectedCc === "HERRERIA" || selectedCc === "16") {
+    // Herrería filter
+    const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
+    
+    let matchedEmployees = cachedCatalogs.empleados.filter(emp => {
+      const empCleaned = cleanName(emp.label);
+      if (herreriaNamesCleaned.has(empCleaned)) return true;
+      for (const hName of herreriaNamesCleaned) {
+        if (empCleaned.includes(hName) || hName.includes(empCleaned)) {
+          return true;
+        }
+      }
+      return false;
+    });
+
+    // Add Federico, Luciano, Digno if not present
+    const customHerreriaNames = ["Federico", "Luciano", "Digno"];
+    customHerreriaNames.forEach(name => {
+      const exists = matchedEmployees.some(emp => emp.label.toLowerCase().trim() === name.toLowerCase());
+      if (!exists) {
+        matchedEmployees.push({ value: name, label: name });
+      }
+    });
+
+    filteredEmployees = matchedEmployees;
+
+  } else if (selectedCc === "15" || selectedCc === "MECANICA") { // MECANICA
     const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
     const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
     filteredEmployees = cachedCatalogs.empleados.filter(emp => {
@@ -2493,7 +2500,13 @@ function renderDashboard() {
       return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
     };
 
-    const activeBaseList = activeMechanicsList && activeMechanicsList.length > 0 ? activeMechanicsList : MECANICA_EMPLOYEES;
+    const currentUser = localStorage.getItem('currentUserUsername');
+    const userSector = getSectorByUsername(currentUser);
+    let baseList = MECANICA_EMPLOYEES;
+    if (userSector === 'Herrería') {
+      baseList = HERRERIA_EMPLOYEES;
+    }
+    const activeBaseList = (activeMechanicsList && activeMechanicsList.length > 0 && userSector !== 'Herrería') ? activeMechanicsList : baseList;
 
     const freeMechanics = activeBaseList.filter(name => {
       const cleaned = cleanName(name);
@@ -2805,8 +2818,12 @@ function openActiveMechanicsModal() {
   const container = document.getElementById('active-mechanics-checklist-container');
   if (!container) return;
 
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+  const baseList = userSector === 'Herrería' ? HERRERIA_EMPLOYEES : MECANICA_EMPLOYEES;
+
   // Render checklist items
-  container.innerHTML = MECANICA_EMPLOYEES.map((name, index) => {
+  container.innerHTML = baseList.map((name, index) => {
     const isChecked = activeMechanicsList.includes(name);
     return `
       <label class="mechanic-check-item">
@@ -4013,10 +4030,10 @@ function getSectorByUsername(username) {
   if (email === 'taller@contenedoreshugo.com.ar' || email === 'paniol@contenedoreshugo.com.ar') {
     return 'Admin';
   }
-  if (email === 'j.carmona@contenedoreshugo.com.ar') {
+  if (email === 'j.carmona@contenedoreshugo.com.ar' || email === 'jcarmona@contenedoreshugo.com.ar') {
     return 'Herrería';
   }
-  if (email === 'ftoledo@contenedoreshugo.com.ar') {
+  if (email === 'ftoledo@contenedoreshugo.com.ar' || email === 'f.toledo@contenedoreshugo.com.ar') {
     return 'Edilicio';
   }
   return 'Taller';

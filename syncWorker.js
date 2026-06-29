@@ -1364,9 +1364,19 @@ async function syncWorkOrder(orderId) {
         "RODRIGUEZ MARCELO",
         "GODOY DAVID"
       ];
+
+      // Map custom mechanics to García, Yamandú Liborio (for Herrería)
+      const customHerreriaMechanicNames = [
+        "Federico",
+        "Luciano",
+        "Digno"
+      ];
       
       let finalDescription = task.descripcion || '';
       const matchedCustomName = customMechanicNames.find(
+        name => name.toLowerCase() === employeeLabel.toLowerCase().trim()
+      );
+      const matchedCustomHerreriaName = customHerreriaMechanicNames.find(
         name => name.toLowerCase() === employeeLabel.toLowerCase().trim()
       );
       
@@ -1376,6 +1386,15 @@ async function syncWorkOrder(orderId) {
         
         // Append suffix to description if not already present
         const suffix = `. Realizó: ${matchedCustomName}`;
+        if (!finalDescription.endsWith(suffix)) {
+          finalDescription = `${finalDescription}${suffix}`;
+        }
+      } else if (matchedCustomHerreriaName) {
+        console.log(`Mapping custom employee "${employeeLabel}" to "García, Yamandú Liborio"`);
+        employeeLabel = "García, Yamandú Liborio";
+        
+        // Append suffix to description if not already present
+        const suffix = `. Realizó: ${matchedCustomHerreriaName}`;
         if (!finalDescription.endsWith(suffix)) {
           finalDescription = `${finalDescription}${suffix}`;
         }
