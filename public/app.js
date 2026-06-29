@@ -1292,9 +1292,6 @@ async function fetchOrders() {
 
 function renderOrders() {
   const container = document.getElementById('orders-list-container');
-  const queueContainer = document.getElementById('sync-queue-container');
-  const historyContainer = document.getElementById('history-list-container');
-  
   if (!container) return;
 
   const filteredActiveOrders = getFilteredActiveOrders();
@@ -1308,19 +1305,9 @@ function renderOrders() {
   }
   updateBulkSyncActionBar();
 
-  // Clean up selected history IDs that are no longer success synced
-  const syncedIds = new Set(filteredActiveOrders.filter(o => o.syncStatus === 'success').map(o => o.id));
-  for (const id of selectedHistoryOrderIds) {
-    if (!syncedIds.has(id)) {
-      selectedHistoryOrderIds.delete(id);
-    }
-  }
-  updateHistoryBulkDeleteActionBar();
-
-  // Apply search filtering for active (non-synced) orders
+  // Apply search filtering for all orders
   const query = document.getElementById('order-search').value.toLowerCase();
-  const activeLocalOrders = filteredActiveOrders.filter(o => o.syncStatus !== 'success');
-  const filtered = activeLocalOrders.filter(o => 
+  const filtered = filteredActiveOrders.filter(o => 
     (o.rodado || '').toLowerCase().includes(query) || 
     (o.interno || '').toLowerCase().includes(query) || 
     (o.clasificacion || '').toLowerCase().includes(query)
@@ -1336,45 +1323,6 @@ function renderOrders() {
     `;
   } else {
     container.innerHTML = filtered.map(order => createOrderCardHtml(order)).join('');
-  }
-
-  // Render History Tab (only synced success orders)
-  if (historyContainer) {
-    const historySearchEl = document.getElementById('history-search');
-    const historyQuery = historySearchEl ? historySearchEl.value.toLowerCase() : '';
-    
-    const syncedOrders = filteredActiveOrders.filter(o => o.syncStatus === 'success');
-    const filteredHistory = syncedOrders.filter(o => 
-      (o.rodado || '').toLowerCase().includes(historyQuery) || 
-      (o.interno || '').toLowerCase().includes(historyQuery) || 
-      (o.clasificacion || '').toLowerCase().includes(historyQuery)
-    );
-
-    if (filteredHistory.length === 0) {
-      historyContainer.innerHTML = `
-        <div class="empty-state">
-          <span class="material-icons">history_toggle_off</span>
-          <p>No hay órdenes sincronizadas aún.</p>
-        </div>
-      `;
-    } else {
-      historyContainer.innerHTML = filteredHistory.map(order => createHistoryCardHtml(order)).join('');
-    }
-  }
-
-  // Render Sync Queue (only pending, syncing, or error ones)
-  if (queueContainer) {
-    const queueOrders = filteredActiveOrders.filter(o => o.syncStatus !== 'success');
-    if (queueOrders.length === 0) {
-      queueContainer.innerHTML = `
-        <div class="empty-state">
-          <span class="material-icons">cloud_done</span>
-          <p>Todas las órdenes están sincronizadas.</p>
-        </div>
-      `;
-    } else {
-      queueContainer.innerHTML = queueOrders.map(order => createQueueCardHtml(order)).join('');
-    }
   }
 
   // Render the Operator/Tasks active dashboard on home page

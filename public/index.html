@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=23">
+  <link rel="stylesheet" href="style.css?v=24">
 </head>
 <body>
 
@@ -107,21 +107,7 @@
       </div>
     </section>
 
-    <!-- VIEW 2.5: HISTORY (ÓRDENES SUBIDAS / HISTORIAL) -->
-    <section id="view-history" class="app-view">
-      <div class="view-header">
-        <h2>Órdenes Sincronizadas</h2>
-      </div>
 
-      <div class="search-bar">
-        <span class="material-icons search-icon">search</span>
-        <input type="text" id="history-search" placeholder="Buscar por Rodado, Interno o Clasificación..." oninput="filterHistory()">
-      </div>
-
-      <div class="orders-list" id="history-list-container">
-        <!-- Dynamic content -->
-      </div>
-    </section>
 
     <!-- VIEW 3: CARGA MASIVA -->
     <section id="view-bulk" class="app-view">
@@ -335,10 +321,7 @@
       <span class="material-icons">assignment</span>
       <span>Órdenes</span>
     </button>
-    <button class="nav-item" onclick="switchView('history')" id="nav-history">
-      <span class="material-icons">task_alt</span>
-      <span>Subidas</span>
-    </button>
+
     <button class="nav-item" onclick="switchView('bulk')" id="nav-bulk">
       <span class="material-icons">content_copy</span>
       <span>Masiva</span>
@@ -741,24 +724,12 @@
     </div>
   </div>
 
-  <!-- FLOATING BULK DELETE ACTION BAR -->
-  <div class="bulk-sync-bar" id="history-bulk-delete-bar" style="background: rgba(239, 68, 68, 0.95); box-shadow: 0 8px 25px rgba(239, 68, 68, 0.2);">
-    <div class="bulk-sync-bar-content">
-      <span class="bulk-sync-count" id="history-bulk-delete-count" style="background-color: var(--danger);">0 seleccionadas</span>
-      <div class="bulk-sync-actions">
-        <button type="button" class="btn-xs" onclick="toggleSelectAllHistoryOrdersList(true)">Todo</button>
-        <button type="button" class="btn-xs" onclick="toggleSelectAllHistoryOrdersList(false)">Ninguno</button>
-        <button type="button" class="btn btn-danger btn-xs" onclick="deleteSelectedHistoryOrders()" style="display:flex; align-items:center; gap:4px; background-color: var(--danger); color: white; border-color: var(--danger);">
-          <span class="material-icons" style="font-size:14px;">delete</span> Eliminar
-        </button>
-      </div>
-    </div>
-  </div>
+
 
   <datalist id="internos-datalist">
     <!-- Populated dynamically from app.js -->
   </datalist>
 
-  <script src="app.js?v=23"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>
