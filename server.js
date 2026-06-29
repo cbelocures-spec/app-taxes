@@ -255,20 +255,33 @@ app.put('/api/orders/:id', (req, res) => {
       clasificacion: finalClasificacion,
       incidente,
       createdBy,
-      syncStatus: (existing.syncStatus === "pending" || existing.syncStatus === "syncing") ? existing.syncStatus : "local",
+      syncStatus: "pending", // Force queue for sync on any update
       syncError: null,
       syncDate: null,
-      tasks: (tasks || []).map((t, idx) => ({
-        id: t.id || `${Date.now()}-${idx}`,
-        centroCosto: t.centroCosto || "",
-        empleado: t.empleado || "",
-        horasEstimadas: parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0,
-        descripcion: t.descripcion || "",
-        status: t.status || "Pendiente",
-        timerStart: t.timerStart || null,
-        timerStarted: t.timerStarted === true || t.timerStarted === 'true',
-        timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : []
-      }))
+      tasks: (tasks || []).map((t, idx) => {
+        const existingTask = existing.tasks ? existing.tasks.find(et => et.id === t.id) : null;
+        let synced = existingTask ? (existingTask.synced === true) : false;
+        let taxesRealizadaSynced = existingTask ? (existingTask.taxesRealizadaSynced === true) : false;
+        
+        // If status changed to Finalizada, reset the updated flag so we sync the update to Taxes
+        if (t.status === "Finalizada" && (!existingTask || existingTask.status !== "Finalizada")) {
+          taxesRealizadaSynced = false;
+        }
+
+        return {
+          id: t.id || `${Date.now()}-${idx}`,
+          centroCosto: t.centroCosto || "",
+          empleado: t.empleado || "",
+          horasEstimadas: parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0,
+          descripcion: t.descripcion || "",
+          status: t.status || "Pendiente",
+          timerStart: t.timerStart || null,
+          timerStarted: t.timerStarted === true || t.timerStarted === 'true',
+          timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : [],
+          synced: synced,
+          taxesRealizadaSynced: taxesRealizadaSynced
+        };
+      })
     });
 
     // Trigger Google Sheets update asynchronously for any newly finalized tasks

@@ -291,11 +291,9 @@ class LocalDB {
       status: t.status || "Pendiente", // Pendiente, Finalizada
       timerStart: t.timerStart || null,
       timerStarted: t.timerStarted === true || t.timerStarted === 'true',
-      timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : []
+      timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : [],
+      synced: false // Tracks if initially created in Taxes
     }));
-
-    // If any task is "Pendiente" or there are no tasks, keep it "local" (do not sync yet)
-    const allCompleted = tasks.length > 0 && tasks.every(t => t.status === "Finalizada");
 
     // Create new Work Order object with defaults
     const newOrder = {
@@ -307,12 +305,13 @@ class LocalDB {
       interno: orderData.interno || "",
       clasificacion: orderData.clasificacion || "",
       incidente: orderData.incidente || "",
-      syncStatus: "local",
+      syncStatus: "pending", // Always queue for sync immediately on creation
       syncError: null,
       syncDate: null,
       createdAt: new Date().toISOString(),
       tasks: tasks,
-      createdBy: orderData.createdBy ? normalizeEmail(orderData.createdBy) : null
+      createdBy: orderData.createdBy ? normalizeEmail(orderData.createdBy) : null,
+      taxesOrderNumber: null // Capture from Taxes toast notification
     };
 
     db.workOrders.push(newOrder);

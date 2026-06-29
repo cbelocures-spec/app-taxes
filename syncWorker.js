@@ -1095,15 +1095,6 @@ async function syncWorkOrder(orderId) {
   const order = db.getWorkOrderById(orderId);
   if (!order) return { success: false, message: "Order not found" };
 
-  const allCompleted = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t.status === "Finalizada");
-  if (!allCompleted) {
-    db.updateWorkOrder(orderId, {
-      syncStatus: "error",
-      syncError: "No se puede subir a Taxes: la orden tiene tareas en proceso o incompletas."
-    });
-    return { success: false, message: "La orden tiene tareas en proceso o incompletas" };
-  }
-
   const settings = db.getSettings();
   
   // Resolve user credentials for this order
@@ -1150,7 +1141,252 @@ async function syncWorkOrder(orderId) {
       throw new Error(`Credenciales inválidas o el usuario ${username} no existe en Taxes.com.ar`);
     }
 
-    // 2. NAVIGATE TO NEW WORK ORDER FORM
+    // 2. NAVIGATE TO CORRECT PAGE
+    if (order.taxesOrderNumber) {
+      console.log(`Order already has a Taxes OT number (${order.taxesOrderNumber}). Running task update/creation flow...`);
+      
+      // Go to Tareas OT page
+      await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+      await delay(3000);
+
+      for (let i = 0; i < order.tasks.length; i++) {
+        const task = order.tasks[i];
+
+        // Case 1: NEW task (not yet synced to Taxes)
+        if (task.synced === false) {
+          console.log(`Task #${i+1} is not synced. Adding as a new task to OT ${order.taxesOrderNumber}...`);
+          
+          // Click "+ NUEVO"
+          const newClicked = await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button, a'));
+            const newBtn = btns.find(b => b.textContent.toLowerCase().includes('nuevo') || b.textContent.toLowerCase().includes('+ nuevo'));
+            if (newBtn) { newBtn.click(); return true; }
+            return false;
+          });
+          if (!newClicked) throw new Error("No se pudo encontrar el botón NUEVO en la página de Tareas.");
+          await delay(3000);
+
+          // Fill form
+          // N° OT
+          const otFilled = await fillSearchableSelect(page, 'N° OT', order.taxesOrderNumber);
+          if (!otFilled) throw new Error(`No se pudo seleccionar la Orden de Trabajo N°: "${order.taxesOrderNumber}"`);
+          
+          // Centro de Costo
+          const ccSelected = await page.evaluate((ccVal) => {
+            const select = Array.from(document.querySelectorAll('select')).find(s => {
+              const parent = s.closest('.form-group') || s.closest('.taxes-form-group') || s.parentElement;
+              return parent && parent.textContent.toLowerCase().includes('centro de costo');
+            });
+            if (select) {
+              const clean = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+              const target = clean(ccVal);
+              const opt = Array.from(select.options).find(o => clean(o.text).includes(target) || clean(o.value) === target);
+              if (opt) {
+                select.value = opt.value;
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                return true;
+              }
+            }
+            return false;
+          }, task.centroCosto);
+          if (!ccSelected) throw new Error(`No se pudo seleccionar el Centro de Costo: "${task.centroCosto}"`);
+          await delay(1000);
+
+          // Empleado
+          const empFilled = await fillSearchableSelect(page, 'Empleado', task.empleado);
+          if (!empFilled) throw new Error(`No se pudo seleccionar el Empleado: "${task.empleado}"`);
+
+          // Horas Estimadas
+          await page.evaluate((hours) => {
+            const input = Array.from(document.querySelectorAll('input')).find(i => {
+              const parent = i.closest('.form-group') || i.closest('.taxes-form-group') || i.parentElement;
+              return parent && parent.textContent.toLowerCase().includes('horas estimadas');
+            });
+            if (input) {
+              input.focus();
+              input.value = String(hours).replace(',', '.');
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }, task.horasEstimadas);
+
+          // Descripcion
+          await page.evaluate((desc) => {
+            const textarea = document.querySelector('textarea');
+            if (textarea) {
+              textarea.focus();
+              textarea.value = desc;
+              textarea.dispatchEvent(new Event('input', { bubbles: true }));
+              textarea.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }, task.descripcion);
+
+          // Realizada Toggle (if Finalizada)
+          if (task.status && task.status.toLowerCase() === 'finalizada') {
+            await page.evaluate(() => {
+              const switchEl = document.querySelector('.custom-control.custom-switch');
+              if (switchEl) {
+                const checkbox = switchEl.querySelector('input[type="checkbox"]');
+                if (checkbox && !checkbox.checked) {
+                  const label = switchEl.querySelector('label');
+                  if (label) label.click();
+                }
+              }
+            });
+          }
+
+          // GUARDAR
+          const saveClicked = await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button'));
+            const saveBtn = btns.find(b => b.textContent.toLowerCase().includes('guardar'));
+            if (saveBtn) { saveBtn.click(); return true; }
+            return false;
+          });
+          if (!saveClicked) throw new Error("No se pudo guardar la nueva tarea.");
+          
+          await delay(4000); // Wait for database save and redirect
+
+          // Update database task synced flags
+          task.synced = true;
+          if (task.status === "Finalizada") {
+            task.taxesRealizadaSynced = true;
+          }
+          db.updateWorkOrder(orderId, { tasks: order.tasks });
+          
+          // Go back to the Tareas list page for the next task
+          await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+          await delay(2000);
+        }
+        
+        // Case 2: EXISTING task that is now "Finalizada" but not yet marked as completed on Taxes
+        else if (task.status === "Finalizada" && task.taxesRealizadaSynced !== true) {
+          console.log(`Task #${i+1} was previously synced but is now Finalizada. Updating status to Realizada on Taxes...`);
+          
+          // Search for OT number on the Tareas page search input
+          await page.evaluate((otNum) => {
+            const labels = Array.from(document.querySelectorAll('label, span, div'));
+            const otLabel = labels.find(l => {
+              const txt = l.textContent.toLowerCase();
+              return txt.includes('buscar por numero') || txt.includes('titulo de ot');
+            });
+            let input = null;
+            if (otLabel) {
+              if (otLabel.tagName === 'LABEL' && otLabel.getAttribute('for')) {
+                input = document.getElementById(otLabel.getAttribute('for'));
+              }
+              if (!input) {
+                const parent = otLabel.parentElement;
+                input = parent ? parent.querySelector('input') : null;
+              }
+            }
+            if (!input) {
+              const allInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+              input = allInputs[1] || allInputs[0];
+            }
+            if (input) {
+              input.value = otNum;
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }, order.taxesOrderNumber);
+
+          // Click "BUSCAR"
+          await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button, a'));
+            const searchBtn = btns.find(b => b.textContent.toLowerCase().includes('buscar'));
+            if (searchBtn) searchBtn.click();
+          });
+          await delay(3000); // Wait for table reload
+
+          // Click "eye" icon for the matching row
+          const eyeClicked = await page.evaluate((empName, descText) => {
+            const clean = (str) => {
+              if (!str) return '';
+              return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+            };
+            const cleanEmp = clean(empName);
+            const cleanDesc = clean(descText);
+            
+            const rows = Array.from(document.querySelectorAll('table tbody tr'));
+            for (const row of rows) {
+              const cells = Array.from(row.querySelectorAll('td'));
+              if (cells.length >= 10) {
+                const rowEmp = clean(cells[5].textContent);
+                const rowDesc = clean(cells[7].textContent);
+                if ((rowEmp.includes(cleanEmp) || cleanEmp.includes(rowEmp)) &&
+                    (rowDesc.includes(cleanDesc) || cleanDesc.includes(rowDesc))) {
+                  const eyeBtn = cells[9].querySelector('a, button');
+                  if (eyeBtn) { eyeBtn.click(); return true; }
+                }
+              }
+            }
+            return false;
+          }, task.empleado, task.descripcion);
+
+          if (!eyeClicked) {
+            console.log(`Warning: Task #${i+1} matching "${task.empleado}" and "${task.descripcion}" was not found on the Tareas table. It might have been deleted on Taxes.`);
+            continue;
+          }
+
+          await delay(3000); // Wait for task form page to load
+
+          // Fill Horas Estimadas
+          await page.evaluate((hours) => {
+            const input = Array.from(document.querySelectorAll('input')).find(i => {
+              const parent = i.closest('.form-group') || i.closest('.taxes-form-group') || i.parentElement;
+              return parent && parent.textContent.toLowerCase().includes('horas estimadas');
+            });
+            if (input) {
+              input.focus();
+              input.value = String(hours).replace(',', '.');
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }, task.horasEstimadas);
+
+          // Toggle "Realizada" to ON
+          await page.evaluate(() => {
+            const switchEl = document.querySelector('.custom-control.custom-switch');
+            if (switchEl) {
+              const checkbox = switchEl.querySelector('input[type="checkbox"]');
+              if (checkbox && !checkbox.checked) {
+                const label = switchEl.querySelector('label');
+                if (label) label.click();
+              }
+            }
+          });
+
+          // Click GUARDAR
+          const saveClicked = await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button'));
+            const saveBtn = btns.find(b => b.textContent.toLowerCase().includes('guardar'));
+            if (saveBtn) { saveBtn.click(); return true; }
+            return false;
+          });
+          if (!saveClicked) throw new Error("No se pudo guardar la actualización de la tarea.");
+          
+          await delay(4000); // Wait for save and redirect
+
+          // Update database task
+          task.taxesRealizadaSynced = true;
+          db.updateWorkOrder(orderId, { tasks: order.tasks });
+
+          // Go back to the Tareas list page for the next task
+          await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+          await delay(2000);
+        }
+      }
+
+      db.updateWorkOrder(orderId, {
+        syncStatus: "success",
+        syncDate: new Date().toISOString(),
+        syncError: null
+      });
+
+      await browser.close();
+      return { success: true, message: `Tareas de la Orden ${order.taxesOrderNumber} actualizadas correctamente.` };
+    }
+
     console.log("Navigating directly to Ordenes de Trabajo list page...");
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
     
@@ -1602,11 +1838,55 @@ async function syncWorkOrder(orderId) {
       throw new Error("El formulario no se guardó correctamente en Taxes.com.ar (sigue abierto o no se redirigió).");
     }
 
+    // Extract Taxes OT number from green toast notifications
+    console.log("Looking for Taxes Work Order Number from toast notifications...");
+    const taxesOrderNumber = await page.evaluate(() => {
+      const elements = Array.from(document.querySelectorAll('.toast, .b-toast, .alert, div, p, span'));
+      for (const el of elements) {
+        const text = el.textContent.trim();
+        const match = text.match(/Orden de Trabajo N\s*(\d+)\s*Creada/i) || 
+                      text.match(/Orden\s*N\s*(\d+)/i) || 
+                      text.match(/N\s*(\d+)\s*Creada/i);
+        if (match && match[1]) {
+          return match[1];
+        }
+      }
+      return null;
+    });
+
+    if (taxesOrderNumber) {
+      console.log(`Successfully captured Taxes Order Number: ${taxesOrderNumber}`);
+    } else {
+      console.log("Warning: Could not capture Taxes Order Number from toast notifications.");
+    }
+
+    // Close any visible toast notifications by clicking close button inside them
+    await page.evaluate(() => {
+      const closeButtons = Array.from(document.querySelectorAll('.toast button.close, .b-toast button.close, .toast .close, .b-toast .close, .toast button, .b-toast button'));
+      closeButtons.forEach(btn => btn.click());
+    }).catch(() => {});
+
     console.log(`Sync success for OT #${order.interno}!`);
+    
+    // Mark all initial tasks as synced
+    const updatedTasks = order.tasks.map(t => {
+      let taxesRealizadaSynced = t.taxesRealizadaSynced === true;
+      if (t.status === "Finalizada") {
+        taxesRealizadaSynced = true;
+      }
+      return {
+        ...t,
+        synced: true,
+        taxesRealizadaSynced: taxesRealizadaSynced
+      };
+    });
+
     db.updateWorkOrder(orderId, {
       syncStatus: "success",
       syncDate: new Date().toISOString(),
-      syncError: null
+      syncError: null,
+      taxesOrderNumber: taxesOrderNumber || null,
+      tasks: updatedTasks
     });
 
     await browser.close();

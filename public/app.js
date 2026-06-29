@@ -1516,17 +1516,11 @@ function createOrderCardHtml(order) {
               <span class="material-icons">edit</span>
             </button>
           ` : ''}
-          ${(order.syncStatus === 'local' || order.syncStatus === 'error') ? (
-            hasPendingTasks ? `
-              <button class="icon-btn success" style="background-color: #cbd5e1; color: #64748b; cursor: not-allowed;" onclick="showToast('No se puede subir: la orden tiene tareas en proceso o incompletas.', 'warning')" title="No se puede subir: tareas en proceso o incompletas">
-                <span class="material-icons">cloud_upload</span>
-              </button>
-            ` : `
-              <button class="icon-btn success" onclick="retrySync('${order.id}')" title="Subir a Taxes">
-                <span class="material-icons">cloud_upload</span>
-              </button>
-            `
-          ) : ''}
+          ${(order.syncStatus === 'local' || order.syncStatus === 'error') ? `
+            <button class="icon-btn success" onclick="retrySync('${order.id}')" title="Subir a Taxes">
+              <span class="material-icons">cloud_upload</span>
+            </button>
+          ` : ''}
           <button class="icon-btn danger" onclick="deleteOrder('${order.id}')" title="Eliminar Localmente">
             <span class="material-icons">delete</span>
           </button>
@@ -1552,15 +1546,9 @@ function createQueueCardHtml(order) {
         <button class="btn btn-warning btn-sm" onclick="editOrder('${order.id}')" style="display:flex; align-items:center; gap:4px;">
           <span class="material-icons" style="font-size:16px;">edit</span> Editar
         </button>
-        ${hasPendingTasks ? `
-          <button class="btn btn-secondary btn-sm" onclick="showToast('No se puede subir: la orden tiene tareas en proceso o incompletas.', 'warning')" style="display:flex; align-items:center; gap:4px; cursor: not-allowed; opacity: 0.6;" title="Tareas en proceso o incompletas">
-            <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
-          </button>
-        ` : `
-          <button class="btn btn-success btn-sm" onclick="retrySync('${order.id}')" style="display:flex; align-items:center; gap:4px; background-color: var(--success); color: white; border-color: var(--success);">
-            <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
-          </button>
-        `}
+        <button class="btn btn-success btn-sm" onclick="retrySync('${order.id}')" style="display:flex; align-items:center; gap:4px; background-color: var(--success); color: white; border-color: var(--success);">
+          <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
+        </button>
       </div>
     `;
   } else if (order.syncStatus === 'syncing') {
@@ -1574,15 +1562,9 @@ function createQueueCardHtml(order) {
         <button class="btn btn-warning btn-sm" onclick="editOrder('${order.id}')" style="display:flex; align-items:center; gap:4px;">
           <span class="material-icons" style="font-size:16px;">edit</span> Editar
         </button>
-        ${hasPendingTasks ? `
-          <button class="btn btn-secondary btn-sm" onclick="showToast('No se puede subir: la orden tiene tareas en proceso o incompletas.', 'warning')" style="display:flex; align-items:center; gap:4px; cursor: not-allowed; opacity: 0.6;" title="Tareas en proceso o incompletas">
-            <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
-          </button>
-        ` : `
-          <button class="btn btn-success btn-sm" onclick="retrySync('${order.id}')" style="display:flex; align-items:center; gap:4px; background-color: var(--success); color: white; border-color: var(--success);">
-            <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
-          </button>
-        `}
+        <button class="btn btn-success btn-sm" onclick="retrySync('${order.id}')" style="display:flex; align-items:center; gap:4px; background-color: var(--success); color: white; border-color: var(--success);">
+          <span class="material-icons" style="font-size:16px;">cloud_upload</span> Subir
+        </button>
       </div>
     `;
   }
