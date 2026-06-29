@@ -1222,16 +1222,26 @@ async function syncWorkOrder(orderId) {
       
       if (!matched && username) {
         const prefix = username.split('@')[0].toLowerCase().trim();
-        const parts = prefix.split(/[\._\-]/).filter(p => p.length >= 3);
-        if (parts.length > 0) {
-          matched = list.find(r => {
-            const cleanedLabel = cleanText(r.label);
-            return parts.some(part => cleanedLabel.includes(cleanText(part)));
-          });
+        const cleanedPrefix = cleanText(prefix);
+        
+        // 1. Exact/partial match with full prefix (e.g. jcarmona)
+        matched = list.find(r => cleanText(r.label).includes(cleanedPrefix));
+        
+        // 2. Try match with prefix minus first letter (e.g. jcarmona -> carmona)
+        if (!matched && prefix.length > 3) {
+          const suffix = cleanText(prefix.substring(1));
+          matched = list.find(r => cleanText(r.label).includes(suffix));
         }
+        
+        // 3. Try splitting by dot/hyphen/underscore (e.g. j.carmona -> carmona)
         if (!matched) {
-          const cleanedPrefix = cleanText(prefix);
-          matched = list.find(r => cleanText(r.label).includes(cleanedPrefix));
+          const parts = prefix.split(/[\._\-]/).filter(p => p.length >= 3);
+          if (parts.length > 0) {
+            matched = list.find(r => {
+              const cleanedLabel = cleanText(r.label);
+              return parts.some(part => cleanedLabel.includes(cleanText(part)));
+            });
+          }
         }
       }
 
