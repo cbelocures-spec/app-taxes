@@ -1206,8 +1206,10 @@ async function syncWorkOrder(orderId) {
           await delay(1000);
 
           // Empleado
-          const empFilled = await fillSearchableSelect(page, 'Empleado', task.empleado);
-          if (!empFilled) throw new Error(`No se pudo seleccionar el Empleado: "${task.empleado}"`);
+          const employeeObj = (db.getCatalogs().empleados || []).find(e => String(e.value) === String(task.empleado));
+          const employeeLabel = employeeObj ? employeeObj.label : task.empleado;
+          const empFilled = await fillSearchableSelect(page, 'Empleado', employeeLabel);
+          if (!empFilled) throw new Error(`No se pudo seleccionar el Empleado: "${employeeLabel}"`);
 
           // Horas Estimadas
           await page.evaluate((hours) => {
@@ -1312,6 +1314,9 @@ async function syncWorkOrder(orderId) {
           await delay(3000); // Wait for table reload
 
           // Click "eye" icon for the matching row
+          const employeeObj = (db.getCatalogs().empleados || []).find(e => String(e.value) === String(task.empleado));
+          const employeeLabel = employeeObj ? employeeObj.label : task.empleado;
+
           const eyeClicked = await page.evaluate((empName, descText) => {
             const clean = (str) => {
               if (!str) return '';
@@ -1334,10 +1339,10 @@ async function syncWorkOrder(orderId) {
               }
             }
             return false;
-          }, task.empleado, task.descripcion);
+          }, employeeLabel, task.descripcion);
 
           if (!eyeClicked) {
-            console.log(`Warning: Task #${i+1} matching "${task.empleado}" and "${task.descripcion}" was not found on the Tareas table. It might have been deleted on Taxes.`);
+            console.log(`Warning: Task #${i+1} matching "${employeeLabel}" and "${task.descripcion}" was not found on the Tareas table. It might have been deleted on Taxes.`);
             continue;
           }
 
