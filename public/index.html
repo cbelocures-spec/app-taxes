@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=17">
+  <link rel="stylesheet" href="style.css?v=18">
 </head>
 <body>
 
@@ -34,6 +34,12 @@
 
   <!-- Main View Container -->
   <main class="app-container">
+    <!-- Sector Tabs (Visible only for Admin users) -->
+    <div id="sector-tabs-bar" class="sector-tabs-bar" style="display: none;">
+      <button type="button" class="sector-tab active" onclick="switchSector('Taller')">Taller</button>
+      <button type="button" class="sector-tab" onclick="switchSector('Herrería')">Herrería</button>
+      <button type="button" class="sector-tab" onclick="switchSector('Edilicio')">Edilicio</button>
+    </div>
 
     <!-- VIEW 1: HOME (INICIO) -->
     <section id="view-home" class="app-view active">
@@ -753,6 +759,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

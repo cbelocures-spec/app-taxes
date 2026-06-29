@@ -1276,8 +1276,10 @@ function renderOrders() {
   
   if (!container) return;
 
+  const filteredActiveOrders = getFilteredActiveOrders();
+
   // Clean up selected IDs that are no longer local or error
-  const syncableIds = new Set(activeOrders.filter(o => o.syncStatus === 'local' || o.syncStatus === 'error').map(o => o.id));
+  const syncableIds = new Set(filteredActiveOrders.filter(o => o.syncStatus === 'local' || o.syncStatus === 'error').map(o => o.id));
   for (const id of selectedOrderIds) {
     if (!syncableIds.has(id)) {
       selectedOrderIds.delete(id);
@@ -1286,7 +1288,7 @@ function renderOrders() {
   updateBulkSyncActionBar();
 
   // Clean up selected history IDs that are no longer success synced
-  const syncedIds = new Set(activeOrders.filter(o => o.syncStatus === 'success').map(o => o.id));
+  const syncedIds = new Set(filteredActiveOrders.filter(o => o.syncStatus === 'success').map(o => o.id));
   for (const id of selectedHistoryOrderIds) {
     if (!syncedIds.has(id)) {
       selectedHistoryOrderIds.delete(id);
@@ -1296,7 +1298,7 @@ function renderOrders() {
 
   // Apply search filtering for active (non-synced) orders
   const query = document.getElementById('order-search').value.toLowerCase();
-  const activeLocalOrders = activeOrders.filter(o => o.syncStatus !== 'success');
+  const activeLocalOrders = filteredActiveOrders.filter(o => o.syncStatus !== 'success');
   const filtered = activeLocalOrders.filter(o => 
     (o.rodado || '').toLowerCase().includes(query) || 
     (o.interno || '').toLowerCase().includes(query) || 
@@ -1320,7 +1322,7 @@ function renderOrders() {
     const historySearchEl = document.getElementById('history-search');
     const historyQuery = historySearchEl ? historySearchEl.value.toLowerCase() : '';
     
-    const syncedOrders = activeOrders.filter(o => o.syncStatus === 'success');
+    const syncedOrders = filteredActiveOrders.filter(o => o.syncStatus === 'success');
     const filteredHistory = syncedOrders.filter(o => 
       (o.rodado || '').toLowerCase().includes(historyQuery) || 
       (o.interno || '').toLowerCase().includes(historyQuery) || 
@@ -1341,7 +1343,7 @@ function renderOrders() {
 
   // Render Sync Queue (only pending, syncing, or error ones)
   if (queueContainer) {
-    const queueOrders = activeOrders.filter(o => o.syncStatus !== 'success');
+    const queueOrders = filteredActiveOrders.filter(o => o.syncStatus !== 'success');
     if (queueOrders.length === 0) {
       queueContainer.innerHTML = `
         <div class="empty-state">
@@ -1392,9 +1394,10 @@ function createHistoryCardHtml(order) {
 }
 
 function updateStats() {
-  const total = activeOrders.length;
-  const synced = activeOrders.filter(o => o.syncStatus === 'success').length;
-  const pending = activeOrders.filter(o => o.syncStatus === 'pending' || o.syncStatus === 'syncing').length;
+  const filtered = getFilteredActiveOrders();
+  const total = filtered.length;
+  const synced = filtered.filter(o => o.syncStatus === 'success').length;
+  const pending = filtered.filter(o => o.syncStatus === 'pending' || o.syncStatus === 'syncing').length;
 
   document.getElementById('stat-total').textContent = total;
   document.getElementById('stat-synced').textContent = synced;
@@ -2358,7 +2361,7 @@ function renderDashboard() {
     }
 
     // Active tasks from all orders (including local, error, pending, syncing, success)
-    const activeLocalOrders = activeOrders || [];
+    const activeLocalOrders = getFilteredActiveOrders();
     
     const workingTasks = [];
     const pausedTasks = [];
@@ -4002,6 +4005,130 @@ function togglePasswordVisibility(inputId) {
   }
 }
 
+// Utility to determine sector by username (client-side)
+function getSectorByUsername(username) {
+  if (!username) return 'Taller';
+  const email = username.toLowerCase().trim();
+  
+  if (email === 'taller@contenedoreshugo.com.ar' || email === 'paniol@contenedoreshugo.com.ar') {
+    return 'Admin';
+  }
+  if (email === 'j.carmona@contenedoreshugo.com.ar') {
+    return 'Herrería';
+  }
+  if (email === 'ftoledo@contenedoreshugo.com.ar') {
+    return 'Edilicio';
+  }
+  return 'Taller';
+}
+
+let currentSelectedSector = 'Taller';
+
+function switchSector(sector) {
+  currentSelectedSector = sector;
+  
+  // Update active class on tab buttons
+  const tabs = document.querySelectorAll('.sector-tab');
+  tabs.forEach(tab => {
+    if (tab.textContent.trim() === sector) {
+      tab.classList.add('active');
+    } else {
+      tab.classList.remove('active');
+    }
+  });
+
+  // Re-filter and render
+  renderOrders();
+  renderDashboard();
+  updateStats();
+  updateClassificationSelectOptions();
+}
+
+function updateClassificationSelectOptions() {
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+  
+  const selects = [
+    { id: 'bulk-clasificacion', defaultText: 'Seleccionar...' },
+    { id: 'pre-form-clasificacion', defaultText: 'Seleccionar Clasificación...' },
+    { id: 'form-clasificacion', defaultText: 'Seleccionar...' }
+  ];
+
+  selects.forEach(sel => {
+    const el = document.getElementById(sel.id);
+    if (!el) return;
+
+    let html = '';
+    if (userSector === 'Herrería') {
+      html = `<option value="Herrería" selected>Herrería</option>`;
+    } else if (userSector === 'Edilicio') {
+      html = `<option value="Edilicio" selected>Edilicio</option>`;
+    } else if (userSector === 'Admin') {
+      const target = currentSelectedSector;
+      html = `
+        <option value="" ${!target ? "selected" : ""} disabled>${sel.defaultText}</option>
+        <option value="Preventivo" ${target === 'Taller' ? "selected" : ""}>Preventivo</option>
+        <option value="Auxilio">Auxilio</option>
+        <option value="Correctivo">Correctivo</option>
+        <option value="Herrería" ${target === 'Herrería' ? "selected" : ""}>Herrería</option>
+        <option value="Edilicio" ${target === 'Edilicio' ? "selected" : ""}>Edilicio</option>
+      `;
+      if (sel.id === 'pre-form-clasificacion') {
+        html = `
+          <option value="">${sel.defaultText}</option>
+          <option value="Correctivo">Correctivo</option>
+          <option value="Preventivo">Preventivo</option>
+          <option value="Auxilio">Auxilio</option>
+          <option value="Herrería" ${target === 'Herrería' ? "selected" : ""}>Herrería</option>
+          <option value="Edilicio" ${target === 'Edilicio' ? "selected" : ""}>Edilicio</option>
+        `;
+      }
+    } else {
+      // Taller
+      html = `
+        <option value="" selected disabled>${sel.defaultText}</option>
+        <option value="Preventivo">Preventivo</option>
+        <option value="Auxilio">Auxilio</option>
+        <option value="Correctivo">Correctivo</option>
+      `;
+      if (sel.id === 'pre-form-clasificacion') {
+        html = `
+          <option value="">${sel.defaultText}</option>
+          <option value="Correctivo">Correctivo</option>
+          <option value="Preventivo">Preventivo</option>
+          <option value="Auxilio">Auxilio</option>
+        `;
+      }
+    }
+    el.innerHTML = html;
+  });
+}
+
+function getFilteredActiveOrders() {
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+
+  if (!activeOrders || !Array.isArray(activeOrders)) return [];
+
+  // Determine active sector filter
+  let sectorFilter = currentSelectedSector;
+  if (userSector !== 'Admin') {
+    sectorFilter = userSector;
+  }
+
+  return activeOrders.filter(o => {
+    const cls = o.clasificacion;
+    if (sectorFilter === 'Herrería') {
+      return cls === 'Herrería';
+    }
+    if (sectorFilter === 'Edilicio') {
+      return cls === 'Edilicio';
+    }
+    // Taller sees everything EXCEPT Herrería and Edilicio
+    return cls !== 'Herrería' && cls !== 'Edilicio';
+  });
+}
+
 function checkUserSession() {
   const username = localStorage.getItem('currentUserUsername');
   const loginOverlay = document.getElementById('login-overlay');
@@ -4014,6 +4141,20 @@ function checkUserSession() {
     if (userDisplay) {
       userDisplay.textContent = username;
     }
+    
+    // Check role and update tabs bar
+    const sector = getSectorByUsername(username);
+    const tabsBar = document.getElementById('sector-tabs-bar');
+    if (tabsBar) {
+      if (sector === 'Admin') {
+        tabsBar.style.display = 'flex';
+      } else {
+        tabsBar.style.display = 'none';
+        currentSelectedSector = sector; // Lock to their sector
+      }
+    }
+    
+    updateClassificationSelectOptions();
   }
 }
 

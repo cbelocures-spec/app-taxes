@@ -75,12 +75,29 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
 
+// Utility to determine sector by username
+function getSectorByUsername(username) {
+  if (!username) return 'Taller';
+  const email = username.toLowerCase().trim();
+  
+  if (email === 'taller@contenedoreshugo.com.ar' || email === 'paniol@contenedoreshugo.com.ar') {
+    return 'Admin';
+  }
+  if (email === 'j.carmona@contenedoreshugo.com.ar') {
+    return 'Herrería';
+  }
+  if (email === 'ftoledo@contenedoreshugo.com.ar') {
+    return 'Edilicio';
+  }
+  return 'Taller';
+}
+
 // User Login (saves credentials locally for worker lookup)
 app.post('/api/login', (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
-      return res.status(400).json({ error: "Usuario y contrase\u00f1a son requeridos." });
+      return res.status(400).json({ error: "Usuario y contraseña son requeridos." });
     }
 
     // Save this user's credentials in per-user store (used by syncWorkOrder per order)
@@ -111,19 +128,33 @@ app.post('/api/login', (req, res) => {
       console.log(`[Login] Secondary user ${username} logged in (global settings kept for ${currentSettings.username}).`);
     }
 
-    res.json({ success: true, username: user.username });
+    res.json({ success: true, username: user.username, sector: getSectorByUsername(username) });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 
-// Get all work orders
+// Get all work orders (filtered by user sector)
 app.get('/api/orders', (req, res) => {
   try {
+    const username = req.headers['x-user-username'] || null;
+    const sector = getSectorByUsername(username);
+
     const orders = db.getWorkOrders();
+    
+    // Filter orders
+    const filtered = orders.filter(o => {
+      const cls = o.clasificacion;
+      if (sector === 'Admin') return true;
+      if (sector === 'Herrería') return cls === 'Herrería';
+      if (sector === 'Edilicio') return cls === 'Edilicio';
+      // Taller sees only Taller orders (neither Herrería nor Edilicio)
+      return cls !== 'Herrería' && cls !== 'Edilicio';
+    });
+
     // Sort by createdAt descending
-    const sorted = [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     res.json(sorted);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -140,6 +171,19 @@ app.post('/api/orders', (req, res) => {
     }
 
     const createdBy = req.headers['x-user-username'] || null;
+    const sector = getSectorByUsername(createdBy);
+
+    // Validate/force classification by sector
+    let finalClasificacion = clasificacion;
+    if (sector === 'Herrería') {
+      finalClasificacion = 'Herrería';
+    } else if (sector === 'Edilicio') {
+      finalClasificacion = 'Edilicio';
+    } else if (sector === 'Taller') {
+      if (clasificacion === 'Herrería' || clasificacion === 'Edilicio') {
+        return res.status(400).json({ error: "Clasificación no permitida para el sector Taller." });
+      }
+    }
 
     const newOrder = db.createWorkOrder({
       rodado,
@@ -147,7 +191,7 @@ app.post('/api/orders', (req, res) => {
       fechaEntrega,
       horario,
       interno,
-      clasificacion,
+      clasificacion: finalClasificacion,
       incidente,
       tasks,
       createdBy
@@ -172,7 +216,34 @@ app.put('/api/orders/:id', (req, res) => {
       return res.status(404).json({ error: "Orden no encontrada" });
     }
 
-    const createdBy = existing.createdBy || req.headers['x-user-username'];
+    const requester = req.headers['x-user-username'] || null;
+    const sector = getSectorByUsername(requester);
+
+    // Check sector permission
+    const existingCls = existing.clasificacion;
+    if (sector === 'Herrería' && existingCls !== 'Herrería') {
+      return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
+    }
+    if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
+      return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
+    }
+    if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
+      return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
+    }
+
+    // Force sector classification
+    let finalClasificacion = clasificacion;
+    if (sector === 'Herrería') {
+      finalClasificacion = 'Herrería';
+    } else if (sector === 'Edilicio') {
+      finalClasificacion = 'Edilicio';
+    } else if (sector === 'Taller') {
+      if (clasificacion === 'Herrería' || clasificacion === 'Edilicio') {
+        return res.status(400).json({ error: "Clasificación no permitida para el sector Taller." });
+      }
+    }
+
+    const createdBy = existing.createdBy || requester;
     const allTasksCompleted = (tasks || []).length > 0 && (tasks || []).every(t => t.status === "Finalizada");
 
     const updated = db.updateWorkOrder(req.params.id, {
@@ -181,7 +252,7 @@ app.put('/api/orders/:id', (req, res) => {
       fechaEntrega,
       horario,
       interno,
-      clasificacion,
+      clasificacion: finalClasificacion,
       incidente,
       createdBy,
       syncStatus: (existing.syncStatus === "pending" || existing.syncStatus === "syncing") ? existing.syncStatus : "local",
@@ -212,6 +283,26 @@ app.put('/api/orders/:id', (req, res) => {
 // Delete a work order (local only)
 app.delete('/api/orders/:id', (req, res) => {
   try {
+    const existing = db.getWorkOrderById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: "Orden no encontrada" });
+    }
+
+    const requester = req.headers['x-user-username'] || null;
+    const sector = getSectorByUsername(requester);
+
+    // Check sector permission
+    const existingCls = existing.clasificacion;
+    if (sector === 'Herrería' && existingCls !== 'Herrería') {
+      return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
+    }
+    if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
+      return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
+    }
+    if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
+      return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
+    }
+
     const success = db.deleteWorkOrder(req.params.id);
     res.json({ success });
   } catch (error) {
@@ -225,6 +316,21 @@ app.post('/api/orders/retry/:id', async (req, res) => {
     const order = db.getWorkOrderById(req.params.id);
     if (!order) {
       return res.status(404).json({ error: "Orden no encontrada" });
+    }
+
+    const requester = req.headers['x-user-username'] || null;
+    const sector = getSectorByUsername(requester);
+
+    // Check sector permission
+    const existingCls = order.clasificacion;
+    if (sector === 'Herrería' && existingCls !== 'Herrería') {
+      return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
+    }
+    if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
+      return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
+    }
+    if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
+      return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
     }
 
     const allCompleted = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t.status === "Finalizada");
