@@ -1275,10 +1275,13 @@ async function syncWorkOrder(orderId) {
           });
 
           if (hoursInputSelector1) {
-            await page.click(hoursInputSelector1);
-            await page.keyboard.down('Control');
-            await page.keyboard.press('A');
-            await page.keyboard.up('Control');
+            await page.evaluate((sel) => {
+              const el = document.querySelector(sel);
+              if (el) {
+                el.focus();
+                el.select();
+              }
+            }, hoursInputSelector1);
             await page.keyboard.press('Backspace');
             await page.keyboard.type(String(task.horasEstimadas).replace(',', '.'));
           }
@@ -1374,10 +1377,13 @@ async function syncWorkOrder(orderId) {
           });
 
           if (searchInputSelector) {
-            await page.click(searchInputSelector);
-            await page.keyboard.down('Control');
-            await page.keyboard.press('A');
-            await page.keyboard.up('Control');
+            await page.evaluate((sel) => {
+              const el = document.querySelector(sel);
+              if (el) {
+                el.focus();
+                el.select();
+              }
+            }, searchInputSelector);
             await page.keyboard.press('Backspace');
             await page.keyboard.type(String(order.taxesOrderNumber));
           }
@@ -1441,10 +1447,13 @@ async function syncWorkOrder(orderId) {
           });
 
           if (hoursInputSelector2) {
-            await page.click(hoursInputSelector2);
-            await page.keyboard.down('Control');
-            await page.keyboard.press('A');
-            await page.keyboard.up('Control');
+            await page.evaluate((sel) => {
+              const el = document.querySelector(sel);
+              if (el) {
+                el.focus();
+                el.select();
+              }
+            }, hoursInputSelector2);
             await page.keyboard.press('Backspace');
             await page.keyboard.type(String(task.horasEstimadas).replace(',', '.'));
           }
