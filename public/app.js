@@ -1476,14 +1476,20 @@ function createOrderCardHtml(order) {
                 const tasks = order.tasks || [];
                 const hasActiveOrPausedTimer = tasks.some(t => t.timerStarted || t.timerStart || t.status === 'En Proceso');
                 const isOutOfService = hasActiveOrPausedTimer || order.estadoUnidad === 'fuera_de_servicio';
+                const tooltip = hasActiveOrPausedTimer ? 'Forzado Fuera de Servicio por tareas activas o en proceso' : (isOutOfService ? 'Haga clic para cambiar a Operativo' : 'Haga clic para cambiar a Fuera de Servicio');
                 
-                if (isOutOfService) {
-                  const tooltip = hasActiveOrPausedTimer ? 'Forzado Fuera de Servicio por tareas activas' : 'Haga clic para pasar a Operativo';
-                  const clickAction = hasActiveOrPausedTimer ? '' : `onclick="toggleOrderEstadoUnidad(event, '${order.id}')"`;
-                  return `<span class="badge-status error" style="cursor: ${hasActiveOrPausedTimer ? 'not-allowed' : 'pointer'}; background-color: #fee2e2; color: #991b1b; border: 1px solid rgba(153,27,27,0.2); padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;" ${clickAction} title="${tooltip}"><span class="material-icons" style="font-size:10px;">warning</span> Fuera de Servicio</span>`;
-                } else {
-                  return `<span class="badge-status success" style="cursor: pointer; background-color: #d1fae5; color: #065f46; border: 1px solid rgba(6,95,70,0.2); padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;" onclick="toggleOrderEstadoUnidad(event, '${order.id}')" title="Haga clic para pasar a Fuera de Servicio"><span class="material-icons" style="font-size:10px;">check_circle</span> Operativo</span>`;
-                }
+                const clickAction = `onclick="toggleOrderEstadoUnidad(event, '${order.id}')"`;
+                
+                return `
+                  <div class="switch-container" style="display: inline-flex; align-items: center; gap: 6px; cursor: ${hasActiveOrPausedTimer ? 'not-allowed' : 'pointer'}; user-select: none; opacity: ${hasActiveOrPausedTimer ? '0.6' : '1'}; vertical-align: middle; margin-left: 8px;" ${clickAction} title="${tooltip}">
+                    <span style="font-size: 11px; font-weight: 600; color: ${isOutOfService ? '#ef4444' : '#10b981'}; text-transform: uppercase;">
+                      ${isOutOfService ? 'F. de Servicio' : 'Operativo'}
+                    </span>
+                    <span class="switch-pill" style="position: relative; display: inline-block; width: 32px; height: 18px; background-color: ${isOutOfService ? '#ef4444' : '#10b981'}; border-radius: 9px; transition: background-color 0.2s;">
+                      <span class="switch-thumb" style="position: absolute; top: 2px; left: ${isOutOfService ? '16px' : '2px'}; width: 14px; height: 14px; background-color: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
+                    </span>
+                  </div>
+                `;
               })()}
             </div>
           </div>
