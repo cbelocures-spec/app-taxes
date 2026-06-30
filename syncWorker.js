@@ -1260,18 +1260,28 @@ async function syncWorkOrder(orderId) {
           if (!empFilled) throw new Error(`No se pudo seleccionar el Empleado: "${employeeLabel}"`);
 
           // Horas Estimadas
-          await page.evaluate((hours) => {
+          const hoursInputSelector1 = await page.evaluate(() => {
             const input = Array.from(document.querySelectorAll('input')).find(i => {
               const parent = i.closest('.form-group') || i.closest('.taxes-form-group') || i.parentElement;
               return parent && parent.textContent.toLowerCase().includes('horas estimadas');
             });
             if (input) {
-              input.focus();
-              input.value = String(hours).replace(',', '.');
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-              input.dispatchEvent(new Event('change', { bubbles: true }));
+              if (!input.id) {
+                input.id = 'temp-hours-input-1';
+              }
+              return '#' + input.id;
             }
-          }, task.horasEstimadas);
+            return null;
+          });
+
+          if (hoursInputSelector1) {
+            await page.click(hoursInputSelector1);
+            await page.keyboard.down('Control');
+            await page.keyboard.press('A');
+            await page.keyboard.up('Control');
+            await page.keyboard.press('Backspace');
+            await page.keyboard.type(String(task.horasEstimadas).replace(',', '.'));
+          }
 
           // Descripcion
           await page.evaluate((desc) => {
@@ -1287,12 +1297,20 @@ async function syncWorkOrder(orderId) {
           // Realizada Toggle (if Finalizada)
           if (task.status && task.status.toLowerCase() === 'finalizada') {
             await page.evaluate(() => {
-              const switchEl = document.querySelector('.custom-control.custom-switch');
+              const switchGroups = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
+              const switchEl = switchGroups.find(el => {
+                const label = el.querySelector('.custom-control-label');
+                return label && label.textContent.toLowerCase().includes('realizada');
+              });
               if (switchEl) {
                 const checkbox = switchEl.querySelector('input[type="checkbox"]');
                 if (checkbox && !checkbox.checked) {
-                  const label = switchEl.querySelector('label');
-                  if (label) label.click();
+                  const label = switchEl.querySelector('.custom-control-label') || switchEl.querySelector('label');
+                  if (label) {
+                    label.click();
+                  } else {
+                    checkbox.click();
+                  }
                 }
               }
             });
@@ -1326,7 +1344,7 @@ async function syncWorkOrder(orderId) {
           console.log(`Task #${i+1} was previously synced but is now Finalizada. Updating status to Realizada on Taxes...`);
           
           // Search for OT number on the Tareas page search input
-          await page.evaluate((otNum) => {
+          const searchInputSelector = await page.evaluate(() => {
             const labels = Array.from(document.querySelectorAll('label, span, div'));
             const otLabel = labels.find(l => {
               const txt = l.textContent.toLowerCase();
@@ -1347,11 +1365,22 @@ async function syncWorkOrder(orderId) {
               input = allInputs[1] || allInputs[0];
             }
             if (input) {
-              input.value = otNum;
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-              input.dispatchEvent(new Event('change', { bubbles: true }));
+              if (!input.id) {
+                input.id = 'temp-ot-search-input';
+              }
+              return '#' + input.id;
             }
-          }, order.taxesOrderNumber);
+            return null;
+          });
+
+          if (searchInputSelector) {
+            await page.click(searchInputSelector);
+            await page.keyboard.down('Control');
+            await page.keyboard.press('A');
+            await page.keyboard.up('Control');
+            await page.keyboard.press('Backspace');
+            await page.keyboard.type(String(order.taxesOrderNumber));
+          }
 
           // Click "BUSCAR"
           await page.evaluate(() => {
@@ -1397,27 +1426,45 @@ async function syncWorkOrder(orderId) {
           await delay(3000); // Wait for task form page to load
 
           // Fill Horas Estimadas
-          await page.evaluate((hours) => {
+          const hoursInputSelector2 = await page.evaluate(() => {
             const input = Array.from(document.querySelectorAll('input')).find(i => {
               const parent = i.closest('.form-group') || i.closest('.taxes-form-group') || i.parentElement;
               return parent && parent.textContent.toLowerCase().includes('horas estimadas');
             });
             if (input) {
-              input.focus();
-              input.value = String(hours).replace(',', '.');
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-              input.dispatchEvent(new Event('change', { bubbles: true }));
+              if (!input.id) {
+                input.id = 'temp-hours-input-2';
+              }
+              return '#' + input.id;
             }
-          }, task.horasEstimadas);
+            return null;
+          });
+
+          if (hoursInputSelector2) {
+            await page.click(hoursInputSelector2);
+            await page.keyboard.down('Control');
+            await page.keyboard.press('A');
+            await page.keyboard.up('Control');
+            await page.keyboard.press('Backspace');
+            await page.keyboard.type(String(task.horasEstimadas).replace(',', '.'));
+          }
 
           // Toggle "Realizada" to ON
           await page.evaluate(() => {
-            const switchEl = document.querySelector('.custom-control.custom-switch');
+            const switchGroups = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
+            const switchEl = switchGroups.find(el => {
+              const label = el.querySelector('.custom-control-label');
+              return label && label.textContent.toLowerCase().includes('realizada');
+            });
             if (switchEl) {
               const checkbox = switchEl.querySelector('input[type="checkbox"]');
               if (checkbox && !checkbox.checked) {
-                const label = switchEl.querySelector('label');
-                if (label) label.click();
+                const label = switchEl.querySelector('.custom-control-label') || switchEl.querySelector('label');
+                if (label) {
+                  label.click();
+                } else {
+                  checkbox.click();
+                }
               }
             }
           });
