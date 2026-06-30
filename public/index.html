@@ -92,9 +92,14 @@
     <section id="view-orders" class="app-view">
       <div class="view-header">
         <h2>Órdenes de Trabajo</h2>
-        <button class="btn btn-primary btn-sm" onclick="openPreOrderModal()">
-          <span class="material-icons">add</span> Nueva
-        </button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary btn-sm" onclick="cleanupSyncedOrders()" style="display: flex; align-items: center; gap: 4px;" title="Limpiar del Taller todas las órdenes ya subidas a Taxes que estén finalizadas">
+            <span class="material-icons" style="font-size: 16px;">delete_sweep</span> Limpiar
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="openPreOrderModal()">
+            <span class="material-icons" style="font-size: 16px;">add</span> Nueva
+          </button>
+        </div>
       </div>
 
       <div class="search-bar">

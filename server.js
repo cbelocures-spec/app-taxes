@@ -333,6 +333,44 @@ app.delete('/api/orders/:id', (req, res) => {
   }
 });
 
+// Cleanup finished synced orders from the app
+app.post('/api/orders/cleanup', (req, res) => {
+  try {
+    const requester = req.headers['x-user-username'] || null;
+    const sector = getSectorByUsername(requester);
+
+    const orders = db.getWorkOrders() || [];
+    let deletedCount = 0;
+
+    orders.forEach(order => {
+      // Check sector permission
+      const cls = order.clasificacion;
+      if (sector === 'Herrería' && cls !== 'Herrería') return;
+      if (sector === 'Edilicio' && cls !== 'Edilicio') return;
+      if (sector === 'Taller' && (cls === 'Herrería' || cls === 'Edilicio')) return;
+
+      if (order.syncStatus === 'success') {
+        const tasks = order.tasks || [];
+        const allFinished = tasks.length > 0 && tasks.every(t => t.status === "Finalizada");
+        const noActiveTimer = tasks.every(t => !t.timerStarted && !t.timerStart);
+        
+        if (allFinished && noActiveTimer) {
+          db.deleteWorkOrder(order.id);
+          deletedCount++;
+        }
+      }
+    });
+
+    if (deletedCount > 0) {
+      triggerActiveTasksGoogleSheetSync();
+    }
+
+    res.json({ success: true, count: deletedCount });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Force retry sync of a work order
 app.post('/api/orders/retry/:id', async (req, res) => {
   try {

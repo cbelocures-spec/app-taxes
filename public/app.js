@@ -1719,6 +1719,26 @@ async function deleteOrder(orderId) {
   }
 }
 
+async function cleanupSyncedOrders() {
+  if (confirm("¿Estás seguro de limpiar de la app todas las órdenes ya subidas a Taxes que estén finalizadas y sin cronómetros activos? (No se borrarán del portal de Taxes)")) {
+    try {
+      const res = await fetch('/api/orders/cleanup', { method: 'POST' });
+      if (!res.ok) throw new Error("Failed to cleanup");
+      const data = await res.json();
+      
+      if (data.count > 0) {
+        showToast(`Se limpiaron ${data.count} órdenes de la app`, "success");
+        fetchOrders();
+      } else {
+        showToast("No hay órdenes finalizadas subidas a Taxes para limpiar", "info");
+      }
+    } catch (error) {
+      showToast("Error al limpiar órdenes", "danger");
+      console.error(error);
+    }
+  }
+}
+
 // 10. TOAST SYSTEM
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
