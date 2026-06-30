@@ -475,12 +475,7 @@ async function submitPreOrderCheck() {
     // Auto-populate interno and clasificacion
     const internoSelect = document.getElementById('form-interno');
     if (internoSelect) {
-      const currentUser = localStorage.getItem('currentUserUsername');
-      if (currentUser === 'jcarmona@contenedoreshugo.com.ar' || currentUser === 'j.carmona@contenedoreshugo.com.ar') {
-        internoSelect.value = "";
-      } else {
-        internoSelect.value = interno;
-      }
+      internoSelect.value = interno;
     }
     document.getElementById('form-clasificacion').value = clasificacion;
   }
