@@ -1369,9 +1369,13 @@ function updateStats() {
   const synced = filtered.filter(o => o.syncStatus === 'success').length;
   const pending = filtered.filter(o => o.syncStatus === 'pending' || o.syncStatus === 'syncing').length;
 
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-synced').textContent = synced;
-  document.getElementById('stat-pending').textContent = pending;
+  const elTotal = document.getElementById('stat-total');
+  const elSynced = document.getElementById('stat-synced');
+  const elPending = document.getElementById('stat-pending');
+
+  if (elTotal) elTotal.textContent = total;
+  if (elSynced) elSynced.textContent = synced;
+  if (elPending) elPending.textContent = pending;
 }
 
 function createOrderCardHtml(order) {
@@ -2102,6 +2106,7 @@ function convertSelectToSearchable(selectEl) {
     labelSpan = trigger.querySelector('.trigger-label');
     searchInput = dropdownPanel.querySelector('.searchable-select-search-input');
     countSpan = dropdownPanel.querySelector('.searchable-select-options-count');
+  } else {
     // Wrap
     wrapper = document.createElement('div');
     wrapper.className = 'searchable-select-container';
@@ -3096,7 +3101,7 @@ function filterBulkVehicles(isFinished = false) {
   });
 
   if (checkedAny) {
-    updateBulkSummary();
+    handleBulkItemCheckChange();
   }
 }
 
