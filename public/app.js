@@ -1474,7 +1474,7 @@ function createOrderCardHtml(order) {
               <span>Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion || 'Sin Clasificar'}</strong></span>
               ${(() => {
                 const tasks = order.tasks || [];
-                const hasActiveOrPausedTimer = tasks.some(t => t.timerStarted || t.timerStart || t.status === 'En Proceso');
+                const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
                 const isOutOfService = hasActiveOrPausedTimer || order.estadoUnidad === 'fuera_de_servicio';
                 const tooltip = hasActiveOrPausedTimer ? 'Forzado Fuera de Servicio por tareas activas o en proceso' : (isOutOfService ? 'Haga clic para cambiar a Operativo' : 'Haga clic para cambiar a Fuera de Servicio');
                 
@@ -1786,7 +1786,7 @@ async function toggleOrderEstadoUnidad(event, orderId) {
   if (!order) return;
 
   const tasks = order.tasks || [];
-  const hasActiveOrPausedTimer = tasks.some(t => t.timerStarted || t.timerStart || t.status === 'En Proceso');
+  const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
   if (hasActiveOrPausedTimer) {
     showToast("No se puede marcar como Operativo mientras haya tareas activas o en proceso", "warning");
     return;
