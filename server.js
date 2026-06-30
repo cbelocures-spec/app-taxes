@@ -355,7 +355,7 @@ app.post('/api/orders/cleanup', (req, res) => {
         const allFinished = tasks.length > 0 && tasks.every(t => t.status === "Finalizada");
         
         // Force out of service if active/paused timers exist
-        const hasActiveOrPausedTimer = tasks.some(t => t.timerStarted || t.timerStart || t.status === 'En Proceso');
+        const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
         const isOutOfService = hasActiveOrPausedTimer || order.estadoUnidad === 'fuera_de_servicio';
 
         if (allFinished && !isOutOfService) {
