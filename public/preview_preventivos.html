@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PROTOTIPO: Taxes + Preventivos + Parte Taller</title>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Google Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <!-- Load base styling of Taxes -->
+  <link rel="stylesheet" href="style.css?v=13">
+
+  <style>
+    /* PROTOTIPO SPECIFIC STYLES & OVERRIDES */
+    .prototype-banner {
+      background: linear-gradient(90deg, #1a73e8, #1557b0);
+      color: white;
+      text-align: center;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .app-header {
+      top: 27px !important; /* Push down to fit prototype banner */
+    }
+    
+    .app-container {
+      margin-top: calc(var(--header-height) + 27px) !important;
+      height: calc(100vh - var(--header-height) - var(--nav-height) - 27px) !important;
+    }
+
+    /* Adjust bottom nav grid for 7 items */
+    .bottom-nav {
+      grid-template-columns: repeat(7, 1fr) !important;
+    }
+
+    #nav-preventivos.active {
+      color: #9c27b0 !important; /* Purple for preventivos */
+    }
+    #nav-partetaller.active {
+      color: #e91e63 !important; /* Pink/Magenta for parte taller */
+    }
+
+    /* Preventivos Sub-navigation Tab Selector */
+    .preventivos-tabs-wrapper {
+      background-color: var(--card-bg);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      margin: -16px -16px 16px -16px;
+      padding: 8px 16px 0 16px;
+      overflow-x: auto;
+      white-space: nowrap;
+      display: flex;
+      gap: 12px;
+    }
+    
+    .preventivos-tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      padding: 8px 12px 10px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    
+    .preventivos-tab-btn.active {
+      color: #9c27b0;
+      border-bottom-color: #9c27b0;
+    }
+    
+    .preventivos-tab-btn .material-icons {
+      font-size: 16px;
+    }
+
+    /* Metrics Grid */
+    .prev-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    
+    .prev-metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: var(--shadow-sm);
+    }
+    
+    .prev-metric-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .prev-metric-icon.blue { background-color: #e8f0fe; color: #1a73e8; }
+    .prev-metric-icon.green { background-color: #ecfdf5; color: #10b981; }
+    .prev-metric-icon.red { background-color: #fee2e2; color: #ef4444; }
+    
+    .prev-metric-info h4 {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    
+    .prev-metric-info p {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    /* Tables */
+    .prev-table-container {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 30px;
+    }
+    
+    .prev-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13.5px;
+    }
+    
+    .prev-table th, .prev-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    
+    .prev-table th {
+      background-color: #f8f9fa;
+      font-weight: 600;
+      color: var(--text-muted);
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+    
+    .prev-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Badges */
+    .badge-prev {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+      border: 1px solid transparent;
+    }
+    .badge-prev.ok {
+      background-color: #ecfdf5;
+      color: #065f46;
+      border-color: rgba(6,95,70,0.15);
+    }
+    .badge-prev.warning {
+      background-color: #fee2e2;
+      color: #991b1b;
+      border-color: rgba(153,27,27,0.15);
+    }
+    
+    .badge-service-type {
+      background-color: #f1f3f4;
+      color: #3c4043;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* Mobile Cards */
+    .prev-card-list {
+      display: none; /* Mobile only */
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 30px;
+    }
+
+    .prev-mobile-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .prev-mobile-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .prev-mobile-card-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: var(--text-muted);
+    }
+    .prev-mobile-card-row strong {
+      color: var(--text-main);
+    }
+
+    /* WhatsApp Simulator UI */
+    .wa-simulator-card {
+      background: #efeae2; /* WhatsApp background */
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 30px;
+      display: flex;
+      flex-direction: column;
+      height: 350px;
+    }
+    
+    .wa-header {
+      background: #008069;
+      color: white;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .wa-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #128c7e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    
+    .wa-chat-area {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .wa-bubble {
+      max-width: 80%;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.4;
+      position: relative;
+    }
+    .wa-bubble.received {
+      background: white;
+      align-self: flex-start;
+      border-top-left-radius: 0;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    }
+    .wa-bubble.sent {
+      background: #d9fdd3;
+      align-self: flex-end;
+      border-top-right-radius: 0;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    }
+    
+    .wa-bubble-meta {
+      font-size: 9px;
+      color: #667781;
+      text-align: right;
+      margin-top: 4px;
+    }
+    
+    .wa-user {
+      font-size: 10px;
+      font-weight: 700;
+      color: #35a587;
+      margin-bottom: 2px;
+    }
+    
+    .wa-input-row {
+      background: #f0f2f5;
+      padding: 8px 12px;
+      display: flex;
+      gap: 8px;
+      border-top: 1px solid rgba(0,0,0,0.08);
+      align-items: center;
+    }
+    
+    .wa-input {
+      flex: 1;
+      background: white;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      outline: none;
+    }
+    
+    .wa-send-btn {
+      background: #00a884;
+      color: white;
+      border: none;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    /* Tampermonkey Console Mock */
+    .tm-console-mock {
+      background: #1e1e1e;
+      color: #34d399;
+      font-family: monospace;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      margin-top: 12px;
+      max-height: 100px;
+      overflow-y: auto;
+      border: 1px solid #333;
+    }
+    .tm-line {
+      margin: 2px 0;
+    }
+    .tm-line.info { color: #60a5fa; }
+    .tm-line.warn { color: #fbbf24; }
+
+    /* Notification animation */
+    .toast-notification {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background-color: #323232;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      z-index: 2000;
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toast-notification.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Media query to switch table/cards */
+    @media (max-width: 600px) {
+      .prev-table-container {
+        display: none;
+      }
+      .prev-card-list {
+        display: flex;
+      }
+      .prev-metrics-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PROTOTYPE BANNER -->
+  <div class="prototype-banner">
+    <span class="material-icons" style="font-size: 14px;">science</span>
+    <span>Prototipo Completo: Taxes + Preventivo + Parte Taller con Simulación de WhatsApp</span>
+  </div>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-logo">
+      <img src="logo.jpg" alt="Contenedores Hugo" class="header-logo-img">
+    </div>
+    
+    <div class="header-center">
+      <span class="header-middle-title">Gestión de Mantenimiento</span>
+      <small class="header-middle-user" id="current-user">Supervisor Paniol</small>
+    </div>
+
+    <div class="header-actions">
+      <span class="material-icons logout-btn" onclick="alert('Acción simulada en prototipo')" title="Cerrar Sesión" style="margin-right: 8px;">logout</span>
+      <span class="material-icons refresh-btn" onclick="location.reload()" title="Refrescar Pantalla">refresh</span>
+      <span class="material-icons sync-indicator idle" id="global-sync-icon">sync</span>
+    </div>
+  </header>
+
+  <!-- Main View Container -->
+  <main class="app-container">
+
+    <!-- VIEW 1: HOME (INICIO) -->
+    <section id="view-home" class="app-view">
+      <div class="view-header">
+        <h2>Dashboard Principal</h2>
+      </div>
+      <div style="padding: 20px; text-align: center; color: var(--text-muted);">
+        <span class="material-icons" style="font-size: 48px; margin-bottom: 12px; color: var(--primary);">dashboard</span>
+        <p>Vista de Inicio original. Utiliza las pestañas de <strong>"Preventivos"</strong> o <strong>"Parte Taller"</strong> en la barra inferior.</p>
+      </div>
+    </section>
+
+    <!-- VIEW 2: ORDERS (ÓRDENES) -->
+    <section id="view-orders" class="app-view">
+      <div class="view-header">
+        <h2>Órdenes de Trabajo</h2>
+        <button class="btn btn-primary btn-sm" onclick="openPreOrderModal()">
+          <span class="material-icons">add</span> Nueva
+        </button>
+      </div>
+
+      <div class="search-bar">
+        <span class="material-icons search-icon">search</span>
+        <input type="text" id="order-search" placeholder="Buscar por Rodado, Interno..." readonly>
+      </div>
+
+      <div class="orders-list" id="prototype-orders-list">
+        <!-- Mock orders list -->
+      </div>
+    </section>
+
+    <!-- VIEW 3: SUBIDAS (HISTORY) -->
+    <section id="view-history" class="app-view">
+      <div class="view-header">
+        <h2>Órdenes Sincronizadas</h2>
+      </div>
+      <div style="padding: 20px; text-align: center; color: var(--text-muted);">
+        <span class="material-icons" style="font-size: 48px; margin-bottom: 12px; color: var(--success);">cloud_done</span>
+        <p>Vista de historial de sincronizaciones exitosas.</p>
+      </div>
+    </section>
+
+    <!-- VIEW 4: MASIVA (BULK) -->
+    <section id="view-bulk" class="app-view">
+      <div class="view-header">
+        <h2>Carga Masiva</h2>
+      </div>
+      <div style="padding: 20px; text-align: center; color: var(--text-muted);">
+        <span class="material-icons" style="font-size: 48px; margin-bottom: 12px; color: #ff9800;">content_copy</span>
+        <p>Vista de creación de órdenes masivas.</p>
+      </div>
+    </section>
+
+    <!-- VIEW 5: PREVENTIVOS -->
+    <section id="view-preventivos" class="app-view">
+      
+      <!-- Sub-tabs internal menu -->
+      <div class="preventivos-tabs-wrapper">
+        <button class="preventivos-tab-btn active" onclick="switchPrevSubTab('dashboard')">
+          <span class="material-icons">build</span> Mantenimiento KM/HS
+        </button>
+        <button class="preventivos-tab-btn" onclick="switchPrevSubTab('combustible')">
+          <span class="material-icons">local_gas_station</span> Combustible
+        </button>
+        <button class="preventivos-tab-btn" onclick="switchPrevSubTab('0km')">
+          <span class="material-icons">fiber_new</span> 0KM
+        </button>
+        <button class="preventivos-tab-btn" onclick="switchPrevSubTab('alarmas')">
+          <span class="material-icons">notifications_active</span> Alarmas
+        </button>
+        <button class="preventivos-tab-btn" onclick="switchPrevSubTab('historial')">
+          <span class="material-icons">history</span> Historial
+        </button>
+      </div>
+
+      <!-- SEARCH BAR -->
+      <div class="search-bar" style="margin-bottom: 16px;">
+        <span class="material-icons search-icon">search</span>
+        <input type="text" id="prev-search-input" placeholder="Buscar por Interno o Modelo..." oninput="applyPrevFilters()">
+      </div>
+
+      <!-- SUB-VIEW: DASHBOARD (KM/HS) -->
+      <div id="prev-subview-dashboard" class="prev-subview">
+        <div class="prev-metrics-grid">
+          <div class="prev-metric-card" onclick="filterByAlertState('all')" style="cursor: pointer;">
+            <div class="prev-metric-icon blue"><span class="material-icons">local_shipping</span></div>
+            <div class="prev-metric-info">
+              <h4>Total Unidades</h4>
+              <p id="metric-total">6</p>
+            </div>
+          </div>
+          <div class="prev-metric-card" onclick="filterByAlertState('ok')" style="cursor: pointer;">
+            <div class="prev-metric-icon green"><span class="material-icons">check_circle</span></div>
+            <div class="prev-metric-info">
+              <h4>Al Día</h4>
+              <p id="metric-ok">4</p>
+            </div>
+          </div>
+          <div class="prev-metric-card" onclick="filterByAlertState('urgente')" style="cursor: pointer;">
+            <div class="prev-metric-icon red"><span class="material-icons">warning</span></div>
+            <div class="prev-metric-info">
+              <h4>Urgentes</h4>
+              <p id="metric-urgente">2</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="prev-table-container">
+          <table class="prev-table">
+            <thead>
+              <tr>
+                <th>Interno</th>
+                <th>Modelo</th>
+                <th>KM Reales</th>
+                <th>Hs Reales</th>
+                <th>Km/Hs Restantes</th>
+                <th>Estado</th>
+                <th style="text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="prev-dashboard-tbody">
+              <!-- JS dynamic -->
+            </tbody>
+          </table>
+        </div>
+        <div class="prev-card-list" id="prev-dashboard-cards">
+          <!-- Mobile dynamic -->
+        </div>
+      </div>
+
+      <!-- SUB-VIEW: COMBUSTIBLE -->
+      <div id="prev-subview-combustible" class="prev-subview" style="display: none;">
+        <div class="prev-table-container">
+          <table class="prev-table">
+            <thead>
+              <tr>
+                <th>Interno</th>
+                <th>Modelo</th>
+                <th>Litros Totales</th>
+                <th>Restante 5k</th>
+                <th>Alerta 5k</th>
+                <th>Restante 10k</th>
+                <th>Alerta 10k</th>
+                <th style="text-align: right;">Servicio</th>
+              </tr>
+            </thead>
+            <tbody id="prev-combustible-tbody">
+              <!-- JS dynamic -->
+            </tbody>
+          </table>
+        </div>
+        <div class="prev-card-list" id="prev-combustible-cards">
+          <!-- Mobile dynamic -->
+        </div>
+      </div>
+
+      <!-- SUB-VIEW: 0KM -->
+      <div id="prev-subview-0km" class="prev-subview" style="display: none;">
+        <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px;">
+          <h3 style="font-size: 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;"><span class="material-icons" style="color: #9c27b0;">fiber_new</span> Planilla de Control 0KM</h3>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
+            Aquí se listan las unidades nuevas o de reciente adquisición que requieren controles preventivos especiales (por ejemplo, a los primeros 1,000 o 5,000 km).
+          </p>
+        </div>
+        <div class="prev-table-container">
+          <table class="prev-table">
+            <thead>
+              <tr>
+                <th>Interno</th>
+                <th>Modelo</th>
+                <th>KM Control 0KM</th>
+                <th>Ajuste de Torque</th>
+                <th>Cambio Filtros</th>
+                <th>Estado</th>
+                <th style="text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="prev-0km-tbody">
+              <!-- JS dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SUB-VIEW: ALARMAS -->
+      <div id="prev-subview-alarmas" class="prev-subview" style="display: none;">
+        <div class="prev-table-container">
+          <table class="prev-table">
+            <thead>
+              <tr>
+                <th>Interno</th>
+                <th>Tipo Preventivo</th>
+                <th>Estado Alarma</th>
+                <th>Fecha Vencimiento</th>
+                <th>Fecha Realizado</th>
+                <th>Demora (Días)</th>
+              </tr>
+            </thead>
+            <tbody id="prev-alarmas-tbody">
+              <!-- JS dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SUB-VIEW: HISTORIAL -->
+      <div id="prev-subview-historial" class="prev-subview" style="display: none;">
+        <div class="prev-table-container">
+          <table class="prev-table">
+            <thead>
+              <tr>
+                <th>Fecha / Hora</th>
+                <th>Interno</th>
+                <th>Tipo Servicio</th>
+                <th>Detalle / Valor</th>
+                <th>Conductor</th>
+                <th>Mes Calendario</th>
+              </tr>
+            </thead>
+            <tbody id="prev-historial-tbody">
+              <!-- JS dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- VIEW 6: PARTE TALLER (NUEVA PESTAÑA INTEGRADA) -->
+    <section id="view-partetaller" class="app-view active">
+      <div class="view-header">
+        <div>
+          <h2>Parte Diario de Taller</h2>
+          <small style="color: var(--text-muted);">Supervisor responsable: <strong>Rodriguez Nicolas</strong></small>
+        </div>
+      </div>
+
+      <!-- Totales Table (Compactador, Volquete, Roll-off) -->
+      <div class="prev-table-container" style="margin-bottom: 20px;">
+        <div style="background-color:#202c33; color:white; padding:10px 16px; font-weight:600; font-size:13px;">
+          Resumen de Unidades Operativas y Fuera de Servicio
+        </div>
+        <table class="prev-table">
+          <thead>
+            <tr>
+              <th>Tipo de Unidad</th>
+              <th>Operativos</th>
+              <th>Fuera de Servicio</th>
+              <th>Total Flota</th>
+            </tr>
+          </thead>
+          <tbody id="pt-resumen-tbody">
+            <tr>
+              <td><strong>COMPACTADOR</strong></td>
+              <td style="color:#10b981; font-weight:700;" id="pt-op-comp">53</td>
+              <td style="color:#ef4444; font-weight:700;" id="pt-out-comp">6</td>
+              <td>59</td>
+            </tr>
+            <tr>
+              <td><strong>VOLQUETE</strong></td>
+              <td style="color:#10b981; font-weight:700;" id="pt-op-volq">7</td>
+              <td style="color:#ef4444; font-weight:700;" id="pt-out-volq">1</td>
+              <td>8</td>
+            </tr>
+            <tr>
+              <td><strong>ROLL - OFF</strong></td>
+              <td style="color:#10b981; font-weight:700;" id="pt-op-roll">12</td>
+              <td style="color:#ef4444; font-weight:700;" id="pt-out-roll">3</td>
+              <td>15</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Flex Grid of Tables for Out of Service and Under Repair -->
+      <div class="prev-table-container" style="margin-bottom: 20px;">
+        <div style="background-color:#e91e63; color:white; padding:10px 16px; font-weight:600; font-size:13px; display:flex; justify-content:space-between; align-items:center;">
+          <span>Vehículos Fuera de Servicio / Novedades</span>
+          <span class="badge" style="background: white; color:#e91e63;" id="pt-out-count">10</span>
+        </div>
+        <table class="prev-table">
+          <thead>
+            <tr>
+              <th onclick="sortParteTaller('interno')" style="cursor:pointer; user-select:none;">Interno <span id="pt-sort-interno">↕</span></th>
+              <th onclick="sortParteTaller('tipo')" style="cursor:pointer; user-select:none;">Tipo <span id="pt-sort-tipo">↕</span></th>
+              <th>Novedad / Falla</th>
+              <th>Ingreso</th>
+              <th onclick="sortParteTaller('dias')" style="cursor:pointer; user-select:none;">Días Parado <span id="pt-sort-dias">↕</span></th>
+              <th onclick="sortParteTaller('estado')" style="cursor:pointer; user-select:none;">Estado <span id="pt-sort-estado">↕</span></th>
+              <th style="text-align: right;">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="pt-fuera-tbody">
+            <!-- Dynamic out of service -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- WHATSAPP SIMULATOR FOR NOVEDADES -->
+      <div style="background-color:#f1f3f4; padding:16px; border-radius: var(--radius-md); border:1px solid var(--border-color); margin-bottom: 30px;">
+        <h3 style="font-size:14px; font-weight:700; color:var(--text-main); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+          <span class="material-icons" style="color:#075e54;">chat</span>
+          Simulador de WhatsApp (Mecánicos de Primera)
+        </h3>
+        <p style="font-size:12px; color:var(--text-muted); line-height:1.4; margin-bottom:12px;">
+          En WhatsApp Web, los mecánicos mandan mensajes sobre fallas. Nuestro script automatizado (Violentmonkey) intercepta los mensajes con formato de número de interno e ingresa el reporte de taller automáticamente en Sheets y en este parte en vivo.
+        </p>
+
+        <!-- Mock WhatsApp interface -->
+        <div class="wa-simulator-card">
+          <div class="wa-header">
+            <div class="wa-avatar">MP</div>
+            <div>
+              <div style="font-weight:700; font-size:14px;">Mecánicos de primera</div>
+              <div style="font-size:10px; opacity:0.8;">Grupo de WhatsApp • En Línea</div>
+            </div>
+          </div>
+          <div class="wa-chat-area" id="wa-chat-box">
+            <div class="wa-bubble received">
+              <div class="wa-user">Carlos (Mecánico)</div>
+              102 embrague roto auxilio
+              <div class="wa-bubble-meta">19:02</div>
+            </div>
+            <div class="wa-bubble received">
+              <div class="wa-user">Alberto (Auxiliar)</div>
+              camion 85 pinchadura delantera derecha
+              <div class="wa-bubble-meta">19:04</div>
+            </div>
+          </div>
+          <div class="wa-input-row">
+            <input type="text" class="wa-input" id="wa-input-message" placeholder="Escribe un mensaje de prueba (ej: 'interno 42 pierde agua')">
+            <button class="wa-send-btn" onclick="sendMockWhatsAppMessage()">
+              <span class="material-icons" style="font-size:18px;">send</span>
+            </button>
+          </div>
+        </div>
+
+        <div style="font-size:11px; font-weight:600; color:var(--text-muted);">CONSOLA DEL SCRIPT DE WHATSAPP:</div>
+        <div class="tm-console-mock" id="wa-script-console">
+          <div class="tm-line info">[Tampermonkey v1.7] Conectado a http://localhost:5000/api/whatsapp-novedad</div>
+          <div class="tm-line">[Tampermonkey] Escuchando mensajes nuevos en chat 'Mecánicos de primera'...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 7: SETTINGS (AJUSTES) -->
+    <section id="view-settings" class="app-view">
+      <div class="view-header">
+        <h2>Ajustes</h2>
+      </div>
+      <div style="padding: 20px; text-align: center; color: var(--text-muted);">
+        <span class="material-icons" style="font-size: 48px; margin-bottom: 12px; color: var(--secondary);">settings</span>
+        <p>Configuración del sistema.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Navigation Bar (Updated for 7 items) -->
+  <nav class="bottom-nav">
+    <button class="nav-item" onclick="switchView('home')" id="nav-home">
+      <span class="material-icons">home</span>
+      <span>Inicio</span>
+    </button>
+    <button class="nav-item" onclick="switchView('orders')" id="nav-orders">
+      <span class="material-icons">assignment</span>
+      <span>Órdenes</span>
+    </button>
+    <button class="nav-item" onclick="switchView('history')" id="nav-history">
+      <span class="material-icons">task_alt</span>
+      <span>Subidas</span>
+    </button>
+    <button class="nav-item" onclick="switchView('bulk')" id="nav-bulk">
+      <span class="material-icons">content_copy</span>
+      <span>Masiva</span>
+    </button>
+    <button class="nav-item" onclick="switchView('preventivos')" id="nav-preventivos">
+      <span class="material-icons">build_circle</span>
+      <span>Preventivos</span>
+    </button>
+    <button class="nav-item active" onclick="switchView('partetaller')" id="nav-partetaller">
+      <span class="material-icons">engineering</span>
+      <span>Parte Taller</span>
+    </button>
+    <button class="nav-item" onclick="switchView('settings')" id="nav-settings">
+      <span class="material-icons">settings</span>
+      <span>Ajustes</span>
+    </button>
+  </nav>
+
+  <!-- FLOATING CREATE ORDER BUTTON -->
+  <button class="voice-fab" id="create-order-fab" onclick="switchView('orders'); openPreOrderModal();" title="Crear orden de trabajo">
+    <span class="material-icons">add</span>
+  </button>
+
+  <!-- PRE-ORDER CHECK MODAL -->
+  <div class="fullscreen-modal" id="pre-order-modal" style="z-index: 1050;">
+    <div class="modal-header">
+      <button class="modal-close-btn" onclick="closePreOrderModal()">
+        <span class="material-icons">close</span>
+      </button>
+      <h2>Crear Orden de Trabajo</h2>
+      <button class="btn btn-success btn-sm" onclick="finishPreOrderModal()">
+        <span class="material-icons">arrow_forward</span> Continuar
+      </button>
+    </div>
+    <div class="modal-content" style="max-width: 500px; margin: 0 auto; padding: 20px;">
+      <div class="form-section-card">
+        <div class="card-title-header">
+          <span class="material-icons">assignment</span>
+          <h3>Nueva Orden Manual</h3>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Número de Interno *</label>
+          <select id="pre-form-interno" style="width:100%; padding:10px; border-radius:8px; border:1px solid #dadce0;">
+            <option value="148">Interno 148 (Iveco Trakker)</option>
+            <option value="133">Interno 133 (Mercedes Axor)</option>
+            <option value="122">Interno 122 (Scania P340)</option>
+            <option value="88">Interno 88 (Ford Cargo)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Clasificación *</label>
+          <select id="pre-form-clasificacion" style="width:100%; padding:10px; border-radius:8px; border:1px solid #dadce0;">
+            <option value="Correctivo">Correctivo</option>
+            <option value="Preventivo">Preventivo</option>
+            <option value="Auxilio">Auxilio</option>
+            <option value="Herreria">Herrería</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERACTIVE MOCK NEW WORK ORDER MODAL -->
+  <div class="fullscreen-modal" id="new-order-modal" style="z-index: 1080;">
+    <div class="modal-header">
+      <button class="modal-close-btn" onclick="closeNewOrderModal()">
+        <span class="material-icons">close</span>
+      </button>
+      <h2>Orden Preventiva</h2>
+      <button class="btn btn-success btn-sm" onclick="simulateSubmitOrder()">
+        <span class="material-icons">check</span> Crear
+      </button>
+    </div>
+    <div class="modal-content" style="padding: 16px;">
+      <div class="form-section-card">
+        <div class="card-title-header">
+          <span class="material-icons" style="color: #1a73e8;">feed</span>
+          <h3>Ficha de la Orden</h3>
+        </div>
+        <div class="form-group">
+          <label>Rodado / Modelo</label>
+          <input type="text" id="form-rodado" value="IVECO TRAKKER 380" readonly style="background-color: #f1f3f4;">
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Interno Unidad</label>
+            <input type="text" id="form-interno" value="148" readonly style="background-color: #f1f3f4; font-weight:700;">
+          </div>
+          <div class="form-group col-6">
+            <label>Clasificación</label>
+            <input type="text" id="form-clasificacion" value="Preventivo" readonly style="background-color: #f1f3f4; font-weight:700; color:#9c27b0;">
+          </div>
+        </div>
+        
+        <div class="form-row" id="form-km-hs-fields" style="background-color: #fcf8e3; border: 1px solid #faebcc; border-radius: 8px; padding: 12px; margin-top: 10px;">
+          <h4 style="font-size:11px; margin-bottom: 8px; color: #8a6d3b; text-transform:uppercase;">Registrar Servicio en Excel</h4>
+          <div style="display:flex; gap: 8px;">
+            <div class="form-group col-6" style="margin-bottom:0;">
+              <label style="color:#8a6d3b;">KM Actuales</label>
+              <input type="number" id="form-km-val" value="150000" style="margin-bottom:0;">
+            </div>
+            <div class="form-group col-6" style="margin-bottom:0;">
+              <label style="color:#8a6d3b;">Horas Actuales</label>
+              <input type="number" id="form-hs-val" value="4820" style="margin-bottom:0;">
+            </div>
+          </div>
+          <small style="font-size:10px; color:#8a6d3b; display:block; margin-top:6px;">Al crear la orden, estos valores se guardarán en preventivo x hora.xlsx y se reiniciará la alerta.</small>
+        </div>
+      </div>
+
+      <div class="form-section-card">
+        <div class="card-title-header">
+          <span class="material-icons" style="color: #f59e0b;">build</span>
+          <h3>Tareas Planificadas</h3>
+        </div>
+        <div class="form-group">
+          <label>Mecánico Asignado</label>
+          <select id="form-mecanico" style="width:100%; padding:10px; border-radius:8px; border:1px solid #dadce0;">
+            <option value="MECANICO 1">Hugo Gimenez</option>
+            <option value="MECANICO 2">Carlos Gomez</option>
+            <option value="MECANICO 3">Alberto Diaz</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Descripción de Tarea</label>
+          <input type="text" id="form-task-desc" value="Mantenimiento Preventivo KM/HS y Cambio de Aceite">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="toast-notification">
+    <span class="material-icons" style="color: #10b981;">check_circle</span>
+    <span id="toast-text">Orden creada y Excel actualizado.</span>
+  </div>
+
+  <!-- JS SIMULATION LOGIC -->
+  <script>
+    // MOCK PREVENTIVOS DATA
+    let mockFleet = [
+      { rowIndex: 5, interno: "148", modelo: "Iveco Trakker", kmReales: 152340, hsReales: 4920, restante: -120, alerta: "Realizar Service (Urgente)" },
+      { rowIndex: 6, interno: "133", modelo: "Mercedes Axor", kmReales: 345000, hsReales: 0, restante: 15400, alerta: "Al Día" },
+      { rowIndex: 7, interno: "122", modelo: "Scania P340", kmReales: 210100, hsReales: 0, restante: -400, alerta: "Realizar Service" },
+      { rowIndex: 8, interno: "88",  modelo: "Ford Cargo",   kmReales: 98400,  hsReales: 1240, restante: 3200,  alerta: "Al Día" },
+      { rowIndex: 9, interno: "75",  modelo: "Volkswagen",   kmReales: 180200, hsReales: 0, restante: 8900,  alerta: "Al Día" },
+      { rowIndex: 10,interno: "42",  modelo: "Iveco Stralis",kmReales: 412000, hsReales: 9810, restante: 14000, alerta: "Al Día" }
+    ];
+
+    let mockFuel = [
+      { interno: "148", modelo: "Iveco Trakker", litrosTotales: 4200, restante5k: 800, alerta5k: "Al Día", restante10k: 5800, alerta10k: "Al Día" },
+      { interno: "133", modelo: "Mercedes Axor", litrosTotales: 9800, restante5k: -120, alerta5k: "Realizar Service", restante10k: 200, alerta10k: "Al Día" },
+      { interno: "122", modelo: "Scania P340", litrosTotales: 1200, restante5k: 3800, alerta5k: "Al Día", restante10k: 8800, alerta10k: "Al Día" }
+    ];
+
+    let mock0KM = [
+      { interno: "201", modelo: "Iveco Trakker 2026", kmControl: "1.000 Km", torque: "Realizado", filtros: "Pendiente", estado: "Realizar Service" },
+      { interno: "202", modelo: "Mercedes Axor 2026", kmControl: "5.000 Km", torque: "Pendiente", filtros: "Pendiente", estado: "Realizar Service" }
+    ];
+
+    let mockAlarmas = [
+      { interno: "148", tipo: "Mantenimiento KM/HS", estado: "Pendiente", fechaAlerta: "14/06/2026", fechaRealizado: "-", demora: "-" },
+      { interno: "122", tipo: "Mantenimiento KM/HS", estado: "Pendiente", fechaAlerta: "15/06/2026", fechaRealizado: "-", demora: "-" },
+      { interno: "133", tipo: "Combustible 5K", estado: "Pendiente", fechaAlerta: "16/06/2026", fechaRealizado: "-", demora: "-" },
+      { interno: "88",  tipo: "Mantenimiento KM/HS", estado: "Realizado", fechaAlerta: "02/06/2026", fechaRealizado: "04/06/2026", demora: "2" }
+    ];
+
+    let mockHistorial = [
+      { fecha: "16/06/2026 14:30", interno: "88", tipo: "SERVICE KM", detalle: "98400 km", conductor: "-", mes: "Copia de Jun" },
+      { fecha: "12/06/2026 10:15", interno: "148", tipo: "COMBUSTIBLE (5K)", detalle: "4200 Lts", conductor: "Gomez", mes: "Copia de Jun" },
+      { fecha: "04/06/2026 17:45", interno: "88", tipo: "SERVICE KM", detalle: "95000 km", conductor: "-", mes: "Copia de Jun" }
+    ];
+
+    let prevActiveFilter = 'all';
+
+    // MOCK PARTE TALLER DATA
+    let ptFueraServicio = [
+      { interno: "102", novedad: "falla electrica en motor", tipo: "COMPACTADOR", fecha: "17/06/2026 15:30", estado: "En Taller", conductor: "Rodriguez N." },
+      { interno: "85", novedad: "falla en hidraulica de pala", tipo: "COMPACTADOR", fecha: "17/06/2026 16:10", estado: "En Taller", conductor: "Gimenez H." },
+      { interno: "114", novedad: "embrague no desacopla", tipo: "ROLL - OFF", fecha: "17/06/2026 14:02", estado: "En Taller", conductor: "Perez J." },
+      { interno: "128", novedad: "rotura de manguera hidraulica", tipo: "ROLL - OFF", fecha: "17/06/2026 11:20", estado: "Auxiliando", conductor: "Flores C." },
+      { interno: "53", novedad: "freno bloqueado trasero izquierdo", tipo: "COMPACTADOR", fecha: "17/06/2026 09:15", estado: "En Taller", conductor: "Sosa L." },
+      { interno: "92", novedad: "cambio de placa y disco", tipo: "COMPACTADOR", fecha: "16/06/2026 18:00", estado: "En Taller", conductor: "Ruiz M." },
+      { interno: "45", novedad: "pinchadura neumatico auxiliar", tipo: "COMPACTADOR", fecha: "16/06/2026 12:40", estado: "En Taller", conductor: "Suarez G." },
+      { interno: "32", novedad: "perdida aceite hidraulico", tipo: "VOLQUETE", fecha: "15/06/2026 15:10", estado: "En Taller", conductor: "Paniagua R." },
+      { interno: "61", novedad: "service preventivo programado", tipo: "COMPACTADOR", fecha: "15/06/2026 08:30", estado: "En Taller", conductor: "Bordon J." },
+      { interno: "12", novedad: "falla inyectores", tipo: "ROLL - OFF", fecha: "14/06/2026 10:15", estado: "En Taller", conductor: "Vera D." }
+    ];
+
+    // RENDER PREVENTIVOS TABLES
+    function renderPrevDashboard() {
+      const tbody = document.getElementById('prev-dashboard-tbody');
+      const cards = document.getElementById('prev-dashboard-cards');
+      tbody.innerHTML = '';
+      cards.innerHTML = '';
+
+      let term = document.getElementById('prev-search-input').value.toLowerCase();
+      
+      let filtered = mockFleet.filter(item => {
+        let matchesSearch = item.interno.toLowerCase().includes(term) || item.modelo.toLowerCase().includes(term);
+        let matchesType = true;
+        let isUrgente = item.alerta.includes('Realizar Service');
+        if (prevActiveFilter === 'ok') matchesType = !isUrgente;
+        if (prevActiveFilter === 'urgente') matchesType = isUrgente;
+        return matchesSearch && matchesType;
+      });
+
+      // Update counters
+      let total = mockFleet.length;
+      let urgentes = mockFleet.filter(i => i.alerta.includes('Realizar Service')).length;
+      document.getElementById('metric-total').innerText = total;
+      document.getElementById('metric-ok').innerText = total - urgentes;
+      document.getElementById('metric-urgente').innerText = urgentes;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">No se encontraron camiones.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(item => {
+        let isUrgente = item.alerta.includes('Realizar Service');
+        let badgeClass = isUrgente ? 'warning' : 'ok';
+        let badgeText = isUrgente ? 'Realizar Service' : 'Al Día';
+        
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${item.interno}</strong></td>
+            <td>${item.modelo}</td>
+            <td>${item.kmReales.toLocaleString('es-AR')} Km</td>
+            <td>${item.hsReales ? item.hsReales.toLocaleString('es-AR') + ' Hs' : '–'}</td>
+            <td style="color:${item.restante < 0 ? '#ef4444' : 'inherit'}; font-weight:${item.restante < 0 ? '700' : 'normal'};">
+              ${item.restante.toLocaleString('es-AR')}
+            </td>
+            <td><span class="badge-prev ${badgeClass}"><span class="material-icons" style="font-size:11px;">${isUrgente?'warning':'check_circle'}</span> ${badgeText}</span></td>
+            <td style="text-align: right;">
+              <button class="btn btn-primary btn-xs" onclick="openOrderForPreventivo('${item.interno}', '${item.modelo}', ${item.kmReales}, ${item.hsReales}, ${item.rowIndex})" style="background-color:#9c27b0; border-color:#9c27b0; font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:2px;">
+                <span class="material-icons" style="font-size:12px;">build</span> Service
+              </button>
+            </td>
+          </tr>
+        `;
+
+        cards.innerHTML += `
+          <div class="prev-mobile-card">
+            <div class="prev-mobile-card-header">
+              <div>
+                <span style="font-size:16px; font-weight:700; color:var(--text-main);">Interno ${item.interno}</span>
+                <span style="font-size:12px; color:var(--text-muted); display:block;">${item.modelo}</span>
+              </div>
+              <span class="badge-prev ${badgeClass}">${badgeText}</span>
+            </div>
+            <div class="prev-mobile-card-row">
+              <span>Km / Hs Actuales:</span>
+              <strong>${item.kmReales.toLocaleString('es-AR')} Km ${item.hsReales ? '/ ' + item.hsReales.toLocaleString('es-AR') + ' Hs' : ''}</strong>
+            </div>
+            <div class="prev-mobile-card-row">
+              <span>Restantes:</span>
+              <strong style="color:${item.restante < 0 ? '#ef4444' : 'inherit'};">${item.restante.toLocaleString('es-AR')}</strong>
+            </div>
+            <div style="margin-top:12px; display:flex; justify-content:flex-end;">
+              <button class="btn btn-primary btn-sm" onclick="openOrderForPreventivo('${item.interno}', '${item.modelo}', ${item.kmReales}, ${item.hsReales}, ${item.rowIndex})" style="background-color:#9c27b0; border-color:#9c27b0; width:100%; display:flex; justify-content:center; align-items:center; gap:4px;">
+                <span class="material-icons" style="font-size:14px;">build</span> Crear Orden Preventiva
+              </button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function renderPrevCombustible() {
+      const tbody = document.getElementById('prev-combustible-tbody');
+      const cards = document.getElementById('prev-combustible-cards');
+      tbody.innerHTML = '';
+      cards.innerHTML = '';
+
+      let term = document.getElementById('prev-search-input').value.toLowerCase();
+      let filtered = mockFuel.filter(item => item.interno.toLowerCase().includes(term) || item.modelo.toLowerCase().includes(term));
+
+      filtered.forEach(item => {
+        let is5kUrgente = item.alerta5k.includes('Realizar');
+        let is10kUrgente = item.alerta10k.includes('Realizar');
+
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${item.interno}</strong></td>
+            <td>${item.modelo}</td>
+            <td>${item.litrosTotales.toLocaleString('es-AR')} Lts</td>
+            <td style="color:${item.restante5k < 0 ? '#ef4444' : 'inherit'};">${item.restante5k.toLocaleString('es-AR')} Lts</td>
+            <td><span class="badge-prev ${is5kUrgente ? 'warning' : 'ok'}">${is5kUrgente ? 'Service' : 'Al Día'}</span></td>
+            <td style="color:${item.restante10k < 0 ? '#ef4444' : 'inherit'};">${item.restante10k.toLocaleString('es-AR')} Lts</td>
+            <td><span class="badge-prev ${is10kUrgente ? 'warning' : 'ok'}">${is10kUrgente ? 'Service' : 'Al Día'}</span></td>
+            <td style="text-align: right;">
+              <button class="btn btn-secondary btn-xs" onclick="openOrderForPreventivo('${item.interno}', '${item.modelo}', null, null, null, 'Combustible')" style="font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:2px;">
+                <span class="material-icons" style="font-size:12px;">local_gas_station</span> Service
+              </button>
+            </td>
+          </tr>
+        `;
+
+        cards.innerHTML += `
+          <div class="prev-mobile-card">
+            <div class="prev-mobile-card-header">
+              <div>
+                <span style="font-size:16px; font-weight:700; color:var(--text-main);">Interno ${item.interno}</span>
+                <span style="font-size:12px; color:var(--text-muted); display:block;">${item.modelo}</span>
+              </div>
+              <span style="font-size:11px; font-weight:600; color:var(--text-muted);">${item.litrosTotales.toLocaleString('es-AR')} Lts Totales</span>
+            </div>
+            <div class="prev-mobile-card-row">
+              <span>Control 5K:</span>
+              <span class="badge-prev ${is5kUrgente ? 'warning' : 'ok'}">${is5kUrgente ? 'Servicio Vencido ('+item.restante5k+' Lts)' : 'Al Día'}</span>
+            </div>
+            <div class="prev-mobile-card-row">
+              <span>Control 10K:</span>
+              <span class="badge-prev ${is10kUrgente ? 'warning' : 'ok'}">${is10kUrgente ? 'Servicio Vencido ('+item.restante10k+' Lts)' : 'Al Día'}</span>
+            </div>
+            <div style="margin-top:12px; display:flex; justify-content:flex-end;">
+              <button class="btn btn-secondary btn-sm" onclick="openOrderForPreventivo('${item.interno}', '${item.modelo}', null, null, null, 'Combustible')" style="width:100%; display:flex; justify-content:center; align-items:center; gap:4px;">
+                <span class="material-icons" style="font-size:14px;">local_gas_station</span> Crear Orden Combustible
+              </button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function renderPrev0KM() {
+      const tbody = document.getElementById('prev-0km-tbody');
+      tbody.innerHTML = '';
+      mock0KM.forEach(item => {
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${item.interno}</strong></td>
+            <td>${item.modelo}</td>
+            <td><span class="badge-service-type">${item.kmControl}</span></td>
+            <td><span class="badge-prev ${item.torque === 'Realizado' ? 'ok' : 'warning'}">${item.torque}</span></td>
+            <td><span class="badge-prev ${item.filtros === 'Realizado' ? 'ok' : 'warning'}">${item.filtros}</span></td>
+            <td><span class="badge-prev warning">${item.estado}</span></td>
+            <td style="text-align: right;">
+              <button class="btn btn-primary btn-xs" onclick="openOrderForPreventivo('${item.interno}', '${item.modelo}', null, null, null, 'Control 0KM')" style="background-color:#9c27b0; border-color:#9c27b0; font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:2px;">
+                <span class="material-icons" style="font-size:12px;">build</span> Service
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    function renderPrevAlarmas() {
+      const tbody = document.getElementById('prev-alarmas-tbody');
+      tbody.innerHTML = '';
+      mockAlarmas.forEach(item => {
+        let isPendiente = item.estado === 'Pendiente';
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${item.interno}</strong></td>
+            <td><span class="badge-service-type">${item.tipo}</span></td>
+            <td><span class="badge-prev ${isPendiente ? 'warning' : 'ok'}">${item.estado}</span></td>
+            <td>${item.fechaAlerta}</td>
+            <td>${item.fechaRealizado}</td>
+            <td style="font-weight:${!isPendiente&&Number(item.demora)>0?'700':'normal'}; color:${!isPendiente&&Number(item.demora)>3?'#ef4444':'inherit'};">
+              ${item.demora} ${item.demora !== '-' ? 'días' : ''}
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    function renderPrevHistorial() {
+      const tbody = document.getElementById('prev-historial-tbody');
+      tbody.innerHTML = '';
+      mockHistorial.forEach(item => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${item.fecha}</td>
+            <td><strong>${item.interno}</strong></td>
+            <td><span class="badge-service-type">${item.tipo}</span></td>
+            <td><strong>${item.detalle}</strong></td>
+            <td>${item.conductor || '–'}</td>
+            <td><span style="font-size:11px; color:var(--text-muted);">${item.mes}</span></td>
+          </tr>
+        `;
+      });
+    }
+
+    // RENDER PARTE TALLER TABLES
+    function renderParteTaller() {
+      const tbody = document.getElementById('pt-fuera-tbody');
+      tbody.innerHTML = '';
+
+      ptFueraServicio.forEach(item => {
+        let badgeStyle = item.estado === 'Auxiliando' ? 'background-color:#fee2e2; color:#ef4444; border:1px solid rgba(239,68,68,0.2);' : 'background-color:#e0f2fe; color:#0369a1; border:1px solid rgba(3,105,161,0.2);';
+        
+        // Calculate days stopped
+        let dias = 0;
+        try {
+          let parts = item.fecha.split(' ')[0].split('/');
+          let dateObj = new Date(parts[2], parts[1]-1, parts[0]);
+          let baseDate = new Date(2026, 5, 17); // 17 de Junio de 2026
+          let diffTime = baseDate - dateObj;
+          dias = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          if (dias < 0) dias = 0;
+        } catch(e) {}
+        
+        let diasText = dias === 0 ? "Hoy" : `${dias} ${dias === 1 ? 'día' : 'días'}`;
+        let diasColor = dias > 2 ? '#ef4444' : (dias > 0 ? '#f59e0b' : 'inherit');
+        let diasWeight = dias > 0 ? '700' : 'normal';
+
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${item.interno}</strong></td>
+            <td><span class="badge-service-type">${item.tipo}</span></td>
+            <td>${item.novedad} <span style="font-size:10px; color:var(--text-muted); display:block;">Cond: ${item.conductor}</span></td>
+            <td>${item.fecha.split(' ')[1]}</td>
+            <td><span style="color:${diasColor}; font-weight:${diasWeight};">${diasText}</span></td>
+            <td><span class="badge-status" style="${badgeStyle}">${item.estado}</span></td>
+            <td style="text-align: right;">
+              <button class="btn btn-primary btn-xs" onclick="openOrderForParteTaller('${item.interno}', '${item.tipo}', '${item.novedad}', '${item.estado}')" style="background-color: #e91e63; border-color: #e91e63; font-size: 11px; padding: 4px 8px; display: inline-flex; align-items: center; gap: 2px;">
+                <span class="material-icons" style="font-size: 12px;">folder_open</span> Abrir OT
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      // Update counters
+      document.getElementById('pt-out-count').innerText = ptFueraServicio.length;
+      
+      let comps = ptFueraServicio.filter(i => i.tipo === 'COMPACTADOR').length;
+      let volqs = ptFueraServicio.filter(i => i.tipo === 'VOLQUETE').length;
+      let rolls = ptFueraServicio.filter(i => i.tipo === 'ROLL - OFF').length;
+
+      document.getElementById('pt-out-comp').innerText = comps;
+      document.getElementById('pt-op-comp').innerText = 59 - comps;
+      
+      document.getElementById('pt-out-volq').innerText = volqs;
+      document.getElementById('pt-op-volq').innerText = 8 - volqs;
+
+      document.getElementById('pt-out-roll').innerText = rolls;
+      document.getElementById('pt-op-roll').innerText = 15 - rolls;
+    }
+
+    // PREVENTIVOS TAB NAVIGATION
+    window.switchPrevSubTab = function(subtab) {
+      document.querySelectorAll('.preventivos-tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.prev-subview').forEach(view => view.style.display = 'none');
+      
+      const activeBtn = Array.from(document.querySelectorAll('.preventivos-tab-btn')).find(btn => btn.innerText.toLowerCase().includes(subtab));
+      if (activeBtn) activeBtn.classList.add('active');
+      
+      const subview = document.getElementById(`prev-subview-${subtab}`);
+      if (subview) subview.style.display = 'block';
+
+      if (subtab === 'dashboard') renderPrevDashboard();
+      if (subtab === 'combustible') renderPrevCombustible();
+      if (subtab === '0km') renderPrev0KM();
+      if (subtab === 'alarmas') renderPrevAlarmas();
+      if (subtab === 'historial') renderPrevHistorial();
+    }
+
+    window.filterByAlertState = function(state) {
+      prevActiveFilter = state;
+      renderPrevDashboard();
+    }
+
+    window.applyPrevFilters = function() {
+      const currentTab = document.querySelector('.preventivos-tab-btn.active').innerText.toLowerCase();
+      if (currentTab.includes('km/hs')) renderPrevDashboard();
+      else if (currentTab.includes('combustible')) renderPrevCombustible();
+    }
+
+    // SPA VIEW SWITCHER
+    window.switchView = function(viewId) {
+      document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.bottom-nav .nav-item').forEach(i => i.classList.remove('active'));
+      
+      document.getElementById(`view-${viewId}`).classList.add('active');
+      document.getElementById(`nav-${viewId}`).classList.add('active');
+      
+      if (viewId === 'preventivos') {
+        switchPrevSubTab('dashboard');
+      } else if (viewId === 'partetaller') {
+        renderParteTaller();
+      } else if (viewId === 'orders') {
+        const searchInput = document.getElementById('order-search');
+        if (searchInput) {
+          searchInput.removeAttribute('readonly');
+          searchInput.value = '';
+        }
+        renderMockOrders();
+      }
+    }
+
+    // SIMULATE WHATSAPP MESSAGE
+    window.sendMockWhatsAppMessage = function() {
+      const input = document.getElementById('wa-input-message');
+      const text = input.value.trim();
+      if (!text) return;
+
+      input.value = '';
+
+      // Add sent message to UI
+      const chatBox = document.getElementById('wa-chat-box');
+      let now = new Date();
+      let timeStr = now.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'});
+      
+      chatBox.innerHTML += `
+        <div class="wa-bubble sent">
+          ${text}
+          <div class="wa-bubble-meta">${timeStr}</div>
+        </div>
+      `;
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      // Console log mock
+      const consoleBox = document.getElementById('wa-script-console');
+      consoleBox.innerHTML += `<div class="tm-line">[${timeStr}] Mensaje recibido: "${text}"</div>`;
+
+      // Execute RegEx (same as user script)
+      const reIngreso = /^(?:interno\s+|camion\s+|unidad\s+)?(\d{1,4}|ac-?\d{1,4})\s*[.\-:,]?\s*(.{3,})$/i;
+      const match = text.match(reIngreso);
+
+      if (match) {
+        let interno = match[1];
+        let novedad = match[2];
+        
+        consoleBox.innerHTML += `<div class="tm-line success">[TAMPERMONKEY] RegEx Match exitoso. Interno: ${interno} | Falla: "${novedad}"</div>`;
+        consoleBox.innerHTML += `<div class="tm-line info">[TAMPERMONKEY] Enviando POST a /api/whatsapp-novedad...</div>`;
+
+        setTimeout(() => {
+          // Add to mock Parte Taller
+          let tipo = Number(interno) > 110 ? "ROLL - OFF" : "COMPACTADOR";
+          if (interno == "32" || interno == "8") tipo = "VOLQUETE";
+
+          ptFueraServicio.unshift({
+            interno: interno,
+            novedad: novedad,
+            tipo: tipo,
+            fecha: now.toLocaleDateString('es-AR') + " " + timeStr,
+            estado: "En Taller",
+            conductor: "Reporte WhatsApp"
+          });
+
+          renderParteTaller();
+
+          consoleBox.innerHTML += `<div class="tm-line success">[Server] Respuesta 200 OK. Interno ${interno} ingresado al taller.</div>`;
+          consoleBox.scrollTop = consoleBox.scrollHeight;
+
+          // Toast
+          const toast = document.getElementById('toast');
+          document.getElementById('toast-text').innerText = `[WhatsApp Web] Interno ${interno} registrado en el Parte de Taller: "${novedad}".`;
+          toast.classList.add('show');
+          setTimeout(() => toast.classList.remove('show'), 5000);
+        }, 1000);
+
+      } else {
+        consoleBox.innerHTML += `<div class="tm-line warn">[TAMPERMONKEY] Mensaje omitido (No coincide con formato 'interno + falla')</div>`;
+        consoleBox.scrollTop = consoleBox.scrollHeight;
+      }
+    }
+
+    // MODAL AND WORK ORDER SIMULATION
+    let currentEditRowIndex = null;
+    let selectedInterno = "";
+    let selectedTipoServicio = "Mantenimiento KM/HS";
+
+    window.openOrderForPreventivo = function(interno, modelo, km, hs, rowIndex, tipo = 'Mantenimiento KM/HS') {
+      currentEditRowIndex = rowIndex;
+      selectedInterno = interno;
+      selectedTipoServicio = tipo;
+
+      document.getElementById('form-interno').value = interno;
+      document.getElementById('form-rodado').value = modelo || "CAMIÓN FLOTA";
+      document.getElementById('form-clasificacion').value = "Preventivo";
+      document.getElementById('form-task-desc').value = `Mantenimiento Preventivo: ${tipo} (Interno ${interno})`;
+
+      const kmHsFields = document.getElementById('form-km-hs-fields');
+      if (tipo === 'Mantenimiento KM/HS' && km !== null) {
+        kmHsFields.style.display = 'block';
+        document.getElementById('form-km-val').value = km;
+        document.getElementById('form-hs-val').value = hs || 0;
+      } else {
+        kmHsFields.style.display = 'none';
+      }
+
+      document.getElementById('new-order-modal').classList.add('open');
+    }
+
+    window.closeNewOrderModal = function() {
+      document.getElementById('new-order-modal').classList.remove('open');
+    }
+
+    window.openPreOrderModal = function() {
+      document.getElementById('pre-order-modal').classList.add('open');
+    }
+    window.closePreOrderModal = function() {
+      document.getElementById('pre-order-modal').classList.remove('open');
+    }
+    window.finishPreOrderModal = function() {
+      closePreOrderModal();
+      const interno = document.getElementById('pre-form-interno').value;
+      const clasificacion = document.getElementById('pre-form-clasificacion').value;
+      
+      document.getElementById('form-interno').value = interno;
+      document.getElementById('form-clasificacion').value = clasificacion;
+      document.getElementById('form-rodado').value = "Camión Seleccionado";
+      document.getElementById('form-task-desc').value = "Tarea general de taller";
+      document.getElementById('form-km-hs-fields').style.display = 'none';
+
+      document.getElementById('new-order-modal').classList.add('open');
+    }
+
+    window.simulateSubmitOrder = function() {
+      closeNewOrderModal();
+      
+      const interno = document.getElementById('form-interno').value;
+      const desc = document.getElementById('form-task-desc').value;
+      const km = document.getElementById('form-km-val').value;
+      const hs = document.getElementById('form-hs-val').value;
+
+      // Update mock data
+      if (selectedTipoServicio === 'Mantenimiento KM/HS' && currentEditRowIndex) {
+        let vehicle = mockFleet.find(v => v.interno === interno);
+        if (vehicle) {
+          vehicle.kmReales = Number(km);
+          vehicle.hsReales = Number(hs);
+          vehicle.restante = 15000; // Reset alert
+          vehicle.alerta = "Al Día";
+        }
+
+        // Add to history log
+        let now = new Date();
+        let formattedDate = now.toLocaleDateString('es-AR') + " " + now.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'});
+        mockHistorial.unshift({
+          fecha: formattedDate,
+          interno: interno,
+          tipo: vehicle.hsReales > 0 ? "SERVICE HORAS" : "SERVICE KM",
+          detalle: vehicle.hsReales > 0 ? hs + " hs" : km + " km",
+          conductor: "-",
+          mes: "Copia de " + ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"][now.getMonth()]
+        });
+
+        // Resolve active alarm
+        let alarm = mockAlarmas.find(a => a.interno === interno && a.estado === 'Pendiente');
+        if (alarm) {
+          alarm.estado = 'Realizado';
+          alarm.fechaRealizado = now.toLocaleDateString('es-AR');
+          alarm.demora = "1";
+        }
+      }
+
+      // Show toast notification
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-text').innerText = `¡Orden de Trabajo creada! Planilla Excel de preventivos actualizada para interno ${interno}.`;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 5000);
+
+      // Refresh view
+      renderPrevDashboard();
+      switchView('preventivos');
+    }
+
+    // PARTE TALLER SORTING LOGIC
+    let ptSortCol = 'dias';
+    let ptSortDir = 'desc';
+
+    window.sortParteTaller = function(col) {
+      if (ptSortCol === col) {
+        ptSortDir = ptSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        ptSortCol = col;
+        ptSortDir = 'desc';
+      }
+      applyParteTallerSort();
+      renderParteTaller();
+    };
+
+    function applyParteTallerSort() {
+      ptFueraServicio.sort((a, b) => {
+        let va = a[ptSortCol];
+        let vb = b[ptSortCol];
+
+        if (ptSortCol === 'dias') {
+          let getDays = (fechaStr) => {
+            try {
+              let parts = fechaStr.split(' ')[0].split('/');
+              let dateObj = new Date(parts[2], parts[1]-1, parts[0]);
+              return Math.floor((new Date(2026, 5, 17) - dateObj) / (1000 * 60 * 60 * 24));
+            } catch(e) { return 0; }
+          };
+          va = getDays(a.fecha);
+          vb = getDays(b.fecha);
+        } else if (ptSortCol === 'interno') {
+          va = Number(a.interno) || 0;
+          vb = Number(b.interno) || 0;
+        } else {
+          va = String(va).toLowerCase();
+          vb = String(vb).toLowerCase();
+        }
+
+        if (va < vb) return ptSortDir === 'asc' ? -1 : 1;
+        if (va > vb) return ptSortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      // Update header icons
+      const cols = ['interno', 'tipo', 'dias', 'estado'];
+      cols.forEach(c => {
+        const el = document.getElementById('pt-sort-' + c);
+        if (!el) return;
+        if (c === ptSortCol) {
+          el.textContent = ptSortDir === 'asc' ? '↑' : '↓';
+          el.style.color = '#e91e63';
+        } else {
+          el.textContent = '↕';
+          el.style.color = 'inherit';
+        }
+      });
+    }
+
+    // MOCK ACTIVE ORDERS DATABASE (Matching Out of Service table)
+    let mockOrders = [
+      { id: "ot-1", rodado: "COMPACTADOR Interno 102", interno: "102", clasificacion: "Correctivo", incidente: "falla electrica en motor", tasks: [{ descripcion: "Revisar circuito eléctrico", empleado: "Carlos Gomez", status: "Trabajando" }] },
+      { id: "ot-2", rodado: "COMPACTADOR Interno 85", interno: "85", clasificacion: "Correctivo", incidente: "falla en hidraulica de pala", tasks: [{ descripcion: "Cambiar retén hidráulico", empleado: "Hugo Gimenez", status: "Pausa" }] },
+      { id: "ot-3", rodado: "ROLL - OFF Interno 114", interno: "114", clasificacion: "Correctivo", incidente: "embrague no desacopla", tasks: [{ descripcion: "Ajustar embrague", empleado: "Alberto Diaz", status: "Trabajando" }] },
+      { id: "ot-4", rodado: "ROLL - OFF Interno 128", interno: "128", clasificacion: "Auxilio", incidente: "rotura de manguera hidraulica", tasks: [{ descripcion: "Reemplazar manguera de alta presión", empleado: "Carlos Gomez", status: "Trabajando" }] },
+      { id: "ot-5", rodado: "COMPACTADOR Interno 53", interno: "53", clasificacion: "Correctivo", incidente: "freno bloqueado trasero izquierdo", tasks: [{ descripcion: "Desbloquear zapata", empleado: "Hugo Gimenez", status: "Trabajando" }] },
+      { id: "ot-6", rodado: "COMPACTADOR Interno 92", interno: "92", clasificacion: "Correctivo", incidente: "cambio de placa y disco", tasks: [{ descripcion: "Reemplazar kit de embrague", empleado: "Alberto Diaz", status: "Trabajando" }] },
+      { id: "ot-7", rodado: "COMPACTADOR Interno 45", interno: "45", clasificacion: "Correctivo", incidente: "pinchadura neumatico auxiliar", tasks: [{ descripcion: "Parchear cubierta", empleado: "Carlos Gomez", status: "Pausa" }] },
+      { id: "ot-8", rodado: "VOLQUETE Interno 32", interno: "32", clasificacion: "Correctivo", incidente: "perdida aceite hidraulico", tasks: [{ descripcion: "Cambiar o-ring de bomba", empleado: "Hugo Gimenez", status: "Trabajando" }] },
+      { id: "ot-9", rodado: "COMPACTADOR Interno 61", interno: "61", clasificacion: "Preventivo", incidente: "service preventivo programado", tasks: [{ descripcion: "Cambio de aceite y engrase", empleado: "Alberto Diaz", status: "Trabajando" }] },
+      { id: "ot-10", rodado: "ROLL - OFF Interno 12", interno: "12", clasificacion: "Correctivo", incidente: "falla inyectores", tasks: [{ descripcion: "Limpieza y calibración de inyectores", empleado: "Carlos Gomez", status: "Pausa" }] }
+    ];
+
+    function renderMockOrders() {
+      const container = document.getElementById('prototype-orders-list');
+      if (!container) return;
+
+      const searchInput = document.getElementById('order-search');
+      const query = searchInput ? searchInput.value.toLowerCase() : '';
+      
+      let filtered = mockOrders.filter(o => 
+        o.rodado.toLowerCase().includes(query) || 
+        o.interno.toLowerCase().includes(query) || 
+        o.clasificacion.toLowerCase().includes(query)
+      );
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <span class="material-icons">search_off</span>
+            <p>No se encontraron órdenes activas en este prototipo.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(order => {
+        const t = order.tasks[0];
+        let statusBadge = `<span class="badge-status local" style="background-color:#e0f2fe; color:#0369a1; border:1px solid rgba(3,105,161,0.2);"><span class="material-icons" style="font-size:12px;">construction</span> En Curso</span>`;
+        if (t.status === 'Pausa') {
+          statusBadge = `<span class="badge-status pending" style="background-color:#fee2e2; color:#ef4444; border:1px solid rgba(239,68,68,0.2);"><span class="material-icons" style="font-size:12px;">pause_circle</span> Pausada</span>`;
+        }
+        
+        return `
+          <div class="order-card" id="card-ot-${order.interno}" style="transition: all 0.3s; margin-bottom: 12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:var(--radius-md); box-shadow:var(--shadow-sm);">
+            <div class="order-card-header" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border-color);">
+              <div style="min-width: 0; flex: 1;">
+                <div class="order-card-title" style="font-weight:700; color:var(--text-main); font-size:15px;">${order.rodado}</div>
+                <div class="order-card-subtitle" style="font-size:12px; color:var(--text-muted); margin-top:2px;">Interno: <strong>${order.interno}</strong> | Clasificación: <strong style="color:${order.clasificacion==='Preventivo'?'#9c27b0':(order.clasificacion==='Auxilio'?'#ef4444':'#1a73e8')}">${order.clasificacion}</strong></div>
+              </div>
+              ${statusBadge}
+            </div>
+            <div style="padding: 12px 16px; font-size:13.5px; color:var(--text-main); border-bottom: 1px solid var(--border-color);">
+              <div><strong>Falla Reportada:</strong> ${order.incidente}</div>
+              <div style="margin-top: 6px; display:flex; align-items:center; gap:6px; color:var(--text-muted); font-size:12.5px;">
+                <span class="material-icons" style="font-size:15px; color:#1a73e8;">engineering</span> 
+                <span>Tarea: <strong>${t.descripcion}</strong> (Asignado a: ${t.empleado})</span>
+              </div>
+            </div>
+            <div class="order-card-footer" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:#f8f9fa;">
+              <div class="tasks-summary" style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text-muted);">
+                <span class="material-icons" style="font-size:15px;">schedule</span>
+                <span>Temporizador corriendo</span>
+              </div>
+              <div class="card-actions" style="display:flex; gap:8px;">
+                <button class="btn btn-secondary btn-xs" onclick="alert('Simulación: editar orden')" style="font-size:11px; padding:3px 6px;">Editar</button>
+                <button class="btn btn-xs" onclick="alert('Simulación: finalizar orden')" style="background-color:#10b981; color:white; border-color:#10b981; font-size:11px; padding:3px 6px;">Finalizar</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // OPEN EXISTING WORK ORDER FROM PARTE TALLER
+    window.openOrderForParteTaller = function(interno, tipo, novedad, estado) {
+      // 1. Switch view to Orders
+      switchView('orders');
+      
+      // 2. Set search filter to this vehicle internal number
+      const searchInput = document.getElementById('order-search');
+      if (searchInput) {
+        searchInput.removeAttribute('readonly'); // Allow user interaction
+        searchInput.value = interno;
+      }
+      
+      // 3. Render and filter mock list
+      renderMockOrders();
+      
+      // 4. Highlight and animate the card
+      setTimeout(() => {
+        const card = document.getElementById(`card-ot-${interno}`);
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.style.border = "2px solid #e91e63";
+          card.style.boxShadow = "0 0 15px rgba(233,30,99,0.3)";
+          card.style.transform = "scale(1.02)";
+          setTimeout(() => {
+            card.style.transform = "scale(1)";
+            card.style.border = "1px solid var(--border-color)";
+            card.style.boxShadow = "var(--shadow-sm)";
+          }, 3000);
+        }
+      }, 100);
+
+      // 5. Toast alert
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-text').innerText = `[Parte Taller] Abriendo Orden de Trabajo activa N° ${interno} (${tipo}).`;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 5000);
+    }
+
+    // INITIAL RENDER
+    document.addEventListener('DOMContentLoaded', () => {
+      renderPrevDashboard();
+      // Apply initial sort by days stopped (longest first)
+      applyParteTallerSort();
+      renderParteTaller();
+      // Set input event listener for mock search
+      const orderSearch = document.getElementById('order-search');
+      if (orderSearch) {
+        orderSearch.removeAttribute('readonly');
+        orderSearch.addEventListener('input', renderMockOrders);
+      }
+    });
+  </script>
+</body>
+</html>

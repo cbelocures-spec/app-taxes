@@ -668,6 +668,10 @@ async function fetchSettings() {
     document.getElementById('set-username').value = data.username || "";
     document.getElementById('set-password').value = data.password || "";
     document.getElementById('set-google-script-url').value = data.googleScriptUrl || "";
+    const activeTasksInput = document.getElementById('set-google-active-tasks-url');
+    if (activeTasksInput) {
+      activeTasksInput.value = data.googleActiveTasksUrl || "";
+    }
     
     isCurrentUserSupervisor = !!data.isSupervisor;
     const hoursSection = document.getElementById('supervisor-hours-section');
@@ -695,6 +699,7 @@ async function saveSettings(e) {
   const username = document.getElementById('set-username').value;
   const password = document.getElementById('set-password').value;
   const googleScriptUrl = document.getElementById('set-google-script-url').value;
+  const googleActiveTasksUrl = document.getElementById('set-google-active-tasks-url')?.value || '';
   const currentUsername = localStorage.getItem('currentUserUsername') || '';
 
   try {
@@ -704,7 +709,7 @@ async function saveSettings(e) {
         'Content-Type': 'application/json',
         'x-user-username': currentUsername  // Tell server which user is saving
       },
-      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl })
+      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl, googleActiveTasksUrl })
     });
 
     if (!res.ok) {
@@ -754,6 +759,45 @@ async function testGoogleScriptConnection() {
     const data = await res.json();
     if (data.status === 'success' || data.status === 'not_found') {
       showToast("¡Conexión con Google Sheets exitosa!", "success");
+    } else {
+      showToast(`Error del script: ${data.message || 'Desconocido'}`, "danger");
+    }
+  } catch (error) {
+    console.error(error);
+    showToast(`Falló la conexión: ${error.message}. Verifica haberlo publicado como 'Cualquiera' (Anyone).`, "danger");
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+}
+
+async function testGoogleActiveTasksConnection() {
+  const url = document.getElementById('set-google-active-tasks-url').value.trim();
+  if (!url) {
+    showToast("Por favor, ingresa una URL primero", "warning");
+    return;
+  }
+
+  const btn = document.getElementById('btn-test-google-active-tasks');
+  const originalText = btn.textContent;
+  btn.textContent = "...";
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/settings/test-google-active-tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP error ${res.status}`);
+    }
+
+    const data = await res.json();
+    if (data.status === 'success' || data.status === 'not_found') {
+      showToast("¡Conexión con Google Sheets de Tareas Activas exitosa!", "success");
     } else {
       showToast(`Error del script: ${data.message || 'Desconocido'}`, "danger");
     }

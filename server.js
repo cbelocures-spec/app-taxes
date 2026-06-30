@@ -200,6 +200,9 @@ app.post('/api/orders', (req, res) => {
     // Trigger Google Sheets update asynchronously for any finalized tasks
     checkAndTriggerGoogleSheetUpdates(null, newOrder.tasks, responsable, interno);
 
+    // Trigger active tasks Google Sheets update
+    triggerActiveTasksGoogleSheetSync();
+
     res.status(201).json(newOrder);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -287,6 +290,9 @@ app.put('/api/orders/:id', (req, res) => {
     // Trigger Google Sheets update asynchronously for any newly finalized tasks
     checkAndTriggerGoogleSheetUpdates(existing, updated.tasks, responsable, interno);
 
+    // Trigger active tasks Google Sheets update
+    triggerActiveTasksGoogleSheetSync();
+
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -317,6 +323,10 @@ app.delete('/api/orders/:id', (req, res) => {
     }
 
     const success = db.deleteWorkOrder(req.params.id);
+    
+    // Trigger active tasks Google Sheets update
+    triggerActiveTasksGoogleSheetSync();
+
     res.json({ success });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -406,6 +416,7 @@ app.get('/api/settings', (req, res) => {
       password: displayPassword,
       portalUrl: settings.portalUrl || "https://taxes.com.ar",
       googleScriptUrl: settings.googleScriptUrl || "",
+      googleActiveTasksUrl: settings.googleActiveTasksUrl || "",
       catalogSyncStatus: catalogStatus,
       catalogSyncError: settings.catalogSyncError || null,
       isSupervisor: !!isMainSupervisor
@@ -420,7 +431,7 @@ app.get('/api/settings', (req, res) => {
 // Save connection settings
 app.post('/api/settings', (req, res) => {
   try {
-    const { username, password, portalUrl, googleScriptUrl } = req.body;
+    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl } = req.body;
     const requestingUser = req.headers['x-user-username'] || null;
     const current = db.getSettings();
     
@@ -432,7 +443,8 @@ app.post('/api/settings', (req, res) => {
 
     const updates = {
       portalUrl: portalUrl !== undefined ? portalUrl : current.portalUrl,
-      googleScriptUrl: googleScriptUrl !== undefined ? googleScriptUrl : current.googleScriptUrl
+      googleScriptUrl: googleScriptUrl !== undefined ? googleScriptUrl : current.googleScriptUrl,
+      googleActiveTasksUrl: googleActiveTasksUrl !== undefined ? googleActiveTasksUrl : current.googleActiveTasksUrl
     };
 
     // Only update global username/password if this is the global/primary user
@@ -446,7 +458,7 @@ app.post('/api/settings', (req, res) => {
     }
 
     const saved = db.saveSettings(updates);
-    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl } });
+    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl, googleActiveTasksUrl: saved.googleActiveTasksUrl } });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -492,6 +504,48 @@ app.post('/api/settings/test-google-sheet', async (req, res) => {
     }
   } catch (error) {
     console.error("[Google Sheets Test] Connection test failed:", error.message);
+    res.status(500).json({ error: `Falló la conexión: ${error.message}` });
+  }
+});
+
+// Test Google Active Tasks script URL connection
+app.post('/api/settings/test-google-active-tasks', async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: "Falta la URL del script." });
+    }
+
+    console.log(`[Google Sheets Active Tasks Test] Testing connection to URL: ${url}`);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'updateActiveTasks',
+        tasks: []
+      })
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `El script devolvió estado HTTP ${response.status}` });
+    }
+
+    const text = await response.text();
+    try {
+      const data = JSON.parse(text);
+      res.json(data);
+    } catch (parseError) {
+      console.error("[Google Sheets Active Tasks Test] Failed to parse JSON response:", text.substring(0, 200));
+      if (text.trim().startsWith('<')) {
+        return res.status(400).json({ 
+          error: "El script devolvió HTML en lugar de JSON. Esto suele ocurrir si pegaste la URL de la hoja de Google Sheet en lugar de la 'URL de la aplicación web' del script de Google Apps Script, o si el script no está configurado para acceso 'Cualquiera' (Anyone)." 
+        });
+      }
+      return res.status(400).json({ error: `Respuesta no válida del script: ${text.substring(0, 100)}` });
+    }
+  } catch (error) {
+    console.error("[Google Sheets Active Tasks Test] Connection test failed:", error.message);
     res.status(500).json({ error: `Falló la conexión: ${error.message}` });
   }
 });
@@ -756,6 +810,58 @@ async function checkAndTriggerGoogleSheetUpdates(existingOrder, updatedTasks, su
     }
   } catch (error) {
     console.error("Error in checkAndTriggerGoogleSheetUpdates:", error);
+  }
+}
+
+async function triggerActiveTasksGoogleSheetSync() {
+  const settings = db.getSettings();
+  const scriptUrl = settings.googleActiveTasksUrl;
+  if (!scriptUrl) {
+    console.log("triggerActiveTasksGoogleSheetSync: googleActiveTasksUrl is not configured.");
+    return;
+  }
+
+  try {
+    const orders = db.getWorkOrders() || [];
+    const catalogs = db.getCatalogs() || {};
+    const activeTasks = [];
+
+    orders.forEach(order => {
+      const tasks = order.tasks || [];
+      tasks.forEach(task => {
+        if (task.status !== "Finalizada") {
+          const mechanicObj = (catalogs.empleados || []).find(e => String(e.value) === String(task.empleado));
+          const mechanicName = mechanicObj ? mechanicObj.label : (task.empleado || "");
+
+          activeTasks.push({
+            orderId: order.id,
+            taxesOrderNumber: order.taxesOrderNumber || "Sin Sincronizar",
+            interno: order.interno,
+            rodado: order.rodado,
+            clasificacion: order.clasificacion,
+            mecanico: mechanicName,
+            descripcion: task.descripcion || "(Sin descripción)",
+            status: task.status
+          });
+        }
+      });
+    });
+
+    console.log(`[Google Sheets Active Tasks] Sending ${activeTasks.length} active tasks to Apps Script...`);
+
+    const response = await fetch(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'updateActiveTasks',
+        tasks: activeTasks
+      })
+    });
+
+    const text = await response.text();
+    console.log(`[Google Sheets Active Tasks] Response (Status ${response.status}):`, text);
+  } catch (error) {
+    console.error("[Google Sheets Active Tasks] Sync failed:", error.message);
   }
 }
 
