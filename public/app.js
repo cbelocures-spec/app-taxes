@@ -429,12 +429,13 @@ async function submitPreOrderCheck() {
   const currentUser = localStorage.getItem('currentUserUsername');
   const isCarmona = currentUser === 'jcarmona@contenedoreshugo.com.ar' || currentUser === 'j.carmona@contenedoreshugo.com.ar';
 
-  // 1. Search for existing open order with this interno and clasificacion
-  const existingOrder = activeOrders.find(o => 
-    String(o.interno).trim() === String(interno) && 
-    String(o.clasificacion).trim().toLowerCase() === String(clasificacion).trim().toLowerCase() &&
-    o.syncStatus !== 'success'
-  );
+  // 1. Search for existing open order with this interno and clasificacion (not fully completed)
+  const existingOrder = activeOrders.find(o => {
+    const isSameInterno = String(o.interno).trim() === String(interno);
+    const isSameCls = String(o.clasificacion).trim().toLowerCase() === String(clasificacion).trim().toLowerCase();
+    const allCompleted = (o.tasks || []).length > 0 && (o.tasks || []).every(t => t.status === "Finalizada");
+    return isSameInterno && isSameCls && !allCompleted;
+  });
 
   if (existingOrder && !isCarmona) {
     showToast(`Ya existe una orden en curso para el interno ${interno} (${clasificacion}). Abriendo existente...`, "warning");
