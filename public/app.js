@@ -495,9 +495,11 @@ function openNewOrderModal() {
   const dd = String(today.getDate()).padStart(2, '0');
   document.getElementById('form-fecha').value = `${yyyy}-${mm}-${dd}`;
   
-  const hh = String(today.getHours()).padStart(2, '0');
-  const min = String(today.getMinutes()).padStart(2, '0');
   document.getElementById('form-hora').value = `${hh}:${min}`;
+  const estadoUnidadSelect = document.getElementById('form-estado-unidad');
+  if (estadoUnidadSelect) {
+    estadoUnidadSelect.value = "operativo";
+  }
 
   // Clear task fields
   const container = document.getElementById('modal-tasks-list');
@@ -559,6 +561,10 @@ function editOrder(orderId) {
   document.getElementById('form-incidente').value = order.incidente;
   document.getElementById('form-fecha').value = order.fechaEntrega;
   document.getElementById('form-hora').value = order.horario;
+  const estadoUnidadSelect = document.getElementById('form-estado-unidad');
+  if (estadoUnidadSelect) {
+    estadoUnidadSelect.value = order.estadoUnidad || "operativo";
+  }
 
   // Clear modal tasks
   const container = document.getElementById('modal-tasks-list');
@@ -620,6 +626,10 @@ function viewOrder(orderId) {
   document.getElementById('form-incidente').value = order.incidente || '';
   document.getElementById('form-fecha').value = order.fechaEntrega;
   document.getElementById('form-hora').value = order.horario;
+  const estadoUnidadSelect = document.getElementById('form-estado-unidad');
+  if (estadoUnidadSelect) {
+    estadoUnidadSelect.value = order.estadoUnidad || "operativo";
+  }
 
   // Clear modal tasks
   const container = document.getElementById('modal-tasks-list');
@@ -1460,7 +1470,22 @@ function createOrderCardHtml(order) {
           ) : ''}
           <div style="min-width: 0; flex: 1;">
             <div class="order-card-title">${order.rodado}</div>
-            <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion || 'Sin Clasificar'}</strong></div>
+            <div class="order-card-subtitle" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
+              <span>Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion || 'Sin Clasificar'}</strong></span>
+              ${(() => {
+                const tasks = order.tasks || [];
+                const hasActiveOrPausedTimer = tasks.some(t => t.timerStarted || t.timerStart || t.status === 'En Proceso');
+                const isOutOfService = hasActiveOrPausedTimer || order.estadoUnidad === 'fuera_de_servicio';
+                
+                if (isOutOfService) {
+                  const tooltip = hasActiveOrPausedTimer ? 'Forzado Fuera de Servicio por tareas activas' : 'Haga clic para pasar a Operativo';
+                  const clickAction = hasActiveOrPausedTimer ? '' : `onclick="toggleOrderEstadoUnidad(event, '${order.id}')"`;
+                  return `<span class="badge-status error" style="cursor: ${hasActiveOrPausedTimer ? 'not-allowed' : 'pointer'}; background-color: #fee2e2; color: #991b1b; border: 1px solid rgba(153,27,27,0.2); padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;" ${clickAction} title="${tooltip}"><span class="material-icons" style="font-size:10px;">warning</span> Fuera de Servicio</span>`;
+                } else {
+                  return `<span class="badge-status success" style="cursor: pointer; background-color: #d1fae5; color: #065f46; border: 1px solid rgba(6,95,70,0.2); padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;" onclick="toggleOrderEstadoUnidad(event, '${order.id}')" title="Haga clic para pasar a Fuera de Servicio"><span class="material-icons" style="font-size:10px;">check_circle</span> Operativo</span>`;
+                }
+              })()}
+            </div>
           </div>
         </div>
         ${statusBadge}
@@ -1639,7 +1664,8 @@ async function submitWorkOrder() {
     fechaEntrega: fechaEl.value,
     horario: horaEl.value,
     incidente: incidenteEl.value,
-    tasks: tasks
+    tasks: tasks,
+    estadoUnidad: document.getElementById('form-estado-unidad')?.value || 'operativo'
   };
  
   const url = currentEditingOrderId ? `/api/orders/${currentEditingOrderId}` : '/api/orders';
@@ -1743,6 +1769,44 @@ async function cleanupSyncedOrders() {
       showToast("Error al limpiar órdenes", "danger");
       console.error(error);
     }
+  }
+}
+
+async function toggleOrderEstadoUnidad(event, orderId) {
+  if (event) {
+    event.stopPropagation(); // Avoid triggering card details click
+  }
+  const order = activeOrders.find(o => o.id === orderId);
+  if (!order) return;
+
+  const tasks = order.tasks || [];
+  const hasActiveOrPausedTimer = tasks.some(t => t.timerStarted || t.timerStart || t.status === 'En Proceso');
+  if (hasActiveOrPausedTimer) {
+    showToast("No se puede marcar como Operativo mientras haya tareas activas o en proceso", "warning");
+    return;
+  }
+
+  const currentStatus = order.estadoUnidad || 'operativo';
+  const newStatus = currentStatus === 'operativo' ? 'fuera_de_servicio' : 'operativo';
+  
+  // Update locally first for immediate visual response
+  order.estadoUnidad = newStatus;
+  renderOrders();
+
+  try {
+    const res = await fetch(`/api/orders/${orderId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(order)
+    });
+    if (!res.ok) throw new Error("Failed to update status");
+    showToast(`Unidad marcada como ${newStatus === 'operativo' ? 'Operativa' : 'Fuera de Servicio'}`, "success");
+  } catch (error) {
+    console.error(error);
+    showToast("Error al actualizar estado de la unidad", "danger");
+    // revert
+    order.estadoUnidad = currentStatus;
+    renderOrders();
   }
 }
 

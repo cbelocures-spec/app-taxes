@@ -161,10 +161,9 @@ app.get('/api/orders', (req, res) => {
   }
 });
 
-// Create a new work order
 app.post('/api/orders', (req, res) => {
   try {
-    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks } = req.body;
+    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad } = req.body;
     
     if (!rodado || !responsable || !interno || !clasificacion) {
       return res.status(400).json({ error: "Faltan campos obligatorios: rodado, responsable, interno, clasificacion son requeridos." });
@@ -194,7 +193,8 @@ app.post('/api/orders', (req, res) => {
       clasificacion: finalClasificacion,
       incidente,
       tasks,
-      createdBy
+      createdBy,
+      estadoUnidad: estadoUnidad || 'operativo'
     });
 
     // Trigger Google Sheets update asynchronously for any finalized tasks
@@ -212,7 +212,7 @@ app.post('/api/orders', (req, res) => {
 // Update a work order
 app.put('/api/orders/:id', (req, res) => {
   try {
-    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks } = req.body;
+    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad } = req.body;
     
     const existing = db.getWorkOrderById(req.params.id);
     if (!existing) {
@@ -261,6 +261,7 @@ app.put('/api/orders/:id', (req, res) => {
       syncStatus: "pending", // Force queue for sync on any update
       syncError: null,
       syncDate: null,
+      estadoUnidad: estadoUnidad !== undefined ? estadoUnidad : existing.estadoUnidad,
       tasks: (tasks || []).map((t, idx) => {
         const existingTask = existing.tasks ? existing.tasks.find(et => et.id === t.id) : null;
         let synced = existingTask ? (existingTask.synced === true) : false;
@@ -353,7 +354,11 @@ app.post('/api/orders/cleanup', (req, res) => {
         const tasks = order.tasks || [];
         const allFinished = tasks.length > 0 && tasks.every(t => t.status === "Finalizada");
         
-        if (allFinished) {
+        // Force out of service if active/paused timers exist
+        const hasActiveOrPausedTimer = tasks.some(t => t.timerStarted || t.timerStart || t.status === 'En Proceso');
+        const isOutOfService = hasActiveOrPausedTimer || order.estadoUnidad === 'fuera_de_servicio';
+
+        if (allFinished && !isOutOfService) {
           idsToDelete.push(order.id);
         }
       }
@@ -865,6 +870,11 @@ async function triggerActiveTasksGoogleSheetSync() {
 
     orders.forEach(order => {
       const tasks = order.tasks || [];
+      
+      const hasActiveOrPausedTimer = tasks.some(t => t.timerStarted || t.timerStart || t.status === 'En Proceso');
+      const isOutOfService = hasActiveOrPausedTimer || order.estadoUnidad === 'fuera_de_servicio';
+      const estadoUnidadLabel = isOutOfService ? "Fuera de Servicio" : "Operativo";
+
       tasks.forEach(task => {
         if (task.status !== "Finalizada") {
           const mechanicObj = (catalogs.empleados || []).find(e => String(e.value) === String(task.empleado));
@@ -878,7 +888,8 @@ async function triggerActiveTasksGoogleSheetSync() {
             clasificacion: order.clasificacion,
             mecanico: mechanicName,
             descripcion: task.descripcion || "(Sin descripción)",
-            status: task.status
+            status: task.status,
+            estadoUnidad: estadoUnidadLabel
           });
         }
       });
