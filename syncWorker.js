@@ -1346,21 +1346,22 @@ async function syncWorkOrder(orderId) {
         else if (task.status === "Finalizada" && task.taxesRealizadaSynced !== true) {
           console.log(`Task #${i+1} was previously synced but is now Finalizada. Updating status to Realizada on Taxes...`);
           
-          // Search for OT number on the Tareas page search input
+           // Search for OT number on the Tareas page search input
           const searchInputSelector = await page.evaluate(() => {
-            const labels = Array.from(document.querySelectorAll('label, span, div'));
+            const cleanTxt = (str) => {
+              if (!str) return '';
+              return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+            };
+            const labels = Array.from(document.querySelectorAll('label, legend, span'));
             const otLabel = labels.find(l => {
-              const txt = l.textContent.toLowerCase();
-              return txt.includes('buscar por numero') || txt.includes('titulo de ot');
+              const txt = cleanTxt(l.textContent);
+              return (txt.includes('buscar por numero') || txt.includes('titulo de ot')) && !l.querySelector('label, legend, span');
             });
             let input = null;
             if (otLabel) {
-              if (otLabel.tagName === 'LABEL' && otLabel.getAttribute('for')) {
-                input = document.getElementById(otLabel.getAttribute('for'));
-              }
-              if (!input) {
-                const parent = otLabel.parentElement;
-                input = parent ? parent.querySelector('input') : null;
+              const parent = otLabel.parentElement ? otLabel.parentElement.parentElement : null;
+              if (parent) {
+                input = parent.querySelector('input[type="text"], input:not([type])');
               }
             }
             if (!input) {
