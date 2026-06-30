@@ -4590,6 +4590,12 @@ function isSameEmployee(val1, val2) {
   const c1 = clean(label1);
   const c2 = clean(label2);
 
+  // Short custom names (first name only) must be matched strictly (exact matches)
+  const customNames = ["federico", "luciano", "digno", "varios"];
+  if (customNames.includes(c1) || customNames.includes(c2)) {
+    return c1 === c2;
+  }
+
   return c1 === c2 || c1.includes(c2) || c2.includes(c1);
 }
 
