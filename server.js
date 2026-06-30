@@ -352,9 +352,8 @@ app.post('/api/orders/cleanup', (req, res) => {
       if (order.syncStatus === 'success') {
         const tasks = order.tasks || [];
         const allFinished = tasks.length > 0 && tasks.every(t => t.status === "Finalizada");
-        const noActiveTimer = tasks.every(t => !t.timerStarted && !t.timerStart);
         
-        if (allFinished && noActiveTimer) {
+        if (allFinished) {
           db.deleteWorkOrder(order.id);
           deletedCount++;
         }

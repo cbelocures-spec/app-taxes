@@ -1720,9 +1720,16 @@ async function deleteOrder(orderId) {
 }
 
 async function cleanupSyncedOrders() {
-  if (confirm("¿Estás seguro de limpiar de la app todas las órdenes ya subidas a Taxes que estén finalizadas y sin cronómetros activos? (No se borrarán del portal de Taxes)")) {
+  if (confirm("¿Estás seguro de limpiar de la app todas las órdenes ya subidas a Taxes que estén finalizadas? (No se borrarán del portal de Taxes)")) {
     try {
-      const res = await fetch('/api/orders/cleanup', { method: 'POST' });
+      const currentUsername = localStorage.getItem('currentUserUsername') || '';
+      const res = await fetch('/api/orders/cleanup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-username': currentUsername
+        }
+      });
       if (!res.ok) throw new Error("Failed to cleanup");
       const data = await res.json();
       
