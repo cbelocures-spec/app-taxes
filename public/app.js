@@ -505,6 +505,8 @@ function openNewOrderModal() {
   const dd = String(today.getDate()).padStart(2, '0');
   document.getElementById('form-fecha').value = `${yyyy}-${mm}-${dd}`;
   
+  const hh = String(today.getHours()).padStart(2, '0');
+  const min = String(today.getMinutes()).padStart(2, '0');
   document.getElementById('form-hora').value = `${hh}:${min}`;
 
   // Clear task fields
