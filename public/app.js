@@ -277,8 +277,23 @@ document.addEventListener('DOMContentLoaded', () => {
     rodadoSelect.addEventListener('change', () => {
       const internoInput = document.getElementById('form-interno');
       if (internoInput) {
-        internoInput.value = "";
-        showNoveltiesForInterno("");
+        const sector = getSectorByUsername(localStorage.getItem('currentUserUsername'));
+        if (sector === 'Herrería') {
+          // Herrería: do NOT auto-populate Interno, leave it empty or let them type
+          internoInput.value = "";
+          showNoveltiesForInterno("");
+        } else {
+          // Taller / Admin / Edilicio: auto-populate Interno from rodado catalog data!
+          const rodadoVal = rodadoSelect.value;
+          const rodadoOpt = cachedCatalogs.rodados.find(r => String(r.value) === String(rodadoVal));
+          if (rodadoOpt && rodadoOpt.interno) {
+            internoInput.value = rodadoOpt.interno;
+            showNoveltiesForInterno(rodadoOpt.interno);
+          } else {
+            internoInput.value = "";
+            showNoveltiesForInterno("");
+          }
+        }
       }
     });
   }
@@ -496,10 +511,6 @@ function openNewOrderModal() {
   document.getElementById('form-fecha').value = `${yyyy}-${mm}-${dd}`;
   
   document.getElementById('form-hora').value = `${hh}:${min}`;
-  const estadoUnidadSelect = document.getElementById('form-estado-unidad');
-  if (estadoUnidadSelect) {
-    estadoUnidadSelect.value = "operativo";
-  }
 
   // Clear task fields
   const container = document.getElementById('modal-tasks-list');
@@ -561,10 +572,6 @@ function editOrder(orderId) {
   document.getElementById('form-incidente').value = order.incidente;
   document.getElementById('form-fecha').value = order.fechaEntrega;
   document.getElementById('form-hora').value = order.horario;
-  const estadoUnidadSelect = document.getElementById('form-estado-unidad');
-  if (estadoUnidadSelect) {
-    estadoUnidadSelect.value = order.estadoUnidad || "operativo";
-  }
 
   // Clear modal tasks
   const container = document.getElementById('modal-tasks-list');
@@ -626,10 +633,6 @@ function viewOrder(orderId) {
   document.getElementById('form-incidente').value = order.incidente || '';
   document.getElementById('form-fecha').value = order.fechaEntrega;
   document.getElementById('form-hora').value = order.horario;
-  const estadoUnidadSelect = document.getElementById('form-estado-unidad');
-  if (estadoUnidadSelect) {
-    estadoUnidadSelect.value = order.estadoUnidad || "operativo";
-  }
 
   // Clear modal tasks
   const container = document.getElementById('modal-tasks-list');
@@ -1671,7 +1674,7 @@ async function submitWorkOrder() {
     horario: horaEl.value,
     incidente: incidenteEl.value,
     tasks: tasks,
-    estadoUnidad: document.getElementById('form-estado-unidad')?.value || 'operativo'
+    estadoUnidad: currentEditingOrderId ? (activeOrders.find(o => o.id === currentEditingOrderId)?.estadoUnidad || 'operativo') : 'operativo'
   };
  
   const url = currentEditingOrderId ? `/api/orders/${currentEditingOrderId}` : '/api/orders';
