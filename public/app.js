@@ -3047,22 +3047,9 @@ function filterBulkVehicles(isFinished = false) {
     return;
   }
 
-  // Split query by commas, dots, semicolons, or spaces
-  const rawParts = query.split(/[,\.\s;]+/);
+  // Split query by commas, dots, semicolons, spaces or line breaks
+  const rawParts = query.split(/[,\.\s;\n\r]+/);
   const parts = rawParts.map(p => p.trim().toLowerCase()).filter(p => p.length > 0);
-  
-  // If typing and query doesn't end with a separator, slice out the last incomplete part
-  let finishedParts = [];
-  if (isFinished) {
-    finishedParts = parts;
-  } else {
-    const endsWithSeparator = /[,\.\s;]$/.test(query);
-    if (endsWithSeparator) {
-      finishedParts = parts;
-    } else {
-      finishedParts = parts.slice(0, -1);
-    }
-  }
 
   const isMultiple = parts.length > 1;
   let checkedAny = false;
@@ -3092,9 +3079,9 @@ function filterBulkVehicles(isFinished = false) {
       isMatched = interno.includes(singlePart) || label.includes(singlePart) || patente.includes(singlePart);
     }
 
-    // Auto-check on exact internal number match for finished parts only
+    // Auto-check on exact internal number match in real-time
     if (isMatched && checkbox && !checkbox.checked) {
-      if (finishedParts.includes(interno)) {
+      if (parts.includes(interno)) {
         checkbox.checked = true;
         item.classList.add('selected');
         checkedAny = true;
