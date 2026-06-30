@@ -1100,6 +1100,7 @@ body {
 }
 
 .searchable-select-trigger span.trigger-label {
+  display: block;
   flex: 1;
   min-width: 0;
   overflow: hidden;

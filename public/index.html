@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=30">
+  <link rel="stylesheet" href="style.css?v=31">
 </head>
 <body>
 
@@ -373,7 +373,9 @@
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label for="pre-form-interno">Número de Interno *</label>
-          <input type="text" id="pre-form-interno" list="internos-datalist" required placeholder="Escriba o seleccione interno..." style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
+          <select id="pre-form-interno" required style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
+            <option value="">Seleccionar Interno...</option>
+          </select>
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label for="pre-form-clasificacion">Clasificación *</label>
@@ -471,7 +473,9 @@
             <div class="form-row" style="display: flex; gap: 12px; width: 100%; max-width: 100%; min-width: 0; overflow: hidden; box-sizing: border-box;">
               <div class="form-group col-6" style="flex: 0 0 calc(50% - 6px); min-width: 0; max-width: calc(50% - 6px); box-sizing: border-box;">
                 <label for="form-interno">Interno Unidad *</label>
-                <input type="text" id="form-interno" list="internos-datalist" required placeholder="Escriba o seleccione interno...">
+                <select id="form-interno" required>
+                  <option value="">Seleccionar Interno...</option>
+                </select>
               </div>
               <div class="form-group col-6" style="flex: 0 0 calc(50% - 6px); min-width: 0; max-width: calc(50% - 6px); box-sizing: border-box;">
                 <label for="form-clasificacion">Clasificación *</label>
@@ -744,6 +748,6 @@
     <!-- Populated dynamically from app.js -->
   </datalist>
 
-  <script src="app.js?v=30"></script>
+  <script src="app.js?v=31"></script>
 </body>
 </html>

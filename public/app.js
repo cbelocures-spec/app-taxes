@@ -433,7 +433,18 @@ function promptDiagnosis(taskInfo = null) {
 
 
 async function submitPreOrderCheck() {
-  const interno = document.getElementById('pre-form-interno').value.trim();
+  const preInternoSelect = document.getElementById('pre-form-interno');
+  let interno = preInternoSelect.value.trim();
+  
+  // Fallback if they typed in search box but didn't click/confirm
+  if (!interno && preInternoSelect.closest) {
+    const wrapper = preInternoSelect.closest('.searchable-select-container');
+    const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
+    if (searchInput && searchInput.value.trim()) {
+      interno = searchInput.value.trim();
+    }
+  }
+
   const clasificacion = document.getElementById('pre-form-clasificacion').value;
 
   if (!interno || !clasificacion) {
@@ -475,7 +486,17 @@ async function submitPreOrderCheck() {
     // Auto-populate interno and clasificacion
     const internoSelect = document.getElementById('form-interno');
     if (internoSelect) {
-      internoSelect.value = interno;
+      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === interno);
+      if (!optionExists && interno) {
+        const newOpt = document.createElement('option');
+        newOpt.value = interno;
+        newOpt.textContent = interno;
+        internoSelect.appendChild(newOpt);
+      }
+      internoSelect.value = interno || "";
+      if (internoSelect.rebuildSearchable) {
+        internoSelect.rebuildSearchable();
+      }
     }
     document.getElementById('form-clasificacion').value = clasificacion;
   }
@@ -563,7 +584,21 @@ function editOrder(orderId) {
   // Populate basic inputs
   const internoSelect = document.getElementById('form-interno');
   if (internoSelect) {
-    internoSelect.value = order.interno || "";
+    if (order.interno) {
+      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === order.interno);
+      if (!optionExists) {
+        const newOpt = document.createElement('option');
+        newOpt.value = order.interno;
+        newOpt.textContent = order.interno;
+        internoSelect.appendChild(newOpt);
+      }
+      internoSelect.value = order.interno;
+    } else {
+      internoSelect.value = "";
+    }
+    if (internoSelect.rebuildSearchable) {
+      internoSelect.rebuildSearchable();
+    }
   }
   document.getElementById('form-clasificacion').value = order.clasificacion;
   document.getElementById('form-incidente').value = order.incidente;
@@ -624,7 +659,21 @@ function viewOrder(orderId) {
   // Populate basic inputs
   const internoSelect = document.getElementById('form-interno');
   if (internoSelect) {
-    internoSelect.value = order.interno || "";
+    if (order.interno) {
+      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === order.interno);
+      if (!optionExists) {
+        const newOpt = document.createElement('option');
+        newOpt.value = order.interno;
+        newOpt.textContent = order.interno;
+        internoSelect.appendChild(newOpt);
+      }
+      internoSelect.value = order.interno;
+    } else {
+      internoSelect.value = "";
+    }
+    if (internoSelect.rebuildSearchable) {
+      internoSelect.rebuildSearchable();
+    }
   }
   document.getElementById('form-clasificacion').value = order.clasificacion;
   document.getElementById('form-incidente').value = order.incidente || '';
@@ -941,10 +990,14 @@ async function fetchCatalogs() {
       return a.localeCompare(b);
     });
 
-    populateDatalist('internos-datalist', uniqueInternos.map(int => ({ value: int, label: int })));
+    const internoOptions = uniqueInternos.map(int => ({ value: int, label: int }));
+    populateSelect('form-interno', internoOptions, "Seleccionar Interno...");
+    populateSelect('pre-form-interno', internoOptions, "Seleccionar Interno...");
 
     // Convert select elements to searchable selects
     convertSelectToSearchable(document.getElementById('form-rodado'));
+    convertSelectToSearchable(document.getElementById('form-interno'));
+    convertSelectToSearchable(document.getElementById('pre-form-interno'));
 
     // Initialize Carga Masiva tasks
     const bulkContainer = document.getElementById('bulk-tasks-container');
@@ -2275,8 +2328,11 @@ function convertSelectToSearchable(selectEl) {
     trigger.style.maxWidth = '100%';
     trigger.style.boxSizing = 'border-box';
 
+    trigger.style.overflow = 'hidden';
+
     labelSpan = document.createElement('span');
     labelSpan.className = 'trigger-label';
+    labelSpan.style.display = 'block';
     labelSpan.style.flex = '1';
     labelSpan.style.minWidth = '0';
     labelSpan.style.overflow = 'hidden';
