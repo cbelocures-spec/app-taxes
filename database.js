@@ -358,6 +358,14 @@ class LocalDB {
     this.write(db);
     return true;
   }
+
+  deleteWorkOrders(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return true;
+    const db = this.read();
+    db.workOrders = db.workOrders.filter(o => !ids.includes(o.id));
+    this.write(db);
+    return true;
+  }
 }
 
 module.exports = new LocalDB();

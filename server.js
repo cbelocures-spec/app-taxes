@@ -340,7 +340,7 @@ app.post('/api/orders/cleanup', (req, res) => {
     const sector = getSectorByUsername(requester);
 
     const orders = db.getWorkOrders() || [];
-    let deletedCount = 0;
+    const idsToDelete = [];
 
     orders.forEach(order => {
       // Check sector permission
@@ -354,17 +354,17 @@ app.post('/api/orders/cleanup', (req, res) => {
         const allFinished = tasks.length > 0 && tasks.every(t => t.status === "Finalizada");
         
         if (allFinished) {
-          db.deleteWorkOrder(order.id);
-          deletedCount++;
+          idsToDelete.push(order.id);
         }
       }
     });
 
-    if (deletedCount > 0) {
+    if (idsToDelete.length > 0) {
+      db.deleteWorkOrders(idsToDelete);
       triggerActiveTasksGoogleSheetSync();
     }
 
-    res.json({ success: true, count: deletedCount });
+    res.json({ success: true, count: idsToDelete.length });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
