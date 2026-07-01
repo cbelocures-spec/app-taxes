@@ -5617,14 +5617,17 @@ function loadPreventivoIntoBulkTasks(type) {
   const container = document.getElementById('bulk-tasks-container');
   if (!container) return;
 
-  // Clear existing task cards in Carga Masiva
-  container.innerHTML = '';
+  // Find all existing task cards
+  let cards = container.querySelectorAll('.bulk-task-item-card');
+  
+  // If there are no cards, add one
+  if (cards.length === 0) {
+    addBulkTaskField();
+    cards = container.querySelectorAll('.bulk-task-item-card');
+  }
 
-  // Add a single task field
-  addBulkTaskField();
-
-  // Find the added task card
-  const card = container.querySelector('.bulk-task-item-card');
+  // Find the first card
+  const card = cards[0];
   if (!card) return;
 
   // Find description textarea in the card and fill it
