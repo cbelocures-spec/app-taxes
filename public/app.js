@@ -1833,7 +1833,16 @@ async function cleanupSyncedOrders() {
           sector: currentSelectedSector
         })
       });
-      if (!res.ok) throw new Error("Failed to cleanup");
+      if (!res.ok) {
+        let errMsg = "Error del servidor";
+        try {
+          const errData = await res.json();
+          if (errData && errData.error) {
+            errMsg = errData.error;
+          }
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
       const data = await res.json();
       
       if (data.count > 0) {
