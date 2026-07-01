@@ -139,7 +139,7 @@ app.post('/api/login', (req, res) => {
       console.log(`[Login] Secondary user ${username} logged in (global settings kept for ${currentSettings.username}).`);
     }
 
-    res.json({ success: true, username: user.username, sector: getSectorByUsername(username) });
+    res.json({ success: true, username, sector: getSectorByUsername(username) });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
