@@ -843,6 +843,34 @@ app.post('/api/preventivos/service', async (req, res) => {
   }
 });
 
+app.post('/api/preventivos/odometer', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  if (!scriptUrl) {
+    return res.status(400).json({ error: "URL del script de preventivos no configurada." });
+  }
+  const { rowIndex, km, hs, interno, vehicleType } = req.body;
+  try {
+    const params = new URLSearchParams({
+      accion: 'updateOdometer',
+      rowIndex,
+      km: km || 0,
+      hs: hs || 0,
+      interno: interno || '',
+      vehicleType: vehicleType || ''
+    });
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${params.toString()}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Error updating preventivos odometer:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 app.post('/api/preventivos/fuel-service', async (req, res) => {
   const settings = db.getSettings();
   const scriptUrl = settings.preventivoScriptUrl;

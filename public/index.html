@@ -369,9 +369,6 @@
         <button class="preventivos-tab-btn" onclick="switchPrevSubTab('combustible')">
           <span class="material-icons">local_gas_station</span> Combustible
         </button>
-        <button class="preventivos-tab-btn" onclick="switchPrevSubTab('0km')">
-          <span class="material-icons">fiber_new</span> 0KM
-        </button>
         <button class="preventivos-tab-btn" onclick="switchPrevSubTab('alarmas')">
           <span class="material-icons">notifications_active</span> Alarmas
         </button>
@@ -470,33 +467,7 @@
         </div>
       </div>
 
-      <!-- SUB-VIEW: 0KM -->
-      <div id="prev-subview-0km" class="prev-subview" style="display: none;">
-        <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px;">
-          <h3 style="font-size: 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;"><span class="material-icons" style="color: #9c27b0;">fiber_new</span> Planilla de Control 0KM</h3>
-          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
-            Aquí se listan las unidades nuevas o de reciente adquisición que requieren controles preventivos especiales (por ejemplo, a los primeros 1,000 o 5,000 km).
-          </p>
-        </div>
-        <div class="prev-table-container">
-          <table class="prev-table">
-            <thead>
-              <tr>
-                <th>Interno</th>
-                <th>Modelo</th>
-                <th>KM Control 0KM</th>
-                <th>Ajuste de Torque</th>
-                <th>Cambio Filtros</th>
-                <th>Estado</th>
-                <th style="text-align: right;">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="prev-0km-tbody">
-              <!-- JS dynamic -->
-            </tbody>
-          </table>
-        </div>
-      </div>
+
 
       <!-- SUB-VIEW: ALARMAS -->
       <div id="prev-subview-alarmas" class="prev-subview" style="display: none;">
@@ -1280,6 +1251,33 @@
         <button class="btn btn-secondary" onclick="closePrevCombustibleModal()">Cancelar</button>
         <button class="btn btn-primary" id="btn-save-prev-combustible" onclick="savePrevCombustible()" style="background-color: #00a884; border-color: #00a884;">
           Guardar Combustible
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ACTUALIZAR MANUALMENTE KM/HS -->
+  <div class="modal-overlay" id="prev-odometer-modal">
+    <div class="dialog-modal" style="max-width: 400px;">
+      <div class="dialog-header" style="background-color: #0288d1; color: white;">
+        <h3 style="color: white; margin: 0;">Actualizar KM/HS Actuales</h3>
+        <button class="dialog-close" onclick="closePrevOdometerModal()" style="color: white;">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <p style="font-size: 14px; margin-bottom: 12px;">Interno: <strong id="prev-odometer-modal-interno" style="color: #0288d1;">—</strong></p>
+        <div class="form-group">
+          <label>Kilómetros Actuales</label>
+          <input type="number" id="prev-odometer-modal-km" placeholder="Ej: 154200" style="width: 100%;">
+        </div>
+        <div class="form-group">
+          <label>Horas Actuales</label>
+          <input type="number" id="prev-odometer-modal-hs" placeholder="Ej: 3450" style="width: 100%;">
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="closePrevOdometerModal()">Cancelar</button>
+        <button class="btn btn-primary" id="btn-save-prev-odometer" onclick="savePrevOdometer()" style="background-color: #0288d1; border-color: #0288d1;">
+          Actualizar KM/HS
         </button>
       </div>
     </div>

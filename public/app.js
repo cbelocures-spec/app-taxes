@@ -5836,15 +5836,21 @@ function switchPrevSubTab(tab) {
   if (tabEl) tabEl.style.display = 'block';
   // Mark active button
   document.querySelectorAll('.preventivos-tab-btn').forEach(btn => {
-    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${tab}'`)) {
+    const onc = btn.getAttribute('onclick');
+    if (onc && onc.includes(`'${tab}'`)) {
       btn.classList.add('active');
     }
   });
   // Load data for the tab
-  if (tab === 'dashboard') renderPrevFlotaTable();
-  else if (tab === 'combustible') renderPrevCombustibleTable();
-  else if (tab === 'alarmas') renderPrevAlermasTable();
-  else if (tab === 'historial') renderPrevHistorialTable();
+  if (tab === 'dashboard') {
+    fetchPreventivoFlota();
+  } else if (tab === 'combustible') {
+    fetchPrevCombustible();
+  } else if (tab === 'alarmas') {
+    fetchPrevAlertas();
+  } else if (tab === 'historial') {
+    fetchPrevHistorial();
+  }
 }
 
 function applyPrevFilters() {
@@ -5923,9 +5929,14 @@ function renderPrevFlotaTable() {
       <td>${rest}</td>
       <td><span class="badge-prev ${badgeClass}">${badgeText}</span></td>
       <td style="text-align:right;">
-        <button class="btn btn-secondary btn-xs" onclick="openPrevServiceModal(${item.originalRowIndex}, '${item.interno}', '${item.modelo}', ${item.kmReales || 0}, ${item.hsReales || 0})" style="display:inline-flex; align-items:center; gap:2px;">
-          <span class="material-icons" style="font-size:13px;">build</span> Service
-        </button>
+        <div style="display:inline-flex; gap:6px;">
+          <button class="btn btn-secondary btn-xs" onclick="openPrevServiceModal(${item.originalRowIndex}, '${item.interno}', '${item.modelo}', ${item.kmReales || 0}, ${item.hsReales || 0})" style="display:inline-flex; align-items:center; gap:2px;">
+            <span class="material-icons" style="font-size:13px;">build</span> Service
+          </button>
+          <button class="btn btn-xs" onclick="openPrevOdometerModal(${item.originalRowIndex}, '${item.interno}', '${item.modelo}', ${item.kmReales || 0}, ${item.hsReales || 0})" style="display:inline-flex; align-items:center; gap:2px; background-color: #0288d1; color: white; border-color: #0288d1;">
+            <span class="material-icons" style="font-size:13px;">edit</span> Actualizar
+          </button>
+        </div>
       </td>
     </tr>`;
   }).join('');
@@ -5944,9 +5955,14 @@ function renderPrevFlotaTable() {
         <div class="prev-mobile-card-row"><span>KM Reales</span><strong>${Number(item.kmReales || 0).toLocaleString('es-AR')}</strong></div>
         <div class="prev-mobile-card-row"><span>Hs Reales</span><strong>${Number(item.hsReales || 0).toLocaleString('es-AR')}</strong></div>
         <div class="prev-mobile-card-row"><span>Restante</span><strong>${Number(item.restante || 0).toLocaleString('es-AR')}</strong></div>
-        <button class="btn btn-secondary btn-sm" onclick="openPrevServiceModal(${item.originalRowIndex}, '${item.interno}', '${item.modelo}', ${item.kmReales || 0}, ${item.hsReales || 0})" style="width:100%; display:flex; justify-content:center; align-items:center; gap:4px; margin-top:8px;">
-          <span class="material-icons" style="font-size:14px;">build</span> Registrar Service
-        </button>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="openPrevServiceModal(${item.originalRowIndex}, '${item.interno}', '${item.modelo}', ${item.kmReales || 0}, ${item.hsReales || 0})" style="flex:1; display:flex; justify-content:center; align-items:center; gap:4px;">
+            <span class="material-icons" style="font-size:14px;">build</span> Service
+          </button>
+          <button class="btn btn-sm" onclick="openPrevOdometerModal(${item.originalRowIndex}, '${item.interno}', '${item.modelo}', ${item.kmReales || 0}, ${item.hsReales || 0})" style="flex:1; display:flex; justify-content:center; align-items:center; gap:4px; background-color: #0288d1; color: white; border-color: #0288d1;">
+            <span class="material-icons" style="font-size:14px;">edit</span> Actualizar
+          </button>
+        </div>
       </div>`;
     }).join('');
   }
@@ -6118,6 +6134,56 @@ async function savePrevService() {
     btn.innerHTML = 'Guardar Service';
   }
 }
+
+// Modal KM/HS Actualizar Odometer
+let prevCurrentOdometerRow = null;
+function openPrevOdometerModal(rowIndex, interno, modelo, km, hs) {
+  prevCurrentOdometerRow = { rowIndex, interno, modelo };
+  document.getElementById('prev-odometer-modal-interno').textContent = `${interno} — ${modelo}`;
+  document.getElementById('prev-odometer-modal-km').value = km || '';
+  document.getElementById('prev-odometer-modal-hs').value = hs || '';
+  document.getElementById('prev-odometer-modal').classList.add('active');
+}
+
+function closePrevOdometerModal() {
+  document.getElementById('prev-odometer-modal').classList.remove('active');
+  prevCurrentOdometerRow = null;
+}
+
+async function savePrevOdometer() {
+  if (!prevCurrentOdometerRow) return;
+  const km = document.getElementById('prev-odometer-modal-km').value;
+  const hs = document.getElementById('prev-odometer-modal-hs').value;
+  const btn = document.getElementById('btn-save-prev-odometer');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons" style="animation:spin 1.5s linear infinite; font-size:16px; vertical-align:middle;">sync</span> Guardando...';
+  try {
+    const res = await fetch('/api/preventivos/odometer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rowIndex: prevCurrentOdometerRow.rowIndex,
+        km,
+        hs,
+        interno: prevCurrentOdometerRow.interno,
+        vehicleType: hs && !km ? 'iveco' : ''
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    showToast(`Kilómetros/Horas actualizados para interno ${prevCurrentOdometerRow.interno} ✓`, 'success');
+    closePrevOdometerModal();
+    await fetchPreventivoFlota();
+  } catch (error) {
+    showToast(`Error al actualizar KM/HS: ${error.message}`, 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Actualizar KM/HS';
+  }
+}
+
 
 // Modal Combustible
 function openPrevCombustibleModal(rowIndex, interno) {
