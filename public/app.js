@@ -1383,9 +1383,22 @@ function addTaskField(taskData = null) {
         <textarea placeholder="Describe las actividades a realizar..." rows="2" class="task-desc">${taskData ? taskData.descripcion : ''}</textarea>
       </div>
 
-      <div class="form-group" style="margin-top: 10px;">
-        <label>Insumos / Repuestos Utilizados</label>
-        <input type="text" placeholder="Ej: 2L Aceite Motor, filtro de aire..." class="task-insumos" value="${taskData && taskData.insumos ? taskData.insumos : ''}" style="width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box;">
+      <div class="form-group task-insumos-section" style="margin-top: 10px;">
+        <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Insumos / Repuestos Utilizados</label>
+        <div class="insumos-checkbox-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 8px; padding: 10px; background: rgba(0,0,0,0.02); border: 1px solid var(--border-color); border-radius: 8px;">
+          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Aceite Motor"> Aceite Motor</label>
+          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Refrigerante"> Refrigerante</label>
+          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Diferencial"> Grasa Diferencial</label>
+          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Caja"> Grasa Caja</label>
+          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Equipo"> Hco Equipo</label>
+          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Direccion"> Hco Direccion</label>
+          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Engrase x KG"> Grasa Engrase x KG</label>
+          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Otros"> Otros</label>
+        </div>
+        <button type="button" class="btn btn-secondary btn-xs btn-agregar-insumos" style="margin-top: 8px; display: flex; align-items: center; gap: 4px;" onclick="agregarCantidadesInsumos(this)">
+          <span class="material-icons" style="font-size: 14px;">add_circle_outline</span> Agregar cantidades a la tarea
+        </button>
+        <input type="hidden" class="task-insumos" value="${taskData && taskData.insumos ? taskData.insumos : ''}">
       </div>
 
       <div class="timer-history-log" style="font-size: 11px; color: var(--text-muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
@@ -1498,6 +1511,38 @@ function addTaskField(taskData = null) {
   }
 
   updateTaskCountBadge();
+}
+
+function agregarCantidadesInsumos(btn) {
+  const card = btn.closest('.task-item-card');
+  if (!card) return;
+  const checks = card.querySelectorAll('.insumo-check:checked');
+  if (checks.length === 0) {
+    showToast('Seleccioná al menos un insumo antes de agregar cantidades.', 'warning');
+    return;
+  }
+  const lineas = [];
+  for (const chk of checks) {
+    const nombre = chk.value;
+    const cantidad = prompt(`Cantidad de ${nombre}:\n(Ej: 5L, 2Kg, 1 unidad)`);
+    if (cantidad === null) return; // cancelled
+    if (cantidad.trim() !== '') {
+      lineas.push(`${nombre}: ${cantidad.trim()}`);
+    }
+  }
+  if (lineas.length === 0) return;
+  const descEl = card.querySelector('.task-desc');
+  const insumoHidden = card.querySelector('.task-insumos');
+  const resumen = 'Insumos: ' + lineas.join(' | ');
+  if (descEl) {
+    descEl.value = (descEl.value.trim() ? descEl.value.trim() + '\n' : '') + resumen;
+  }
+  if (insumoHidden) {
+    insumoHidden.value = lineas.join(' | ');
+  }
+  // Uncheck all boxes after adding
+  checks.forEach(c => { c.checked = false; });
+  showToast('Insumos agregados a la tarea ✓', 'success');
 }
 
 function removeTaskField(cardId) {
