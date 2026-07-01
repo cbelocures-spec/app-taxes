@@ -1828,7 +1828,10 @@ async function cleanupSyncedOrders() {
         headers: {
           'Content-Type': 'application/json',
           'x-user-username': currentUsername
-        }
+        },
+        body: JSON.stringify({
+          sector: currentSelectedSector
+        })
       });
       if (!res.ok) throw new Error("Failed to cleanup");
       const data = await res.json();
