@@ -6271,6 +6271,29 @@ function openNewOrderModalWithFuelPreventivo(interno, tipo, rowIndex, litrosTota
       internoSelect.dispatchEvent(event);
     }
   }
+
+  // Auto-populate Rodado based on selected Interno
+  const rodadoOpt = cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim());
+  if (rodadoOpt) {
+    const rodadoSelect = document.getElementById('form-rodado');
+    const rodadoText = document.getElementById('form-rodado-text');
+    if (isHerreria) {
+      if (rodadoText) {
+        rodadoText.value = rodadoOpt.label;
+        const event = new Event('change');
+        rodadoText.dispatchEvent(event);
+      }
+    } else {
+      if (rodadoSelect) {
+        rodadoSelect.value = rodadoOpt.value;
+        if (rodadoSelect.rebuildSearchable) {
+          rodadoSelect.rebuildSearchable();
+        }
+        const event = new Event('change');
+        rodadoSelect.dispatchEvent(event);
+      }
+    }
+  }
   
   // Set Clasificación to "Preventivo"
   const clasificacionEl = document.getElementById('form-clasificacion');
@@ -6294,35 +6317,33 @@ function openNewOrderModalWithFuelPreventivo(interno, tipo, rowIndex, litrosTota
     litrosTotales: litrosTotales
   };
   
-  // Pre-load tasks checklist
-  const tasks = tipo === '5k' ? [
+  // Combine all items into a single task with newlines
+  const combinedDescription = tipo === '5k' ? [
     "Realizar Preventivo 5.000 Lts",
-    "Cambio de filtros de Aire",
-    "Cambio Filtro Aceite",
-    "Cambio Filtro de Combustible",
-    "Cambio Aceite Motor",
-    "Revision Grasa de Caja Nivel Y Estado",
-    "Revision Grasa de Diferencial Estado y Nivel",
-    "Revision Gral : Frenos - Cardan - Perdidas Aire / Fluidos",
-    "Otros"
-  ] : [
+    "- Cambio de filtros de Aire",
+    "- Cambio Filtro Aceite",
+    "- Cambio Filtro de Combustible",
+    "- Cambio Aceite Motor",
+    "- Revision Grasa de Caja Nivel Y Estado",
+    "- Revision Grasa de Diferencial Estado y Nivel",
+    "- Revision Gral : Frenos - Cardan - Perdidas Aire / Fluidos",
+    "- Otros"
+  ].join('\n') : [
     "Realizar Preventivo 10.000 Lts",
-    "Cambio de filtros de Aire",
-    "Cambio Filtro Aceite",
-    "Cambio Filtro de Combustible",
-    "Cambio Aceite Motor",
-    "Cambio Grasa de Caja",
-    "Cambio Grasa de Diferencial",
-    "Revision Gral : Frenos - Cardan - Perdidas Aire / Fluidos",
-    "Otros"
-  ];
+    "- Cambio de filtros de Aire",
+    "- Cambio Filtro Aceite",
+    "- Cambio Filtro de Combustible",
+    "- Cambio Aceite Motor",
+    "- Cambio Grasa de Caja",
+    "- Cambio Grasa de Diferencial",
+    "- Revision Gral : Frenos - Cardan - Perdidas Aire / Fluidos",
+    "- Otros"
+  ].join('\n');
   
-  tasks.forEach(taskDesc => {
-    addTaskField({
-      descripcion: taskDesc,
-      centroCosto: "15", // MECANICA default
-      status: "Pendiente"
-    });
+  addTaskField({
+    descripcion: combinedDescription,
+    centroCosto: "15", // MECANICA default
+    status: "Pendiente"
   });
 }
 
