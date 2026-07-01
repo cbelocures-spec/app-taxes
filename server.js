@@ -11,6 +11,17 @@ try { localtunnel = require('localtunnel'); } catch(e) {}
 const { exec } = require('child_process');
 const fs = require('fs');
 
+const lastConsoleErrors = [];
+const originalConsoleError = console.error;
+console.error = function(...args) {
+  lastConsoleErrors.push({
+    timestamp: new Date().toISOString(),
+    args: args.map(a => a instanceof Error ? { message: a.message, stack: a.stack } : a)
+  });
+  if (lastConsoleErrors.length > 50) lastConsoleErrors.shift();
+  originalConsoleError.apply(console, args);
+};
+
 // Capturar errores inesperados en el servidor y activar agentes de auto-curación
 process.on('uncaughtException', (err) => {
   const errorLogPath = path.join(__dirname, 'last_error.log');
@@ -134,6 +145,10 @@ app.post('/api/login', (req, res) => {
   }
 });
 
+// Debug endpoint to retrieve last console.error logs
+app.get('/api/debug/logs', (req, res) => {
+  res.json(lastConsoleErrors);
+});
 
 // Get all work orders (filtered by user sector)
 app.get('/api/orders', (req, res) => {
