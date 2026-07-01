@@ -5823,6 +5823,7 @@ function setupAllFieldsForSector() {
 
 let prevFlotaData = [];
 let prevCombustibleData = [];
+let fuelAlertFilter = 'all'; // 'all' | 'ok' | 'alerta'
 let prevAlertas = [];
 let prevHistorial = [];
 let prevCurrentFilter = 'all';
@@ -5987,34 +5988,68 @@ function renderPrevCombustibleTable() {
   if (!tbody) return;
   if (!prevCombustibleData || prevCombustibleData.length === 0) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px;">Haz clic en "Procesar Combustible de Planilla" para cargar los datos.</td></tr>';
+    // Reset metric cards
+    document.getElementById('fuel-metric-total').textContent = '0';
+    document.getElementById('fuel-metric-ok').textContent = '0';
+    document.getElementById('fuel-metric-alerta').textContent = '0';
     return;
   }
   const searchTerm = (document.getElementById('prev-search-input')?.value || '').toLowerCase();
-  const filtered = prevCombustibleData.filter(item =>
-    String(item.interno).toLowerCase().includes(searchTerm) ||
-    String(item.modelo).toLowerCase().includes(searchTerm)
-  );
-  tbody.innerHTML = filtered.map(item => {
-    const a5 = String(item.alerta5k || '');
-    const a10 = String(item.alerta10k || '');
-    const bad5 = a5.toLowerCase().includes('realizar') || a5.toLowerCase().includes('urgente') || a5.toLowerCase().includes('service');
-    const bad10 = a10.toLowerCase().includes('realizar') || a10.toLowerCase().includes('urgente') || a10.toLowerCase().includes('service');
-    return `<tr>
-      <td><strong>${item.interno}</strong></td>
-      <td>${item.modelo}</td>
-      <td>${Number(item.litrosTotales || 0).toLocaleString('es-AR')}</td>
-      <td>${Number(item.restante5k || 0).toLocaleString('es-AR')}</td>
-      <td><span class="badge-prev ${bad5 ? 'warning' : 'ok'}">${item.alerta5k || '—'}</span></td>
-      <td>${Number(item.restante10k || 0).toLocaleString('es-AR')}</td>
-      <td><span class="badge-prev ${bad10 ? 'warning' : 'ok'}">${item.alerta10k || '—'}</span></td>
-      <td>${item.lastService || '—'}</td>
-      <td style="text-align:right;">
-        <button class="btn btn-secondary btn-xs" onclick="openPrevCombustibleModal(${item.originalRowIndex}, '${item.interno}')" style="display:inline-flex; align-items:center; gap:2px;">
-          <span class="material-icons" style="font-size:13px;">local_gas_station</span> Service
-        </button>
-      </td>
-    </tr>`;
-  }).join('');
+
+  // Classify each item
+  const classified = prevCombustibleData.map(item => {
+    const a5 = String(item.alerta5k || '').toLowerCase();
+    const a10 = String(item.alerta10k || '').toLowerCase();
+    const hasAlert = ['realizar', 'urgente', 'service'].some(w => a5.includes(w) || a10.includes(w));
+    return { ...item, hasAlert };
+  });
+
+  // Update metric cards
+  const total = classified.length;
+  const alertaCount = classified.filter(i => i.hasAlert).length;
+  const okCount = total - alertaCount;
+  document.getElementById('fuel-metric-total').textContent = total;
+  document.getElementById('fuel-metric-ok').textContent = okCount;
+  document.getElementById('fuel-metric-alerta').textContent = alertaCount;
+
+  // Apply alert filter + search
+  const filtered = classified.filter(item => {
+    const matchSearch = String(item.interno).toLowerCase().includes(searchTerm) ||
+                        String(item.modelo).toLowerCase().includes(searchTerm);
+    const matchFilter = fuelAlertFilter === 'all' ||
+                        (fuelAlertFilter === 'ok' && !item.hasAlert) ||
+                        (fuelAlertFilter === 'alerta' && item.hasAlert);
+    return matchSearch && matchFilter;
+  });
+
+  tbody.innerHTML = filtered.length === 0
+    ? '<tr><td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades que coincidan con el filtro.</td></tr>'
+    : filtered.map(item => {
+        const a5 = String(item.alerta5k || '');
+        const a10 = String(item.alerta10k || '');
+        const bad5 = ['realizar', 'urgente', 'service'].some(w => a5.toLowerCase().includes(w));
+        const bad10 = ['realizar', 'urgente', 'service'].some(w => a10.toLowerCase().includes(w));
+        return `<tr>
+          <td><strong>${item.interno}</strong></td>
+          <td>${item.modelo}</td>
+          <td>${Number(item.litrosTotales || 0).toLocaleString('es-AR')}</td>
+          <td>${Number(item.restante5k || 0).toLocaleString('es-AR')}</td>
+          <td><span class="badge-prev ${bad5 ? 'warning' : 'ok'}">${item.alerta5k || '—'}</span></td>
+          <td>${Number(item.restante10k || 0).toLocaleString('es-AR')}</td>
+          <td><span class="badge-prev ${bad10 ? 'warning' : 'ok'}">${item.alerta10k || '—'}</span></td>
+          <td>${item.lastService || '—'}</td>
+          <td style="text-align:right;">
+            <button class="btn btn-secondary btn-xs" onclick="openPrevCombustibleModal(${item.originalRowIndex}, '${item.interno}')" style="display:inline-flex; align-items:center; gap:2px;">
+              <span class="material-icons" style="font-size:13px;">local_gas_station</span> Service
+            </button>
+          </td>
+        </tr>`;
+      }).join('');
+}
+
+function filterCombustibleByAlert(state) {
+  fuelAlertFilter = state;
+  renderPrevCombustibleTable();
 }
 
 async function fetchPrevHistorial() {

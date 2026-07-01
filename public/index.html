@@ -436,6 +436,32 @@
 
       <!-- SUB-VIEW: COMBUSTIBLE -->
       <div id="prev-subview-combustible" class="prev-subview" style="display: none;">
+
+        <!-- Metric cards -->
+        <div class="prev-metrics-grid" style="margin-bottom: 14px;">
+          <div class="prev-metric-card" onclick="filterCombustibleByAlert('all')" style="cursor: pointer;">
+            <div class="prev-metric-icon blue"><span class="material-icons">local_shipping</span></div>
+            <div class="prev-metric-info">
+              <h4>Total Unidades</h4>
+              <p id="fuel-metric-total">0</p>
+            </div>
+          </div>
+          <div class="prev-metric-card" onclick="filterCombustibleByAlert('ok')" style="cursor: pointer;">
+            <div class="prev-metric-icon green"><span class="material-icons">check_circle</span></div>
+            <div class="prev-metric-info">
+              <h4>Al Día</h4>
+              <p id="fuel-metric-ok">0</p>
+            </div>
+          </div>
+          <div class="prev-metric-card" onclick="filterCombustibleByAlert('alerta')" style="cursor: pointer;">
+            <div class="prev-metric-icon red"><span class="material-icons">warning</span></div>
+            <div class="prev-metric-info">
+              <h4>Con Alerta</h4>
+              <p id="fuel-metric-alerta">0</p>
+            </div>
+          </div>
+        </div>
+
         <div style="margin-bottom: 12px; display: flex; justify-content: flex-end;">
           <button class="btn btn-primary btn-sm" onclick="procesarCombustiblePlanilla()" id="btn-process-fuel-planilla" style="display: flex; align-items: center; gap: 4px;">
             <span class="material-icons" style="font-size: 16px;">local_gas_station</span>
