@@ -913,27 +913,64 @@ body {
 }
 
 /* Insumos checkbox grid */
+.insumos-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  background: rgba(0,0,0,0.02);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.insumo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: white;
+  border: 1px solid #eef2f6;
+  transition: all 0.15s;
+}
+.insumo-row:hover {
+  background: rgba(37, 99, 235, 0.04);
+  border-color: #d1d5db;
+}
+.insumo-row.active {
+  border-color: var(--primary);
+  background: rgba(37, 99, 235, 0.02);
+}
 .insumo-check-label {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 13px;
   color: var(--text);
-  padding: 6px 8px;
-  border-radius: 6px;
   cursor: pointer;
-  transition: background 0.15s;
   user-select: none;
-}
-.insumo-check-label:hover {
-  background: rgba(var(--primary-rgb, 37,99,235), 0.07);
+  margin: 0;
+  flex-grow: 1;
 }
 .insumo-check-label input[type="checkbox"] {
   accent-color: var(--primary);
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
   flex-shrink: 0;
+}
+.insumo-qty-input {
+  width: 100px;
+  padding: 4px 6px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-sizing: border-box;
+  outline: none;
+}
+.insumo-qty-input:focus {
+  border-color: var(--primary);
 }
 
 .task-item-header {

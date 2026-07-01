@@ -1385,15 +1385,39 @@ function addTaskField(taskData = null) {
 
       <div class="form-group task-insumos-section" style="margin-top: 10px;">
         <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Insumos / Repuestos Utilizados</label>
-        <div class="insumos-checkbox-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 8px; padding: 10px; background: rgba(0,0,0,0.02); border: 1px solid var(--border-color); border-radius: 8px;">
-          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Aceite Motor"> Aceite Motor</label>
-          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Refrigerante"> Refrigerante</label>
-          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Diferencial"> Grasa Diferencial</label>
-          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Caja"> Grasa Caja</label>
-          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Equipo"> Hco Equipo</label>
-          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Direccion"> Hco Direccion</label>
-          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Engrase x KG"> Grasa Engrase x KG</label>
-          <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Otros"> Otros</label>
+        <div class="insumos-checkbox-grid">
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Aceite Motor" onchange="toggleInsumoRow(this)"> Aceite Motor</label>
+            <input type="text" placeholder="ej: 5L" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Refrigerante" onchange="toggleInsumoRow(this)"> Refrigerante</label>
+            <input type="text" placeholder="ej: 3L" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Diferencial" onchange="toggleInsumoRow(this)"> Grasa Diferencial</label>
+            <input type="text" placeholder="ej: 1Kg" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Caja" onchange="toggleInsumoRow(this)"> Grasa Caja</label>
+            <input type="text" placeholder="ej: 2L" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Equipo" onchange="toggleInsumoRow(this)"> Hco Equipo</label>
+            <input type="text" placeholder="ej: 10L" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Direccion" onchange="toggleInsumoRow(this)"> Hco Direccion</label>
+            <input type="text" placeholder="ej: 1L" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Engrase x KG" onchange="toggleInsumoRow(this)"> Grasa Engrase x KG</label>
+            <input type="text" placeholder="ej: 2Kg" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Otros" onchange="toggleInsumoRow(this)"> Otros</label>
+            <input type="text" placeholder="ej: Filtro de aire" class="insumo-qty-input" style="display: none;">
+          </div>
         </div>
         <button type="button" class="btn btn-secondary btn-xs btn-agregar-insumos" style="margin-top: 8px; display: flex; align-items: center; gap: 4px;" onclick="agregarCantidadesInsumos(this)">
           <span class="material-icons" style="font-size: 14px;">add_circle_outline</span> Agregar cantidades a la tarea
@@ -1513,6 +1537,25 @@ function addTaskField(taskData = null) {
   updateTaskCountBadge();
 }
 
+function toggleInsumoRow(checkbox) {
+  const row = checkbox.closest('.insumo-row');
+  if (!row) return;
+  const input = row.querySelector('.insumo-qty-input');
+  if (checkbox.checked) {
+    row.classList.add('active');
+    if (input) {
+      input.style.display = 'block';
+      input.focus();
+    }
+  } else {
+    row.classList.remove('active');
+    if (input) {
+      input.style.display = 'none';
+      input.value = '';
+    }
+  }
+}
+
 function agregarCantidadesInsumos(btn) {
   const card = btn.closest('.task-item-card');
   if (!card) return;
@@ -1524,10 +1567,13 @@ function agregarCantidadesInsumos(btn) {
   const lineas = [];
   for (const chk of checks) {
     const nombre = chk.value;
-    const cantidad = prompt(`Cantidad de ${nombre}:\n(Ej: 5L, 2Kg, 1 unidad)`);
-    if (cantidad === null) return; // cancelled
-    if (cantidad.trim() !== '') {
-      lineas.push(`${nombre}: ${cantidad.trim()}`);
+    const row = chk.closest('.insumo-row');
+    const input = row ? row.querySelector('.insumo-qty-input') : null;
+    const cantidad = input ? input.value.trim() : '';
+    if (cantidad !== '') {
+      lineas.push(`${nombre}: ${cantidad}`);
+    } else {
+      lineas.push(nombre); // fall back if empty
     }
   }
   if (lineas.length === 0) return;
@@ -1540,8 +1586,12 @@ function agregarCantidadesInsumos(btn) {
   if (insumoHidden) {
     insumoHidden.value = lineas.join(' | ');
   }
-  // Uncheck all boxes after adding
-  checks.forEach(c => { c.checked = false; });
+  
+  // Uncheck all boxes and hide inputs after adding
+  checks.forEach(c => {
+    c.checked = false;
+    toggleInsumoRow(c);
+  });
   showToast('Insumos agregados a la tarea ✓', 'success');
 }
 
