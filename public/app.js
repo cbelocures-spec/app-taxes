@@ -1854,6 +1854,11 @@ async function cleanupSyncedOrders() {
     } catch (error) {
       showToast("Error al limpiar órdenes: " + error.message, "danger");
       console.error(error);
+      if (error.message.includes("Session expired") || error.message.includes("invalid user")) {
+        localStorage.removeItem('currentUserUsername');
+        localStorage.removeItem('currentUserPassword');
+        checkUserSession();
+      }
     }
   }
 }
