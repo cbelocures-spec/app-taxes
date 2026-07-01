@@ -96,6 +96,9 @@
           <button class="btn btn-secondary btn-sm" onclick="cleanupSyncedOrders()" style="display: flex; align-items: center; gap: 4px;" title="Limpiar del Taller todas las órdenes ya subidas a Taxes que estén finalizadas">
             <span class="material-icons" style="font-size: 16px;">delete_sweep</span> Limpiar
           </button>
+          <button class="btn btn-secondary btn-sm" onclick="openMassiveOrderModal()" style="display: flex; align-items: center; gap: 4px;" title="Crear órdenes masivas para múltiples internos">
+            <span class="material-icons" style="font-size: 16px;">library_add</span> Masivas
+          </button>
           <button class="btn btn-primary btn-sm" onclick="openPreOrderModal()">
             <span class="material-icons" style="font-size: 16px;">add</span> Nueva
           </button>
@@ -392,6 +395,130 @@
             <span class="material-icons">arrow_forward</span> Continuar
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MASSIVE ORDER MODAL -->
+  <div class="fullscreen-modal" id="massive-order-modal" style="z-index: 1050; display: none;">
+    <div class="modal-header">
+      <button class="modal-close-btn" onclick="closeMassiveOrderModal()">
+        <span class="material-icons">close</span>
+      </button>
+      <h2>Crear Órdenes Masivas</h2>
+      <div style="width: 40px;"></div>
+    </div>
+    <div class="modal-content" style="max-width: 900px; margin: 0 auto; padding: 20px;">
+      <div class="form-section-card" style="margin-bottom: 20px;">
+        <div class="card-title-header">
+          <span class="material-icons" style="color: var(--primary);">assignment_turned_in</span>
+          <h3>1. Seleccionar Internos y Cargar Insumos</h3>
+        </div>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+          Busca y marca los internos para los cuales deseas generar las órdenes. Luego, ingresa la cantidad de insumos consumidos en la grilla.
+        </p>
+        <div class="search-bar" style="margin-bottom: 15px;">
+          <span class="material-icons search-icon">search</span>
+          <input type="text" id="massive-interno-search" placeholder="Filtrar internos por número..." oninput="filterMassiveInternos()">
+        </div>
+        
+        <!-- Multi-select list of internos -->
+        <div id="massive-internos-checkbox-list" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; background: #fafafa; margin-bottom: 20px;">
+          <!-- Dynamically populated checkboxes -->
+        </div>
+
+        <!-- Consumables Grid (structured table) -->
+        <div style="overflow-x: auto; margin-top: 15px; border: 1px solid var(--border-color); border-radius: 8px; background: #fff;">
+          <table class="table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+            <thead>
+              <tr style="background: #f1f5f9; border-bottom: 2px solid var(--border-color);">
+                <th style="padding: 10px; font-weight: 600;">Interno</th>
+                <th style="padding: 10px; font-weight: 600; width: 85px;">Refrig. (L)</th>
+                <th style="padding: 10px; font-weight: 600; width: 85px;">Ac. Motor (L)</th>
+                <th style="padding: 10px; font-weight: 600; width: 85px;">Ac. Caja (L)</th>
+                <th style="padding: 10px; font-weight: 600; width: 85px;">Ac. Dif. (L)</th>
+                <th style="padding: 10px; font-weight: 600; width: 85px;">Hco. Dir. (L)</th>
+                <th style="padding: 10px; font-weight: 600;">Otros Insumos / Notas</th>
+              </tr>
+            </thead>
+            <tbody id="massive-insumos-grid-body">
+              <tr id="massive-grid-empty-state">
+                <td colspan="7" style="padding: 15px; text-align: center; color: var(--text-muted);">Ningún interno seleccionado</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="form-section-card" style="margin-bottom: 20px;">
+        <div class="card-title-header">
+          <span class="material-icons" style="color: var(--primary);">info</span>
+          <h3>2. Datos Generales de las Órdenes</h3>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+          <div class="form-group">
+            <label for="massive-form-clasificacion">Clasificación *</label>
+            <select id="massive-form-clasificacion" required style="width: 100%; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px;">
+              <option value="Preventivo" selected>Preventivo</option>
+              <option value="Correctivo">Correctivo</option>
+              <option value="Auxilio">Auxilio</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="massive-form-responsable">Responsable de Orden *</label>
+            <select id="massive-form-responsable" required style="width: 100%; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px;"></select>
+          </div>
+          <div class="form-group">
+            <label for="massive-form-fecha">Fecha Entrega *</label>
+            <input type="date" id="massive-form-fecha" required style="width: 100%; padding: 8px 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box;">
+          </div>
+          <div class="form-group">
+            <label for="massive-form-horario">Horario *</label>
+            <input type="time" id="massive-form-horario" required style="width: 100%; padding: 8px 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box;">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section-card" style="margin-bottom: 30px;">
+        <div class="card-title-header">
+          <span class="material-icons" style="color: var(--primary);">build</span>
+          <h3>3. Tarea y Operario Asignado</h3>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+          <div class="form-group">
+            <label for="massive-form-cc">Centro de Costo *</label>
+            <select id="massive-form-cc" required style="width: 100%; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px;">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="massive-form-empleado">Operario Responsable *</label>
+            <select id="massive-form-empleado" required style="width: 100%; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px;"></select>
+          </div>
+          <div class="form-group">
+            <label for="massive-form-horas">Horas Estimadas *</label>
+            <input type="number" id="massive-form-horas" step="0.01" min="0" value="0.00" required style="width: 100%; padding: 8px 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box;">
+          </div>
+        </div>
+        
+        <div class="form-group" style="margin-top: 15px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label for="massive-form-descripcion">Descripción de Actividad *</label>
+            <button class="btn btn-secondary btn-sm" type="button" onclick="loadPreventivoAIntoMassiveDescription()" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; font-size: 12px; border-radius: 6px;">
+              <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Cargar Preventivo A
+            </button>
+          </div>
+          <textarea id="massive-form-descripcion" required placeholder="Detalle la actividad o presione 'Cargar Preventivo A' para autocompletar..." rows="6" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; font-family: monospace; resize: vertical;"></textarea>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="btn btn-secondary" onclick="closeMassiveOrderModal()" style="padding: 12px 24px; font-size: 16px; border-radius: 8px;">
+          Cancelar
+        </button>
+        <button class="btn btn-primary" onclick="submitMassiveOrders()" style="padding: 12px 24px; font-size: 16px; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons">playlist_add</span> Generar Órdenes
+        </button>
       </div>
     </div>
   </div>
@@ -748,6 +875,6 @@
     <!-- Populated dynamically from app.js -->
   </datalist>
 
-  <script src="app.js?v=37"></script>
+  <script src="app.js?v=38"></script>
 </body>
 </html>

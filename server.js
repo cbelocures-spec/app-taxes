@@ -237,6 +237,61 @@ app.post('/api/orders', (req, res) => {
   }
 });
 
+app.post('/api/orders/bulk', (req, res) => {
+  try {
+    const { orders } = req.body;
+    if (!Array.isArray(orders) || orders.length === 0) {
+      return res.status(400).json({ error: "Se requiere un array 'orders' no vacío." });
+    }
+
+    const createdBy = req.headers['x-user-username'] || null;
+    const sector = getSectorByUsername(createdBy);
+    const createdOrders = [];
+
+    for (const orderData of orders) {
+      const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad } = orderData;
+      
+      if (!rodado || !responsable || !interno || !clasificacion) {
+        return res.status(400).json({ error: `Campos obligatorios faltantes en orden para interno ${interno || 'desconocido'}.` });
+      }
+
+      let finalClasificacion = clasificacion;
+      if (sector === 'Herrería') {
+        finalClasificacion = 'Herrería';
+      } else if (sector === 'Edilicio') {
+        finalClasificacion = 'Edilicio';
+      } else if (sector === 'Taller') {
+        if (clasificacion === 'Herrería' || clasificacion === 'Edilicio') {
+          return res.status(400).json({ error: "Clasificación no permitida para el sector Taller." });
+        }
+      }
+
+      const newOrder = db.createWorkOrder({
+        rodado,
+        responsable,
+        fechaEntrega,
+        horario,
+        interno,
+        clasificacion: finalClasificacion,
+        incidente: incidente || '',
+        tasks: tasks || [],
+        createdBy,
+        estadoUnidad: estadoUnidad || 'operativo'
+      });
+
+      checkAndTriggerGoogleSheetUpdates(null, newOrder.tasks, responsable, interno);
+      createdOrders.push(newOrder);
+    }
+
+    // Trigger active tasks Google Sheets update once
+    triggerActiveTasksGoogleSheetSync();
+
+    res.status(201).json({ success: true, count: createdOrders.length, orders: createdOrders });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Update a work order
 app.put('/api/orders/:id', (req, res) => {
   try {

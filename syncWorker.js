@@ -1153,6 +1153,14 @@ function resolveAndMapEmployee(task) {
     }
   }
 
+  // Append insumos/supplies if present and not already concatenated
+  if (task.insumos && task.insumos.trim()) {
+    const insumosSuffix = `[Insumos: ${task.insumos.trim()}]`;
+    if (!finalDescription.includes(insumosSuffix)) {
+      finalDescription = `${finalDescription}\n${insumosSuffix}`;
+    }
+  }
+
   return { employeeLabel, finalDescription };
 }
 

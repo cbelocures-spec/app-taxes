@@ -1263,6 +1263,11 @@ function addTaskField(taskData = null) {
         <textarea placeholder="Describe las actividades a realizar..." rows="2" class="task-desc">${taskData ? taskData.descripcion : ''}</textarea>
       </div>
 
+      <div class="form-group" style="margin-top: 10px;">
+        <label>Insumos / Repuestos Utilizados</label>
+        <input type="text" placeholder="Ej: 2L Aceite Motor, filtro de aire..." class="task-insumos" value="${taskData && taskData.insumos ? taskData.insumos : ''}" style="width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box;">
+      </div>
+
       <div class="timer-history-log" style="font-size: 11px; color: var(--text-muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
         ${renderTimerHistoryHtml(taskData ? taskData.timerHistory : [])}
       </div>
@@ -1698,6 +1703,8 @@ async function submitWorkOrder() {
     const hours = card.querySelector('.task-hours').value;
     const status = card.querySelector('.task-status').value;
     const desc = card.querySelector('.task-desc').value;
+    const insumosInput = card.querySelector('.task-insumos');
+    const insumos = insumosInput ? insumosInput.value.trim() : '';
  
     if (!cc || !emp) {
       tasksValid = false;
@@ -1720,6 +1727,7 @@ async function submitWorkOrder() {
       horasEstimadas: hours,
       status: status,
       descripcion: desc,
+      insumos: insumos,
       timerStart: timerStartVal,
       timerStarted: card.dataset.timerStarted === 'true',
       timerHistory: timerHistoryVal
@@ -5249,3 +5257,267 @@ function renderEmployeeHoursSummary() {
     </div>
   `;
 }
+
+function openMassiveOrderModal() {
+  const modal = document.getElementById('massive-order-modal');
+  if (!modal) return;
+  modal.style.display = 'block';
+
+  // Reset checkboxes and search
+  document.getElementById('massive-interno-search').value = '';
+  document.getElementById('massive-form-descripcion').value = '';
+  document.getElementById('massive-form-horas').value = '0.00';
+  document.getElementById('massive-form-clasificacion').value = 'Preventivo';
+
+  // Set default date and time
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0];
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const timeStr = `${hh}:${min}`;
+  document.getElementById('massive-form-fecha').value = dateStr;
+  document.getElementById('massive-form-horario').value = timeStr;
+
+  // Clear insumos grid
+  const tbody = document.getElementById('massive-insumos-grid-body');
+  tbody.innerHTML = `
+    <tr id="massive-grid-empty-state">
+      <td colspan="7" style="padding: 15px; text-align: center; color: var(--text-muted);">Ningún interno seleccionado</td>
+    </tr>
+  `;
+
+  // Populate Internos Checkbox List
+  const listContainer = document.getElementById('massive-internos-checkbox-list');
+  let checkboxHtml = '';
+  const sortedRodados = [...cachedCatalogs.rodados].sort((a, b) => {
+    return String(a.interno || '').localeCompare(String(b.interno || ''), undefined, {numeric: true});
+  });
+
+  sortedRodados.forEach(r => {
+    checkboxHtml += `
+      <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; padding: 6px; border-radius: 6px; background: #fff; border: 1px solid #e2e8f0;" class="massive-interno-item" data-interno="${r.interno}">
+        <input type="checkbox" value="${r.interno}" onchange="toggleMassiveInternoRow('${r.interno}', '${r.label.replace(/'/g, "\\'")}')">
+        <span style="font-weight: 600; color: #1e293b;">${r.interno}</span>
+      </label>
+    `;
+  });
+  listContainer.innerHTML = checkboxHtml;
+
+  // Populate CC dropdown
+  let ccOpts = `<option value="">Seleccionar Centro Costo...</option>`;
+  cachedCatalogs.centrosCosto.forEach(c => {
+    ccOpts += `<option value="${c.value}">${c.label}</option>`;
+  });
+  const ccSelect = document.getElementById('massive-form-cc');
+  ccSelect.innerHTML = ccOpts;
+  ccSelect.value = "15";
+
+  // Populate Responsable (searchable)
+  let respOpts = `<option value="">Seleccionar Responsable...</option>`;
+  cachedCatalogs.responsables.forEach(r => {
+    respOpts += `<option value="${r.value}">${r.label}</option>`;
+  });
+  const respSelect = document.getElementById('massive-form-responsable');
+  respSelect.innerHTML = respOpts;
+  const defaultBelocures = cachedCatalogs.responsables.find(r => r.label.toLowerCase().includes('belocures'));
+  if (defaultBelocures) {
+    respSelect.value = defaultBelocures.value;
+  }
+  convertSelectToSearchable(respSelect);
+
+  // Populate Empleado (searchable)
+  let empOpts = `<option value="">Seleccionar Operario...</option>`;
+  cachedCatalogs.empleados.forEach(e => {
+    empOpts += `<option value="${e.value}">${e.label}</option>`;
+  });
+  const empSelect = document.getElementById('massive-form-empleado');
+  empSelect.innerHTML = empOpts;
+  convertSelectToSearchable(empSelect);
+}
+
+function closeMassiveOrderModal() {
+  const modal = document.getElementById('massive-order-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function filterMassiveInternos() {
+  const query = document.getElementById('massive-interno-search').value.trim().toLowerCase();
+  const items = document.querySelectorAll('.massive-interno-item');
+  items.forEach(item => {
+    const interno = String(item.dataset.interno || '').toLowerCase();
+    if (interno.includes(query)) {
+      item.style.display = 'flex';
+    } else {
+      item.style.display = 'none';
+    }
+  });
+}
+
+function toggleMassiveInternoRow(interno, label) {
+  const tbody = document.getElementById('massive-insumos-grid-body');
+  const emptyState = document.getElementById('massive-grid-empty-state');
+  
+  // Find checkbox to see if it is checked
+  const checkbox = document.querySelector(`#massive-internos-checkbox-list input[value="${interno}"]`);
+  if (!checkbox) return;
+
+  if (checkbox.checked) {
+    if (emptyState) emptyState.remove();
+
+    const row = document.createElement('tr');
+    row.id = `massive-row-${interno}`;
+    row.style.borderBottom = '1px solid var(--border-color)';
+    row.innerHTML = `
+      <td style="padding: 10px; font-weight: 600; color: var(--text-main); font-size: 13px;">${label}</td>
+      <td style="padding: 6px;"><input type="number" step="0.1" class="insumo-val" data-interno="${interno}" data-insumo="refrigerante" style="width: 100%; padding: 6px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+      <td style="padding: 6px;"><input type="number" step="0.1" class="insumo-val" data-interno="${interno}" data-insumo="aceite_motor" style="width: 100%; padding: 6px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+      <td style="padding: 6px;"><input type="number" step="0.1" class="insumo-val" data-interno="${interno}" data-insumo="grasa_caja" style="width: 100%; padding: 6px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+      <td style="padding: 6px;"><input type="number" step="0.1" class="insumo-val" data-interno="${interno}" data-insumo="grasa_diferencial" style="width: 100%; padding: 6px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+      <td style="padding: 6px;"><input type="number" step="0.1" class="insumo-val" data-interno="${interno}" data-insumo="hco_direccion" style="width: 100%; padding: 6px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+      <td style="padding: 6px;"><input type="text" class="insumo-val" data-interno="${interno}" data-insumo="otros" placeholder="Filtros, repuestos..." style="width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid var(--border-color); border-radius: 6px;"></td>
+    `;
+    tbody.appendChild(row);
+  } else {
+    const row = document.getElementById(`massive-row-${interno}`);
+    if (row) row.remove();
+
+    // If no more custom rows, restore empty state
+    const customRows = tbody.querySelectorAll('tr[id^="massive-row-"]');
+    if (customRows.length === 0) {
+      tbody.innerHTML = `
+        <tr id="massive-grid-empty-state">
+          <td colspan="7" style="padding: 15px; text-align: center; color: var(--text-muted);">Ningún interno seleccionado</td>
+        </tr>
+      `;
+    }
+  }
+}
+
+function loadPreventivoAIntoMassiveDescription() {
+  const descTextarea = document.getElementById('massive-form-descripcion');
+  descTextarea.value = `Ctrol Refrigerante\nCtrol Aceite Motor\nCtrol Grasa Caja\nCtrol Grasa Diferencial\nCtrol Hco Direccion`;
+}
+
+async function submitMassiveOrders() {
+  const checkedBoxes = Array.from(document.querySelectorAll('#massive-internos-checkbox-list input[type="checkbox"]:checked'));
+  if (checkedBoxes.length === 0) {
+    return showToast("Por favor, selecciona al menos un interno.", "danger");
+  }
+
+  const clasificacion = document.getElementById('massive-form-clasificacion').value;
+  const responsableSelect = document.getElementById('massive-form-responsable');
+  let responsable = responsableSelect.value;
+  if (!responsable && responsableSelect.closest) {
+    const wrapper = responsableSelect.closest('.searchable-select-container');
+    const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
+    if (searchInput && searchInput.value.trim()) {
+      responsable = searchInput.value.trim();
+    }
+  }
+
+  const fechaEntrega = document.getElementById('massive-form-fecha').value;
+  const horario = document.getElementById('massive-form-horario').value;
+  const cc = document.getElementById('massive-form-cc').value;
+  
+  const empleadoSelect = document.getElementById('massive-form-empleado');
+  let empleado = empleadoSelect.value;
+  if (!empleado && empleadoSelect.closest) {
+    const wrapper = empleadoSelect.closest('.searchable-select-container');
+    const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
+    if (searchInput && searchInput.value.trim()) {
+      empleado = searchInput.value.trim();
+    }
+  }
+
+  const horasEstimadas = document.getElementById('massive-form-horas').value;
+  const baseDescripcion = document.getElementById('massive-form-descripcion').value.trim();
+
+  if (!responsable || !fechaEntrega || !horario || !cc || !empleado || !baseDescripcion) {
+    return showToast("Completa todos los campos obligatorios del formulario.", "danger");
+  }
+
+  // Build order payload list
+  const ordersPayload = [];
+  
+  for (const box of checkedBoxes) {
+    const interno = box.value;
+    
+    // Find matching rodado label from cachedCatalogs
+    const rodadoOpt = cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno));
+    const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+
+    // Read insumos values from inputs in this row
+    const row = document.getElementById(`massive-row-${interno}`);
+    const insumosParts = [];
+    
+    if (row) {
+      const inputs = row.querySelectorAll('.insumo-val');
+      inputs.forEach(input => {
+        const insumoType = input.dataset.insumo;
+        const val = input.value.trim();
+        if (val) {
+          if (insumoType === 'refrigerante') insumosParts.push(`Refrigerante: ${val}L`);
+          else if (insumoType === 'aceite_motor') insumosParts.push(`Aceite Motor: ${val}L`);
+          else if (insumoType === 'grasa_caja') insumosParts.push(`Grasa Caja: ${val}L`);
+          else if (insumoType === 'grasa_diferencial') insumosParts.push(`Grasa Diferencial: ${val}L`);
+          else if (insumoType === 'hco_direccion') insumosParts.push(`Hco Dirección: ${val}L`);
+          else if (insumoType === 'otros') insumosParts.push(`Otros: ${val}`);
+        }
+      });
+    }
+
+    let finalDescripcion = baseDescripcion;
+    if (insumosParts.length > 0) {
+      finalDescripcion += `\n[Insumos: ${insumosParts.join(', ')}]`;
+    }
+
+    ordersPayload.push({
+      rodado: rodadoLabel,
+      responsable: responsable,
+      fechaEntrega: fechaEntrega,
+      horario: horario,
+      interno: interno,
+      clasificacion: clasificacion,
+      incidente: "",
+      estadoUnidad: "operativo",
+      tasks: [{
+        centroCosto: cc,
+        empleado: empleado,
+        horasEstimadas: horasEstimadas,
+        descripcion: finalDescripcion,
+        status: "Pendiente"
+      }]
+    });
+  }
+
+  try {
+    showToast("Generando órdenes masivas...", "warning");
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const res = await fetch('/api/orders/bulk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-username': currentUsername
+      },
+      body: JSON.stringify({ orders: ordersPayload })
+    });
+
+    if (!res.ok) {
+      let errMsg = "Error al generar órdenes masivas";
+      try {
+        const errData = await res.json();
+        if (errData && errData.error) errMsg = errData.error;
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
+
+    const data = await res.json();
+    showToast(`Se generaron ${data.count} órdenes de trabajo masivas`, "success");
+    closeMassiveOrderModal();
+    fetchOrders();
+  } catch (error) {
+    showToast("Error masiva: " + error.message, "danger");
+    console.error(error);
+  }
+}
+
