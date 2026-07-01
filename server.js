@@ -880,6 +880,15 @@ async function triggerActiveTasksGoogleSheetSync() {
           const mechanicObj = (catalogs.empleados || []).find(e => String(e.value) === String(task.empleado));
           const mechanicName = mechanicObj ? mechanicObj.label : (task.empleado || "");
 
+          let taskStatus = task.status;
+          if (task.timerStart !== null && task.timerStart > 0) {
+            taskStatus = "En proceso";
+          } else if (task.timerStarted === true || task.timerStarted === 'true' || (Array.isArray(task.timerHistory) && task.timerHistory.length > 0)) {
+            taskStatus = "En pausa";
+          } else {
+            taskStatus = "Pendiente";
+          }
+
           activeTasks.push({
             orderId: order.id,
             taxesOrderNumber: order.taxesOrderNumber || "Sin Sincronizar",
@@ -888,7 +897,7 @@ async function triggerActiveTasksGoogleSheetSync() {
             clasificacion: order.clasificacion,
             mecanico: mechanicName,
             descripcion: task.descripcion || "(Sin descripción)",
-            status: task.status,
+            status: taskStatus,
             estadoUnidad: estadoUnidadLabel
           });
         }
