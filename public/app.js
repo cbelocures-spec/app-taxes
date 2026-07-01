@@ -1843,7 +1843,7 @@ async function cleanupSyncedOrders() {
         showToast("No hay órdenes finalizadas operativas para limpiar", "info");
       }
     } catch (error) {
-      showToast("Error al limpiar órdenes", "danger");
+      showToast("Error al limpiar órdenes: " + error.message, "danger");
       console.error(error);
     }
   }

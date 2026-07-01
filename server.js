@@ -340,6 +340,8 @@ app.post('/api/orders/cleanup', (req, res) => {
     const requester = req.headers['x-user-username'] || null;
     const { sector: reqSector } = req.body || {};
 
+    console.log(`[Cleanup Request] requester: ${requester}, reqSector: ${reqSector}`);
+
     let sector = reqSector || getSectorByUsername(requester);
     if (sector === 'Admin') {
       sector = 'Taller'; // Safe default
@@ -374,6 +376,7 @@ app.post('/api/orders/cleanup', (req, res) => {
 
     res.json({ success: true, count: idsToDelete.length });
   } catch (error) {
+    console.error("[Cleanup Error] Failed to cleanup:", error);
     res.status(500).json({ error: error.message });
   }
 });
