@@ -446,16 +446,14 @@ async function submitPreOrderCheck() {
   const preInternoSelect = document.getElementById('pre-form-interno');
   const preInternoText = document.getElementById('pre-form-interno-text');
   
-  let interno = isHerreria ? (preInternoText ? preInternoText.value.trim() : '') : preInternoSelect.value.trim();
+  let interno = preInternoSelect.value.trim();
   
-  if (!isHerreria) {
-    // Fallback if they typed in search box but didn't click/confirm
-    if (!interno && preInternoSelect.closest) {
-      const wrapper = preInternoSelect.closest('.searchable-select-container');
-      const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
-      if (searchInput && searchInput.value.trim()) {
-        interno = searchInput.value.trim();
-      }
+  // Fallback if they typed in search box but didn't click/confirm (works for all sectors)
+  if (!interno && preInternoSelect.closest) {
+    const wrapper = preInternoSelect.closest('.searchable-select-container');
+    const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
+    if (searchInput && searchInput.value.trim()) {
+      interno = searchInput.value.trim();
     }
   }
 
@@ -500,9 +498,12 @@ async function submitPreOrderCheck() {
     openNewOrderModal();
     
     if (isHerreria) {
-      // For Herrería, only populate the interno field; rodado is typed separately by the user
+      // For Herrería: pre-fill Rodado/Contenedor with the selected interno value;
+      // Interno Unidad stays empty — user fills it manually
+      const rodadoText = document.getElementById('form-rodado-text');
+      if (rodadoText) rodadoText.value = interno || "";
       const internoText = document.getElementById('form-interno-text');
-      if (internoText) internoText.value = interno || "";
+      if (internoText) internoText.value = ""; // empty — user fills it
     } else {
       // Auto-select the rodado based on the interno
       const rodadoSelect = document.getElementById('form-rodado');
@@ -5733,25 +5734,19 @@ function setupAllFieldsForSector() {
     if (rodadoText) rodadoText.removeAttribute('required');
   }
 
-  // 2. Pre-order modal: Interno
+  // 2. Pre-order modal: Interno — always show the searchable select (for all sectors including Herrería)
   const preInternoSelectGroup = document.getElementById('pre-form-interno-group-select');
   const preInternoTextGroup = document.getElementById('pre-form-interno-group-text');
   const preInternoSelect = document.getElementById('pre-form-interno');
   const preInternoText = document.getElementById('pre-form-interno-text');
 
-  if (isHerreria) {
-    if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'none';
-    if (preInternoTextGroup) preInternoTextGroup.style.display = 'block';
-    if (preInternoSelect) preInternoSelect.removeAttribute('required');
-    if (preInternoText) preInternoText.setAttribute('required', 'true');
-  } else {
-    if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'block';
-    if (preInternoTextGroup) preInternoTextGroup.style.display = 'none';
-    if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
-    if (preInternoText) preInternoText.removeAttribute('required');
-  }
+  // Always show the select dropdown (ignore text alternative for pre-order modal)
+  if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'block';
+  if (preInternoTextGroup) preInternoTextGroup.style.display = 'none';
+  if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
+  if (preInternoText) preInternoText.removeAttribute('required');
 
-  // 3. Main modal: Interno
+  // 3. Main modal: Interno — for Herrería show text field (free type), for others show select
   const internoSelectGroup = document.getElementById('form-interno-group-select');
   const internoTextGroup = document.getElementById('form-interno-group-text');
   const internoSelect = document.getElementById('form-interno');
@@ -5761,7 +5756,7 @@ function setupAllFieldsForSector() {
     if (internoSelectGroup) internoSelectGroup.style.display = 'none';
     if (internoTextGroup) internoTextGroup.style.display = 'block';
     if (internoSelect) internoSelect.removeAttribute('required');
-    if (internoText) internoText.setAttribute('required', 'true');
+    // Interno Unidad stays empty — user fills manually
   } else {
     if (internoSelectGroup) internoSelectGroup.style.display = 'block';
     if (internoTextGroup) internoTextGroup.style.display = 'none';
