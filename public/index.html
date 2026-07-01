@@ -886,10 +886,50 @@
       <div id="diagnosis-task-summary" style="text-align: left; background: #f1f5f9; padding: 12px; border-radius: 8px; font-size: 13px; color: var(--text-main); margin-bottom: 16px; border-left: 4px solid var(--primary); display: none; line-height: 1.5;">
         <!-- Dynamic task summary here -->
       </div>
-      <div class="form-group" style="text-align: left; margin-bottom: 24px;">
+      <div class="form-group" style="text-align: left; margin-bottom: 16px;">
         <label for="diagnosis-text" style="font-weight: 600; font-size: 12px; color: var(--text-main); text-transform: uppercase;">Diagnóstico</label>
         <textarea id="diagnosis-text" placeholder="Ej: Batería sin carga, manguera rota..." rows="3" style="width: 100%; padding: 12px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; resize: vertical; font-family: inherit; margin-top: 6px; box-sizing: border-box;"></textarea>
       </div>
+      
+      <!-- INLINE INSUMOS IN DIAGNOSIS -->
+      <div class="form-group" style="text-align: left; margin-bottom: 24px;">
+        <label style="font-weight: 600; font-size: 12px; color: var(--text-main); text-transform: uppercase; display: block; margin-bottom: 8px;">Insumos Utilizados (Opcional)</label>
+        <div style="display: grid; grid-template-columns: 1fr; gap: 8px; max-height: 200px; overflow-y: auto; padding: 10px; background: rgba(0,0,0,0.02); border: 1px solid var(--border-color); border-radius: 8px;">
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="diag-insumo-check" value="Aceite Motor" onchange="toggleInsumoRow(this)"> Aceite Motor</label>
+            <input type="text" placeholder="ej: 5L" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="diag-insumo-check" value="Refrigerante" onchange="toggleInsumoRow(this)"> Refrigerante</label>
+            <input type="text" placeholder="ej: 3L" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="diag-insumo-check" value="Grasa Diferencial" onchange="toggleInsumoRow(this)"> Grasa Diferencial</label>
+            <input type="text" placeholder="ej: 1Kg" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="diag-insumo-check" value="Grasa Caja" onchange="toggleInsumoRow(this)"> Grasa Caja</label>
+            <input type="text" placeholder="ej: 2L" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="diag-insumo-check" value="Hco Equipo" onchange="toggleInsumoRow(this)"> Hco Equipo</label>
+            <input type="text" placeholder="ej: 10L" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="diag-insumo-check" value="Hco Direccion" onchange="toggleInsumoRow(this)"> Hco Direccion</label>
+            <input type="text" placeholder="ej: 1L" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="diag-insumo-check" value="Grasa Engrase x KG" onchange="toggleInsumoRow(this)"> Grasa Engrase x KG</label>
+            <input type="text" placeholder="ej: 2Kg" class="insumo-qty-input" style="display: none;">
+          </div>
+          <div class="insumo-row">
+            <label class="insumo-check-label"><input type="checkbox" class="diag-insumo-check" value="Otros" onchange="toggleInsumoRow(this)"> Otros</label>
+            <input type="text" placeholder="ej: Filtro de aire" class="insumo-qty-input" style="display: none;">
+          </div>
+        </div>
+      </div>
+      
       <div style="display: flex; gap: 12px; justify-content: flex-end;">
         <button class="btn btn-secondary" id="btn-diagnosis-skip" style="padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer;">Omitir</button>
         <button class="btn btn-primary" id="btn-diagnosis-save" style="padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer;">Guardar</button>

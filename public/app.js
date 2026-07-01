@@ -249,13 +249,22 @@ document.addEventListener('DOMContentLoaded', () => {
             descripcion: descVal
           };
 
-          promptDiagnosis(taskInfo).then(diagnosis => {
-            if (diagnosis) {
+          promptDiagnosis(taskInfo).then(result => {
+            if (result) {
               const textareaEl = card.querySelector('.task-desc');
+              const insumoEl = card.querySelector('.task-insumos');
               if (textareaEl) {
-                const prefix = textareaEl.value.trim() ? ' - ' : '';
-                textareaEl.value = textareaEl.value.trim() + prefix + 'Diagnóstico: ' + diagnosis;
-                textareaEl.dispatchEvent(new Event('input', { bubbles: true }));
+                let additions = [];
+                if (result.diagnosis) additions.push('Diagnóstico: ' + result.diagnosis);
+                if (result.insumos) additions.push('Insumos: ' + result.insumos);
+                if (additions.length > 0) {
+                  const prefix = textareaEl.value.trim() ? ' - ' : '';
+                  textareaEl.value = textareaEl.value.trim() + prefix + additions.join(' - ');
+                  textareaEl.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+              }
+              if (insumoEl && result.insumos) {
+                insumoEl.value = result.insumos;
               }
             }
           });
@@ -456,7 +465,14 @@ function promptDiagnosis(taskInfo = null) {
       }
     }
 
+    // Reset textarea and checkboxes
     textarea.value = '';
+    const checkboxes = modal.querySelectorAll('.diag-insumo-check');
+    checkboxes.forEach(chk => {
+      chk.checked = false;
+      toggleInsumoRow(chk); // Hide inline inputs
+    });
+
     modal.classList.add('open');
 
     // Clear any previous event listeners by cloning buttons
@@ -471,8 +487,28 @@ function promptDiagnosis(taskInfo = null) {
 
     newBtnSave.addEventListener('click', () => {
       const val = textarea.value.trim();
+      
+      // Collect insumos from modal
+      const lineas = [];
+      const checkedBoxes = modal.querySelectorAll('.diag-insumo-check:checked');
+      checkedBoxes.forEach(chk => {
+        const nombre = chk.value;
+        const row = chk.closest('.insumo-row');
+        const input = row ? row.querySelector('.insumo-qty-input') : null;
+        const cantidad = input ? input.value.trim() : '';
+        if (cantidad !== '') {
+          lineas.push(`${nombre}: ${cantidad}`);
+        } else {
+          lineas.push(nombre);
+        }
+      });
+      const insumosVal = lineas.join(' | ');
+
       closeModal();
-      resolve(val || null);
+      resolve({
+        diagnosis: val || null,
+        insumos: insumosVal || null
+      });
     });
 
     newBtnSkip.addEventListener('click', () => {
@@ -3218,11 +3254,19 @@ async function markDashboardTaskFinished(orderId, taskId) {
     descripcion: task.descripcion
   };
 
-  // Prompt for optional diagnosis
-  const diagnosis = await promptDiagnosis(taskInfo);
-  if (diagnosis) {
-    const prefix = task.descripcion ? ' - ' : '';
-    task.descripcion = (task.descripcion || '').trim() + prefix + 'Diagnóstico: ' + diagnosis;
+  // Prompt for optional diagnosis and insumos
+  const result = await promptDiagnosis(taskInfo);
+  if (result) {
+    let additions = [];
+    if (result.diagnosis) additions.push('Diagnóstico: ' + result.diagnosis);
+    if (result.insumos) additions.push('Insumos: ' + result.insumos);
+    if (additions.length > 0) {
+      const prefix = task.descripcion ? ' - ' : '';
+      task.descripcion = (task.descripcion || '').trim() + prefix + additions.join(' - ');
+    }
+    if (result.insumos) {
+      task.insumos = result.insumos;
+    }
   }
 
   task.timerStart = null;
