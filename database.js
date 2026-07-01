@@ -54,6 +54,8 @@ const DEFAULT_DB = {
     portalUrl: "https://taxes.com.ar",
     googleScriptUrl: "",
     googleActiveTasksUrl: "",
+    preventivoScriptUrl: "",
+    parteTallerScriptUrl: "",
     catalogSyncStatus: "idle",
     catalogSyncError: null
   },

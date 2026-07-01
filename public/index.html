@@ -307,6 +307,14 @@
             </button>
           </div>
         </div>
+        <div class="form-group">
+          <label for="set-preventivo-script-url">URL de Script de Preventivos (Google Sheet)</label>
+          <input type="url" id="set-preventivo-script-url" placeholder="https://script.google.com/macros/s/.../exec" style="width: 100%;">
+        </div>
+        <div class="form-group">
+          <label for="set-partetaller-script-url">URL de Script de Parte Taller (Google Sheet)</label>
+          <input type="url" id="set-partetaller-script-url" placeholder="https://script.google.com/macros/s/.../exec" style="width: 100%;">
+        </div>
         
         <button type="submit" class="btn btn-primary btn-block">
           <span class="material-icons">save</span> Guardar Configuración
@@ -351,6 +359,313 @@
       </div>
     </section>
 
+    <!-- VIEW 5: PREVENTIVOS -->
+    <section id="view-preventivos" class="app-view">
+      <!-- Sub-tabs internal menu -->
+      <div class="preventivos-tabs-wrapper">
+        <button class="preventivos-tab-btn active" onclick="switchPrevSubTab('dashboard')">
+          <span class="material-icons">build</span> Mantenimiento KM/HS
+        </button>
+        <button class="preventivos-tab-btn" onclick="switchPrevSubTab('combustible')">
+          <span class="material-icons">local_gas_station</span> Combustible
+        </button>
+        <button class="preventivos-tab-btn" onclick="switchPrevSubTab('0km')">
+          <span class="material-icons">fiber_new</span> 0KM
+        </button>
+        <button class="preventivos-tab-btn" onclick="switchPrevSubTab('alarmas')">
+          <span class="material-icons">notifications_active</span> Alarmas
+        </button>
+        <button class="preventivos-tab-btn" onclick="switchPrevSubTab('historial')">
+          <span class="material-icons">history</span> Historial
+        </button>
+      </div>
+
+      <!-- SEARCH BAR -->
+      <div class="search-bar" style="margin-bottom: 16px;">
+        <span class="material-icons search-icon">search</span>
+        <input type="text" id="prev-search-input" placeholder="Buscar por Interno o Modelo..." oninput="applyPrevFilters()">
+      </div>
+
+      <!-- SUB-VIEW: DASHBOARD (KM/HS) -->
+      <div id="prev-subview-dashboard" class="prev-subview">
+        <div class="prev-metrics-grid">
+          <div class="prev-metric-card" onclick="filterByAlertState('all')" style="cursor: pointer;">
+            <div class="prev-metric-icon blue"><span class="material-icons">local_shipping</span></div>
+            <div class="prev-metric-info">
+              <h4>Total Unidades</h4>
+              <p id="metric-total">0</p>
+            </div>
+          </div>
+          <div class="prev-metric-card" onclick="filterByAlertState('ok')" style="cursor: pointer;">
+            <div class="prev-metric-icon green"><span class="material-icons">check_circle</span></div>
+            <div class="prev-metric-info">
+              <h4>Al Día</h4>
+              <p id="metric-ok">0</p>
+            </div>
+          </div>
+          <div class="prev-metric-card" onclick="filterByAlertState('urgente')" style="cursor: pointer;">
+            <div class="prev-metric-icon red"><span class="material-icons">warning</span></div>
+            <div class="prev-metric-info">
+              <h4>Urgentes</h4>
+              <p id="metric-urgente">0</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="prev-table-container">
+          <table class="prev-table">
+            <thead>
+              <tr>
+                <th>Interno</th>
+                <th>Modelo</th>
+                <th>KM Reales</th>
+                <th>Hs Reales</th>
+                <th>Km/Hs Restantes</th>
+                <th>Estado</th>
+                <th style="text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="prev-dashboard-tbody">
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 20px;">Cargando preventivos...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prev-card-list" id="prev-dashboard-cards">
+          <!-- Mobile dynamic -->
+        </div>
+      </div>
+
+      <!-- SUB-VIEW: COMBUSTIBLE -->
+      <div id="prev-subview-combustible" class="prev-subview" style="display: none;">
+        <div style="margin-bottom: 12px; display: flex; justify-content: flex-end;">
+          <button class="btn btn-primary btn-sm" onclick="procesarCombustiblePlanilla()" id="btn-process-fuel-planilla" style="display: flex; align-items: center; gap: 4px;">
+            <span class="material-icons" style="font-size: 16px;">local_gas_station</span>
+            <span>Procesar Combustible de Planilla</span>
+          </button>
+        </div>
+        <div class="prev-table-container">
+          <table class="prev-table">
+            <thead>
+              <tr>
+                <th>Interno</th>
+                <th>Modelo</th>
+                <th>Litros Totales</th>
+                <th>Restante 5k</th>
+                <th>Alerta 5k</th>
+                <th>Restante 10k</th>
+                <th>Alerta 10k</th>
+                <th>Último Service</th>
+                <th style="text-align: right;">Servicio</th>
+              </tr>
+            </thead>
+            <tbody id="prev-combustible-tbody">
+              <!-- JS dynamic -->
+            </tbody>
+          </table>
+        </div>
+        <div class="prev-card-list" id="prev-combustible-cards">
+          <!-- Mobile dynamic -->
+        </div>
+      </div>
+
+      <!-- SUB-VIEW: 0KM -->
+      <div id="prev-subview-0km" class="prev-subview" style="display: none;">
+        <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px;">
+          <h3 style="font-size: 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;"><span class="material-icons" style="color: #9c27b0;">fiber_new</span> Planilla de Control 0KM</h3>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
+            Aquí se listan las unidades nuevas o de reciente adquisición que requieren controles preventivos especiales (por ejemplo, a los primeros 1,000 o 5,000 km).
+          </p>
+        </div>
+        <div class="prev-table-container">
+          <table class="prev-table">
+            <thead>
+              <tr>
+                <th>Interno</th>
+                <th>Modelo</th>
+                <th>KM Control 0KM</th>
+                <th>Ajuste de Torque</th>
+                <th>Cambio Filtros</th>
+                <th>Estado</th>
+                <th style="text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="prev-0km-tbody">
+              <!-- JS dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SUB-VIEW: ALARMAS -->
+      <div id="prev-subview-alarmas" class="prev-subview" style="display: none;">
+        <div class="prev-table-container">
+          <table class="prev-table">
+            <thead>
+              <tr>
+                <th>Interno</th>
+                <th>Tipo Preventivo</th>
+                <th>Estado Alarma</th>
+                <th>Fecha Alerta</th>
+                <th>Fecha Realizado</th>
+                <th>Demora (Días)</th>
+              </tr>
+            </thead>
+            <tbody id="prev-alarmas-tbody">
+              <!-- JS dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SUB-VIEW: HISTORIAL -->
+      <div id="prev-subview-historial" class="prev-subview" style="display: none;">
+        <div class="prev-table-container">
+          <table class="prev-table">
+            <thead>
+              <tr>
+                <th>Fecha / Hora</th>
+                <th>Interno</th>
+                <th>Tipo Servicio</th>
+                <th>Detalle / Valor</th>
+                <th>Conductor</th>
+                <th>Mes Calendario</th>
+              </tr>
+            </thead>
+            <tbody id="prev-historial-tbody">
+              <!-- JS dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 6: PARTE TALLER -->
+    <section id="view-partetaller" class="app-view">
+      <div class="view-header">
+        <div>
+          <h2>Parte Diario de Taller</h2>
+          <small style="color: var(--text-muted);">Sincronizado en tiempo real</small>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="fetchParteTallerEstado()" style="display: flex; align-items: center; gap: 4px;">
+          <span class="material-icons" style="font-size: 16px;">refresh</span>
+          <span>Actualizar</span>
+        </button>
+      </div>
+
+      <!-- Totales Table (Compactador, Volquete, Roll-off, Plancha) -->
+      <div class="partetaller-dashboard-card">
+        <div class="partetaller-title-row">
+          <h3 style="font-size: 14px; font-weight: 600; margin: 0;">Resumen de Unidades Operativas y Fuera de Servicio</h3>
+        </div>
+        <div class="partetaller-grid-4">
+          <div class="partetaller-totals-card">
+            <h5>Compactador</h5>
+            <div class="partetaller-totals-val">
+              <span class="op" id="pt-op-comp">0</span>
+              <span style="color: var(--text-muted);">/</span>
+              <span class="fs" id="pt-out-comp">0</span>
+            </div>
+          </div>
+          <div class="partetaller-totals-card">
+            <h5>Volquete</h5>
+            <div class="partetaller-totals-val">
+              <span class="op" id="pt-op-volq">0</span>
+              <span style="color: var(--text-muted);">/</span>
+              <span class="fs" id="pt-out-volq">0</span>
+            </div>
+          </div>
+          <div class="partetaller-totals-card">
+            <h5>Roll - Off</h5>
+            <div class="partetaller-totals-val">
+              <span class="op" id="pt-op-roll">0</span>
+              <span style="color: var(--text-muted);">/</span>
+              <span class="fs" id="pt-out-roll">0</span>
+            </div>
+          </div>
+          <div class="partetaller-totals-card">
+            <h5>Plancha</h5>
+            <div class="partetaller-totals-val">
+              <span class="op" id="pt-op-plancha">0</span>
+              <span style="color: var(--text-muted);">/</span>
+              <span class="fs" id="pt-out-plancha">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fuera de Servicio and Under Repair -->
+      <div class="partetaller-section-header">
+        <h3 style="font-size: 14px; font-weight: 700; margin: 0;">Fuera de Servicio / En Taller</h3>
+        <span class="badge" style="background-color: #ef4444; color: white;" id="pt-out-count">0</span>
+      </div>
+
+      <div class="prev-table-container">
+        <table class="prev-table">
+          <thead>
+            <tr>
+              <th>Interno</th>
+              <th>Tipo</th>
+              <th>Novedad / Falla</th>
+              <th>Días Parado</th>
+              <th>Desde</th>
+            </tr>
+          </thead>
+          <tbody id="pt-fuera-tbody">
+            <tr>
+              <td colspan="5" style="text-align: center; padding: 20px;">No hay unidades registradas fuera de servicio.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="partetaller-section-header">
+        <h3 style="font-size: 14px; font-weight: 700; margin: 0;">En Reparación</h3>
+        <span class="badge" style="background-color: #ff9800; color: white;" id="pt-rep-count">0</span>
+      </div>
+
+      <div class="prev-table-container">
+        <table class="prev-table">
+          <thead>
+            <tr>
+              <th>Interno</th>
+              <th>Tipo</th>
+              <th>Novedad / Tarea</th>
+            </tr>
+          </thead>
+          <tbody id="pt-reparacion-tbody">
+            <tr>
+              <td colspan="3" style="text-align: center; padding: 20px;">No hay unidades registradas en reparación.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="partetaller-section-header">
+        <h3 style="font-size: 14px; font-weight: 700; margin: 0;">Servicios Pendientes</h3>
+        <span class="badge" style="background-color: #2196f3; color: white;" id="pt-pend-count">0</span>
+      </div>
+
+      <div class="prev-table-container">
+        <table class="prev-table">
+          <thead>
+            <tr>
+              <th>Interno</th>
+              <th>Tipo</th>
+              <th>Novedades</th>
+              <th>Servicio</th>
+            </tr>
+          </thead>
+          <tbody id="pt-pendientes-tbody">
+            <tr>
+              <td colspan="4" style="text-align: center; padding: 20px;">No hay servicios pendientes.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
   </main>
 
   <!-- Bottom Navigation Bar -->
@@ -363,10 +678,17 @@
       <span class="material-icons">assignment</span>
       <span>Órdenes</span>
     </button>
-
     <button class="nav-item" onclick="switchView('bulk')" id="nav-bulk">
       <span class="material-icons">content_copy</span>
       <span>Masiva</span>
+    </button>
+    <button class="nav-item" onclick="switchView('preventivos')" id="nav-preventivos">
+      <span class="material-icons">build_circle</span>
+      <span>Preventivos</span>
+    </button>
+    <button class="nav-item" onclick="switchView('partetaller')" id="nav-partetaller">
+      <span class="material-icons">engineering</span>
+      <span>Parte Taller</span>
     </button>
     <button class="nav-item" onclick="switchView('settings')" id="nav-settings">
       <span class="material-icons">settings</span>
@@ -908,6 +1230,60 @@
   </div>
 
 
+
+  <!-- MODAL: REGISTRAR SERVICE (KM/HS) -->
+  <div class="modal-overlay" id="prev-service-modal">
+    <div class="dialog-modal" style="max-width: 400px;">
+      <div class="dialog-header" style="background-color: #9c27b0; color: white;">
+        <h3 style="color: white; margin: 0;">Registrar Service KM/HS</h3>
+        <button class="dialog-close" onclick="closePrevServiceModal()" style="color: white;">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <p style="font-size: 14px; margin-bottom: 12px;">Interno: <strong id="prev-service-modal-interno" style="color: #9c27b0;">—</strong></p>
+        <div class="form-group">
+          <label>Kilómetros Actuales</label>
+          <input type="number" id="prev-service-modal-km" placeholder="Ej: 154200" style="width: 100%;">
+        </div>
+        <div class="form-group">
+          <label>Horas Actuales</label>
+          <input type="number" id="prev-service-modal-hs" placeholder="Ej: 3450" style="width: 100%;">
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="closePrevServiceModal()">Cancelar</button>
+        <button class="btn btn-primary" id="btn-save-prev-service" onclick="savePrevService()" style="background-color: #9c27b0; border-color: #9c27b0;">
+          Guardar Service
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTRAR SERVICE COMBUSTIBLE -->
+  <div class="modal-overlay" id="prev-combustible-modal">
+    <div class="dialog-modal" style="max-width: 400px;">
+      <div class="dialog-header" style="background-color: #00a884; color: white;">
+        <h3 style="color: white; margin: 0;">Registrar Service Combustible</h3>
+        <button class="dialog-close" onclick="closePrevCombustibleModal()" style="color: white;">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <p style="font-size: 14px; margin-bottom: 12px;">Interno: <strong id="prev-combustible-modal-interno" style="color: #00a884;">—</strong></p>
+        <div class="form-group">
+          <label>Litros Service 5K</label>
+          <input type="number" id="prev-combustible-modal-litros5k" placeholder="Ej: 5000" style="width: 100%;">
+        </div>
+        <div class="form-group">
+          <label>Litros Service 10K</label>
+          <input type="number" id="prev-combustible-modal-litros10k" placeholder="Ej: 10000" style="width: 100%;">
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="closePrevCombustibleModal()">Cancelar</button>
+        <button class="btn btn-primary" id="btn-save-prev-combustible" onclick="savePrevCombustible()" style="background-color: #00a884; border-color: #00a884;">
+          Guardar Combustible
+        </button>
+      </div>
+    </div>
+  </div>
 
   <datalist id="internos-datalist">
     <!-- Populated dynamically from app.js -->

@@ -548,6 +548,8 @@ app.get('/api/settings', (req, res) => {
       portalUrl: settings.portalUrl || "https://taxes.com.ar",
       googleScriptUrl: settings.googleScriptUrl || "",
       googleActiveTasksUrl: settings.googleActiveTasksUrl || "",
+      preventivoScriptUrl: settings.preventivoScriptUrl || "",
+      parteTallerScriptUrl: settings.parteTallerScriptUrl || "",
       catalogSyncStatus: catalogStatus,
       catalogSyncError: settings.catalogSyncError || null,
       isSupervisor: !!isMainSupervisor
@@ -562,7 +564,7 @@ app.get('/api/settings', (req, res) => {
 // Save connection settings
 app.post('/api/settings', (req, res) => {
   try {
-    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl } = req.body;
+    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl } = req.body;
     const requestingUser = req.headers['x-user-username'] || null;
     const current = db.getSettings();
     
@@ -575,7 +577,9 @@ app.post('/api/settings', (req, res) => {
     const updates = {
       portalUrl: portalUrl !== undefined ? portalUrl : current.portalUrl,
       googleScriptUrl: googleScriptUrl !== undefined ? googleScriptUrl : current.googleScriptUrl,
-      googleActiveTasksUrl: googleActiveTasksUrl !== undefined ? googleActiveTasksUrl : current.googleActiveTasksUrl
+      googleActiveTasksUrl: googleActiveTasksUrl !== undefined ? googleActiveTasksUrl : current.googleActiveTasksUrl,
+      preventivoScriptUrl: preventivoScriptUrl !== undefined ? preventivoScriptUrl : current.preventivoScriptUrl,
+      parteTallerScriptUrl: parteTallerScriptUrl !== undefined ? parteTallerScriptUrl : current.parteTallerScriptUrl
     };
 
     // Only update global username/password if this is the global/primary user
@@ -589,7 +593,7 @@ app.post('/api/settings', (req, res) => {
     }
 
     const saved = db.saveSettings(updates);
-    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl, googleActiveTasksUrl: saved.googleActiveTasksUrl } });
+    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl, googleActiveTasksUrl: saved.googleActiveTasksUrl, preventivoScriptUrl: saved.preventivoScriptUrl, parteTallerScriptUrl: saved.parteTallerScriptUrl } });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -735,6 +739,194 @@ app.post('/api/active-mechanics', (req, res) => {
     const saved = db.saveActiveMechanics(list);
     res.json({ success: true, list: saved });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- PREVENTIVOS PROXY ENDPOINTS ---
+app.get('/api/preventivos/flota', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  if (!scriptUrl) {
+    return res.status(400).json({ error: "URL del script de preventivos no configurada." });
+  }
+  try {
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=getFleetData`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching preventivos fleet:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/preventivos/combustible', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  if (!scriptUrl) {
+    return res.status(400).json({ error: "URL del script de preventivos no configurada." });
+  }
+  try {
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=getFuelData`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching preventivos fuel:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/preventivos/historial', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  if (!scriptUrl) {
+    return res.status(400).json({ error: "URL del script de preventivos no configurada." });
+  }
+  try {
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=getHistoryData`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching preventivos history:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/preventivos/alertas', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  if (!scriptUrl) {
+    return res.status(400).json({ error: "URL del script de preventivos no configurada." });
+  }
+  try {
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=getAlertsData`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching preventivos alerts:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/preventivos/service', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  if (!scriptUrl) {
+    return res.status(400).json({ error: "URL del script de preventivos no configurada." });
+  }
+  const { rowIndex, km, hs, interno, vehicleType } = req.body;
+  try {
+    const params = new URLSearchParams({
+      accion: 'updateService',
+      rowIndex,
+      km: km || 0,
+      hs: hs || 0,
+      interno: interno || '',
+      vehicleType: vehicleType || ''
+    });
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${params.toString()}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Error updating preventivos service:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/preventivos/fuel-service', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  if (!scriptUrl) {
+    return res.status(400).json({ error: "URL del script de preventivos no configurada." });
+  }
+  const { rowIndex, litros5k, litros10k, interno } = req.body;
+  try {
+    const params = new URLSearchParams({
+      accion: 'updateFuelService',
+      rowIndex,
+      litros5k: litros5k !== undefined && litros5k !== null ? litros5k : '',
+      litros10k: litros10k !== undefined && litros10k !== null ? litros10k : '',
+      interno: interno || ''
+    });
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${params.toString()}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Error updating preventivos fuel service:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/preventivos/process-fuel', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  if (!scriptUrl) {
+    return res.status(400).json({ error: "URL del script de preventivos no configurada." });
+  }
+  try {
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=processSpreadsheetFuelLoads`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const text = await response.text();
+    try {
+      res.json(JSON.parse(text));
+    } catch(e) {
+      res.json({ ok: true, result: text });
+    }
+  } catch (error) {
+    console.error("Error processing fuel loads:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- PARTE TALLER PROXY ENDPOINTS ---
+app.get('/api/parte-taller/estado', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.parteTallerScriptUrl;
+  if (!scriptUrl) {
+    return res.status(400).json({ error: "URL del script de parte taller no configurada." });
+  }
+  try {
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=get_state`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching parte taller state:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/parte-taller/novedad', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.parteTallerScriptUrl;
+  if (!scriptUrl) {
+    return res.status(400).json({ error: "URL del script de parte taller no configurada." });
+  }
+  try {
+    const response = await fetch(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Error forwarding post to parte taller:", error);
     res.status(500).json({ error: error.message });
   }
 });

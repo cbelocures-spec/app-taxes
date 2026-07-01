@@ -363,6 +363,14 @@ function switchView(viewId) {
       addBulkTaskField();
     }
   }
+
+  if (viewId === 'preventivos') {
+    fetchPreventivoFlota();
+  }
+
+  if (viewId === 'partetaller') {
+    fetchParteTallerEstado();
+  }
 }
 
 // 2. MODAL CONTROLLERS
@@ -850,6 +858,10 @@ async function fetchSettings() {
     if (activeTasksInput) {
       activeTasksInput.value = data.googleActiveTasksUrl || "";
     }
+    const prevScriptInput = document.getElementById('set-preventivo-script-url');
+    if (prevScriptInput) prevScriptInput.value = data.preventivoScriptUrl || "";
+    const ptScriptInput = document.getElementById('set-partetaller-script-url');
+    if (ptScriptInput) ptScriptInput.value = data.parteTallerScriptUrl || "";
     
     isCurrentUserSupervisor = !!data.isSupervisor;
     const hoursSection = document.getElementById('supervisor-hours-section');
@@ -878,6 +890,8 @@ async function saveSettings(e) {
   const password = document.getElementById('set-password').value;
   const googleScriptUrl = document.getElementById('set-google-script-url').value;
   const googleActiveTasksUrl = document.getElementById('set-google-active-tasks-url')?.value || '';
+  const preventivoScriptUrl = document.getElementById('set-preventivo-script-url')?.value || '';
+  const parteTallerScriptUrl = document.getElementById('set-partetaller-script-url')?.value || '';
   const currentUsername = localStorage.getItem('currentUserUsername') || '';
 
   try {
@@ -887,7 +901,7 @@ async function saveSettings(e) {
         'Content-Type': 'application/json',
         'x-user-username': currentUsername  // Tell server which user is saving
       },
-      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl, googleActiveTasksUrl })
+      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl })
     });
 
     if (!res.ok) {
@@ -5802,3 +5816,510 @@ function setupAllFieldsForSector() {
   }
 }
 
+
+// ============================================================
+// PREVENTIVOS MODULE
+// ============================================================
+
+let prevFlotaData = [];
+let prevCombustibleData = [];
+let prevAlertas = [];
+let prevHistorial = [];
+let prevCurrentFilter = 'all';
+let prevCurrentServiceRow = null; // { rowIndex, interno, modelo }
+let prevCurrentCombustibleRow = null;
+
+function switchPrevSubTab(tab) {
+  document.querySelectorAll('.preventivos-tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.prev-subview').forEach(v => v.style.display = 'none');
+  const tabEl = document.getElementById(`prev-subview-${tab}`);
+  if (tabEl) tabEl.style.display = 'block';
+  // Mark active button
+  document.querySelectorAll('.preventivos-tab-btn').forEach(btn => {
+    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${tab}'`)) {
+      btn.classList.add('active');
+    }
+  });
+  // Load data for the tab
+  if (tab === 'dashboard') renderPrevFlotaTable();
+  else if (tab === 'combustible') renderPrevCombustibleTable();
+  else if (tab === 'alarmas') renderPrevAlermasTable();
+  else if (tab === 'historial') renderPrevHistorialTable();
+}
+
+function applyPrevFilters() {
+  renderPrevFlotaTable();
+}
+
+function filterByAlertState(state) {
+  prevCurrentFilter = state;
+  renderPrevFlotaTable();
+}
+
+async function fetchPreventivoFlota() {
+  try {
+    document.getElementById('prev-dashboard-tbody').innerHTML =
+      '<tr><td colspan="7" style="text-align:center; padding:20px;"><span class="material-icons" style="animation:spin 1.5s linear infinite; vertical-align:middle;">sync</span> Cargando datos de Google Sheets...</td></tr>';
+    const res = await fetch('/api/preventivos/flota');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const rawData = await res.json();
+    prevFlotaData = Array.isArray(rawData) ? rawData : (JSON.parse(rawData) || []);
+    renderPrevFlotaTable();
+  } catch (error) {
+    console.error('Error fetching preventivos flota:', error);
+    document.getElementById('prev-dashboard-tbody').innerHTML =
+      `<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}. Configure la URL del script en Ajustes.</td></tr>`;
+  }
+}
+
+function renderPrevFlotaTable() {
+  const tbody = document.getElementById('prev-dashboard-tbody');
+  const cards = document.getElementById('prev-dashboard-cards');
+  if (!tbody) return;
+
+  const searchTerm = (document.getElementById('prev-search-input')?.value || '').toLowerCase();
+
+  let urgentes = 0;
+  let filtered = prevFlotaData.filter(item => {
+    const alerta = String(item.alerta || '').toLowerCase();
+    const isUrgente = alerta.includes('realizar') || alerta.includes('urgente') || alerta.includes('service');
+    if (isUrgente) urgentes++;
+    const matchSearch = String(item.interno).toLowerCase().includes(searchTerm) ||
+                        String(item.modelo).toLowerCase().includes(searchTerm);
+    if (!matchSearch) return false;
+    if (prevCurrentFilter === 'ok') return !isUrgente;
+    if (prevCurrentFilter === 'urgente') return isUrgente;
+    return true;
+  });
+
+  const total = prevFlotaData.length;
+  const el = id => document.getElementById(id);
+  if (el('metric-total')) el('metric-total').textContent = total;
+  if (el('metric-urgente')) el('metric-urgente').textContent = urgentes;
+  if (el('metric-ok')) el('metric-ok').textContent = total - urgentes;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">No se encontraron unidades.</td></tr>';
+    if (cards) cards.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">No se encontraron unidades.</div>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(item => {
+    const alerta = String(item.alerta || '');
+    const isUrgente = alerta.toLowerCase().includes('realizar') || alerta.toLowerCase().includes('urgente') || alerta.toLowerCase().includes('service');
+    const badgeClass = isUrgente ? 'warning' : 'ok';
+    const badgeText = isUrgente ? '⚠ Realizar Service' : '✓ Al Día';
+    const km = item.kmReales ? Number(item.kmReales).toLocaleString('es-AR') : 0;
+    const hs = item.hsReales ? Number(item.hsReales).toLocaleString('es-AR') : 0;
+    const rest = item.restante ? Number(item.restante).toLocaleString('es-AR') : 0;
+    return `<tr>
+      <td><strong>${item.interno}</strong></td>
+      <td>${item.modelo}</td>
+      <td>${km}</td>
+      <td>${hs}</td>
+      <td>${rest}</td>
+      <td><span class="badge-prev ${badgeClass}">${badgeText}</span></td>
+      <td style="text-align:right;">
+        <button class="btn btn-secondary btn-xs" onclick="openPrevServiceModal(${item.originalRowIndex}, '${item.interno}', '${item.modelo}', ${item.kmReales || 0}, ${item.hsReales || 0})" style="display:inline-flex; align-items:center; gap:2px;">
+          <span class="material-icons" style="font-size:13px;">build</span> Service
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  if (cards) {
+    cards.innerHTML = filtered.map(item => {
+      const alerta = String(item.alerta || '');
+      const isUrgente = alerta.toLowerCase().includes('realizar') || alerta.toLowerCase().includes('urgente') || alerta.toLowerCase().includes('service');
+      const badgeClass = isUrgente ? 'warning' : 'ok';
+      const badgeText = isUrgente ? '⚠ Realizar Service' : '✓ Al Día';
+      return `<div class="prev-mobile-card">
+        <div class="prev-mobile-card-header">
+          <div><strong style="font-size:16px;">${item.interno}</strong><br><span style="font-size:12px; color:var(--text-muted);">${item.modelo}</span></div>
+          <span class="badge-prev ${badgeClass}">${badgeText}</span>
+        </div>
+        <div class="prev-mobile-card-row"><span>KM Reales</span><strong>${Number(item.kmReales || 0).toLocaleString('es-AR')}</strong></div>
+        <div class="prev-mobile-card-row"><span>Hs Reales</span><strong>${Number(item.hsReales || 0).toLocaleString('es-AR')}</strong></div>
+        <div class="prev-mobile-card-row"><span>Restante</span><strong>${Number(item.restante || 0).toLocaleString('es-AR')}</strong></div>
+        <button class="btn btn-secondary btn-sm" onclick="openPrevServiceModal(${item.originalRowIndex}, '${item.interno}', '${item.modelo}', ${item.kmReales || 0}, ${item.hsReales || 0})" style="width:100%; display:flex; justify-content:center; align-items:center; gap:4px; margin-top:8px;">
+          <span class="material-icons" style="font-size:14px;">build</span> Registrar Service
+        </button>
+      </div>`;
+    }).join('');
+  }
+}
+
+async function fetchPrevCombustible() {
+  try {
+    const res = await fetch('/api/preventivos/combustible');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rawData = await res.json();
+    prevCombustibleData = Array.isArray(rawData) ? rawData : (JSON.parse(rawData) || []);
+    renderPrevCombustibleTable();
+  } catch (error) {
+    console.error('Error fetching combustible:', error);
+    document.getElementById('prev-combustible-tbody').innerHTML =
+      `<tr><td colspan="9" style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}</td></tr>`;
+  }
+}
+
+function renderPrevCombustibleTable() {
+  const tbody = document.getElementById('prev-combustible-tbody');
+  if (!tbody) return;
+  if (!prevCombustibleData || prevCombustibleData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px;">Haz clic en "Procesar Combustible de Planilla" para cargar los datos.</td></tr>';
+    return;
+  }
+  const searchTerm = (document.getElementById('prev-search-input')?.value || '').toLowerCase();
+  const filtered = prevCombustibleData.filter(item =>
+    String(item.interno).toLowerCase().includes(searchTerm) ||
+    String(item.modelo).toLowerCase().includes(searchTerm)
+  );
+  tbody.innerHTML = filtered.map(item => {
+    const a5 = String(item.alerta5k || '');
+    const a10 = String(item.alerta10k || '');
+    const bad5 = a5.toLowerCase().includes('realizar') || a5.toLowerCase().includes('urgente') || a5.toLowerCase().includes('service');
+    const bad10 = a10.toLowerCase().includes('realizar') || a10.toLowerCase().includes('urgente') || a10.toLowerCase().includes('service');
+    return `<tr>
+      <td><strong>${item.interno}</strong></td>
+      <td>${item.modelo}</td>
+      <td>${Number(item.litrosTotales || 0).toLocaleString('es-AR')}</td>
+      <td>${Number(item.restante5k || 0).toLocaleString('es-AR')}</td>
+      <td><span class="badge-prev ${bad5 ? 'warning' : 'ok'}">${item.alerta5k || '—'}</span></td>
+      <td>${Number(item.restante10k || 0).toLocaleString('es-AR')}</td>
+      <td><span class="badge-prev ${bad10 ? 'warning' : 'ok'}">${item.alerta10k || '—'}</span></td>
+      <td>${item.lastService || '—'}</td>
+      <td style="text-align:right;">
+        <button class="btn btn-secondary btn-xs" onclick="openPrevCombustibleModal(${item.originalRowIndex}, '${item.interno}')" style="display:inline-flex; align-items:center; gap:2px;">
+          <span class="material-icons" style="font-size:13px;">local_gas_station</span> Service
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function fetchPrevHistorial() {
+  try {
+    const res = await fetch('/api/preventivos/historial');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rawData = await res.json();
+    prevHistorial = Array.isArray(rawData) ? rawData : (JSON.parse(rawData) || []);
+    renderPrevHistorialTable();
+  } catch (error) {
+    console.error('Error fetching historial:', error);
+    document.getElementById('prev-historial-tbody').innerHTML =
+      `<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}</td></tr>`;
+  }
+}
+
+function renderPrevHistorialTable() {
+  const tbody = document.getElementById('prev-historial-tbody');
+  if (!tbody) return;
+  if (!prevHistorial || prevHistorial.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No hay historial disponible.</td></tr>';
+    return;
+  }
+  const searchTerm = (document.getElementById('prev-search-input')?.value || '').toLowerCase();
+  const filtered = prevHistorial.filter(item =>
+    String(item.interno || '').toLowerCase().includes(searchTerm) ||
+    String(item.tipo || '').toLowerCase().includes(searchTerm)
+  );
+  tbody.innerHTML = filtered.map(item => `<tr>
+    <td>${item.fecha || '—'}</td>
+    <td><strong>${item.interno || '—'}</strong></td>
+    <td><span class="badge-service-type">${item.tipo || 'KM/HS'}</span></td>
+    <td>${item.datos || '—'}</td>
+    <td>${item.conductor || '—'}</td>
+    <td>${item.month ? 'Mes ' + item.month : '—'}</td>
+  </tr>`).join('');
+}
+
+async function fetchPrevAlertas() {
+  try {
+    const res = await fetch('/api/preventivos/alertas');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rawData = await res.json();
+    prevAlertas = Array.isArray(rawData) ? rawData : (JSON.parse(rawData) || []);
+    renderPrevAlermasTable();
+  } catch (error) {
+    console.error('Error fetching alertas:', error);
+    document.getElementById('prev-alarmas-tbody').innerHTML =
+      `<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}</td></tr>`;
+  }
+}
+
+function renderPrevAlermasTable() {
+  const tbody = document.getElementById('prev-alarmas-tbody');
+  if (!tbody) return;
+  if (!prevAlertas || prevAlertas.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No hay alertas registradas.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = prevAlertas.map(item => {
+    const esPendiente = item.estado === 'Pendiente';
+    return `<tr>
+      <td><strong>${item.interno || '—'}</strong></td>
+      <td>${item.tipo || '—'}</td>
+      <td><span class="badge-prev ${esPendiente ? 'warning' : 'ok'}">${item.estado || '—'}</span></td>
+      <td>${item.fechaAlerta || '—'}</td>
+      <td>${item.fechaRealizado || '—'}</td>
+      <td>${item.demora !== undefined && item.demora !== '' ? item.demora : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Modal KM/HS Service
+function openPrevServiceModal(rowIndex, interno, modelo, km, hs) {
+  prevCurrentServiceRow = { rowIndex, interno, modelo };
+  document.getElementById('prev-service-modal-interno').textContent = `${interno} — ${modelo}`;
+  document.getElementById('prev-service-modal-km').value = km || '';
+  document.getElementById('prev-service-modal-hs').value = hs || '';
+  document.getElementById('prev-service-modal').classList.add('active');
+}
+
+function closePrevServiceModal() {
+  document.getElementById('prev-service-modal').classList.remove('active');
+  prevCurrentServiceRow = null;
+}
+
+async function savePrevService() {
+  if (!prevCurrentServiceRow) return;
+  const km = document.getElementById('prev-service-modal-km').value;
+  const hs = document.getElementById('prev-service-modal-hs').value;
+  const btn = document.getElementById('btn-save-prev-service');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons" style="animation:spin 1.5s linear infinite; font-size:16px; vertical-align:middle;">sync</span> Guardando...';
+  try {
+    const res = await fetch('/api/preventivos/service', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rowIndex: prevCurrentServiceRow.rowIndex,
+        km,
+        hs,
+        interno: prevCurrentServiceRow.interno,
+        vehicleType: hs && !km ? 'iveco' : ''
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    showToast(`Service registrado para interno ${prevCurrentServiceRow.interno} ✓`, 'success');
+    closePrevServiceModal();
+    await fetchPreventivoFlota();
+  } catch (error) {
+    showToast(`Error al guardar service: ${error.message}`, 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Guardar Service';
+  }
+}
+
+// Modal Combustible
+function openPrevCombustibleModal(rowIndex, interno) {
+  prevCurrentCombustibleRow = { rowIndex, interno };
+  document.getElementById('prev-combustible-modal-interno').textContent = interno;
+  document.getElementById('prev-combustible-modal-litros5k').value = '';
+  document.getElementById('prev-combustible-modal-litros10k').value = '';
+  document.getElementById('prev-combustible-modal').classList.add('active');
+}
+
+function closePrevCombustibleModal() {
+  document.getElementById('prev-combustible-modal').classList.remove('active');
+  prevCurrentCombustibleRow = null;
+}
+
+async function savePrevCombustible() {
+  if (!prevCurrentCombustibleRow) return;
+  const litros5k = document.getElementById('prev-combustible-modal-litros5k').value;
+  const litros10k = document.getElementById('prev-combustible-modal-litros10k').value;
+  const btn = document.getElementById('btn-save-prev-combustible');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons" style="animation:spin 1.5s linear infinite; font-size:16px; vertical-align:middle;">sync</span> Guardando...';
+  try {
+    const res = await fetch('/api/preventivos/fuel-service', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rowIndex: prevCurrentCombustibleRow.rowIndex,
+        litros5k: litros5k || null,
+        litros10k: litros10k || null,
+        interno: prevCurrentCombustibleRow.interno
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    showToast(`Service combustible registrado para interno ${prevCurrentCombustibleRow.interno} ✓`, 'success');
+    closePrevCombustibleModal();
+    await fetchPrevCombustible();
+  } catch (error) {
+    showToast(`Error al guardar service combustible: ${error.message}`, 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Guardar Combustible';
+  }
+}
+
+async function procesarCombustiblePlanilla() {
+  const btn = document.getElementById('btn-process-fuel-planilla');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons" style="animation:spin 1.5s linear infinite; font-size:16px; vertical-align:middle;">sync</span> Procesando...';
+  }
+  try {
+    const res = await fetch('/api/preventivos/process-fuel', { method: 'POST' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    const msg = data.result || data.msg || JSON.stringify(data);
+    showToast(msg.substring(0, 120), 'success');
+    await fetchPrevCombustible();
+  } catch (error) {
+    showToast(`Error al procesar planilla: ${error.message}`, 'danger');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons" style="font-size:16px;">local_gas_station</span> <span>Procesar Combustible de Planilla</span>';
+    }
+  }
+}
+
+
+
+
+// ============================================================
+// PARTE TALLER MODULE
+// ============================================================
+
+async function fetchParteTallerEstado() {
+  const tbody = document.getElementById('pt-fuera-tbody');
+  const repTbody = document.getElementById('pt-reparacion-tbody');
+  const pendTbody = document.getElementById('pt-pendientes-tbody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;"><span class="material-icons" style="animation:spin 1.5s linear infinite; vertical-align:middle;">sync</span> Cargando...</td></tr>';
+
+  try {
+    const res = await fetch('/api/parte-taller/estado');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.msg || 'Error al leer estado');
+    renderParteTallerDashboard(data.state);
+  } catch (error) {
+    console.error('Error fetching parte taller estado:', error);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}. Configure la URL del script en Ajustes.</td></tr>`;
+    if (repTbody) repTbody.innerHTML = '';
+    if (pendTbody) pendTbody.innerHTML = '';
+  }
+}
+
+function renderParteTallerDashboard(state) {
+  if (!state) {
+    const noData = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos registrados aún.</td></tr>';
+    const el = id => document.getElementById(id);
+    if (el('pt-fuera-tbody')) el('pt-fuera-tbody').innerHTML = noData;
+    if (el('pt-reparacion-tbody')) el('pt-reparacion-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos.</td></tr>';
+    if (el('pt-pendientes-tbody')) el('pt-pendientes-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos.</td></tr>';
+    return;
+  }
+
+  const el = id => document.getElementById(id);
+  const resumen = state.resumen || {};
+  const totales = resumen.totales || {};
+
+  function parseCount(tipo, campo) {
+    return parseInt((totales[tipo] || {})[campo] || '0') || 0;
+  }
+
+  // Fill totals for each vehicle type
+  const types = [
+    { key: 'COMPACTADOR', opId: 'pt-op-comp', fsId: 'pt-out-comp' },
+    { key: 'VOLQUETE',    opId: 'pt-op-volq', fsId: 'pt-out-volq' },
+    { key: 'ROLL-OFF',   opId: 'pt-op-roll', fsId: 'pt-out-roll' },
+    { key: 'PLANCHA',    opId: 'pt-op-plancha', fsId: 'pt-out-plancha' }
+  ];
+  types.forEach(t => {
+    if (el(t.opId)) el(t.opId).textContent = parseCount(t.key, 'operativos');
+    if (el(t.fsId)) el(t.fsId).textContent = parseCount(t.key, 'fuera');
+  });
+
+  // Fuera de servicio
+  const fueraDeServicio = state.fuera_de_servicio || [];
+  if (el('pt-out-count')) el('pt-out-count').textContent = fueraDeServicio.length;
+  if (el('pt-fuera-tbody')) {
+    if (fueraDeServicio.length === 0) {
+      el('pt-fuera-tbody').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades fuera de servicio.</td></tr>';
+    } else {
+      el('pt-fuera-tbody').innerHTML = fueraDeServicio.map(item => {
+        const novedades = Array.isArray(item.novedades) ? item.novedades.join('; ') : (item.novedad || item.falla || '—');
+        const desde = item.fecha_ingreso || item.ingreso || '—';
+        // Calculate days stopped
+        let diasParado = '—';
+        if (item.fecha_ingreso) {
+          try {
+            const parts = item.fecha_ingreso.split('/');
+            if (parts.length === 3) {
+              const fechaIngreso = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+              const diffMs = Date.now() - fechaIngreso.getTime();
+              diasParado = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + ' días';
+            }
+          } catch(e) {}
+        }
+        return `<tr>
+          <td><strong>${item.interno || '—'}</strong></td>
+          <td>${item.tipo || '—'}</td>
+          <td>${novedades}</td>
+          <td>${diasParado}</td>
+          <td>${desde}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  // En reparación
+  const reparacion = state.reparacion || [];
+  if (el('pt-rep-count')) el('pt-rep-count').textContent = reparacion.length;
+  if (el('pt-reparacion-tbody')) {
+    if (reparacion.length === 0) {
+      el('pt-reparacion-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades en reparación.</td></tr>';
+    } else {
+      el('pt-reparacion-tbody').innerHTML = reparacion.map(item => {
+        const novedad = Array.isArray(item.novedades) ? item.novedades.join('; ') : (item.novedad || item.tarea || '—');
+        return `<tr>
+          <td><strong>${item.interno || '—'}</strong></td>
+          <td>${item.tipo || '—'}</td>
+          <td>${novedad}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  // Servicios pendientes
+  const pendientes = state.servicios_pendientes || [];
+  if (el('pt-pend-count')) el('pt-pend-count').textContent = pendientes.length;
+  if (el('pt-pendientes-tbody')) {
+    if (pendientes.length === 0) {
+      el('pt-pendientes-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No hay servicios pendientes.</td></tr>';
+    } else {
+      el('pt-pendientes-tbody').innerHTML = pendientes.map(item => {
+        const novedades = Array.isArray(item.novedades) ? item.novedades.join('; ') : (item.novedad || '—');
+        const servicio = item.servicio || item.tipo_servicio || '—';
+        return `<tr>
+          <td><strong>${item.interno || '—'}</strong></td>
+          <td>${item.tipo || '—'}</td>
+          <td>${novedades}</td>
+          <td>${servicio}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+}

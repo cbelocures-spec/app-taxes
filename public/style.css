@@ -2412,4 +2412,279 @@ body {
   box-shadow: 0 2px 8px rgba(26, 115, 232, 0.2);
 }
 
+/* ==========================================
+   PREVENTIVOS & PARTE TALLER SPECIFIC STYLES
+   ========================================== */
+
+/* Overrides for bottom-nav with 6 items */
+.bottom-nav {
+  grid-template-columns: repeat(6, 1fr) !important;
+}
+
+#nav-preventivos.active {
+  color: #9c27b0 !important; /* Purple for preventivos */
+}
+#nav-partetaller.active {
+  color: #e91e63 !important; /* Pink/Magenta for parte taller */
+}
+
+/* Preventivos Sub-navigation Tab Selector */
+.preventivos-tabs-wrapper {
+  background-color: var(--card-bg);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  margin: -16px -16px 16px -16px;
+  padding: 8px 16px 0 16px;
+  overflow-x: auto;
+  white-space: nowrap;
+  display: flex;
+  gap: 12px;
+}
+
+.preventivos-tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 8px 12px 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.preventivos-tab-btn.active {
+  color: #9c27b0;
+  border-bottom-color: #9c27b0;
+}
+
+.preventivos-tab-btn .material-icons {
+  font-size: 16px;
+}
+
+/* Metrics Grid */
+.prev-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.prev-metric-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.prev-metric-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.prev-metric-icon.blue { background-color: #e8f0fe; color: #1a73e8; }
+.prev-metric-icon.green { background-color: #ecfdf5; color: #10b981; }
+.prev-metric-icon.red { background-color: #fee2e2; color: #ef4444; }
+
+.prev-metric-info h4 {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.prev-metric-info p {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+/* Tables */
+.prev-table-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 30px;
+}
+
+.prev-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13.5px;
+}
+
+.prev-table th, .prev-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.prev-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.prev-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Badges */
+.badge-prev {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+}
+.badge-prev.ok {
+  background-color: #ecfdf5;
+  color: #065f46;
+  border-color: rgba(6,95,70,0.15);
+}
+.badge-prev.warning {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-color: rgba(153,27,27,0.15);
+}
+
+.badge-service-type {
+  background-color: #f1f3f4;
+  color: #3c4043;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Mobile Cards */
+.prev-card-list {
+  display: none; /* Mobile only by default */
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.prev-mobile-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.prev-mobile-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.prev-mobile-card-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+}
+.prev-mobile-card-row strong {
+  color: var(--text-main);
+}
+
+/* Parte Taller specific styles */
+.partetaller-dashboard-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 20px;
+}
+
+.partetaller-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.partetaller-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.partetaller-totals-card {
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  text-align: center;
+}
+
+.partetaller-totals-card h5 {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.partetaller-totals-val {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.partetaller-totals-val .op { color: #10b981; }
+.partetaller-totals-val .fs { color: #ef4444; }
+
+.partetaller-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 24px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 6px;
+}
+
+/* Media query to switch table/cards */
+@media (max-width: 600px) {
+  .prev-table-container {
+    display: none;
+  }
+  .prev-card-list {
+    display: flex;
+  }
+  .prev-metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .partetaller-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+
 
