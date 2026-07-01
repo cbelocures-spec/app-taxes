@@ -3213,6 +3213,9 @@ function handleBulkItemCheckChange() {
   // Render visual badges of selected vehicles
   renderSelectedVehicleBadges();
 
+  // Update dynamic insumos grid
+  updateBulkInsumosGrid();
+
   updateBulkSummary();
 }
 
@@ -3461,7 +3464,7 @@ function addBulkTaskField(initialData = null) {
 
       <div class="form-group" style="margin-bottom: 0;">
         <label style="font-size: 12px; font-weight: 500; margin-bottom: 4px; display: block;">Descripción de la Tarea *</label>
-        <input type="text" class="bulk-task-desc" placeholder="Ej: Control de agua y aceite" required style="width: 100%;">
+        <textarea class="bulk-task-desc" placeholder="Ej: Control de agua y aceite" required style="width: 100%; resize: vertical; font-family: monospace;" rows="4"></textarea>
       </div>
     </div>
   `;
@@ -3629,8 +3632,7 @@ async function submitBulkOrders() {
 
   showToast(`Iniciando creación de ${selectedChks.length} órdenes...`, "warning");
 
-  let successCount = 0;
-  let errorCount = 0;
+  const ordersList = [];
 
   for (let i = 0; i < selectedChks.length; i++) {
     const chk = selectedChks[i];
@@ -3638,7 +3640,41 @@ async function submitBulkOrders() {
     const rodadoOpt = cachedCatalogs.rodados.find(r => r.value === rodadoId);
     if (!rodadoOpt) continue;
 
-    const payload = {
+    const interno = String(rodadoOpt.interno || '').trim();
+    
+    // Read insumos for this specific vehicle
+    const row = document.getElementById(`bulk-row-${interno}`);
+    const insumosParts = [];
+    if (row) {
+      const inputs = row.querySelectorAll('.bulk-insumo-val');
+      inputs.forEach(input => {
+        const insumoType = input.dataset.insumo;
+        const val = input.value.trim();
+        if (val) {
+          if (insumoType === 'refrigerante') insumosParts.push(`Refrigerante: ${val}L`);
+          else if (insumoType === 'aceite_motor') insumosParts.push(`Aceite Motor: ${val}L`);
+          else if (insumoType === 'grasa_caja') insumosParts.push(`Grasa Caja: ${val}L`);
+          else if (insumoType === 'grasa_diferencial') insumosParts.push(`Grasa Diferencial: ${val}L`);
+          else if (insumoType === 'hco_direccion') insumosParts.push(`Hco Dirección: ${val}L`);
+          else if (insumoType === 'otros') insumosParts.push(`Otros: ${val}`);
+        }
+      });
+    }
+
+    // Clone tasksPayload so we can modify description independently for each vehicle
+    const vehicleTasks = tasksPayload.map((t, idx) => {
+      let desc = t.descripcion;
+      // Append insumos only to the first task
+      if (idx === 0 && insumosParts.length > 0) {
+        desc += `\n[Insumos: ${insumosParts.join(', ')}]`;
+      }
+      return {
+        ...t,
+        descripcion: desc
+      };
+    });
+
+    ordersList.push({
       rodado: rodadoOpt.label,
       responsable: "AUTO",
       interno: rodadoOpt.interno || "",
@@ -3646,30 +3682,38 @@ async function submitBulkOrders() {
       fechaEntrega: fechaEntrega,
       horario: horario,
       incidente: incidenteEl.value.trim(),
-      tasks: tasksPayload
-    };
-
-    try {
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        successCount++;
-      } else {
-        errorCount++;
-      }
-    } catch (e) {
-      errorCount++;
-      console.error("Error creating bulk order for " + rodadoOpt.label, e);
-    }
+      tasks: vehicleTasks
+    });
   }
 
-  if (errorCount === 0) {
-    showToast(`Éxito: Se crearon ${successCount} órdenes correctamente.`, "success");
-    toggleAllBulkVehicles(false);
-    document.getElementById('bulk-incidente').value = '';
+  try {
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const res = await fetch('/api/orders/bulk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-username': currentUsername
+      },
+      body: JSON.stringify({ orders: ordersList })
+    });
+
+    if (res.ok) {
+      showToast(`Éxito: Se crearon ${ordersList.length} órdenes correctamente.`, "success");
+      toggleAllBulkVehicles(false);
+      document.getElementById('bulk-incidente').value = '';
+      fetchOrders();
+    } else {
+      let errMsg = "Error al crear órdenes";
+      try {
+        const errData = await res.json();
+        if (errData && errData.error) errMsg = errData.error;
+      } catch (_) {}
+      showToast(errMsg, "danger");
+    }
+  } catch (e) {
+    showToast("Error de conexión al enviar órdenes", "danger");
+    console.error("Error creating bulk orders", e);
+  }
     // Clear tasks and add one default
     const container = document.getElementById('bulk-tasks-container');
     if (container) {
@@ -5518,6 +5562,93 @@ async function submitMassiveOrders() {
   } catch (error) {
     showToast("Error masiva: " + error.message, "danger");
     console.error(error);
+  }
+}
+
+function updateBulkInsumosGrid() {
+  const container = document.getElementById('bulk-insumos-grid-container');
+  const tbody = document.getElementById('bulk-insumos-grid-body');
+  if (!container || !tbody) return;
+
+  const checkboxes = document.querySelectorAll('#bulk-vehicle-list input[type="checkbox"]:checked');
+  if (checkboxes.length === 0) {
+    container.style.display = 'none';
+    tbody.innerHTML = '';
+    return;
+  }
+
+  container.style.display = 'block';
+
+  // Gather current selected internos
+  const selectedInternos = [];
+  checkboxes.forEach(chk => {
+    const rodado = cachedCatalogs.rodados.find(r => r.value === chk.value);
+    if (rodado) {
+      selectedInternos.push(rodado);
+    }
+  });
+
+  // Remove rows for internos that are no longer checked
+  const existingRows = tbody.querySelectorAll('tr[id^="bulk-row-"]');
+  existingRows.forEach(row => {
+    const rowInterno = row.id.replace('bulk-row-', '');
+    const isStillChecked = selectedInternos.some(r => String(r.interno || '').trim() === String(rowInterno));
+    if (!isStillChecked) {
+      row.remove();
+    }
+  });
+
+  // Add rows for new checked internos
+  selectedInternos.forEach(rodado => {
+    const interno = String(rodado.interno || '').trim();
+    if (!interno) return;
+    let row = document.getElementById(`bulk-row-${interno}`);
+    if (!row) {
+      row = document.createElement('tr');
+      row.id = `bulk-row-${interno}`;
+      row.style.borderBottom = '1px solid var(--border-color)';
+      row.innerHTML = `
+        <td style="padding: 8px; font-weight: 600; color: var(--text-main); font-size: 13px;">${rodado.label}</td>
+        <td style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="refrigerante" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+        <td style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="aceite_motor" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+        <td style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="grasa_caja" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+        <td style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="grasa_diferencial" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+        <td style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="hco_direccion" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+        <td style="padding: 4px;"><input type="text" class="bulk-insumo-val" data-interno="${interno}" data-insumo="otros" placeholder="Filtros, repuestos..." style="width: 100%; padding: 4px; box-sizing: border-box; border: 1px solid var(--border-color); border-radius: 6px;"></td>
+      `;
+      tbody.appendChild(row);
+    }
+  });
+}
+
+function loadPreventivoIntoBulkTasks(type) {
+  const container = document.getElementById('bulk-tasks-container');
+  if (!container) return;
+
+  // Clear existing task cards in Carga Masiva
+  container.innerHTML = '';
+
+  // Add a single task field
+  addBulkTaskField();
+
+  // Find the added task card
+  const card = container.querySelector('.bulk-task-item-card');
+  if (!card) return;
+
+  // Find description textarea in the card and fill it
+  const descInput = card.querySelector('.bulk-task-desc');
+  if (descInput) {
+    if (type === 'A') {
+      descInput.value = `Ctrol Refrigerante\nCtrol Aceite Motor\nCtrol Grasa Caja\nCtrol Grasa Diferencial\nCtrol Hco Direccion`;
+    }
+  }
+
+  // Pre-select Centro de Costo to MECANICA (15) if available
+  const ccSelect = card.querySelector('.bulk-task-cc');
+  if (ccSelect) {
+    ccSelect.value = "15";
+    // Trigger change to update employee list
+    updateBulkEmployeeDropdownForCard(card);
   }
 }
 

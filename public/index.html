@@ -96,9 +96,6 @@
           <button class="btn btn-secondary btn-sm" onclick="cleanupSyncedOrders()" style="display: flex; align-items: center; gap: 4px;" title="Limpiar del Taller todas las órdenes ya subidas a Taxes que estén finalizadas">
             <span class="material-icons" style="font-size: 16px;">delete_sweep</span> Limpiar
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="openMassiveOrderModal()" style="display: flex; align-items: center; gap: 4px;" title="Crear órdenes masivas para múltiples internos">
-            <span class="material-icons" style="font-size: 16px;">library_add</span> Masivas
-          </button>
           <button class="btn btn-primary btn-sm" onclick="openPreOrderModal()">
             <span class="material-icons" style="font-size: 16px;">add</span> Nueva
           </button>
@@ -160,6 +157,27 @@
               <!-- Dynamic Badges -->
             </div>
           </div>
+
+          <!-- Consumables Grid (structured table) for Carga Masiva tab -->
+          <div id="bulk-insumos-grid-container" style="display: none; overflow-x: auto; margin-top: 15px; border: 1px solid var(--border-color); border-radius: 8px; background: #fff; padding: 10px;">
+            <label style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 8px; text-transform: uppercase;">Insumos Consumidos por Unidad:</label>
+            <table class="table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+              <thead>
+                <tr style="background: #f1f5f9; border-bottom: 2px solid var(--border-color);">
+                  <th style="padding: 8px; font-weight: 600;">Interno</th>
+                  <th style="padding: 8px; font-weight: 600; width: 75px;">Refrig. (L)</th>
+                  <th style="padding: 8px; font-weight: 600; width: 75px;">Ac. Motor (L)</th>
+                  <th style="padding: 8px; font-weight: 600; width: 75px;">Ac. Caja (L)</th>
+                  <th style="padding: 8px; font-weight: 600; width: 75px;">Ac. Dif. (L)</th>
+                  <th style="padding: 8px; font-weight: 600; width: 75px;">Hco. Dir. (L)</th>
+                  <th style="padding: 8px; font-weight: 600;">Otros Insumos / Notas</th>
+                </tr>
+              </thead>
+              <tbody id="bulk-insumos-grid-body">
+                <!-- Dynamic rows populated when checking vehicles -->
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- CARD 2: TAREAS A REALIZAR -->
@@ -172,6 +190,13 @@
             <button type="button" class="btn btn-secondary btn-xs" onclick="addBulkTaskField()" style="display: flex; align-items: center; gap: 4px;">
               <span class="material-icons" style="font-size: 14px;">add</span> Agregar Tarea
             </button>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('A')" style="display: flex; align-items: center; gap: 4px; background: #e2e8f0; border-color: #cbd5e1; color: #334155;">
+              <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo A
+            </button>
+            <!-- En el futuro se pueden agregar Preventivo B, C, etc. aquí -->
           </div>
 
           <div id="bulk-tasks-container">
@@ -875,6 +900,6 @@
     <!-- Populated dynamically from app.js -->
   </datalist>
 
-  <script src="app.js?v=38"></script>
+  <script src="app.js?v=39"></script>
 </body>
 </html>
