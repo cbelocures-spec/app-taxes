@@ -500,8 +500,7 @@ async function submitPreOrderCheck() {
     openNewOrderModal();
     
     if (isHerreria) {
-      const rodadoText = document.getElementById('form-rodado-text');
-      if (rodadoText) rodadoText.value = interno || "";
+      // For Herrería, only populate the interno field; rodado is typed separately by the user
       const internoText = document.getElementById('form-interno-text');
       if (internoText) internoText.value = interno || "";
     } else {
