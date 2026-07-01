@@ -191,7 +191,7 @@ app.get('/api/orders', (req, res) => {
 
 app.post('/api/orders', (req, res) => {
   try {
-    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad } = req.body;
+    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset } = req.body;
     
     if (!rodado || !responsable || !interno || !clasificacion) {
       return res.status(400).json({ error: "Faltan campos obligatorios: rodado, responsable, interno, clasificacion son requeridos." });
@@ -222,7 +222,8 @@ app.post('/api/orders', (req, res) => {
       incidente,
       tasks,
       createdBy,
-      estadoUnidad: estadoUnidad || 'operativo'
+      estadoUnidad: estadoUnidad || 'operativo',
+      combustibleReset
     });
 
     // Trigger Google Sheets update asynchronously for any finalized tasks
@@ -230,6 +231,14 @@ app.post('/api/orders', (req, res) => {
 
     // Trigger active tasks Google Sheets update
     triggerActiveTasksGoogleSheetSync();
+
+    // Trigger fuel service reset if all tasks are completed
+    const allTasksCompleted = (newOrder.tasks || []).length > 0 && (newOrder.tasks || []).every(t => t.status === "Finalizada");
+    if (allTasksCompleted && newOrder.combustibleReset && !newOrder.combustibleReset.triggered) {
+      newOrder.combustibleReset.triggered = true;
+      db.updateWorkOrder(newOrder.id, { combustibleReset: newOrder.combustibleReset });
+      triggerFuelServiceReset(newOrder);
+    }
 
     res.status(201).json(newOrder);
   } catch (error) {
@@ -295,7 +304,7 @@ app.post('/api/orders/bulk', (req, res) => {
 // Update a work order
 app.put('/api/orders/:id', (req, res) => {
   try {
-    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad } = req.body;
+    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset } = req.body;
     
     const existing = db.getWorkOrderById(req.params.id);
     if (!existing) {
@@ -345,6 +354,7 @@ app.put('/api/orders/:id', (req, res) => {
       syncError: null,
       syncDate: null,
       estadoUnidad: estadoUnidad !== undefined ? estadoUnidad : existing.estadoUnidad,
+      combustibleReset: combustibleReset !== undefined ? combustibleReset : existing.combustibleReset,
       tasks: (tasks || []).map((t, idx) => {
         const existingTask = existing.tasks ? existing.tasks.find(et => et.id === t.id) : null;
         let synced = existingTask ? (existingTask.synced === true) : false;
@@ -376,6 +386,13 @@ app.put('/api/orders/:id', (req, res) => {
 
     // Trigger active tasks Google Sheets update
     triggerActiveTasksGoogleSheetSync();
+
+    // Trigger fuel service reset if all tasks are completed
+    if (allTasksCompleted && updated.combustibleReset && !updated.combustibleReset.triggered) {
+      updated.combustibleReset.triggered = true;
+      db.updateWorkOrder(updated.id, { combustibleReset: updated.combustibleReset });
+      triggerFuelServiceReset(updated);
+    }
 
     res.json(updated);
   } catch (error) {
@@ -1161,6 +1178,44 @@ async function checkAndTriggerGoogleSheetUpdates(existingOrder, updatedTasks, su
     }
   } catch (error) {
     console.error("Error in checkAndTriggerGoogleSheetUpdates:", error);
+  }
+}
+
+async function triggerFuelServiceReset(order) {
+  if (!order || !order.combustibleReset) return;
+  const { tipo, rowIndex, litrosTotales } = order.combustibleReset;
+  if (!tipo || !rowIndex || !litrosTotales) return;
+  
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  if (!scriptUrl) {
+    console.error("triggerFuelServiceReset: URL de preventivo no configurada.");
+    return;
+  }
+  
+  try {
+    const litros5k = tipo === '5k' ? litrosTotales : '';
+    const litros10k = tipo === '10k' ? litrosTotales : '';
+    
+    const params = new URLSearchParams({
+      accion: 'updateFuelService',
+      rowIndex: String(rowIndex),
+      interno: String(order.interno),
+      litros5k: String(litros5k),
+      litros10k: String(litros10k)
+    });
+    
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${params.toString()}`;
+    console.log(`[Combustible Reset] Resetting fuel service: ${url}`);
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Apps Script responded with status ${response.status}`);
+    }
+    const data = await response.json();
+    console.log(`[Combustible Reset] Result:`, data);
+  } catch (error) {
+    console.error(`[Combustible Reset] Error resetting fuel service:`, error.message);
   }
 }
 

@@ -314,7 +314,9 @@ class LocalDB {
       createdAt: new Date().toISOString(),
       tasks: tasks,
       createdBy: orderData.createdBy ? normalizeEmail(orderData.createdBy) : null,
-      taxesOrderNumber: null // Capture from Taxes toast notification
+      taxesOrderNumber: null, // Capture from Taxes toast notification
+      estadoUnidad: orderData.estadoUnidad || 'operativo',
+      combustibleReset: orderData.combustibleReset || null
     };
 
     db.workOrders.push(newOrder);

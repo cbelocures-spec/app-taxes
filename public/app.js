@@ -654,6 +654,7 @@ function closeNewOrderModal() {
   const modal = document.getElementById('new-order-modal');
   modal.classList.remove('open', 'readonly-mode');
   currentEditingOrderId = null;
+  currentCombustibleReset = null;
   
   // Hide novelties panel
   showNoveltiesForInterno("");
@@ -1875,7 +1876,8 @@ async function submitWorkOrder() {
     horario: horaEl.value,
     incidente: incidenteEl.value,
     tasks: tasks,
-    estadoUnidad: currentEditingOrderId ? (activeOrders.find(o => o.id === currentEditingOrderId)?.estadoUnidad || 'operativo') : 'operativo'
+    estadoUnidad: currentEditingOrderId ? (activeOrders.find(o => o.id === currentEditingOrderId)?.estadoUnidad || 'operativo') : 'operativo',
+    combustibleReset: currentCombustibleReset
   };
  
   const url = currentEditingOrderId ? `/api/orders/${currentEditingOrderId}` : '/api/orders';
@@ -5829,6 +5831,7 @@ let prevHistorial = [];
 let prevCurrentFilter = 'all';
 let prevCurrentServiceRow = null; // { rowIndex, interno, modelo }
 let prevCurrentCombustibleRow = null;
+let currentCombustibleReset = null;
 
 function switchPrevSubTab(tab) {
   document.querySelectorAll('.preventivos-tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -6039,7 +6042,7 @@ function renderPrevCombustibleTable() {
           <td><span class="badge-prev ${bad10 ? 'warning' : 'ok'}">${item.alerta10k || '—'}</span></td>
           <td>${item.lastService || '—'}</td>
           <td style="text-align:right;">
-            <button class="btn btn-secondary btn-xs" onclick="openPrevCombustibleModal(${item.originalRowIndex}, '${item.interno}')" style="display:inline-flex; align-items:center; gap:2px;">
+            <button class="btn btn-secondary btn-xs" onclick="openPrevCombustibleModal(${item.originalRowIndex}, '${item.interno}', '${a5.replace(/'/g, "\\'")}', '${a10.replace(/'/g, "\\'")}', ${item.litrosTotales || 0})" style="display:inline-flex; align-items:center; gap:2px;">
               <span class="material-icons" style="font-size:13px;">local_gas_station</span> Service
             </button>
           </td>
@@ -6221,50 +6224,106 @@ async function savePrevOdometer() {
 
 
 // Modal Combustible
-function openPrevCombustibleModal(rowIndex, interno) {
-  prevCurrentCombustibleRow = { rowIndex, interno };
-  document.getElementById('prev-combustible-modal-interno').textContent = interno;
-  document.getElementById('prev-combustible-modal-litros5k').value = '';
-  document.getElementById('prev-combustible-modal-litros10k').value = '';
-  document.getElementById('prev-combustible-modal').classList.add('active');
-}
-
-function closePrevCombustibleModal() {
-  document.getElementById('prev-combustible-modal').classList.remove('active');
-  prevCurrentCombustibleRow = null;
-}
-
-async function savePrevCombustible() {
-  if (!prevCurrentCombustibleRow) return;
-  const litros5k = document.getElementById('prev-combustible-modal-litros5k').value;
-  const litros10k = document.getElementById('prev-combustible-modal-litros10k').value;
-  const btn = document.getElementById('btn-save-prev-combustible');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="material-icons" style="animation:spin 1.5s linear infinite; font-size:16px; vertical-align:middle;">sync</span> Guardando...';
-  try {
-    const res = await fetch('/api/preventivos/fuel-service', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        rowIndex: prevCurrentCombustibleRow.rowIndex,
-        litros5k: litros5k || null,
-        litros10k: litros10k || null,
-        interno: prevCurrentCombustibleRow.interno
-      })
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `HTTP ${res.status}`);
-    }
-    showToast(`Service combustible registrado para interno ${prevCurrentCombustibleRow.interno} ✓`, 'success');
-    closePrevCombustibleModal();
-    await fetchPrevCombustible();
-  } catch (error) {
-    showToast(`Error al guardar service combustible: ${error.message}`, 'danger');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = 'Guardar Combustible';
+function openPrevCombustibleModal(rowIndex, interno, alerta5k, alerta10k, litrosTotales) {
+  // Determine default based on which alert is active
+  const a5 = String(alerta5k || '').toLowerCase();
+  const a10 = String(alerta10k || '').toLowerCase();
+  const has10k = ['realizar', 'urgente', 'service'].some(w => a10.includes(w));
+  const has5k = ['realizar', 'urgente', 'service'].some(w => a5.includes(w));
+  
+  let defaultTipo = "5k";
+  if (has10k) {
+    defaultTipo = "10k";
   }
+  
+  // Ask the user to confirm the type of preventivo
+  const confirmMsg = `¿Desea crear el Preventivo de 10.000 Lts para el Interno ${interno}?\n\n[Aceptar] para Preventivo 10.000 Lts\n[Cancelar] para Preventivo 5.000 Lts`;
+  const tipo = confirm(confirmMsg) ? "10k" : "5k";
+  
+  openNewOrderModalWithFuelPreventivo(interno, tipo, rowIndex, litrosTotales);
+}
+
+function openNewOrderModalWithFuelPreventivo(interno, tipo, rowIndex, litrosTotales) {
+  // Switch view to orders tab first
+  switchView('orders');
+  
+  // Open the new order modal
+  openNewOrderModal();
+  
+  // Set Interno
+  const internoSelect = document.getElementById('form-interno');
+  const internoText = document.getElementById('form-interno-text');
+  const isHerreria = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Herrería');
+  
+  if (isHerreria) {
+    if (internoText) {
+      internoText.value = interno;
+      const event = new Event('change');
+      internoText.dispatchEvent(event);
+    }
+  } else {
+    if (internoSelect) {
+      internoSelect.value = interno;
+      if (internoSelect.rebuildSearchable) {
+        internoSelect.rebuildSearchable();
+      }
+      const event = new Event('change');
+      internoSelect.dispatchEvent(event);
+    }
+  }
+  
+  // Set Clasificación to "Preventivo"
+  const clasificacionEl = document.getElementById('form-clasificacion');
+  if (clasificacionEl) {
+    clasificacionEl.value = 'Preventivo';
+    if (clasificacionEl.rebuildSearchable) {
+      clasificacionEl.rebuildSearchable();
+    }
+  }
+  
+  // Set Incidente / Detalle
+  const incidenteEl = document.getElementById('form-incidente');
+  if (incidenteEl) {
+    incidenteEl.value = `Realizar Preventivo Combustible ${tipo === '5k' ? '5.000 Lts' : '10.000 Lts'}`;
+  }
+  
+  // Set global combustibleReset metadata
+  currentCombustibleReset = {
+    tipo: tipo,
+    rowIndex: rowIndex,
+    litrosTotales: litrosTotales
+  };
+  
+  // Pre-load tasks checklist
+  const tasks = tipo === '5k' ? [
+    "Realizar Preventivo 5.000 Lts",
+    "Cambio de filtros de Aire",
+    "Cambio Filtro Aceite",
+    "Cambio Filtro de Combustible",
+    "Cambio Aceite Motor",
+    "Revision Grasa de Caja Nivel Y Estado",
+    "Revision Grasa de Diferencial Estado y Nivel",
+    "Revision Gral : Frenos - Cardan - Perdidas Aire / Fluidos",
+    "Otros"
+  ] : [
+    "Realizar Preventivo 10.000 Lts",
+    "Cambio de filtros de Aire",
+    "Cambio Filtro Aceite",
+    "Cambio Filtro de Combustible",
+    "Cambio Aceite Motor",
+    "Cambio Grasa de Caja",
+    "Cambio Grasa de Diferencial",
+    "Revision Gral : Frenos - Cardan - Perdidas Aire / Fluidos",
+    "Otros"
+  ];
+  
+  tasks.forEach(taskDesc => {
+    addTaskField({
+      descripcion: taskDesc,
+      centroCosto: "15", // MECANICA default
+      status: "Pendiente"
+    });
+  });
 }
 
 async function procesarCombustiblePlanilla() {
