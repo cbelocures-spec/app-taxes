@@ -3701,7 +3701,15 @@ async function submitBulkOrders() {
       showToast(`Éxito: Se crearon ${ordersList.length} órdenes correctamente.`, "success");
       toggleAllBulkVehicles(false);
       document.getElementById('bulk-incidente').value = '';
+      
+      // Clear tasks and add one default
+      const container = document.getElementById('bulk-tasks-container');
+      if (container) {
+        container.innerHTML = '';
+        addBulkTaskField();
+      }
       fetchOrders();
+      switchView('orders');
     } else {
       let errMsg = "Error al crear órdenes";
       try {
@@ -3713,22 +3721,6 @@ async function submitBulkOrders() {
   } catch (e) {
     showToast("Error de conexión al enviar órdenes", "danger");
     console.error("Error creating bulk orders", e);
-  }
-    // Clear tasks and add one default
-    const container = document.getElementById('bulk-tasks-container');
-    if (container) {
-      container.innerHTML = '';
-      addBulkTaskField();
-    }
-    fetchOrders();
-    switchView('orders');
-  } else if (successCount > 0) {
-    showToast(`Advertencia: Se crearon ${successCount} órdenes, pero ${errorCount} fallaron.`, "warning");
-    toggleAllBulkVehicles(false);
-    fetchOrders();
-    switchView('orders');
-  } else {
-    showToast(`Error: Falló la creación de las ${errorCount} órdenes.`, "danger");
   }
 }
 
