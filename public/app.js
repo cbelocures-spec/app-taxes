@@ -59,6 +59,7 @@ window.fetch = async function(url, options = {}) {
 
 // Global State
 let cachedCatalogs = { rodados: [], responsables: [], empleados: [], centrosCosto: [] };
+let cachedInternoOptions = [];
 let cachedNovelties = [];
 let activeOrders = [];
 let currentRetryOrderId = null;
@@ -368,15 +369,51 @@ function switchView(viewId) {
 function openPreOrderModal() {
   setupAllFieldsForSector();
 
+  // Reset the searchable select for Interno by repopulating and rebuilding it
   const preInternoSelect = document.getElementById('pre-form-interno');
   if (preInternoSelect) {
+    if (cachedInternoOptions && cachedInternoOptions.length > 0) {
+      populateSelect('pre-form-interno', cachedInternoOptions, "Seleccionar Interno...");
+    }
     preInternoSelect.value = "";
+    if (preInternoSelect.rebuildSearchable) {
+      preInternoSelect.rebuildSearchable();
+    } else {
+      // Manually clear the search input inside the searchable wrapper
+      const wrapper = preInternoSelect.closest ? preInternoSelect.closest('.searchable-select-container') : null;
+      if (wrapper) {
+        const searchInput = wrapper.querySelector('.searchable-select-search-input');
+        if (searchInput) searchInput.value = '';
+        const labelSpan = wrapper.querySelector('.trigger-label');
+        if (labelSpan) labelSpan.textContent = 'Seleccionar Interno...';
+      }
+    }
   }
   const preInternoText = document.getElementById('pre-form-interno-text');
   if (preInternoText) {
     preInternoText.value = "";
   }
-  document.getElementById('pre-form-clasificacion').value = "";
+
+  // Ensure classification options match the current selected sector tab
+  updateClassificationSelectOptions();
+
+  // Reset the clasificacion select
+  const clsEl = document.getElementById('pre-form-clasificacion');
+  if (clsEl) {
+    clsEl.value = "";
+    if (clsEl.rebuildSearchable) {
+      clsEl.rebuildSearchable();
+    } else {
+      const wrapper = clsEl.closest ? clsEl.closest('.searchable-select-container') : null;
+      if (wrapper) {
+        const searchInput = wrapper.querySelector('.searchable-select-search-input');
+        if (searchInput) searchInput.value = '';
+        const labelSpan = wrapper.querySelector('.trigger-label');
+        if (labelSpan) labelSpan.textContent = 'Seleccionar Clasificación...';
+      }
+    }
+  }
+
   document.getElementById('pre-order-modal').classList.add('open');
 }
 
@@ -562,6 +599,18 @@ function openNewOrderModal() {
   if (rodadoText) {
     rodadoText.value = "";
   }
+  
+  const internoSelect = document.getElementById('form-interno');
+  if (internoSelect) {
+    if (cachedInternoOptions && cachedInternoOptions.length > 0) {
+      populateSelect('form-interno', cachedInternoOptions, "Seleccionar Interno...");
+    }
+    internoSelect.value = "";
+    if (internoSelect.rebuildSearchable) {
+      internoSelect.rebuildSearchable();
+    }
+  }
+  
   const internoText = document.getElementById('form-interno-text');
   if (internoText) {
     internoText.value = "";
@@ -1061,6 +1110,7 @@ async function fetchCatalogs() {
     });
 
     const internoOptions = uniqueInternos.map(int => ({ value: int, label: int }));
+    cachedInternoOptions = internoOptions;
     populateSelect('form-interno', internoOptions, "Seleccionar Interno...");
     populateSelect('pre-form-interno', internoOptions, "Seleccionar Interno...");
 
@@ -4448,9 +4498,6 @@ function switchSector(sector) {
 }
 
 function updateClassificationSelectOptions() {
-  const currentUser = localStorage.getItem('currentUserUsername');
-  const userSector = getSectorByUsername(currentUser);
-  
   const selects = [
     { id: 'bulk-clasificacion', defaultText: 'Seleccionar...' },
     { id: 'pre-form-clasificacion', defaultText: 'Seleccionar Clasificación...' },
@@ -4462,32 +4509,22 @@ function updateClassificationSelectOptions() {
     if (!el) return;
 
     let html = '';
-    if (userSector === 'Herrería') {
-      html = `<option value="Herrería" selected>Herrería</option>`;
-    } else if (userSector === 'Edilicio') {
-      html = `<option value="Edilicio" selected>Edilicio</option>`;
-    } else if (userSector === 'Admin') {
-      const target = currentSelectedSector;
+    const sector = currentSelectedSector;
+
+    if (sector === 'Herrería') {
       html = `
-        <option value="" ${!target ? "selected" : ""} disabled>${sel.defaultText}</option>
-        <option value="Preventivo" ${target === 'Taller' ? "selected" : ""}>Preventivo</option>
-        <option value="Auxilio">Auxilio</option>
+        <option value="">${sel.defaultText}</option>
         <option value="Correctivo">Correctivo</option>
-        <option value="Herrería" ${target === 'Herrería' ? "selected" : ""}>Herrería</option>
-        <option value="Edilicio" ${target === 'Edilicio' ? "selected" : ""}>Edilicio</option>
+        <option value="Preventivo">Preventivo</option>
+        <option value="Auxilio">Auxilio</option>
+        <option value="Herrería" selected>Herrería</option>
       `;
-      if (sel.id === 'pre-form-clasificacion') {
-        html = `
-          <option value="">${sel.defaultText}</option>
-          <option value="Correctivo">Correctivo</option>
-          <option value="Preventivo">Preventivo</option>
-          <option value="Auxilio">Auxilio</option>
-          <option value="Herrería" ${target === 'Herrería' ? "selected" : ""}>Herrería</option>
-          <option value="Edilicio" ${target === 'Edilicio' ? "selected" : ""}>Edilicio</option>
-        `;
-      }
+    } else if (sector === 'Edilicio') {
+      html = `
+        <option value="Edilicio" selected>Edilicio</option>
+      `;
     } else {
-      // Taller
+      // Taller / Admin
       html = `
         <option value="" selected disabled>${sel.defaultText}</option>
         <option value="Preventivo">Preventivo</option>
