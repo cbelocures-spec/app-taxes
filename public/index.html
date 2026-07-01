@@ -597,11 +597,16 @@
               <h3>Datos Generales</h3>
             </div>
             
-            <div class="form-group">
+            <div class="form-group" id="form-rodado-group-select">
               <label for="form-rodado">Rodado *</label>
               <select id="form-rodado" required>
                 <option value="">Seleccionar Rodado...</option>
               </select>
+            </div>
+
+            <div class="form-group" id="form-rodado-group-text" style="display: none;">
+              <label for="form-rodado-text">Rodado / Contenedor / Interno *</label>
+              <input type="text" id="form-rodado-text" placeholder="Ej: REP. CONTENEDOR METALICO 1 1/2 MTS" list="internos-datalist" style="width: 100%; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box;">
             </div>
             
             <div class="form-group" style="display: none;">
@@ -900,6 +905,6 @@
     <!-- Populated dynamically from app.js -->
   </datalist>
 
-  <script src="app.js?v=41"></script>
+  <script src="app.js?v=42"></script>
 </body>
 </html>

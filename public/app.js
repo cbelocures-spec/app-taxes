@@ -477,7 +477,9 @@ async function submitPreOrderCheck() {
     });
   }
 
-  if (existingOrder && !isCarmona) {
+  const userSector = getSectorByUsername(currentUser);
+
+  if (existingOrder && !isCarmona && userSector !== 'Herrería') {
     const orderCls = existingOrder.clasificacion || "Sin Clasificar";
     showToast(`Abriendo orden en curso del interno ${interno} (${orderCls})...`, "warning");
     closePreOrderModal();
@@ -526,12 +528,20 @@ function openNewOrderModal() {
   modal.classList.add('open');
   // Reset form
   document.getElementById('work-order-form').reset();
+  
+  // Set up input vs select based on user sector
+  setupRodadoFieldForSector();
+
   const rodadoSelect = document.getElementById('form-rodado');
   if (rodadoSelect) {
     rodadoSelect.value = "";
     if (rodadoSelect.rebuildSearchable) {
       rodadoSelect.rebuildSearchable();
     }
+  }
+  const rodadoText = document.getElementById('form-rodado-text');
+  if (rodadoText) {
+    rodadoText.value = "";
   }
   
   // Reset dates
@@ -584,8 +594,12 @@ function editOrder(orderId) {
   // Open modal
   document.getElementById('new-order-modal').classList.add('open');
 
+  // Set up input vs select based on user sector
+  setupRodadoFieldForSector();
+
   // Find corresponding Rodado value in cachedCatalogs
   const rodadoSelect = document.getElementById('form-rodado');
+  const rodadoText = document.getElementById('form-rodado-text');
   const rodadoOpt = cachedCatalogs.rodados.find(r => r.label === order.rodado);
   if (rodadoOpt) {
     rodadoSelect.value = rodadoOpt.value;
@@ -594,6 +608,9 @@ function editOrder(orderId) {
   }
   if (rodadoSelect.rebuildSearchable) {
     rodadoSelect.rebuildSearchable();
+  }
+  if (rodadoText) {
+    rodadoText.value = order.rodado || "";
   }
 
   // Populate basic inputs
@@ -659,8 +676,12 @@ function viewOrder(orderId) {
   const modal = document.getElementById('new-order-modal');
   modal.classList.add('open', 'readonly-mode');
 
+  // Set up input vs select based on user sector
+  setupRodadoFieldForSector();
+
   // Find corresponding Rodado value in cachedCatalogs
   const rodadoSelect = document.getElementById('form-rodado');
+  const rodadoText = document.getElementById('form-rodado-text');
   const rodadoOpt = cachedCatalogs.rodados.find(r => r.label === order.rodado);
   if (rodadoOpt) {
     rodadoSelect.value = rodadoOpt.value;
@@ -669,6 +690,9 @@ function viewOrder(orderId) {
   }
   if (rodadoSelect.rebuildSearchable) {
     rodadoSelect.rebuildSearchable();
+  }
+  if (rodadoText) {
+    rodadoText.value = order.rodado || "";
   }
 
   // Populate basic inputs
@@ -1686,10 +1710,16 @@ async function submitWorkOrder() {
     horaEl.value = `${hh}:${min}`;
   }
  
+  const isHerreria = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Herrería');
+  const rodadoTextEl = document.getElementById('form-rodado-text');
+  const rodadoVal = isHerreria ? (rodadoTextEl ? rodadoTextEl.value.trim() : '') : rodadoEl.value;
+
   // Manual validations for touch optimization
-  if (!rodadoEl.value) return showToast("Por favor, selecciona un Rodado.", "danger");
+  if (!rodadoVal) return showToast("Por favor, ingresa o selecciona un Rodado.", "danger");
   if (!internoEl.value) return showToast("Por favor, ingresa el Interno de Unidad.", "danger");
   if (!clasificacionEl.value) return showToast("Por favor, selecciona una Clasificación.", "danger");
+
+  const rodadoLabel = isHerreria ? rodadoVal : rodadoEl.options[rodadoEl.selectedIndex].text;
  
   // Collect tasks
   const tasks = [];
@@ -1739,7 +1769,7 @@ async function submitWorkOrder() {
   }
  
   const payload = {
-    rodado: rodadoEl.options[rodadoEl.selectedIndex].text,
+    rodado: rodadoLabel,
     responsable: "AUTO", // Always send AUTO so the worker resolves it from the logged-in user
     interno: internoEl.value,
     clasificacion: clasificacionEl.value,
@@ -5644,6 +5674,28 @@ function loadPreventivoIntoBulkTasks(type) {
     ccSelect.value = "15";
     // Trigger change to update employee list
     updateBulkEmployeeDropdownForCard(card);
+  }
+}
+
+function setupRodadoFieldForSector() {
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+
+  const selectGroup = document.getElementById('form-rodado-group-select');
+  const textGroup = document.getElementById('form-rodado-group-text');
+  const rodadoSelect = document.getElementById('form-rodado');
+  const rodadoText = document.getElementById('form-rodado-text');
+
+  if (userSector === 'Herrería') {
+    if (selectGroup) selectGroup.style.display = 'none';
+    if (textGroup) textGroup.style.display = 'block';
+    if (rodadoSelect) rodadoSelect.removeAttribute('required');
+    if (rodadoText) rodadoText.setAttribute('required', 'true');
+  } else {
+    if (selectGroup) selectGroup.style.display = 'block';
+    if (textGroup) textGroup.style.display = 'none';
+    if (rodadoSelect) rodadoSelect.setAttribute('required', 'true');
+    if (rodadoText) rodadoText.removeAttribute('required');
   }
 }
 
