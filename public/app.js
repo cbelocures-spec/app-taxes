@@ -456,15 +456,30 @@ async function submitPreOrderCheck() {
   const isCarmona = currentUser === 'jcarmona@contenedoreshugo.com.ar' || currentUser === 'j.carmona@contenedoreshugo.com.ar';
 
   // 1. Search for existing open order with this interno and clasificacion (not fully completed)
-  const existingOrder = activeOrders.find(o => {
+  let existingOrder = activeOrders.find(o => {
     const isSameInterno = String(o.interno).trim() === String(interno);
     const isSameCls = String(o.clasificacion).trim().toLowerCase() === String(clasificacion).trim().toLowerCase();
     const allCompleted = (o.tasks || []).length > 0 && (o.tasks || []).every(t => t.status === "Finalizada");
     return isSameInterno && isSameCls && !allCompleted;
   });
 
+  // 2. Fallback: Search for any open order of this Interno that is forced/marked Out of Service
+  if (!existingOrder) {
+    existingOrder = activeOrders.find(o => {
+      const isSameInterno = String(o.interno).trim() === String(interno);
+      const allCompleted = (o.tasks || []).length > 0 && (o.tasks || []).every(t => t.status === "Finalizada");
+      if (!isSameInterno || allCompleted) return false;
+      
+      const tasks = o.tasks || [];
+      const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
+      const isOutOfService = hasActiveOrPausedTimer || o.estadoUnidad === 'fuera_de_servicio';
+      return isOutOfService;
+    });
+  }
+
   if (existingOrder && !isCarmona) {
-    showToast(`Ya existe una orden en curso para el interno ${interno} (${clasificacion}). Abriendo existente...`, "warning");
+    const orderCls = existingOrder.clasificacion || "Sin Clasificar";
+    showToast(`Abriendo orden en curso del interno ${interno} (${orderCls})...`, "warning");
     closePreOrderModal();
     editOrder(existingOrder.id);
   } else {
@@ -1805,7 +1820,7 @@ async function deleteOrder(orderId) {
 }
 
 async function cleanupSyncedOrders() {
-  if (confirm("¿Estás seguro de limpiar de la app todas las órdenes ya subidas a Taxes que estén finalizadas? (No se borrarán del portal de Taxes)")) {
+  if (confirm("¿Estás seguro de limpiar de la app todas las órdenes finalizadas que estén operativas? (No se borrarán del portal de Taxes)")) {
     try {
       const currentUsername = localStorage.getItem('currentUserUsername') || '';
       const res = await fetch('/api/orders/cleanup', {
@@ -1822,7 +1837,7 @@ async function cleanupSyncedOrders() {
         showToast(`Se limpiaron ${data.count} órdenes de la app`, "success");
         fetchOrders();
       } else {
-        showToast("No hay órdenes finalizadas subidas a Taxes para limpiar", "info");
+        showToast("No hay órdenes finalizadas operativas para limpiar", "info");
       }
     } catch (error) {
       showToast("Error al limpiar órdenes", "danger");

@@ -350,17 +350,15 @@ app.post('/api/orders/cleanup', (req, res) => {
       if (sector === 'Edilicio' && cls !== 'Edilicio') return;
       if (sector === 'Taller' && (cls === 'Herrería' || cls === 'Edilicio')) return;
 
-      if (order.syncStatus === 'success') {
-        const tasks = order.tasks || [];
-        const allFinished = tasks.length > 0 && tasks.every(t => t.status === "Finalizada");
-        
-        // Force out of service if active/paused timers exist
-        const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
-        const isOutOfService = hasActiveOrPausedTimer || order.estadoUnidad === 'fuera_de_servicio';
+      const tasks = order.tasks || [];
+      const allFinished = tasks.length > 0 && tasks.every(t => t.status === "Finalizada");
+      
+      // Force out of service if active/paused timers exist
+      const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
+      const isOutOfService = hasActiveOrPausedTimer || order.estadoUnidad === 'fuera_de_servicio';
 
-        if (allFinished && !isOutOfService) {
-          idsToDelete.push(order.id);
-        }
+      if (allFinished && !isOutOfService) {
+        idsToDelete.push(order.id);
       }
     });
 
