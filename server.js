@@ -338,7 +338,7 @@ app.delete('/api/orders/:id', (req, res) => {
 app.post('/api/orders/cleanup', (req, res) => {
   try {
     const requester = req.headers['x-user-username'] || null;
-    const { sector: reqSector } = req.body;
+    const { sector: reqSector } = req.body || {};
 
     let sector = reqSector || getSectorByUsername(requester);
     if (sector === 'Admin') {

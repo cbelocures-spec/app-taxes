@@ -245,12 +245,16 @@ async function fillSearchableSelect(page, labelText, searchValue) {
         await delay(500);
       }
 
-      // Focus and clear existing text reliably via keyboard
+      // Focus and clear existing text reliably via evaluate and keyboard
+      await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        if (el) {
+          el.value = '';
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }, searchSelector);
       await page.focus(searchSelector);
-      await page.keyboard.down('Control');
-      await page.keyboard.press('A');
-      await page.keyboard.up('Control');
-      await page.keyboard.press('Backspace');
       await delay(300);
 
       // Type the query
