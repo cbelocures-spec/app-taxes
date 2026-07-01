@@ -366,9 +366,15 @@ function switchView(viewId) {
 
 // 2. MODAL CONTROLLERS
 function openPreOrderModal() {
+  setupAllFieldsForSector();
+
   const preInternoSelect = document.getElementById('pre-form-interno');
   if (preInternoSelect) {
     preInternoSelect.value = "";
+  }
+  const preInternoText = document.getElementById('pre-form-interno-text');
+  if (preInternoText) {
+    preInternoText.value = "";
   }
   document.getElementById('pre-form-clasificacion').value = "";
   document.getElementById('pre-order-modal').classList.add('open');
@@ -433,15 +439,23 @@ function promptDiagnosis(taskInfo = null) {
 
 
 async function submitPreOrderCheck() {
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+  const isHerreria = (userSector === 'Herrería');
+
   const preInternoSelect = document.getElementById('pre-form-interno');
-  let interno = preInternoSelect.value.trim();
+  const preInternoText = document.getElementById('pre-form-interno-text');
   
-  // Fallback if they typed in search box but didn't click/confirm
-  if (!interno && preInternoSelect.closest) {
-    const wrapper = preInternoSelect.closest('.searchable-select-container');
-    const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
-    if (searchInput && searchInput.value.trim()) {
-      interno = searchInput.value.trim();
+  let interno = isHerreria ? (preInternoText ? preInternoText.value.trim() : '') : preInternoSelect.value.trim();
+  
+  if (!isHerreria) {
+    // Fallback if they typed in search box but didn't click/confirm
+    if (!interno && preInternoSelect.closest) {
+      const wrapper = preInternoSelect.closest('.searchable-select-container');
+      const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
+      if (searchInput && searchInput.value.trim()) {
+        interno = searchInput.value.trim();
+      }
     }
   }
 
@@ -452,7 +466,6 @@ async function submitPreOrderCheck() {
     return;
   }
 
-  const currentUser = localStorage.getItem('currentUserUsername');
   const isCarmona = currentUser === 'jcarmona@contenedoreshugo.com.ar' || currentUser === 'j.carmona@contenedoreshugo.com.ar';
 
   // 1. Search for existing open order with this interno and clasificacion (not fully completed)
@@ -477,8 +490,6 @@ async function submitPreOrderCheck() {
     });
   }
 
-  const userSector = getSectorByUsername(currentUser);
-
   if (existingOrder && !isCarmona && userSector !== 'Herrería') {
     const orderCls = existingOrder.clasificacion || "Sin Clasificar";
     showToast(`Abriendo orden en curso del interno ${interno} (${orderCls})...`, "warning");
@@ -488,33 +499,41 @@ async function submitPreOrderCheck() {
     closePreOrderModal();
     openNewOrderModal();
     
-    // Auto-select the rodado based on the interno
-    const rodadoSelect = document.getElementById('form-rodado');
-    const rodadoOpt = cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno));
-    if (rodadoOpt) {
-      rodadoSelect.value = rodadoOpt.value;
+    if (isHerreria) {
+      const rodadoText = document.getElementById('form-rodado-text');
+      if (rodadoText) rodadoText.value = interno || "";
+      const internoText = document.getElementById('form-interno-text');
+      if (internoText) internoText.value = interno || "";
     } else {
-      rodadoSelect.value = "";
-    }
-    if (rodadoSelect.rebuildSearchable) {
-      rodadoSelect.rebuildSearchable();
+      // Auto-select the rodado based on the interno
+      const rodadoSelect = document.getElementById('form-rodado');
+      const rodadoOpt = cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno));
+      if (rodadoOpt) {
+        rodadoSelect.value = rodadoOpt.value;
+      } else {
+        rodadoSelect.value = "";
+      }
+      if (rodadoSelect.rebuildSearchable) {
+        rodadoSelect.rebuildSearchable();
+      }
+      
+      // Auto-populate interno and clasificacion
+      const internoSelect = document.getElementById('form-interno');
+      if (internoSelect) {
+        let optionExists = Array.from(internoSelect.options).some(opt => opt.value === interno);
+        if (!optionExists && interno) {
+          const newOpt = document.createElement('option');
+          newOpt.value = interno;
+          newOpt.textContent = interno;
+          internoSelect.appendChild(newOpt);
+        }
+        internoSelect.value = interno || "";
+        if (internoSelect.rebuildSearchable) {
+          internoSelect.rebuildSearchable();
+        }
+      }
     }
     
-    // Auto-populate interno and clasificacion
-    const internoSelect = document.getElementById('form-interno');
-    if (internoSelect) {
-      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === interno);
-      if (!optionExists && interno) {
-        const newOpt = document.createElement('option');
-        newOpt.value = interno;
-        newOpt.textContent = interno;
-        internoSelect.appendChild(newOpt);
-      }
-      internoSelect.value = interno || "";
-      if (internoSelect.rebuildSearchable) {
-        internoSelect.rebuildSearchable();
-      }
-    }
     document.getElementById('form-clasificacion').value = clasificacion;
   }
 }
@@ -530,7 +549,7 @@ function openNewOrderModal() {
   document.getElementById('work-order-form').reset();
   
   // Set up input vs select based on user sector
-  setupRodadoFieldForSector();
+  setupAllFieldsForSector();
 
   const rodadoSelect = document.getElementById('form-rodado');
   if (rodadoSelect) {
@@ -542,6 +561,10 @@ function openNewOrderModal() {
   const rodadoText = document.getElementById('form-rodado-text');
   if (rodadoText) {
     rodadoText.value = "";
+  }
+  const internoText = document.getElementById('form-interno-text');
+  if (internoText) {
+    internoText.value = "";
   }
   
   // Reset dates
@@ -595,7 +618,7 @@ function editOrder(orderId) {
   document.getElementById('new-order-modal').classList.add('open');
 
   // Set up input vs select based on user sector
-  setupRodadoFieldForSector();
+  setupAllFieldsForSector();
 
   // Find corresponding Rodado value in cachedCatalogs
   const rodadoSelect = document.getElementById('form-rodado');
@@ -611,6 +634,10 @@ function editOrder(orderId) {
   }
   if (rodadoText) {
     rodadoText.value = order.rodado || "";
+  }
+  const internoText = document.getElementById('form-interno-text');
+  if (internoText) {
+    internoText.value = order.interno || "";
   }
 
   // Populate basic inputs
@@ -677,7 +704,7 @@ function viewOrder(orderId) {
   modal.classList.add('open', 'readonly-mode');
 
   // Set up input vs select based on user sector
-  setupRodadoFieldForSector();
+  setupAllFieldsForSector();
 
   // Find corresponding Rodado value in cachedCatalogs
   const rodadoSelect = document.getElementById('form-rodado');
@@ -693,6 +720,10 @@ function viewOrder(orderId) {
   }
   if (rodadoText) {
     rodadoText.value = order.rodado || "";
+  }
+  const internoText = document.getElementById('form-interno-text');
+  if (internoText) {
+    internoText.value = order.interno || "";
   }
 
   // Populate basic inputs
@@ -1714,9 +1745,12 @@ async function submitWorkOrder() {
   const rodadoTextEl = document.getElementById('form-rodado-text');
   const rodadoVal = isHerreria ? (rodadoTextEl ? rodadoTextEl.value.trim() : '') : rodadoEl.value;
 
+  const internoTextEl = document.getElementById('form-interno-text');
+  const internoVal = isHerreria ? (internoTextEl ? internoTextEl.value.trim() : '') : internoEl.value;
+
   // Manual validations for touch optimization
   if (!rodadoVal) return showToast("Por favor, ingresa o selecciona un Rodado.", "danger");
-  if (!internoEl.value) return showToast("Por favor, ingresa el Interno de Unidad.", "danger");
+  if (!internoVal) return showToast("Por favor, ingresa el Interno de Unidad.", "danger");
   if (!clasificacionEl.value) return showToast("Por favor, selecciona una Clasificación.", "danger");
 
   const rodadoLabel = isHerreria ? rodadoVal : rodadoEl.options[rodadoEl.selectedIndex].text;
@@ -1771,7 +1805,7 @@ async function submitWorkOrder() {
   const payload = {
     rodado: rodadoLabel,
     responsable: "AUTO", // Always send AUTO so the worker resolves it from the logged-in user
-    interno: internoEl.value,
+    interno: internoVal,
     clasificacion: clasificacionEl.value,
     fechaEntrega: fechaEl.value,
     horario: horaEl.value,
@@ -5677,25 +5711,63 @@ function loadPreventivoIntoBulkTasks(type) {
   }
 }
 
-function setupRodadoFieldForSector() {
+function setupAllFieldsForSector() {
   const currentUser = localStorage.getItem('currentUserUsername');
   const userSector = getSectorByUsername(currentUser);
+  const isHerreria = (userSector === 'Herrería');
 
-  const selectGroup = document.getElementById('form-rodado-group-select');
-  const textGroup = document.getElementById('form-rodado-group-text');
+  // 1. Main modal: Rodado
+  const rodadoSelectGroup = document.getElementById('form-rodado-group-select');
+  const rodadoTextGroup = document.getElementById('form-rodado-group-text');
   const rodadoSelect = document.getElementById('form-rodado');
   const rodadoText = document.getElementById('form-rodado-text');
 
-  if (userSector === 'Herrería') {
-    if (selectGroup) selectGroup.style.display = 'none';
-    if (textGroup) textGroup.style.display = 'block';
+  if (isHerreria) {
+    if (rodadoSelectGroup) rodadoSelectGroup.style.display = 'none';
+    if (rodadoTextGroup) rodadoTextGroup.style.display = 'block';
     if (rodadoSelect) rodadoSelect.removeAttribute('required');
     if (rodadoText) rodadoText.setAttribute('required', 'true');
   } else {
-    if (selectGroup) selectGroup.style.display = 'block';
-    if (textGroup) textGroup.style.display = 'none';
+    if (rodadoSelectGroup) rodadoSelectGroup.style.display = 'block';
+    if (rodadoTextGroup) rodadoTextGroup.style.display = 'none';
     if (rodadoSelect) rodadoSelect.setAttribute('required', 'true');
     if (rodadoText) rodadoText.removeAttribute('required');
+  }
+
+  // 2. Pre-order modal: Interno
+  const preInternoSelectGroup = document.getElementById('pre-form-interno-group-select');
+  const preInternoTextGroup = document.getElementById('pre-form-interno-group-text');
+  const preInternoSelect = document.getElementById('pre-form-interno');
+  const preInternoText = document.getElementById('pre-form-interno-text');
+
+  if (isHerreria) {
+    if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'none';
+    if (preInternoTextGroup) preInternoTextGroup.style.display = 'block';
+    if (preInternoSelect) preInternoSelect.removeAttribute('required');
+    if (preInternoText) preInternoText.setAttribute('required', 'true');
+  } else {
+    if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'block';
+    if (preInternoTextGroup) preInternoTextGroup.style.display = 'none';
+    if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
+    if (preInternoText) preInternoText.removeAttribute('required');
+  }
+
+  // 3. Main modal: Interno
+  const internoSelectGroup = document.getElementById('form-interno-group-select');
+  const internoTextGroup = document.getElementById('form-interno-group-text');
+  const internoSelect = document.getElementById('form-interno');
+  const internoText = document.getElementById('form-interno-text');
+
+  if (isHerreria) {
+    if (internoSelectGroup) internoSelectGroup.style.display = 'none';
+    if (internoTextGroup) internoTextGroup.style.display = 'block';
+    if (internoSelect) internoSelect.removeAttribute('required');
+    if (internoText) internoText.setAttribute('required', 'true');
+  } else {
+    if (internoSelectGroup) internoSelectGroup.style.display = 'block';
+    if (internoTextGroup) internoTextGroup.style.display = 'none';
+    if (internoSelect) internoSelect.setAttribute('required', 'true');
+    if (internoText) internoText.removeAttribute('required');
   }
 }
 

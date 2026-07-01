@@ -399,11 +399,15 @@
           <span class="material-icons">search</span>
           <h3>Filtro de Unidad y Tipo</h3>
         </div>
-        <div class="form-group" style="margin-top: 15px;">
+        <div class="form-group" id="pre-form-interno-group-select" style="margin-top: 15px;">
           <label for="pre-form-interno">Número de Interno *</label>
           <select id="pre-form-interno" required style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
             <option value="">Seleccionar Interno...</option>
           </select>
+        </div>
+        <div class="form-group" id="pre-form-interno-group-text" style="margin-top: 15px; display: none;">
+          <label for="pre-form-interno-text">Número de Interno / Contenedor *</label>
+          <input type="text" id="pre-form-interno-text" placeholder="Ej: 5655" list="internos-datalist" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box;">
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label for="pre-form-clasificacion">Clasificación *</label>
@@ -628,11 +632,15 @@
             </div>
 
             <div class="form-row" style="display: flex; gap: 12px; width: 100%; max-width: 100%; min-width: 0; overflow: hidden; box-sizing: border-box;">
-              <div class="form-group col-6" style="flex: 0 0 calc(50% - 6px); min-width: 0; max-width: calc(50% - 6px); box-sizing: border-box;">
+              <div class="form-group col-6" id="form-interno-group-select" style="flex: 0 0 calc(50% - 6px); min-width: 0; max-width: calc(50% - 6px); box-sizing: border-box;">
                 <label for="form-interno">Interno Unidad *</label>
                 <select id="form-interno" required>
                   <option value="">Seleccionar Interno...</option>
                 </select>
+              </div>
+              <div class="form-group col-6" id="form-interno-group-text" style="display: none; flex: 0 0 calc(50% - 6px); min-width: 0; max-width: calc(50% - 6px); box-sizing: border-box;">
+                <label for="form-interno-text">Interno Unidad *</label>
+                <input type="text" id="form-interno-text" placeholder="Ej: 5655" list="internos-datalist" style="width: 100%; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; height: 38px;">
               </div>
               <div class="form-group col-6" style="flex: 0 0 calc(50% - 6px); min-width: 0; max-width: calc(50% - 6px); box-sizing: border-box;">
                 <label for="form-clasificacion">Clasificación *</label>
@@ -905,6 +913,6 @@
     <!-- Populated dynamically from app.js -->
   </datalist>
 
-  <script src="app.js?v=42"></script>
+  <script src="app.js?v=43"></script>
 </body>
 </html>
