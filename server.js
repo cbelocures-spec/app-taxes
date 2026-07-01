@@ -13,13 +13,26 @@ const fs = require('fs');
 
 const lastConsoleErrors = [];
 const originalConsoleError = console.error;
+const originalConsoleLog = console.log;
+
 console.error = function(...args) {
   lastConsoleErrors.push({
+    type: 'error',
     timestamp: new Date().toISOString(),
     args: args.map(a => a instanceof Error ? { message: a.message, stack: a.stack } : a)
   });
-  if (lastConsoleErrors.length > 50) lastConsoleErrors.shift();
+  if (lastConsoleErrors.length > 100) lastConsoleErrors.shift();
   originalConsoleError.apply(console, args);
+};
+
+console.log = function(...args) {
+  lastConsoleErrors.push({
+    type: 'log',
+    timestamp: new Date().toISOString(),
+    args: args
+  });
+  if (lastConsoleErrors.length > 100) lastConsoleErrors.shift();
+  originalConsoleLog.apply(console, args);
 };
 
 // Capturar errores inesperados en el servidor y activar agentes de auto-curación
