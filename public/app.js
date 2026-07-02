@@ -6266,7 +6266,14 @@ function renderPrevAlermasTable() {
 
 // Modal KM/HS Service
 function openPrevServiceModal(rowIndex, interno, modelo, km, hs) {
-  prevCurrentServiceRow = { rowIndex, interno, modelo };
+  // Determine vehicle type from data (if only hs column has value, it's iveco/hours)
+  const isHoras = (!km || Number(km) === 0) && (hs && Number(hs) > 0);
+  prevCurrentServiceRow = {
+    rowIndex,
+    interno,
+    modelo,
+    vehicleType: isHoras ? 'iveco' : 'km'
+  };
   document.getElementById('prev-service-modal-interno').textContent = `${interno} — ${modelo}`;
   document.getElementById('prev-service-modal-km').value = km || '';
   document.getElementById('prev-service-modal-hs').value = hs || '';
@@ -6280,12 +6287,19 @@ function closePrevServiceModal() {
 
 async function savePrevService() {
   if (!prevCurrentServiceRow) return;
-  const km = document.getElementById('prev-service-modal-km').value;
-  const hs = document.getElementById('prev-service-modal-hs').value;
+  const km = document.getElementById('prev-service-modal-km').value.trim();
+  const hs = document.getElementById('prev-service-modal-hs').value.trim();
+  const isIveco = hs && !km;
+  const valorStr = isIveco ? hs : km;
+  if (!valorStr) {
+    showToast('Ingresá el valor de Km o Hs para registrar el service.', 'warning');
+    return;
+  }
   const btn = document.getElementById('btn-save-prev-service');
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons" style="animation:spin 1.5s linear infinite; font-size:16px; vertical-align:middle;">sync</span> Guardando...';
   try {
+    // 1. Update Google Sheets service (resets interval + updates reales)
     const res = await fetch('/api/preventivos/service', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -6294,16 +6308,53 @@ async function savePrevService() {
         km,
         hs,
         interno: prevCurrentServiceRow.interno,
-        vehicleType: hs && !km ? 'iveco' : ''
+        vehicleType: isIveco ? 'iveco' : ''
       })
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `HTTP ${res.status}`);
     }
-    showToast(`Service registrado para interno ${prevCurrentServiceRow.interno} ✓`, 'success');
+
+    // 2. Create Work Order (no tasks)
+    const incidente = isIveco
+      ? `Servicio de la unidad a las ${hs} hs`
+      : `Servicio de la Unidad a los ${km} Km`;
+
+    const currentUser = localStorage.getItem('currentUserUsername') || '';
+    const rodadoOpt = cachedCatalogs.rodados
+      ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(prevCurrentServiceRow.interno).trim())
+      : null;
+    const rodadoVal = rodadoOpt ? rodadoOpt.value : '';
+
+    const orderPayload = {
+      rodado: rodadoVal,
+      responsable: currentUser,
+      fechaEntrega: '',
+      horario: '',
+      interno: String(prevCurrentServiceRow.interno),
+      clasificacion: 'Preventivo',
+      incidente: incidente,
+      tasks: [],
+      estadoUnidad: 'operativo',
+      createdBy: currentUser
+    };
+
+    const orderRes = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderPayload)
+    });
+    if (!orderRes.ok) {
+      const oe = await orderRes.json().catch(() => ({}));
+      console.warn('Orden creada con advertencia:', oe.error);
+    }
+
+    showToast(`Service registrado y Orden creada para Interno ${prevCurrentServiceRow.interno} ✓`, 'success');
     closePrevServiceModal();
     await fetchPreventivoFlota();
+    // Refresh orders list in background
+    if (typeof fetchOrders === 'function') fetchOrders();
   } catch (error) {
     showToast(`Error al guardar service: ${error.message}`, 'danger');
   } finally {
@@ -6315,7 +6366,8 @@ async function savePrevService() {
 // Modal KM/HS Actualizar Odometer
 let prevCurrentOdometerRow = null;
 function openPrevOdometerModal(rowIndex, interno, modelo, km, hs) {
-  prevCurrentOdometerRow = { rowIndex, interno, modelo };
+  const isHoras = (!km || Number(km) === 0) && (hs && Number(hs) > 0);
+  prevCurrentOdometerRow = { rowIndex, interno, modelo, vehicleType: isHoras ? 'iveco' : 'km' };
   document.getElementById('prev-odometer-modal-interno').textContent = `${interno} — ${modelo}`;
   document.getElementById('prev-odometer-modal-km').value = km || '';
   document.getElementById('prev-odometer-modal-hs').value = hs || '';
