@@ -6638,6 +6638,172 @@ async function fetchParteTallerEstado() {
   }
 }
 
+// Dynamically adjusts the taller list and totals by moving units with active/paused Taxes tasks into "En Reparación"
+function adjustPtStateLists(state) {
+  if (!state) return;
+  if (!activeOrders || !Array.isArray(activeOrders)) return;
+
+  // 1. Find all open orders with active or paused tasks in Taxes
+  const activeRepairOrders = activeOrders.filter(o => {
+    const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
+    if (isClosed) return false;
+    const tasks = o.tasks || [];
+    return tasks.some(t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0)));
+  });
+
+  // Keep track of which internos are forced into "reparacion"
+  const repairInternos = new Map(); // key: resolved Taxes interno -> order object
+  activeRepairOrders.forEach(o => {
+    const taxInt = String(o.interno || '').trim().toUpperCase();
+    if (taxInt) {
+      repairInternos.set(taxInt, o);
+    }
+  });
+
+  if (repairInternos.size === 0) return;
+
+  // Helper to map and check matching
+  function findMatchingOrder(internoPT) {
+    const ptIntUpper = String(internoPT || '').trim().toUpperCase();
+    for (const [taxInt, order] of repairInternos.entries()) {
+      if (taxInt === 'IRINEO GRAL.' && ptIntUpper.includes('IRINEO')) return order;
+      if (taxInt === 'VOLQUETE NICO' && (ptIntUpper.includes('NICO') || ptIntUpper.startsWith('NICO'))) return order;
+      if (taxInt === ptIntUpper) return order;
+    }
+    return null;
+  }
+
+  // 2. Scan all lists in state, extract matching units, and filter them out
+  const lists = ['fuera_de_servicio', 'reparacion', 'servicios_pendientes'];
+  const unitsToMove = []; // array of { unit, matchingOrder, sourceList }
+
+  lists.forEach(listName => {
+    if (!state[listName]) state[listName] = [];
+    state[listName] = state[listName].filter(unit => {
+      const matchingOrder = findMatchingOrder(unit.interno);
+      if (matchingOrder) {
+        unitsToMove.push({ unit, matchingOrder, sourceList: listName });
+        return false; // Remove from original list
+      }
+      return true; // Keep in original list
+    });
+  });
+
+  // Ensure "reparacion" array exists
+  if (!state.reparacion) state.reparacion = [];
+
+  // 3. For each moved unit, update its novelty/tasks and place in "reparacion"
+  unitsToMove.forEach(({ unit, matchingOrder, sourceList }) => {
+    // Generate active task descriptions
+    const activeTasks = (matchingOrder.tasks || [])
+      .filter(t => t.status !== 'Finalizada')
+      .map(t => {
+        let prefix = '[ ]';
+        if (t.timerStart > 0) {
+          prefix = '[ ] ⚡ [En Proceso]';
+        } else if (t.timerStarted || (t.timerHistory && t.timerHistory.length > 0)) {
+          prefix = '[ ] ⏸ [Pausado]';
+        }
+        return `${prefix} ${t.descripcion || 'Tarea sin descripción'}`;
+      });
+
+    // Combine original novelty items with active task descriptions
+    let originalLines = [];
+    if (Array.isArray(unit.novedad_items)) {
+      originalLines = unit.novedad_items.map(x => {
+        const pfx = x.hecho ? '[X]' : '[ ]';
+        return `${pfx} ${x.texto.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()}`;
+      });
+    } else if (unit.novedad) {
+      originalLines = unit.novedad.split('\n').map(l => l.trim()).filter(Boolean);
+    }
+
+    // Filter out duplicates (if the task description matches an original item text)
+    const activeClean = activeTasks.map(t => t.replace(/^\[\s*\]\s*(⚡ \[En Proceso\]|⏸ \[Pausado\])\s*/, '').trim().toUpperCase());
+    originalLines = originalLines.filter(line => {
+      const cleanLine = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim().toUpperCase();
+      return !activeClean.includes(cleanLine);
+    });
+
+    // Combined novelty text
+    const combinedLines = [...originalLines, ...activeTasks];
+    unit.novedad = combinedLines.join('\n');
+    unit.novedad_items = combinedLines.map(line => {
+      const hecho = line.startsWith('[X]') || line.startsWith('[x]');
+      const texto = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
+      return { texto, hecho };
+    });
+
+    // Update list reference to "reparacion"
+    state.reparacion.push(unit);
+    
+    // Remove from repairInternos once handled
+    const taxInt = String(matchingOrder.interno || '').trim().toUpperCase();
+    repairInternos.delete(taxInt);
+  });
+
+  // 4. For any remaining repairInternos (units not currently in taller), create a temporary unit in "reparacion"
+  for (const [taxInt, order] of repairInternos.entries()) {
+    let internoLabel = order.interno;
+    
+    // Try to guess vehicle type
+    let unitType = 'COMPACTADOR';
+    const rodadoOpt = cachedCatalogs.rodados
+      ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(order.interno).trim())
+      : null;
+    if (rodadoOpt) {
+      const labelUpper = String(rodadoOpt.label || '').toUpperCase();
+      if (labelUpper.includes('VOLQ')) unitType = 'VOLQUETE';
+      else if (labelUpper.includes('ROLL') || labelUpper.includes('OFF')) unitType = 'ROLL - OFF';
+      else if (labelUpper.includes('PLANCHA')) unitType = 'PLANCHA';
+    }
+
+    const activeTasks = (order.tasks || [])
+      .filter(t => t.status !== 'Finalizada')
+      .map(t => {
+        let prefix = '[ ]';
+        if (t.timerStart > 0) {
+          prefix = '[ ] ⚡ [En Proceso]';
+        } else if (t.timerStarted || (t.timerHistory && t.timerHistory.length > 0)) {
+          prefix = '[ ] ⏸ [Pausado]';
+        }
+        return `${prefix} ${t.descripcion || 'Tarea sin descripción'}`;
+      });
+
+    const tempUnit = {
+      interno: internoLabel,
+      tipo: unitType,
+      novedad: activeTasks.join('\n'),
+      novedad_items: activeTasks.map(line => {
+        const hecho = line.startsWith('[X]') || line.startsWith('[x]');
+        const texto = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
+        return { texto, hecho };
+      }),
+      dia_parado: new Date().toLocaleDateString('es-AR'),
+      dias_en_reparacion: 0
+    };
+
+    state.reparacion.push(tempUnit);
+  }
+
+  // 5. Recalculate totals dynamically based on the newly adjusted list sizes
+  const totales = (state.resumen || {}).totales || {};
+  const types = ['COMPACTADOR', 'VOLQUETE', 'ROLL - OFF', 'PLANCHA'];
+  types.forEach(t => {
+    const origOp = parseInt((totales[t] || {}).operativos || '0') || 0;
+    const origFs = parseInt((totales[t] || {}).fuera || '0') || 0;
+    const totalFleet = origOp + origFs;
+
+    const newFsCount = 
+      (state.fuera_de_servicio || []).filter(u => String(u.tipo).trim().toUpperCase() === t).length +
+      (state.reparacion || []).filter(u => String(u.tipo).trim().toUpperCase() === t).length;
+
+    if (!totales[t]) totales[t] = {};
+    totales[t].fuera = newFsCount;
+    totales[t].operativos = Math.max(0, totalFleet - newFsCount);
+  });
+}
+
 function renderParteTallerDashboard(state) {
   if (!state) {
     const noData = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos registrados aún.</td></tr>';
@@ -6648,11 +6814,15 @@ function renderParteTallerDashboard(state) {
     return;
   }
 
-  // Store state globally for editing
+  // Store state globally for editing (original state without live Taxes adjustments)
   window._ptState = state;
 
+  // Clone state for rendering to dynamically merge/inject live active tasks from Taxes
+  const displayState = JSON.parse(JSON.stringify(state));
+  adjustPtStateLists(displayState);
+
   const el = id => document.getElementById(id);
-  const resumen = state.resumen || {};
+  const resumen = displayState.resumen || {};
   const totales = resumen.totales || {};
 
   function parseCount(tipo, campo) {
@@ -6763,7 +6933,7 @@ function renderParteTallerDashboard(state) {
   }
 
   // 1. Fuera de servicio
-  const fueraDeServicio = state.fuera_de_servicio || [];
+  const fueraDeServicio = displayState.fuera_de_servicio || [];
   if (el('pt-out-count')) el('pt-out-count').textContent = fueraDeServicio.length;
   if (el('pt-fuera-tbody')) {
     if (fueraDeServicio.length === 0) {
@@ -6785,7 +6955,7 @@ function renderParteTallerDashboard(state) {
   }
 
   // 2. En reparación
-  const reparacion = state.reparacion || [];
+  const reparacion = displayState.reparacion || [];
   if (el('pt-rep-count')) el('pt-rep-count').textContent = reparacion.length;
   if (el('pt-reparacion-tbody')) {
     if (reparacion.length === 0) {
@@ -6807,7 +6977,7 @@ function renderParteTallerDashboard(state) {
   }
 
   // 3. Servicios pendientes
-  const pendientes = state.servicios_pendientes || [];
+  const pendientes = displayState.servicios_pendientes || [];
   if (el('pt-pend-count')) el('pt-pend-count').textContent = pendientes.length;
   if (el('pt-pendientes-tbody')) {
     if (pendientes.length === 0) {
