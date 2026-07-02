@@ -1937,19 +1937,16 @@ async function submitWorkOrder() {
     horaEl.value = `${hh}:${min}`;
   }
  
-  const isHerreria = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Herrería');
-  const rodadoTextEl = document.getElementById('form-rodado-text');
-  const rodadoVal = isHerreria ? (rodadoTextEl ? rodadoTextEl.value.trim() : '') : rodadoEl.value;
-
-  const internoTextEl = document.getElementById('form-interno-text');
-  const internoVal = isHerreria ? (internoTextEl ? internoTextEl.value.trim() : '') : internoEl.value;
+  // Always read from the select dropdowns (both Taller and Herrería use selects now)
+  const rodadoVal = rodadoEl.value;
+  const internoVal = internoEl.value;
 
   // Manual validations for touch optimization
-  if (!rodadoVal) return showToast("Por favor, ingresa o selecciona un Rodado.", "danger");
-  if (!internoVal) return showToast("Por favor, ingresa el Interno de Unidad.", "danger");
+  if (!rodadoVal) return showToast("Por favor, selecciona un Rodado.", "danger");
+  if (!internoVal) return showToast("Por favor, selecciona el Interno de Unidad.", "danger");
   if (!clasificacionEl.value) return showToast("Por favor, selecciona una Clasificación.", "danger");
 
-  const rodadoLabel = isHerreria ? rodadoVal : rodadoEl.options[rodadoEl.selectedIndex].text;
+  const rodadoLabel = rodadoEl.options[rodadoEl.selectedIndex]?.text || rodadoVal;
  
   // Collect tasks
   const tasks = [];
@@ -5914,17 +5911,11 @@ function setupAllFieldsForSector() {
   const rodadoSelect = document.getElementById('form-rodado');
   const rodadoText = document.getElementById('form-rodado-text');
 
-  if (isHerreria) {
-    if (rodadoSelectGroup) rodadoSelectGroup.style.display = 'none';
-    if (rodadoTextGroup) rodadoTextGroup.style.display = 'block';
-    if (rodadoSelect) rodadoSelect.removeAttribute('required');
-    if (rodadoText) rodadoText.setAttribute('required', 'true');
-  } else {
-    if (rodadoSelectGroup) rodadoSelectGroup.style.display = 'block';
-    if (rodadoTextGroup) rodadoTextGroup.style.display = 'none';
-    if (rodadoSelect) rodadoSelect.setAttribute('required', 'true');
-    if (rodadoText) rodadoText.removeAttribute('required');
-  }
+  // Rodado: always use the searchable select for ALL sectors (Herrería included)
+  if (rodadoSelectGroup) rodadoSelectGroup.style.display = 'block';
+  if (rodadoTextGroup) rodadoTextGroup.style.display = 'none';
+  if (rodadoSelect) rodadoSelect.setAttribute('required', 'true');
+  if (rodadoText) rodadoText.removeAttribute('required');
 
   // 2. Pre-order modal: Interno — always show the searchable select (for all sectors including Herrería)
   const preInternoSelectGroup = document.getElementById('pre-form-interno-group-select');
@@ -5938,23 +5929,16 @@ function setupAllFieldsForSector() {
   if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
   if (preInternoText) preInternoText.removeAttribute('required');
 
-  // 3. Main modal: Interno — for Herrería show text field (free type), for others show select
+  // 3. Main modal: Interno — always use the searchable select for ALL sectors
   const internoSelectGroup = document.getElementById('form-interno-group-select');
   const internoTextGroup = document.getElementById('form-interno-group-text');
   const internoSelect = document.getElementById('form-interno');
   const internoText = document.getElementById('form-interno-text');
 
-  if (isHerreria) {
-    if (internoSelectGroup) internoSelectGroup.style.display = 'none';
-    if (internoTextGroup) internoTextGroup.style.display = 'block';
-    if (internoSelect) internoSelect.removeAttribute('required');
-    // Interno Unidad stays empty — user fills manually
-  } else {
-    if (internoSelectGroup) internoSelectGroup.style.display = 'block';
-    if (internoTextGroup) internoTextGroup.style.display = 'none';
-    if (internoSelect) internoSelect.setAttribute('required', 'true');
-    if (internoText) internoText.removeAttribute('required');
-  }
+  if (internoSelectGroup) internoSelectGroup.style.display = 'block';
+  if (internoTextGroup) internoTextGroup.style.display = 'none';
+  if (internoSelect) internoSelect.setAttribute('required', 'true');
+  if (internoText) internoText.removeAttribute('required');
 }
 
 
@@ -6643,12 +6627,25 @@ function adjustPtStateLists(state) {
   if (!state) return;
   if (!activeOrders || !Array.isArray(activeOrders)) return;
 
-  // 1. Find all open orders with active or paused tasks in Taxes
+  // Determine current user sector: Taller = centroCosto '15', Herrería = everything else
+  const currentUserForAdj = localStorage.getItem('currentUserUsername');
+  const isHerreriaAdj = (getSectorByUsername(currentUserForAdj) === 'Herrería');
+
+  // Helper: does a task match the current user's sector?
+  function taskMatchesSector(t) {
+    if (isHerreriaAdj) return t.centroCosto !== '15'; // Herrería tasks
+    return !t.centroCosto || t.centroCosto === '15'; // Mecánica tasks
+  }
+
+  // 1. Find all open orders with active or paused sector-matching tasks
   const activeRepairOrders = activeOrders.filter(o => {
     const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
     if (isClosed) return false;
     const tasks = o.tasks || [];
-    return tasks.some(t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0)));
+    // Only count tasks for this sector that are active/paused
+    return tasks.filter(taskMatchesSector).some(
+      t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0))
+    );
   });
 
   // Keep track of which internos are forced into "reparacion"
@@ -6694,8 +6691,9 @@ function adjustPtStateLists(state) {
 
   // 3. For each moved unit, update its novelty/tasks and place in "reparacion"
   unitsToMove.forEach(({ unit, matchingOrder, sourceList }) => {
-    // Generate active task descriptions
+    // Generate active task descriptions (only tasks for this sector)
     const activeTasks = (matchingOrder.tasks || [])
+      .filter(taskMatchesSector)
       .filter(t => t.status !== 'Finalizada')
       .map(t => {
         let prefix = '[ ]';
@@ -6746,7 +6744,7 @@ function adjustPtStateLists(state) {
   for (const [taxInt, order] of repairInternos.entries()) {
     let internoLabel = order.interno;
     
-    // Try to guess vehicle type
+    // Try to guess vehicle type from catalog label
     let unitType = 'COMPACTADOR';
     const rodadoOpt = cachedCatalogs.rodados
       ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(order.interno).trim())
@@ -6756,6 +6754,14 @@ function adjustPtStateLists(state) {
       if (labelUpper.includes('VOLQ')) unitType = 'VOLQUETE';
       else if (labelUpper.includes('ROLL') || labelUpper.includes('OFF')) unitType = 'ROLL - OFF';
       else if (labelUpper.includes('PLANCHA')) unitType = 'PLANCHA';
+      else if (labelUpper.includes('COMPAC')) unitType = 'COMPACTADOR';
+      else if (labelUpper.includes('CONTENEDOR') || labelUpper.includes('CAJITA') || labelUpper.includes('CAJA')) unitType = 'CONTENEDOR';
+      else if (labelUpper.includes('CAMION') || labelUpper.includes('CAMIÓN') || labelUpper.includes('TRACTO')) unitType = 'CAMIÓN';
+      else if (labelUpper.includes('SEMI')) unitType = 'SEMI';
+      else unitType = 'UNIDAD'; // Unknown - don't default to COMPACTADOR
+    } else {
+      // No catalog match — if label looks like a number, keep COMPACTADOR; otherwise use 'UNIDAD'
+      if (isNaN(Number(String(order.interno || '').trim()))) unitType = 'UNIDAD';
     }
 
     const activeTasks = (order.tasks || [])
