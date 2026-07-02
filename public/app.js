@@ -6300,7 +6300,7 @@ function openPrevServiceModal(rowIndex, interno, modelo, km, hs) {
   if (hsGroup) hsGroup.style.display = isIveco ? 'block' : 'none';
   document.getElementById('prev-service-modal-km').value = isIveco ? '' : (km || '');
   document.getElementById('prev-service-modal-hs').value = isIveco ? (hs || '') : '';
-  document.getElementById('prev-service-modal').classList.add('active');
+  document.getElementById('prev-service-modal').classList.add('open');
   // Focus the visible field
   setTimeout(() => {
     const focusEl = isIveco
@@ -6311,7 +6311,7 @@ function openPrevServiceModal(rowIndex, interno, modelo, km, hs) {
 }
 
 function closePrevServiceModal() {
-  document.getElementById('prev-service-modal').classList.remove('active');
+  document.getElementById('prev-service-modal').classList.remove('open');
   prevCurrentServiceRow = null;
 }
 
@@ -6406,7 +6406,7 @@ function openPrevOdometerModal(rowIndex, interno, modelo, km, hs) {
   if (hsGroup) hsGroup.style.display = isIveco ? 'block' : 'none';
   document.getElementById('prev-odometer-modal-km').value = isIveco ? '' : (km || '');
   document.getElementById('prev-odometer-modal-hs').value = isIveco ? (hs || '') : '';
-  document.getElementById('prev-odometer-modal').classList.add('active');
+  document.getElementById('prev-odometer-modal').classList.add('open');
   setTimeout(() => {
     const focusEl = isIveco
       ? document.getElementById('prev-odometer-modal-hs')
@@ -6416,7 +6416,7 @@ function openPrevOdometerModal(rowIndex, interno, modelo, km, hs) {
 }
 
 function closePrevOdometerModal() {
-  document.getElementById('prev-odometer-modal').classList.remove('active');
+  document.getElementById('prev-odometer-modal').classList.remove('open');
   prevCurrentOdometerRow = null;
 }
 
