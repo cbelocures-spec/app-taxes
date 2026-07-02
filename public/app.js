@@ -6977,10 +6977,13 @@ async function ptAsignarSeleccionados(interno) {
 let currentEditingPtInterno = null;
 let currentEditingPtOriginalList = null;
 
+
 // Opens the modal for adding a new unit
 function openPtAddUnitModal() {
   currentEditingPtInterno = null;
   currentEditingPtOriginalList = null;
+  window._ptDuplicateEditInterno = null;
+  window._ptDuplicateEditList = null;
   
   document.getElementById('pt-unit-modal-title').textContent = 'Agregar Unidad a Taller';
   document.getElementById('pt-unit-empresa').value = 'hugo';
@@ -7002,6 +7005,8 @@ function openPtEditUnitModal(interno, listName) {
 
   currentEditingPtInterno = String(interno).trim();
   currentEditingPtOriginalList = listName;
+  window._ptDuplicateEditInterno = null;
+  window._ptDuplicateEditList = null;
   
   document.getElementById('pt-unit-modal-title').textContent = `Editar Unidad #${interno}`;
   
@@ -7043,6 +7048,69 @@ function closePtUnitModal() {
   document.getElementById('pt-unit-modal').classList.remove('open');
 }
 
+// Check if typed Interno + Empresa is already registered in taller
+function ptCheckForDuplicateUnit() {
+  if (currentEditingPtInterno !== null) return; // Ignore if we specifically clicked edit pencil
+
+  const empresa = document.getElementById('pt-unit-empresa').value;
+  const interno = document.getElementById('pt-unit-interno').value.trim();
+  if (!interno) return;
+
+  let searchInterno = interno;
+  if (empresa === 'irineo') {
+    searchInterno = 'Irineo ' + interno;
+  } else if (empresa === 'nico') {
+    searchInterno = 'Nico ' + interno;
+  }
+
+  if (!window._ptState) return;
+  const state = window._ptState;
+  const lists = ['servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
+  let foundUnit = null;
+  let foundList = null;
+
+  for (const listName of lists) {
+    if (state[listName]) {
+      const item = state[listName].find(u => String(u.interno).trim().toUpperCase() === searchInterno.trim().toUpperCase());
+      if (item) {
+        foundUnit = item;
+        foundList = listName;
+        break;
+      }
+    }
+  }
+
+  if (foundUnit) {
+    // Found registered duplicate! Load its values and switch modal state to Editing
+    document.getElementById('pt-unit-modal-title').textContent = `Editar Unidad #${searchInterno} (Ya registrada)`;
+    document.getElementById('pt-unit-tipo').value = foundUnit.tipo || 'COMPACTADOR';
+    document.getElementById('pt-unit-estado').value = foundList;
+    
+    let rawNovedadText = '';
+    if (Array.isArray(foundUnit.novedad_items)) {
+      rawNovedadText = foundUnit.novedad_items.map(x => {
+        const prefix = x.hecho ? '[X]' : '[ ]';
+        return `${prefix} ${x.texto.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()}`;
+      }).join('\n');
+    } else {
+      rawNovedadText = foundUnit.novedad || '';
+    }
+    document.getElementById('pt-unit-novedad').value = rawNovedadText;
+    
+    window._ptDuplicateEditInterno = searchInterno;
+    window._ptDuplicateEditList = foundList;
+    showToast(`La unidad #${searchInterno} ya está registrada. Cargando novedades existentes...`, 'info');
+  } else {
+    // Clean if we previously auto-switched
+    if (window._ptDuplicateEditInterno) {
+      document.getElementById('pt-unit-modal-title').textContent = 'Agregar Unidad a Taller';
+      document.getElementById('pt-unit-novedad').value = '';
+      window._ptDuplicateEditInterno = null;
+      window._ptDuplicateEditList = null;
+    }
+  }
+}
+
 // Handles change of company in the modal
 function ptOnEmpresaChange() {
   const empresa = document.getElementById('pt-unit-empresa').value;
@@ -7052,10 +7120,13 @@ function ptOnEmpresaChange() {
   } else {
     ptOnInternoChange();
   }
+  ptCheckForDuplicateUnit();
 }
 
 // Auto-fills unit type from interno selection (only for Hugo)
 function ptOnInternoChange() {
+  ptCheckForDuplicateUnit();
+
   const empresa = document.getElementById('pt-unit-empresa').value;
   if (empresa !== 'hugo') return;
 
@@ -7077,6 +7148,7 @@ function ptOnInternoChange() {
 
 // Submits the unit add/edit data
 async function savePtUnit() {
+  const saveBtn = document.getElementById('btn-save-pt-unit');
   const empresa = document.getElementById('pt-unit-empresa').value;
   const interno = document.getElementById('pt-unit-interno').value.trim();
   const tipo = document.getElementById('pt-unit-tipo').value;
@@ -7091,6 +7163,18 @@ async function savePtUnit() {
   if (!novedadText) {
     showToast('Debe ingresar al menos una novedad.', 'warning');
     return;
+  }
+
+  // Prevent duplicate submits (disabling button)
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Guardando...';
+  }
+
+  // Auto-switch to edit mode if we found a duplicate
+  if (!currentEditingPtInterno && window._ptDuplicateEditInterno) {
+    currentEditingPtInterno = window._ptDuplicateEditInterno;
+    currentEditingPtOriginalList = window._ptDuplicateEditList;
   }
 
   // Format saved interno with prefix if Irineo or Volquete Nico
@@ -7285,6 +7369,15 @@ async function savePtUnit() {
   } catch (err) {
     console.error(err);
     showToast(err.message || 'Error al guardar la unidad.', 'danger');
+  } finally {
+    // Re-enable save button
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Guardar Unidad';
+    }
+    // Clean duplicate edit state variables
+    window._ptDuplicateEditInterno = null;
+    window._ptDuplicateEditList = null;
   }
 }
 
