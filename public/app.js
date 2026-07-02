@@ -6677,12 +6677,11 @@ function renderParteTallerDashboard(state) {
     } else {
       el('pt-fuera-tbody').innerHTML = fueraDeServicio.map(item => {
         const novedades = Array.isArray(item.novedades) ? item.novedades.join('; ') : (item.novedad || item.falla || '—');
-        const desde = item.fecha_ingreso || item.ingreso || '—';
-        // Calculate days stopped
-        let diasParado = '—';
-        if (item.fecha_ingreso) {
+        const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
+        let diasParado = item.dias_en_reparacion ? (item.dias_en_reparacion + ' días') : '—';
+        if (diasParado === '—' && desde !== '—') {
           try {
-            const parts = item.fecha_ingreso.split('/');
+            const parts = desde.split('/');
             if (parts.length === 3) {
               const fechaIngreso = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
               const diffMs = Date.now() - fechaIngreso.getTime();
