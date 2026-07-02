@@ -4657,6 +4657,11 @@ function switchSector(sector) {
   renderDashboard();
   updateStats();
   updateClassificationSelectOptions();
+  setupAllFieldsForSector();
+  
+  if (window._ptState) {
+    renderParteTallerDashboard(window._ptState);
+  }
 }
 
 function updateClassificationSelectOptions() {
@@ -6971,9 +6976,8 @@ function renderParteTallerDashboard(state) {
     return 0;
   }
 
-  // Determine current user sector for filtering
-  const currentUserForPt = localStorage.getItem('currentUserUsername');
-  const currentPtSector = (getSectorByUsername(currentUserForPt) === 'Herrería') ? 'herreria' : 'taller';
+  // Determine current sector for Pt filtering based on active tab/selected sector
+  const currentPtSector = (currentSelectedSector === 'Herrería') ? 'herreria' : 'taller';
 
   function matchesPtSector(item) {
     // If item has no sector tag, show to everyone (legacy data)
