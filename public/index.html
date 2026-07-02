@@ -1390,16 +1390,11 @@
           <textarea id="pt-unit-novedad" placeholder="Describe los desperfectos o tareas pendientes. Cada ítem en una línea nueva.&#10;Ej:&#10;[ ] colocar comando interno&#10;[ ] Frenos desgastados" rows="4" style="width: 100%; font-family: monospace; font-size: 13px;"></textarea>
         </div>
       </div>
-      <div class="dialog-footer" style="display:flex; justify-content:space-between; align-items:center; width:100%; box-sizing:border-box;">
-        <button class="btn btn-danger" id="btn-delete-pt-unit" onclick="deletePtUnit()" style="display:none; background-color:#ef4444; border-color:#ef4444;">
-          Eliminar de Taller
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="closePtUnitModal()">Cancelar</button>
+        <button class="btn btn-primary" id="btn-save-pt-unit" onclick="savePtUnit()" style="background-color: var(--primary); border-color: var(--primary);">
+          Guardar Unidad
         </button>
-        <div style="display:flex; gap:10px; margin-left:auto;">
-          <button class="btn btn-secondary" onclick="closePtUnitModal()">Cancelar</button>
-          <button class="btn btn-primary" id="btn-save-pt-unit" onclick="savePtUnit()" style="background-color: var(--primary); border-color: var(--primary);">
-            Guardar Unidad
-          </button>
-        </div>
       </div>
     </div>
   </div>
