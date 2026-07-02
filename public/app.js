@@ -7160,10 +7160,13 @@ function renderParteTallerDashboard(state) {
     } else {
       el('pt-fuera-tbody').innerHTML = fueraDeServicio.map(item => {
         const internoPT = String(item.interno || '');
-        const displayLabel = (currentSelectedSector === 'Herrería' && item.rodado) ? item.rodado : internoPT;
+        const hasRodadoDesc = item.rodado && String(item.rodado).trim().toUpperCase() !== internoPT.trim().toUpperCase();
+        const displayLabel = (currentSelectedSector === 'Herrería' && hasRodadoDesc)
+          ? `<strong>${internoPT}</strong><div style="font-size:11px; color:var(--text-muted); font-weight:normal; margin-top:2px;">${item.rodado}</div>`
+          : `<strong>${internoPT}</strong>`;
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         return `<tr>
-          <td><div style="display:flex; align-items:center; gap:4px;"><strong>${displayLabel}</strong> ${getEditBtnHtml(internoPT, 'fuera_de_servicio')}</div></td>
+          <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEditBtnHtml(internoPT, 'fuera_de_servicio')}</div></td>
           <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
@@ -7183,10 +7186,13 @@ function renderParteTallerDashboard(state) {
     } else {
       el('pt-reparacion-tbody').innerHTML = reparacion.map(item => {
         const internoPT = String(item.interno || '');
-        const displayLabel = (currentSelectedSector === 'Herrería' && item.rodado) ? item.rodado : internoPT;
+        const hasRodadoDesc = item.rodado && String(item.rodado).trim().toUpperCase() !== internoPT.trim().toUpperCase();
+        const displayLabel = (currentSelectedSector === 'Herrería' && hasRodadoDesc)
+          ? `<strong>${internoPT}</strong><div style="font-size:11px; color:var(--text-muted); font-weight:normal; margin-top:2px;">${item.rodado}</div>`
+          : `<strong>${internoPT}</strong>`;
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         return `<tr>
-          <td><div style="display:flex; align-items:center; gap:4px;"><strong>${displayLabel}</strong> ${getEditBtnHtml(internoPT, 'reparacion')}</div></td>
+          <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEditBtnHtml(internoPT, 'reparacion')}</div></td>
           <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
@@ -7206,10 +7212,13 @@ function renderParteTallerDashboard(state) {
     } else {
       el('pt-pendientes-tbody').innerHTML = pendientes.map(item => {
         const internoPT = String(item.interno || '');
-        const displayLabel = (currentSelectedSector === 'Herrería' && item.rodado) ? item.rodado : internoPT;
+        const hasRodadoDesc = item.rodado && String(item.rodado).trim().toUpperCase() !== internoPT.trim().toUpperCase();
+        const displayLabel = (currentSelectedSector === 'Herrería' && hasRodadoDesc)
+          ? `<strong>${internoPT}</strong><div style="font-size:11px; color:var(--text-muted); font-weight:normal; margin-top:2px;">${item.rodado}</div>`
+          : `<strong>${internoPT}</strong>`;
         const servicio = item.servicio || item.tipo_servicio || '—';
         return `<tr>
-          <td><div style="display:flex; align-items:center; gap:4px;"><strong>${displayLabel}</strong> ${getEditBtnHtml(internoPT, 'servicios_pendientes')}</div></td>
+          <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEditBtnHtml(internoPT, 'servicios_pendientes')}</div></td>
           <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
