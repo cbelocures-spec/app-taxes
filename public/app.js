@@ -579,12 +579,20 @@ async function submitPreOrderCheck() {
     openNewOrderModal();
     
     if (isHerreria) {
-      // For Herrería: pre-fill Rodado/Contenedor with the selected interno value;
-      // Interno Unidad stays empty — user fills it manually
-      const rodadoText = document.getElementById('form-rodado-text');
-      if (rodadoText) rodadoText.value = interno || "";
+      // For Herrería: rodado is a select dropdown now, select matching option
+      const rodadoSelect = document.getElementById('form-rodado');
+      const rodadoOpt = cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno));
+      if (rodadoOpt && rodadoSelect) {
+        rodadoSelect.value = rodadoOpt.value;
+      } else if (rodadoSelect) {
+        rodadoSelect.value = "";
+      }
+      if (rodadoSelect && rodadoSelect.rebuildSearchable) {
+        rodadoSelect.rebuildSearchable();
+      }
+      // Interno Unidad stays a text input — reset/clear it
       const internoText = document.getElementById('form-interno-text');
-      if (internoText) internoText.value = ""; // empty — user fills it
+      if (internoText) internoText.value = "";
     } else {
       // Auto-select the rodado based on the interno
       const rodadoSelect = document.getElementById('form-rodado');
@@ -1937,9 +1945,11 @@ async function submitWorkOrder() {
     horaEl.value = `${hh}:${min}`;
   }
  
-  // Always read from the select dropdowns (both Taller and Herrería use selects now)
+  const isHerreria = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Herrería');
   const rodadoVal = rodadoEl.value;
-  const internoVal = internoEl.value;
+
+  const internoTextEl = document.getElementById('form-interno-text');
+  const internoVal = isHerreria ? (internoTextEl ? internoTextEl.value.trim() : '') : internoEl.value;
 
   // Manual validations for touch optimization
   if (!rodadoVal) return showToast("Por favor, selecciona un Rodado.", "danger");
@@ -5929,16 +5939,23 @@ function setupAllFieldsForSector() {
   if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
   if (preInternoText) preInternoText.removeAttribute('required');
 
-  // 3. Main modal: Interno — always use the searchable select for ALL sectors
+  // 3. Main modal: Interno — for Herrería show text field (free type), for others show select
   const internoSelectGroup = document.getElementById('form-interno-group-select');
   const internoTextGroup = document.getElementById('form-interno-group-text');
   const internoSelect = document.getElementById('form-interno');
   const internoText = document.getElementById('form-interno-text');
 
-  if (internoSelectGroup) internoSelectGroup.style.display = 'block';
-  if (internoTextGroup) internoTextGroup.style.display = 'none';
-  if (internoSelect) internoSelect.setAttribute('required', 'true');
-  if (internoText) internoText.removeAttribute('required');
+  if (isHerreria) {
+    if (internoSelectGroup) internoSelectGroup.style.display = 'none';
+    if (internoTextGroup) internoTextGroup.style.display = 'block';
+    if (internoSelect) internoSelect.removeAttribute('required');
+    if (internoText) internoText.setAttribute('required', 'true');
+  } else {
+    if (internoSelectGroup) internoSelectGroup.style.display = 'block';
+    if (internoTextGroup) internoTextGroup.style.display = 'none';
+    if (internoSelect) internoSelect.setAttribute('required', 'true');
+    if (internoText) internoText.removeAttribute('required');
+  }
 }
 
 
