@@ -6266,18 +6266,30 @@ function renderPrevAlermasTable() {
 
 // Modal KM/HS Service
 function openPrevServiceModal(rowIndex, interno, modelo, km, hs) {
-  // Determine vehicle type from data (if only hs column has value, it's iveco/hours)
-  const isHoras = (!km || Number(km) === 0) && (hs && Number(hs) > 0);
+  // Iveco = horas | Volkswagen (y otros) = km
+  const isIveco = String(modelo || '').toLowerCase().includes('iveco');
   prevCurrentServiceRow = {
     rowIndex,
     interno,
     modelo,
-    vehicleType: isHoras ? 'iveco' : 'km'
+    vehicleType: isIveco ? 'iveco' : 'km'
   };
   document.getElementById('prev-service-modal-interno').textContent = `${interno} — ${modelo}`;
-  document.getElementById('prev-service-modal-km').value = km || '';
-  document.getElementById('prev-service-modal-hs').value = hs || '';
+  // Show/hide the relevant field and pre-fill
+  const kmGroup = document.getElementById('prev-service-modal-km-group');
+  const hsGroup = document.getElementById('prev-service-modal-hs-group');
+  if (kmGroup) kmGroup.style.display = isIveco ? 'none' : 'block';
+  if (hsGroup) hsGroup.style.display = isIveco ? 'block' : 'none';
+  document.getElementById('prev-service-modal-km').value = isIveco ? '' : (km || '');
+  document.getElementById('prev-service-modal-hs').value = isIveco ? (hs || '') : '';
   document.getElementById('prev-service-modal').classList.add('active');
+  // Focus the visible field
+  setTimeout(() => {
+    const focusEl = isIveco
+      ? document.getElementById('prev-service-modal-hs')
+      : document.getElementById('prev-service-modal-km');
+    if (focusEl) focusEl.focus();
+  }, 100);
 }
 
 function closePrevServiceModal() {
@@ -6287,12 +6299,12 @@ function closePrevServiceModal() {
 
 async function savePrevService() {
   if (!prevCurrentServiceRow) return;
-  const km = document.getElementById('prev-service-modal-km').value.trim();
-  const hs = document.getElementById('prev-service-modal-hs').value.trim();
-  const isIveco = hs && !km;
+  const isIveco = prevCurrentServiceRow.vehicleType === 'iveco';
+  const km = isIveco ? '' : document.getElementById('prev-service-modal-km').value.trim();
+  const hs = isIveco ? document.getElementById('prev-service-modal-hs').value.trim() : '';
   const valorStr = isIveco ? hs : km;
   if (!valorStr) {
-    showToast('Ingresá el valor de Km o Hs para registrar el service.', 'warning');
+    showToast(`Ingresá ${isIveco ? 'las Horas' : 'los Km'} para registrar el service.`, 'warning');
     return;
   }
   const btn = document.getElementById('btn-save-prev-service');
@@ -6366,12 +6378,23 @@ async function savePrevService() {
 // Modal KM/HS Actualizar Odometer
 let prevCurrentOdometerRow = null;
 function openPrevOdometerModal(rowIndex, interno, modelo, km, hs) {
-  const isHoras = (!km || Number(km) === 0) && (hs && Number(hs) > 0);
-  prevCurrentOdometerRow = { rowIndex, interno, modelo, vehicleType: isHoras ? 'iveco' : 'km' };
+  const isIveco = String(modelo || '').toLowerCase().includes('iveco');
+  prevCurrentOdometerRow = { rowIndex, interno, modelo, vehicleType: isIveco ? 'iveco' : 'km' };
   document.getElementById('prev-odometer-modal-interno').textContent = `${interno} — ${modelo}`;
-  document.getElementById('prev-odometer-modal-km').value = km || '';
-  document.getElementById('prev-odometer-modal-hs').value = hs || '';
+  // Show/hide the relevant field
+  const kmGroup = document.getElementById('prev-odometer-modal-km-group');
+  const hsGroup = document.getElementById('prev-odometer-modal-hs-group');
+  if (kmGroup) kmGroup.style.display = isIveco ? 'none' : 'block';
+  if (hsGroup) hsGroup.style.display = isIveco ? 'block' : 'none';
+  document.getElementById('prev-odometer-modal-km').value = isIveco ? '' : (km || '');
+  document.getElementById('prev-odometer-modal-hs').value = isIveco ? (hs || '') : '';
   document.getElementById('prev-odometer-modal').classList.add('active');
+  setTimeout(() => {
+    const focusEl = isIveco
+      ? document.getElementById('prev-odometer-modal-hs')
+      : document.getElementById('prev-odometer-modal-km');
+    if (focusEl) focusEl.focus();
+  }, 100);
 }
 
 function closePrevOdometerModal() {
@@ -6387,6 +6410,9 @@ async function savePrevOdometer() {
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons" style="animation:spin 1.5s linear infinite; font-size:16px; vertical-align:middle;">sync</span> Guardando...';
   try {
+    const isIveco = prevCurrentOdometerRow.vehicleType === 'iveco';
+    const km = isIveco ? '' : document.getElementById('prev-odometer-modal-km').value.trim();
+    const hs = isIveco ? document.getElementById('prev-odometer-modal-hs').value.trim() : '';
     const res = await fetch('/api/preventivos/odometer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -6395,7 +6421,7 @@ async function savePrevOdometer() {
         km,
         hs,
         interno: prevCurrentOdometerRow.interno,
-        vehicleType: hs && !km ? 'iveco' : ''
+        vehicleType: isIveco ? 'iveco' : ''
       })
     });
     if (!res.ok) {
