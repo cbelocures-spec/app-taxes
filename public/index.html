@@ -545,10 +545,16 @@
           <h2>Parte Diario de Taller</h2>
           <small style="color: var(--text-muted);">Sincronizado en tiempo real</small>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="fetchParteTallerEstado()" style="display: flex; align-items: center; gap: 4px;">
-          <span class="material-icons" style="font-size: 16px;">refresh</span>
-          <span>Actualizar</span>
-        </button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-primary btn-sm" onclick="openPtAddUnitModal()" style="display: flex; align-items: center; gap: 4px; background-color: var(--primary); border-color: var(--primary); color: white;">
+            <span class="material-icons" style="font-size: 16px;">add</span>
+            <span>Agregar Unidad</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="fetchParteTallerEstado()" style="display: flex; align-items: center; gap: 4px;">
+            <span class="material-icons" style="font-size: 16px;">refresh</span>
+            <span>Actualizar</span>
+          </button>
+        </div>
       </div>
 
       <!-- Totales Table (Compactador, Volquete, Roll-off, Plancha) -->
@@ -629,12 +635,15 @@
             <tr>
               <th>Interno</th>
               <th>Tipo</th>
-              <th>Novedad / Tarea</th>
+              <th>Novedad / Tarea (Seleccionar)</th>
+              <th>Orden de Trabajo</th>
+              <th>Días Parado</th>
+              <th>Desde</th>
             </tr>
           </thead>
           <tbody id="pt-reparacion-tbody">
             <tr>
-              <td colspan="3" style="text-align: center; padding: 20px;">No hay unidades registradas en reparación.</td>
+              <td colspan="6" style="text-align: center; padding: 20px;">No hay unidades registradas en reparación.</td>
             </tr>
           </tbody>
         </table>
@@ -651,13 +660,14 @@
             <tr>
               <th>Interno</th>
               <th>Tipo</th>
-              <th>Novedades</th>
+              <th>Novedades (Seleccionar)</th>
+              <th>Orden de Trabajo</th>
               <th>Servicio</th>
             </tr>
           </thead>
           <tbody id="pt-pendientes-tbody">
             <tr>
-              <td colspan="4" style="text-align: center; padding: 20px;">No hay servicios pendientes.</td>
+              <td colspan="5" style="text-align: center; padding: 20px;">No hay servicios pendientes.</td>
             </tr>
           </tbody>
         </table>
@@ -1320,6 +1330,51 @@
         <button class="btn btn-secondary" onclick="closePrevOdometerModal()">Cancelar</button>
         <button class="btn btn-primary" id="btn-save-prev-odometer" onclick="savePrevOdometer()" style="background-color: #0288d1; border-color: #0288d1;">
           Actualizar KM/HS
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: AGREGAR / EDITAR UNIDAD EN PARTE TALLER -->
+  <div class="modal-overlay" id="pt-unit-modal">
+    <div class="dialog-modal" style="max-width: 450px;">
+      <div class="dialog-header" id="pt-unit-modal-header" style="background-color: var(--primary); color: white;">
+        <h3 style="color: white; margin: 0;" id="pt-unit-modal-title">Agregar Unidad a Taller</h3>
+        <button class="dialog-close" onclick="closePtUnitModal()" style="color: white;">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-group">
+          <label>Número de Interno</label>
+          <input type="number" id="pt-unit-interno" placeholder="Ej: 54" style="width: 100%;" onchange="ptOnInternoChange()">
+        </div>
+        <div class="form-group">
+          <label>Tipo de Unidad</label>
+          <select id="pt-unit-tipo" style="width: 100%;">
+            <option value="COMPACTADOR">COMPACTADOR</option>
+            <option value="VOLQUETE">VOLQUETE</option>
+            <option value="ROLL - OFF">ROLL - OFF</option>
+            <option value="PLANCHA">PLANCHA</option>
+            <option value="OTRO">OTRO</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Estado en Taller</label>
+          <select id="pt-unit-estado" style="width: 100%;">
+            <option value="servicios_pendientes">📋 Servicios Pendientes (unidad operativa)</option>
+            <option value="reparacion">🔧 En Reparación (unidad inactiva)</option>
+            <option value="fuera_de_servicio">❌ Fuera de Servicio (unidad inactiva)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Novedad / Diagnóstico / Servicio</label>
+          <textarea id="pt-unit-novedad" placeholder="Describe los desperfectos o tareas pendientes. Cada ítem en una línea nueva.&#10;Ej:&#10;[ ] colocar comando interno&#10;[ ] Frenos desgastados" rows="5" style="width: 100%; font-family: monospace; font-size: 13px;"></textarea>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="closePtUnitModal()">Cancelar</button>
+        <button class="btn btn-primary" id="btn-save-pt-unit" onclick="savePtUnit()" style="background-color: var(--primary); border-color: var(--primary);">
+          Guardar Unidad
         </button>
       </div>
     </div>

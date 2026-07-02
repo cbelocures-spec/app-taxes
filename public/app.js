@@ -6643,10 +6643,13 @@ function renderParteTallerDashboard(state) {
     const noData = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos registrados aún.</td></tr>';
     const el = id => document.getElementById(id);
     if (el('pt-fuera-tbody')) el('pt-fuera-tbody').innerHTML = noData;
-    if (el('pt-reparacion-tbody')) el('pt-reparacion-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos.</td></tr>';
-    if (el('pt-pendientes-tbody')) el('pt-pendientes-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos.</td></tr>';
+    if (el('pt-reparacion-tbody')) el('pt-reparacion-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos.</td></tr>';
+    if (el('pt-pendientes-tbody')) el('pt-pendientes-tbody').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos.</td></tr>';
     return;
   }
+
+  // Store state globally for editing
+  window._ptState = state;
 
   const el = id => document.getElementById(id);
   const resumen = state.resumen || {};
@@ -6668,128 +6671,147 @@ function renderParteTallerDashboard(state) {
     if (el(t.fsId)) el(t.fsId).textContent = parseCount(t.key, 'fuera');
   });
 
-  // Fuera de servicio
+  // Checklist helper
+  function getChecklistHtml(item, internoPT) {
+    let pendingItems = [];
+    if (Array.isArray(item.novedad_items) && item.novedad_items.length > 0) {
+      pendingItems = item.novedad_items
+        .filter(x => !x.hecho)
+        .map(x => x.texto.replace(/^\[\s*\]\s*/, '').trim())
+        .filter(Boolean);
+    } else if (item.novedad) {
+      item.novedad.split('\n').forEach(line => {
+        const l = line.trim();
+        if (l && !l.startsWith('[X]') && !l.startsWith('[x]')) {
+          const clean = l.replace(/^\[\s*\]\s*/, '').trim();
+          if (clean) pendingItems.push(clean);
+        }
+      });
+    }
+
+    if (pendingItems.length > 0) {
+      return `<div style="display:flex; flex-direction:column; gap:5px;">
+        ${pendingItems.map((txt, idx) => {
+          const safeId = `ptck_${internoPT}_${idx}`;
+          const safeTxt = txt.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+          return `<label style="display:flex; align-items:flex-start; gap:6px; font-size:12px; cursor:pointer;">
+            <input type="checkbox" class="pt-item-checkbox" data-interno="${internoPT}" value="${safeTxt}"
+              id="${safeId}" style="margin-top:2px; accent-color:var(--primary); flex-shrink:0;">
+            <span>${txt}</span>
+          </label>`;
+        }).join('')}
+        <button class="btn btn-secondary btn-xs" onclick="ptAsignarSeleccionados('${internoPT}')"
+          style="margin-top:6px; font-size:11px; display:inline-flex; align-items:center; gap:3px; align-self:flex-start;">
+          <span class="material-icons" style="font-size:13px;">assignment</span> Asignar Seleccionados
+        </button>
+      </div>`;
+    }
+    return '<span style="color:var(--text-muted); font-size:12px;">Sin ítems pendientes</span>';
+  }
+
+  // Order button helper
+  function getOrdenBtnHtml(internoPT) {
+    const openOrder = activeOrders && activeOrders.find(o =>
+      String(o.interno || '').trim() === internoPT &&
+      (!o.estado || o.estado.toLowerCase() !== 'cerrada')
+    );
+    if (openOrder) {
+      return `<button class="btn btn-xs" onclick="editOrder('${openOrder.id}')"
+           style="background:#0288d1; color:white; border-color:#0288d1; font-size:11px; white-space:nowrap; display:inline-flex; align-items:center; gap:3px;">
+           <span class="material-icons" style="font-size:12px;">open_in_browser</span> Abrir Orden
+         </button>`;
+    }
+    return `<button class="btn btn-xs" onclick="ptCrearOrden('${internoPT}')"
+         style="background:#00897b; color:white; border-color:#00897b; font-size:11px; white-space:nowrap; display:inline-flex; align-items:center; gap:3px;">
+         <span class="material-icons" style="font-size:12px;">add_circle</span> Crear Orden
+       </button>`;
+  }
+
+  // Edit pencil helper
+  function getEditBtnHtml(internoPT, listName) {
+    return `<button class="btn btn-link btn-xs" onclick="openPtEditUnitModal('${internoPT}', '${listName}')"
+      style="padding:0; margin-left:6px; min-width:auto; color:var(--primary); display:inline-flex; align-items:center; vertical-align:middle;" title="Editar Unidad">
+      <span class="material-icons" style="font-size:16px;">edit</span>
+    </button>`;
+  }
+
+  // Helper to calculate days out of service
+  function getDiasParadoHtml(item, desde) {
+    let diasParado = item.dias_en_reparacion ? (item.dias_en_reparacion + ' días') : '—';
+    if (diasParado === '—' && desde !== '—') {
+      try {
+        const parts = desde.split('/');
+        if (parts.length === 3) {
+          const fechaIngreso = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          const diffMs = Date.now() - fechaIngreso.getTime();
+          diasParado = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + ' días';
+        }
+      } catch(e) {}
+    }
+    const color = parseInt(item.dias_en_reparacion || 0) > 30 ? '#ef4444' : 'inherit';
+    return `<span style="font-weight:600; color:${color};">${diasParado}</span>`;
+  }
+
+  // 1. Fuera de servicio
   const fueraDeServicio = state.fuera_de_servicio || [];
   if (el('pt-out-count')) el('pt-out-count').textContent = fueraDeServicio.length;
   if (el('pt-fuera-tbody')) {
     if (fueraDeServicio.length === 0) {
       el('pt-fuera-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades fuera de servicio.</td></tr>';
     } else {
-      // Build lookup map for safe onclick usage
-      window._ptFueraMap = {};
-      fueraDeServicio.forEach(item => { window._ptFueraMap[String(item.interno)] = item; });
-
       el('pt-fuera-tbody').innerHTML = fueraDeServicio.map(item => {
         const internoPT = String(item.interno || '');
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
-        let diasParado = item.dias_en_reparacion ? (item.dias_en_reparacion + ' días') : '—';
-        if (diasParado === '—' && desde !== '—') {
-          try {
-            const parts = desde.split('/');
-            if (parts.length === 3) {
-              const fechaIngreso = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-              const diffMs = Date.now() - fechaIngreso.getTime();
-              diasParado = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + ' días';
-            }
-          } catch(e) {}
-        }
-
-        // Get PENDING items only (remove [X] done items)
-        let pendingItems = [];
-        if (Array.isArray(item.novedad_items) && item.novedad_items.length > 0) {
-          pendingItems = item.novedad_items
-            .filter(x => !x.hecho)
-            .map(x => x.texto.replace(/^\[\s*\]\s*/, '').trim())
-            .filter(Boolean);
-        } else if (item.novedad) {
-          item.novedad.split('\n').forEach(line => {
-            const l = line.trim();
-            if (l && !l.startsWith('[X]') && !l.startsWith('[x]')) {
-              const clean = l.replace(/^\[\s*\]\s*/, '').trim();
-              if (clean) pendingItems.push(clean);
-            }
-          });
-        }
-
-        const checklistHtml = pendingItems.length > 0
-          ? `<div style="display:flex; flex-direction:column; gap:5px;">
-              ${pendingItems.map((txt, idx) => {
-                const safeId = `ptck_${internoPT}_${idx}`;
-                const safeTxt = txt.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
-                return `<label style="display:flex; align-items:flex-start; gap:6px; font-size:12px; cursor:pointer;">
-                  <input type="checkbox" class="pt-item-checkbox" data-interno="${internoPT}" value="${safeTxt}"
-                    id="${safeId}" style="margin-top:2px; accent-color:var(--primary); flex-shrink:0;">
-                  <span>${txt}</span>
-                </label>`;
-              }).join('')}
-              <button class="btn btn-secondary btn-xs" onclick="ptAsignarSeleccionados('${internoPT}')"
-                style="margin-top:6px; font-size:11px; display:inline-flex; align-items:center; gap:3px; align-self:flex-start;">
-                <span class="material-icons" style="font-size:13px;">assignment</span> Asignar Seleccionados
-              </button>
-            </div>`
-          : '<span style="color:var(--text-muted); font-size:12px;">Sin ítems pendientes</span>';
-
-        // Look up existing open order for this interno
-        const openOrder = activeOrders && activeOrders.find(o =>
-          String(o.interno || '').trim() === internoPT &&
-          (!o.estado || o.estado.toLowerCase() !== 'cerrada')
-        );
-        const ordenBtn = openOrder
-          ? `<button class="btn btn-xs" onclick="editOrder('${openOrder.id}')"
-               style="background:#0288d1; color:white; border-color:#0288d1; font-size:11px; white-space:nowrap; display:inline-flex; align-items:center; gap:3px;">
-               <span class="material-icons" style="font-size:12px;">open_in_browser</span> Abrir Orden
-             </button>`
-          : `<button class="btn btn-xs" onclick="ptCrearOrden('${internoPT}')"
-               style="background:#00897b; color:white; border-color:#00897b; font-size:11px; white-space:nowrap; display:inline-flex; align-items:center; gap:3px;">
-               <span class="material-icons" style="font-size:12px;">add_circle</span> Crear Orden
-             </button>`;
-
         return `<tr>
-          <td><strong>${item.interno || '—'}</strong></td>
+          <td><div style="display:flex; align-items:center; gap:4px;"><strong>${internoPT}</strong> ${getEditBtnHtml(internoPT, 'fuera_de_servicio')}</div></td>
           <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
-          <td style="min-width:220px;">${checklistHtml}</td>
-          <td style="white-space:nowrap;">${ordenBtn}</td>
-          <td style="white-space:nowrap; font-weight:600; color:${parseInt(item.dias_en_reparacion||0)>30?'#ef4444':'inherit'};">${diasParado}</td>
+          <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
+          <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
           <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
         </tr>`;
       }).join('');
     }
   }
 
-
-  // En reparación
+  // 2. En reparación
   const reparacion = state.reparacion || [];
   if (el('pt-rep-count')) el('pt-rep-count').textContent = reparacion.length;
   if (el('pt-reparacion-tbody')) {
     if (reparacion.length === 0) {
-      el('pt-reparacion-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades en reparación.</td></tr>';
+      el('pt-reparacion-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades en reparación.</td></tr>';
     } else {
       el('pt-reparacion-tbody').innerHTML = reparacion.map(item => {
-        const novedad = Array.isArray(item.novedades) ? item.novedades.join('; ') : (item.novedad || item.tarea || '—');
+        const internoPT = String(item.interno || '');
+        const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         return `<tr>
-          <td><strong>${item.interno || '—'}</strong></td>
-          <td>${item.tipo || '—'}</td>
-          <td>${novedad}</td>
+          <td><div style="display:flex; align-items:center; gap:4px;"><strong>${internoPT}</strong> ${getEditBtnHtml(internoPT, 'reparacion')}</div></td>
+          <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
+          <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
+          <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
+          <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
         </tr>`;
       }).join('');
     }
   }
 
-  // Servicios pendientes
+  // 3. Servicios pendientes
   const pendientes = state.servicios_pendientes || [];
   if (el('pt-pend-count')) el('pt-pend-count').textContent = pendientes.length;
   if (el('pt-pendientes-tbody')) {
     if (pendientes.length === 0) {
-      el('pt-pendientes-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No hay servicios pendientes.</td></tr>';
+      el('pt-pendientes-tbody').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No hay servicios pendientes.</td></tr>';
     } else {
       el('pt-pendientes-tbody').innerHTML = pendientes.map(item => {
-        const novedades = Array.isArray(item.novedades) ? item.novedades.join('; ') : (item.novedad || '—');
+        const internoPT = String(item.interno || '');
         const servicio = item.servicio || item.tipo_servicio || '—';
         return `<tr>
-          <td><strong>${item.interno || '—'}</strong></td>
-          <td>${item.tipo || '—'}</td>
-          <td>${novedades}</td>
-          <td>${servicio}</td>
+          <td><div style="display:flex; align-items:center; gap:4px;"><strong>${internoPT}</strong> ${getEditBtnHtml(internoPT, 'servicios_pendientes')}</div></td>
+          <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
+          <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
+          <td><span style="font-size:12px;">${servicio}</span></td>
         </tr>`;
       }).join('');
     }
@@ -6870,3 +6892,261 @@ function ptAsignarSeleccionados(interno) {
     }, 200);
   }
 }
+
+// Variable to keep track of the current interno being edited in the modal
+let currentEditingPtInterno = null;
+let currentEditingPtOriginalList = null;
+
+// Opens the modal for adding a new unit
+function openPtAddUnitModal() {
+  currentEditingPtInterno = null;
+  currentEditingPtOriginalList = null;
+  
+  document.getElementById('pt-unit-modal-title').textContent = 'Agregar Unidad a Taller';
+  document.getElementById('pt-unit-interno').value = '';
+  document.getElementById('pt-unit-interno').disabled = false;
+  document.getElementById('pt-unit-tipo').value = 'COMPACTADOR';
+  document.getElementById('pt-unit-estado').value = 'servicios_pendientes';
+  document.getElementById('pt-unit-novedad').value = '';
+  
+  document.getElementById('pt-unit-modal').classList.add('open');
+}
+
+// Opens the modal for editing an existing unit
+function openPtEditUnitModal(interno, listName) {
+  if (!window._ptState) return;
+  const list = window._ptState[listName] || [];
+  const item = list.find(u => String(u.interno).trim() === String(interno).trim());
+  if (!item) return;
+
+  currentEditingPtInterno = String(interno).trim();
+  currentEditingPtOriginalList = listName;
+  
+  document.getElementById('pt-unit-modal-title').textContent = `Editar Unidad #${interno}`;
+  document.getElementById('pt-unit-interno').value = interno;
+  document.getElementById('pt-unit-interno').disabled = true;
+  document.getElementById('pt-unit-tipo').value = item.tipo || 'COMPACTADOR';
+  document.getElementById('pt-unit-estado').value = listName;
+  
+  // Format novedades: get all texts from item
+  let rawNovedadText = '';
+  if (Array.isArray(item.novedad_items)) {
+    rawNovedadText = item.novedad_items.map(x => {
+      const prefix = x.hecho ? '[X]' : '[ ]';
+      return `${prefix} ${x.texto.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()}`;
+    }).join('\n');
+  } else {
+    rawNovedadText = item.novedad || '';
+  }
+  document.getElementById('pt-unit-novedad').value = rawNovedadText;
+  
+  document.getElementById('pt-unit-modal').classList.add('open');
+}
+
+// Closes the unit modal
+function closePtUnitModal() {
+  document.getElementById('pt-unit-modal').classList.remove('open');
+}
+
+// Auto-fills unit type from interno selection
+function ptOnInternoChange() {
+  const interno = document.getElementById('pt-unit-interno').value.trim();
+  if (!interno) return;
+  const rodadoOpt = cachedCatalogs.rodados
+    ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
+    : null;
+  if (rodadoOpt) {
+    const labelUpper = String(rodadoOpt.label || '').toUpperCase();
+    let guessedType = 'COMPACTADOR';
+    if (labelUpper.includes('VOLQ')) guessedType = 'VOLQUETE';
+    else if (labelUpper.includes('ROLL') || labelUpper.includes('OFF')) guessedType = 'ROLL - OFF';
+    else if (labelUpper.includes('PLANCHA')) guessedType = 'PLANCHA';
+    
+    document.getElementById('pt-unit-tipo').value = guessedType;
+  }
+}
+
+// Submits the unit add/edit data
+async function savePtUnit() {
+  const interno = document.getElementById('pt-unit-interno').value.trim();
+  const tipo = document.getElementById('pt-unit-tipo').value;
+  const estado = document.getElementById('pt-unit-estado').value;
+  const novedadText = document.getElementById('pt-unit-novedad').value.trim();
+  const currentUser = localStorage.getItem('currentUserUsername') || 'Rodriguez Nicolas';
+
+  if (!interno) {
+    showToast('El número de interno es obligatorio.', 'warning');
+    return;
+  }
+  if (!novedadText) {
+    showToast('Debe ingresar al menos una novedad.', 'warning');
+    return;
+  }
+
+  // Format novedad lines to guarantee checkbox brackets
+  const novedadFormatted = novedadText.split('\n').map(line => {
+    const l = line.trim();
+    if (!l) return '';
+    if (!l.startsWith('[ ]') && !l.startsWith('[X]') && !l.startsWith('[x]')) {
+      return '[ ] ' + l;
+    }
+    return l;
+  }).filter(Boolean).join('\n');
+
+  try {
+    // If ADDING a unit
+    if (!currentEditingPtInterno) {
+      // 1. Save to Google Sheets state
+      const res = await fetch('/api/parte-taller/novedad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accion: 'actualizar_estado_flota',
+          interno: interno,
+          estado: estado,
+          motivo: novedadFormatted,
+          responsable: currentUser
+        })
+      });
+      if (!res.ok) throw new Error('Error al registrar la novedad en el Parte Taller.');
+
+      // 2. Automatically generate a Correctivo work order in Taxes if reparación or fuera_de_servicio
+      if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
+        const rodadoOpt = cachedCatalogs.rodados
+          ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
+          : null;
+        const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Clean novedades for the Incident description
+        const incidentDesc = novedadFormatted.split('\n').map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()).filter(Boolean).join(', ');
+
+        const orderPayload = {
+          rodado: rodadoLabel,
+          responsable: "AUTO",
+          interno: interno,
+          clasificacion: "Correctivo",
+          fechaEntrega: today,
+          horario: "12:00",
+          incidente: incidentDesc,
+          tasks: [],
+          estadoUnidad: (estado === 'fuera_de_servicio' ? 'fuera_de_servicio' : 'operativo')
+        };
+
+        const orderRes = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderPayload)
+        });
+        if (!orderRes.ok) {
+          console.error('Error auto-creating work order in Taxes.');
+        } else {
+          showToast(`Unidad registrada y Orden de Trabajo Correctiva creada ✓`, 'success');
+        }
+      } else {
+        showToast('Unidad agregada con éxito a Servicios Pendientes.', 'success');
+      }
+    } 
+    // If EDITING an existing unit
+    else {
+      if (!window._ptState) return;
+      const state = window._ptState;
+
+      // 1. Remove from all three lists to start clean
+      const lists = ['servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
+      let foundUnitObj = null;
+
+      lists.forEach(listName => {
+        if (state[listName]) {
+          const idx = state[listName].findIndex(u => String(u.interno).trim() === interno);
+          if (idx !== -1) {
+            foundUnitObj = state[listName][idx];
+            state[listName].splice(idx, 1);
+          }
+        }
+      });
+
+      if (!foundUnitObj) {
+        foundUnitObj = { interno, tipo, dia_parado: new Date().toLocaleDateString('es-AR') };
+      }
+
+      // 2. Update properties
+      foundUnitObj.tipo = tipo;
+      foundUnitObj.novedad = novedadFormatted;
+      
+      // If moved from operative to inoperative, update dia_parado
+      const oldWasOperative = (currentEditingPtOriginalList === 'servicios_pendientes');
+      const newIsOperative = (estado === 'servicios_pendientes');
+      if (oldWasOperative && !newIsOperative) {
+        foundUnitObj.dia_parado = new Date().toLocaleDateString('es-AR');
+        foundUnitObj.dias_en_reparacion = 0;
+      }
+
+      // Add to new list
+      if (!state[estado]) state[estado] = [];
+      state[estado].push(foundUnitObj);
+
+      // Recalculate totals client-side for immediate consistency (it will reload anyway)
+      state.resumen = state.resumen || {};
+      state.resumen.responsable = currentUser;
+
+      // 3. Save entire state to Google Sheet
+      const res = await fetch('/api/parte-taller/novedad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accion: 'save_state',
+          state: state
+        })
+      });
+      if (!res.ok) throw new Error('Error al guardar los cambios en el Parte Taller.');
+
+      // 4. Auto-create work order if state changed to reparación or fuera_de_servicio and there's no open order
+      if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
+        const hasOpenOrder = activeOrders && activeOrders.some(o =>
+          String(o.interno || '').trim() === interno &&
+          (!o.estado || o.estado.toLowerCase() !== 'cerrada')
+        );
+        if (!hasOpenOrder) {
+          const rodadoOpt = cachedCatalogs.rodados
+            ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
+            : null;
+          const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+          const today = new Date().toISOString().split('T')[0];
+          const incidentDesc = novedadFormatted.split('\n').map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()).filter(Boolean).join(', ');
+
+          const orderPayload = {
+            rodado: rodadoLabel,
+            responsable: "AUTO",
+            interno: interno,
+            clasificacion: "Correctivo",
+            fechaEntrega: today,
+            horario: "12:00",
+            incidente: incidentDesc,
+            tasks: [],
+            estadoUnidad: (estado === 'fuera_de_servicio' ? 'fuera_de_servicio' : 'operativo')
+          };
+
+          await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderPayload)
+          });
+          showToast(`Unidad actualizada y Orden de Trabajo Correctiva creada ✓`, 'success');
+        } else {
+          showToast('Unidad actualizada con éxito.', 'success');
+        }
+      } else {
+        showToast('Unidad actualizada con éxito.', 'success');
+      }
+    }
+
+    closePtUnitModal();
+    fetchParteTallerEstado();
+    if (typeof fetchOrders === 'function') fetchOrders();
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || 'Error al guardar la unidad.', 'danger');
+  }
+}
+
