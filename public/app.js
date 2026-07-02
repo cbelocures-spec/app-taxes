@@ -6932,8 +6932,34 @@ function renderParteTallerDashboard(state) {
     return `<span style="font-weight:600; color:${color};">${diasParado}</span>`;
   }
 
+  // Helper to compute numeric days from item (for sorting)
+  function getDaysValue(item) {
+    if (item.dias_en_reparacion && parseInt(item.dias_en_reparacion) > 0) return parseInt(item.dias_en_reparacion);
+    const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '';
+    if (desde && desde !== '—') {
+      try {
+        const parts = desde.split('/');
+        if (parts.length === 3) {
+          const fechaIngreso = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          return Math.floor((Date.now() - fechaIngreso.getTime()) / (1000 * 60 * 60 * 24));
+        }
+      } catch(e) {}
+    }
+    return 0;
+  }
+
+  // Determine current user sector for filtering
+  const currentUserForPt = localStorage.getItem('currentUserUsername');
+  const currentPtSector = (getSectorByUsername(currentUserForPt) === 'Herrería') ? 'herreria' : 'taller';
+
+  function matchesPtSector(item) {
+    // If item has no sector tag, show to everyone (legacy data)
+    if (!item.sector) return true;
+    return item.sector === currentPtSector;
+  }
+
   // 1. Fuera de servicio
-  const fueraDeServicio = displayState.fuera_de_servicio || [];
+  const fueraDeServicio = (displayState.fuera_de_servicio || []).filter(matchesPtSector).sort((a, b) => getDaysValue(b) - getDaysValue(a));
   if (el('pt-out-count')) el('pt-out-count').textContent = fueraDeServicio.length;
   if (el('pt-fuera-tbody')) {
     if (fueraDeServicio.length === 0) {
@@ -6955,7 +6981,7 @@ function renderParteTallerDashboard(state) {
   }
 
   // 2. En reparación
-  const reparacion = displayState.reparacion || [];
+  const reparacion = (displayState.reparacion || []).filter(matchesPtSector).sort((a, b) => getDaysValue(b) - getDaysValue(a));
   if (el('pt-rep-count')) el('pt-rep-count').textContent = reparacion.length;
   if (el('pt-reparacion-tbody')) {
     if (reparacion.length === 0) {
@@ -7487,7 +7513,8 @@ async function savePtUnit() {
           interno: saveInterno,
           estado: estado,
           motivo: novedadFormatted,
-          responsable: currentUser
+          responsable: currentUser,
+          sector: (getSectorByUsername(currentUser) === 'Herrería') ? 'herreria' : 'taller'
         })
       });
       if (!res.ok) throw new Error('Error al registrar la novedad en el Parte Taller.');
@@ -7572,6 +7599,16 @@ async function savePtUnit() {
         foundUnitObj.interno = saveInterno;
         foundUnitObj.tipo = tipo;
         foundUnitObj.novedad = novedadFormatted;
+        // Also update novedad_items so the checklist re-renders correctly
+        foundUnitObj.novedad_items = novedadFormatted.split('\n').map(line => {
+          const hecho = line.startsWith('[X]') || line.startsWith('[x]');
+          const texto = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
+          return { texto, hecho };
+        }).filter(x => x.texto);
+        // Preserve sector tag
+        const userSectorForSave = getSectorByUsername(currentUser);
+        if (userSectorForSave === 'Herrería') foundUnitObj.sector = 'herreria';
+        else if (!foundUnitObj.sector) foundUnitObj.sector = 'taller';
         
         // If moved from operative to inoperative, update dia_parado
         const oldWasOperative = (currentEditingPtOriginalList === 'servicios_pendientes');
