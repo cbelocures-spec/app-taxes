@@ -1272,7 +1272,13 @@ function updateEmployeeDropdownForCard(card) {
 
   let filteredEmployees = cachedCatalogs.empleados;
 
-  if (userSector === 'Herrería' || selectedCc === "HERRERIA" || selectedCc === "16") {
+  // Detect sector by label text of the selected CC option (robust, not hardcoded)
+  const selectedOption = ccSelect.options[ccSelect.selectedIndex];
+  const selectedLabel = selectedOption ? selectedOption.textContent.trim().toUpperCase() : '';
+  const isHerreriaCC = selectedLabel.includes('HERRER') || selectedCc === "HERRERIA" || selectedCc === "16" || userSector === 'Herrería';
+  const isMecanicaCC = selectedLabel.includes('MECAN') || selectedCc === "15" || selectedCc === "MECANICA";
+
+  if (isHerreriaCC) {
     // Herrería filter
     const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
     const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
@@ -1299,7 +1305,7 @@ function updateEmployeeDropdownForCard(card) {
 
     filteredEmployees = matchedEmployees;
 
-  } else if (selectedCc === "15" || selectedCc === "MECANICA") { // MECANICA
+  } else if (isMecanicaCC) { // MECANICA
     const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
     const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
     filteredEmployees = cachedCatalogs.empleados.filter(emp => {
@@ -1527,7 +1533,14 @@ function addTaskField(taskData = null) {
     // We filter first and then assign the value
     let filteredEmployees = cachedCatalogs.empleados;
     const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
-    if (taskData.centroCosto === "15" || taskData.centroCosto === "MECANICA") {
+
+    // Detect sector by looking up the label of the centroCosto in the catalog
+    const ccCatalogOpt = cachedCatalogs.centrosCosto.find(c => c.value === taskData.centroCosto);
+    const ccLabelUpper = ccCatalogOpt ? ccCatalogOpt.label.trim().toUpperCase() : String(taskData.centroCosto || '').toUpperCase();
+    const isHerreriaCC = ccLabelUpper.includes('HERRER');
+    const isMecanicaCC = ccLabelUpper.includes('MECAN') || taskData.centroCosto === '15';
+
+    if (isMecanicaCC) {
       const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
       filteredEmployees = cachedCatalogs.empleados.filter(emp => {
         const empCleaned = cleanName(emp.label);
@@ -1539,7 +1552,7 @@ function addTaskField(taskData = null) {
         }
         return false;
       });
-    } else if (taskData.centroCosto === "16" || taskData.centroCosto === "HERRERIA" || String(taskData.centroCosto || '').toLowerCase().includes('herrer')) {
+    } else if (isHerreriaCC) {
       const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
       let matchedEmployees = cachedCatalogs.empleados.filter(emp => {
         const empCleaned = cleanName(emp.label);
@@ -1551,7 +1564,6 @@ function addTaskField(taskData = null) {
         }
         return false;
       });
-      // Add custom Herrería names if not present in catalog
       const customHerreriaNames = ["Federico", "Luciano", "Digno"];
       customHerreriaNames.forEach(name => {
         const exists = matchedEmployees.some(emp => emp.label.toLowerCase().trim() === name.toLowerCase());
@@ -3863,7 +3875,13 @@ function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
 
   let filteredEmployees = cachedCatalogs.empleados;
 
-  if (userSector === 'Herrería' || selectedCc === "HERRERIA" || selectedCc === "16") {
+  // Detect sector by label text of the selected CC option (robust, not hardcoded)
+  const selectedOption = ccSelect.options[ccSelect.selectedIndex];
+  const selectedLabel = selectedOption ? selectedOption.textContent.trim().toUpperCase() : '';
+  const isHerreriaCC = selectedLabel.includes('HERRER') || selectedCc === "HERRERIA" || selectedCc === "16" || userSector === 'Herrería';
+  const isMecanicaCC = selectedLabel.includes('MECAN') || selectedCc === "15" || selectedCc === "MECANICA";
+
+  if (isHerreriaCC) {
     // Herrería filter
     const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
     const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
@@ -3890,7 +3908,7 @@ function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
 
     filteredEmployees = matchedEmployees;
 
-  } else if (selectedCc === "15" || selectedCc === "MECANICA") { // MECANICA
+  } else if (isMecanicaCC) { // MECANICA
     const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
     const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
     filteredEmployees = cachedCatalogs.empleados.filter(emp => {
