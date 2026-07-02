@@ -722,14 +722,27 @@ function editOrder(orderId) {
   // Set up input vs select based on user sector
   setupAllFieldsForSector();
 
-  // Find corresponding Rodado value in cachedCatalogs
+  // Find corresponding Rodado value in cachedCatalogs (robust: case-insensitive, trimmed)
   const rodadoSelect = document.getElementById('form-rodado');
   const rodadoText = document.getElementById('form-rodado-text');
-  const rodadoOpt = cachedCatalogs.rodados.find(r => r.label === order.rodado);
+  const cleanRodado = String(order.rodado || '').trim().toUpperCase();
+  const rodadoOpt = cachedCatalogs.rodados.find(r =>
+    String(r.label || '').trim().toUpperCase() === cleanRodado ||
+    String(r.value || '').trim() === String(order.rodado || '').trim()
+  );
   if (rodadoOpt) {
     rodadoSelect.value = rodadoOpt.value;
   } else {
-    rodadoSelect.value = "";
+    // If no exact match, try to add as option so it doesn't reset
+    if (order.rodado) {
+      const newOpt = document.createElement('option');
+      newOpt.value = order.rodado;
+      newOpt.textContent = order.rodado;
+      rodadoSelect.appendChild(newOpt);
+      rodadoSelect.value = order.rodado;
+    } else {
+      rodadoSelect.value = "";
+    }
   }
   if (rodadoSelect.rebuildSearchable) {
     rodadoSelect.rebuildSearchable();
@@ -808,14 +821,26 @@ function viewOrder(orderId) {
   // Set up input vs select based on user sector
   setupAllFieldsForSector();
 
-  // Find corresponding Rodado value in cachedCatalogs
+  // Find corresponding Rodado value in cachedCatalogs (robust: case-insensitive, trimmed)
   const rodadoSelect = document.getElementById('form-rodado');
   const rodadoText = document.getElementById('form-rodado-text');
-  const rodadoOpt = cachedCatalogs.rodados.find(r => r.label === order.rodado);
+  const cleanRodado = String(order.rodado || '').trim().toUpperCase();
+  const rodadoOpt = cachedCatalogs.rodados.find(r =>
+    String(r.label || '').trim().toUpperCase() === cleanRodado ||
+    String(r.value || '').trim() === String(order.rodado || '').trim()
+  );
   if (rodadoOpt) {
     rodadoSelect.value = rodadoOpt.value;
   } else {
-    rodadoSelect.value = "";
+    if (order.rodado) {
+      const newOpt = document.createElement('option');
+      newOpt.value = order.rodado;
+      newOpt.textContent = order.rodado;
+      rodadoSelect.appendChild(newOpt);
+      rodadoSelect.value = order.rodado;
+    } else {
+      rodadoSelect.value = "";
+    }
   }
   if (rodadoSelect.rebuildSearchable) {
     rodadoSelect.rebuildSearchable();
@@ -1501,8 +1526,8 @@ function addTaskField(taskData = null) {
     
     // We filter first and then assign the value
     let filteredEmployees = cachedCatalogs.empleados;
-    if (taskData.centroCosto === "15") {
-      const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    if (taskData.centroCosto === "15" || taskData.centroCosto === "MECANICA") {
       const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
       filteredEmployees = cachedCatalogs.empleados.filter(emp => {
         const empCleaned = cleanName(emp.label);
@@ -1514,6 +1539,27 @@ function addTaskField(taskData = null) {
         }
         return false;
       });
+    } else if (taskData.centroCosto === "16" || taskData.centroCosto === "HERRERIA" || String(taskData.centroCosto || '').toLowerCase().includes('herrer')) {
+      const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
+      let matchedEmployees = cachedCatalogs.empleados.filter(emp => {
+        const empCleaned = cleanName(emp.label);
+        if (herreriaNamesCleaned.has(empCleaned)) return true;
+        for (const hName of herreriaNamesCleaned) {
+          if (empCleaned.includes(hName) || hName.includes(empCleaned)) {
+            return true;
+          }
+        }
+        return false;
+      });
+      // Add custom Herrería names if not present in catalog
+      const customHerreriaNames = ["Federico", "Luciano", "Digno"];
+      customHerreriaNames.forEach(name => {
+        const exists = matchedEmployees.some(emp => emp.label.toLowerCase().trim() === name.toLowerCase());
+        if (!exists) {
+          matchedEmployees.push({ value: name, label: name });
+        }
+      });
+      filteredEmployees = matchedEmployees;
     }
     let empOptions = `<option value="">Seleccionar Empleado...</option>`;
     filteredEmployees.forEach(opt => {
@@ -1830,10 +1876,12 @@ function createOrderCardHtml(order) {
       </div>
 
       <div class="order-card-footer">
-        <div class="tasks-summary">
+        <div class="tasks-summary" onclick="toggleTaskEmployees(event, '${order.id}')" style="cursor:pointer;" title="Ver personal asignado">
           <span class="material-icons">format_list_bulleted</span>
           <span>${order.tasks.length} Tareas asignadas</span>
+          <span class="material-icons" style="font-size:14px; margin-left:2px; color:var(--text-muted);">expand_more</span>
         </div>
+        <div class="task-employees-detail" id="task-emp-${order.id}" style="display:none; width:100%; margin-top:6px; padding:6px 8px; background:var(--bg-secondary); border-radius:6px; font-size:12px;"></div>
         <div class="card-actions">
           ${(order.syncStatus !== 'pending' && order.syncStatus !== 'syncing') ? `
             <button class="icon-btn warning" onclick="editOrder('${order.id}')" title="Editar Orden">
@@ -1852,6 +1900,42 @@ function createOrderCardHtml(order) {
       </div>
     </div>
   `;
+}
+
+function toggleTaskEmployees(event, orderId) {
+  event.stopPropagation();
+  const detailEl = document.getElementById(`task-emp-${orderId}`);
+  if (!detailEl) return;
+
+  if (detailEl.style.display !== 'none') {
+    detailEl.style.display = 'none';
+    return;
+  }
+
+  const order = activeOrders.find(o => o.id === orderId);
+  if (!order || !order.tasks || order.tasks.length === 0) {
+    detailEl.innerHTML = '<span style="color:var(--text-muted);">Sin tareas asignadas</span>';
+    detailEl.style.display = 'block';
+    return;
+  }
+
+  let html = '';
+  order.tasks.forEach((t, idx) => {
+    const empOpt = (cachedCatalogs && cachedCatalogs.empleados)
+      ? cachedCatalogs.empleados.find(e => e.value === t.empleado)
+      : null;
+    const empName = empOpt ? empOpt.label : (t.empleado || 'Sin asignar');
+    const statusIcon = t.status === 'Finalizada' ? '✅' : (t.timerStart > 0 ? '⚡' : (t.timerStarted || (t.timerHistory && t.timerHistory.length > 0) ? '⏸' : '⏳'));
+    const desc = t.descripcion ? t.descripcion.split('\n')[0].substring(0, 40) : 'Sin descripción';
+    html += `<div style="display:flex; align-items:center; gap:6px; padding:3px 0; border-bottom:1px solid var(--border-color);">
+      <span style="font-size:13px;">${statusIcon}</span>
+      <strong style="font-size:12px;">${empName}</strong>
+      <span style="color:var(--text-muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">— ${desc}</span>
+    </div>`;
+  });
+
+  detailEl.innerHTML = html;
+  detailEl.style.display = 'block';
 }
 
 function createQueueCardHtml(order) {
