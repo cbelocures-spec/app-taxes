@@ -6751,28 +6751,102 @@ function adjustPtStateLists(state) {
   if (!state) return;
   if (!activeOrders || !Array.isArray(activeOrders)) return;
 
-  // Determine sector based on active tab/selected sector: Taller = centroCosto '15', Herrería = everything else
+  // Determine sector based on active tab/selected sector
   const isHerreriaAdj = (currentSelectedSector === 'Herrería');
 
-  // Helper: does a task match the current user's sector?
+  // Helper: does a task match the current sector?
   function taskMatchesSector(t) {
-    if (isHerreriaAdj) return t.centroCosto !== '15'; // Herrería tasks
-    return !t.centroCosto || t.centroCosto === '15'; // Mecánica tasks
+    // Use label-based detection matching the catalog
+    const ccOpt = cachedCatalogs.centrosCosto ? cachedCatalogs.centrosCosto.find(c => c.value === t.centroCosto) : null;
+    const ccLabel = ccOpt ? ccOpt.label.toUpperCase() : String(t.centroCosto || '').toUpperCase();
+    if (isHerreriaAdj) return ccLabel.includes('HERRER');
+    return ccLabel.includes('MECAN') || t.centroCosto === '15' || (!ccLabel.includes('HERRER') && !ccLabel.includes('EDILI'));
   }
+
+  // ============================================================
+  // HERRERÍA MODE: Only show live orders from Taxes as Fuera de Servicio
+  // ============================================================
+  if (isHerreriaAdj) {
+    // Clear all Google Sheet-based lists (not applicable for Herrería)
+    state.fuera_de_servicio = [];
+    state.reparacion = [];
+    state.servicios_pendientes = [];
+
+    // Find all open Herrería orders with active/paused tasks
+    const herreriaOrders = activeOrders.filter(o => {
+      const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
+      if (isClosed) return false;
+      const tasks = o.tasks || [];
+      return tasks.filter(taskMatchesSector).some(
+        t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0))
+      );
+    });
+
+    // Create fuera_de_servicio entries from live Herrería orders
+    herreriaOrders.forEach(order => {
+      const activeTasks = (order.tasks || [])
+        .filter(taskMatchesSector)
+        .filter(t => t.status !== 'Finalizada')
+        .map(t => {
+          let prefix = '[ ]';
+          if (t.timerStart > 0) {
+            prefix = '[ ] ⚡ [En Proceso]';
+          } else if (t.timerStarted || (t.timerHistory && t.timerHistory.length > 0)) {
+            prefix = '[ ] ⏸ [Pausado]';
+          }
+          return `${prefix} ${t.descripcion || 'Tarea sin descripción'}`;
+        });
+
+      // Guess type from catalog
+      let unitType = 'UNIDAD';
+      const rodadoOpt = cachedCatalogs.rodados
+        ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(order.interno).trim())
+        : null;
+      if (rodadoOpt) {
+        const labelUpper = String(rodadoOpt.label || '').toUpperCase();
+        if (labelUpper.includes('VOLQ')) unitType = 'VOLQUETE';
+        else if (labelUpper.includes('ROLL') || labelUpper.includes('OFF')) unitType = 'ROLL - OFF';
+        else if (labelUpper.includes('PLANCHA')) unitType = 'PLANCHA';
+        else if (labelUpper.includes('COMPAC')) unitType = 'COMPACTADOR';
+        else if (labelUpper.includes('CONTENEDOR') || labelUpper.includes('CAJITA') || labelUpper.includes('CAJA')) unitType = 'CONTENEDOR';
+        else unitType = 'UNIDAD';
+      }
+
+      state.fuera_de_servicio.push({
+        interno: order.interno || 'Sin numero',
+        tipo: unitType,
+        novedad: activeTasks.join('\n'),
+        novedad_items: activeTasks.map(line => {
+          const hecho = line.startsWith('[X]') || line.startsWith('[x]');
+          const texto = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
+          return { texto, hecho };
+        }),
+        dia_parado: new Date().toLocaleDateString('es-AR'),
+        dias_en_reparacion: 0
+      });
+    });
+
+    // Clear totals (not applicable for Herrería view)
+    state.resumen = { totales: {} };
+    return;
+  }
+
+  // ============================================================
+  // TALLER MODE: Standard logic - move units with active tasks to "En Reparación"
+  // ============================================================
 
   // 1. Find all open orders with active or paused sector-matching tasks
   const activeRepairOrders = activeOrders.filter(o => {
     const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
     if (isClosed) return false;
     const tasks = o.tasks || [];
-    // Only count tasks for this sector that are active/paused
     return tasks.filter(taskMatchesSector).some(
       t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0))
     );
   });
 
   // Keep track of which internos are forced into "reparacion"
-  const repairInternos = new Map(); // key: resolved Taxes interno -> order object
+  const repairInternos = new Map();
   activeRepairOrders.forEach(o => {
     const taxInt = String(o.interno || '').trim().toUpperCase();
     if (taxInt) {
@@ -6795,7 +6869,7 @@ function adjustPtStateLists(state) {
 
   // 2. Scan all lists in state, extract matching units, and filter them out
   const lists = ['fuera_de_servicio', 'reparacion', 'servicios_pendientes'];
-  const unitsToMove = []; // array of { unit, matchingOrder, sourceList }
+  const unitsToMove = [];
 
   lists.forEach(listName => {
     if (!state[listName]) state[listName] = [];
@@ -6803,18 +6877,16 @@ function adjustPtStateLists(state) {
       const matchingOrder = findMatchingOrder(unit.interno);
       if (matchingOrder) {
         unitsToMove.push({ unit, matchingOrder, sourceList: listName });
-        return false; // Remove from original list
+        return false;
       }
-      return true; // Keep in original list
+      return true;
     });
   });
 
-  // Ensure "reparacion" array exists
   if (!state.reparacion) state.reparacion = [];
 
   // 3. For each moved unit, update its novelty/tasks and place in "reparacion"
   unitsToMove.forEach(({ unit, matchingOrder, sourceList }) => {
-    // Generate active task descriptions (only tasks for this sector)
     const activeTasks = (matchingOrder.tasks || [])
       .filter(taskMatchesSector)
       .filter(t => t.status !== 'Finalizada')
@@ -6828,7 +6900,6 @@ function adjustPtStateLists(state) {
         return `${prefix} ${t.descripcion || 'Tarea sin descripción'}`;
       });
 
-    // Combine original novelty items with active task descriptions
     let originalLines = [];
     if (Array.isArray(unit.novedad_items)) {
       originalLines = unit.novedad_items.map(x => {
@@ -6839,14 +6910,12 @@ function adjustPtStateLists(state) {
       originalLines = unit.novedad.split('\n').map(l => l.trim()).filter(Boolean);
     }
 
-    // Filter out duplicates (if the task description matches an original item text)
     const activeClean = activeTasks.map(t => t.replace(/^\[\s*\]\s*(⚡ \[En Proceso\]|⏸ \[Pausado\])\s*/, '').trim().toUpperCase());
     originalLines = originalLines.filter(line => {
       const cleanLine = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim().toUpperCase();
       return !activeClean.includes(cleanLine);
     });
 
-    // Combined novelty text
     const combinedLines = [...originalLines, ...activeTasks];
     unit.novedad = combinedLines.join('\n');
     unit.novedad_items = combinedLines.map(line => {
@@ -6855,19 +6924,15 @@ function adjustPtStateLists(state) {
       return { texto, hecho };
     });
 
-    // Update list reference to "reparacion"
     state.reparacion.push(unit);
-    
-    // Remove from repairInternos once handled
     const taxInt = String(matchingOrder.interno || '').trim().toUpperCase();
     repairInternos.delete(taxInt);
   });
 
-  // 4. For any remaining repairInternos (units not currently in taller), create a temporary unit in "reparacion"
+  // 4. For any remaining repairInternos (units not currently in taller), create a temporary unit
   for (const [taxInt, order] of repairInternos.entries()) {
     let internoLabel = order.interno;
     
-    // Try to guess vehicle type from catalog label
     let unitType = 'COMPACTADOR';
     const rodadoOpt = cachedCatalogs.rodados
       ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(order.interno).trim())
@@ -6881,9 +6946,8 @@ function adjustPtStateLists(state) {
       else if (labelUpper.includes('CONTENEDOR') || labelUpper.includes('CAJITA') || labelUpper.includes('CAJA')) unitType = 'CONTENEDOR';
       else if (labelUpper.includes('CAMION') || labelUpper.includes('CAMIÓN') || labelUpper.includes('TRACTO')) unitType = 'CAMIÓN';
       else if (labelUpper.includes('SEMI')) unitType = 'SEMI';
-      else unitType = 'UNIDAD'; // Unknown - don't default to COMPACTADOR
+      else unitType = 'UNIDAD';
     } else {
-      // No catalog match — if label looks like a number, keep COMPACTADOR; otherwise use 'UNIDAD'
       if (isNaN(Number(String(order.interno || '').trim()))) unitType = 'UNIDAD';
     }
 
@@ -6915,7 +6979,7 @@ function adjustPtStateLists(state) {
     state.reparacion.push(tempUnit);
   }
 
-  // 5. Recalculate totals dynamically based on the newly adjusted list sizes
+  // 5. Recalculate totals
   const totales = (state.resumen || {}).totales || {};
   const types = ['COMPACTADOR', 'VOLQUETE', 'ROLL - OFF', 'PLANCHA'];
   types.forEach(t => {
