@@ -7005,20 +7005,21 @@ function openPtEditUnitModal(interno, listName) {
   
   document.getElementById('pt-unit-modal-title').textContent = `Editar Unidad #${interno}`;
   
-  // Detect company from prefix
+  // Detect company anywhere in the name (case-insensitive)
   let inputInternoVal = String(interno).trim();
   let empresaVal = 'hugo';
-  if (inputInternoVal.startsWith('Irineo ')) {
+  const upperVal = inputInternoVal.toUpperCase();
+  if (upperVal.includes('IRINEO')) {
     empresaVal = 'irineo';
-    inputInternoVal = inputInternoVal.replace(/^Irineo\s+/, '');
-  } else if (inputInternoVal.startsWith('Nico ')) {
+    inputInternoVal = inputInternoVal.replace(/irineo/gi, '').replace(/[-_]/g, '').trim();
+  } else if (upperVal.includes('NICO')) {
     empresaVal = 'nico';
-    inputInternoVal = inputInternoVal.replace(/^Nico\s+/, '');
+    inputInternoVal = inputInternoVal.replace(/volquete\s+nico/gi, '').replace(/nico/gi, '').replace(/[-_]/g, '').trim();
   }
 
   document.getElementById('pt-unit-empresa').value = empresaVal;
   document.getElementById('pt-unit-interno').value = inputInternoVal;
-  document.getElementById('pt-unit-interno').disabled = true;
+  document.getElementById('pt-unit-interno').disabled = false; // Always keep enabled so user can edit and remove suffix/typos
   document.getElementById('pt-unit-tipo').value = item.tipo || 'COMPACTADOR';
   document.getElementById('pt-unit-estado').value = listName;
   
