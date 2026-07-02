@@ -7023,6 +7023,10 @@ function openPtAddUnitModal() {
   const novedadLabel = document.getElementById('pt-unit-novedad-label');
   if (novedadLabel) novedadLabel.textContent = 'Novedad / Diagnóstico / Servicio';
   
+  // Hide Delete button in Add mode
+  const deleteBtn = document.getElementById('btn-delete-pt-unit');
+  if (deleteBtn) deleteBtn.style.display = 'none';
+  
   document.getElementById('pt-unit-modal').classList.add('open');
 }
 
@@ -7102,6 +7106,10 @@ function openPtEditUnitModal(interno, listName) {
   const novedadLabel = document.getElementById('pt-unit-novedad-label');
   if (novedadLabel) novedadLabel.textContent = 'Agregar nuevos ítems (opcional)';
   
+  // Show Delete button in Edit mode
+  const deleteBtn = document.getElementById('btn-delete-pt-unit');
+  if (deleteBtn) deleteBtn.style.display = 'block';
+  
   document.getElementById('pt-unit-modal').classList.add('open');
 }
 
@@ -7175,14 +7183,87 @@ function ptCheckForDuplicateUnit() {
     
     window._ptDuplicateEditInterno = searchInterno;
     window._ptDuplicateEditList = foundList;
+    
+    // Show Delete button since it is now behaving as Edit mode
+    const deleteBtn = document.getElementById('btn-delete-pt-unit');
+    if (deleteBtn) deleteBtn.style.display = 'block';
+    
     showToast(`La unidad #${searchInterno} ya está registrada. Cargando novedades existentes...`, 'info');
   } else {
     // Clean if we previously auto-switched
     if (window._ptDuplicateEditInterno) {
       document.getElementById('pt-unit-modal-title').textContent = 'Agregar Unidad a Taller';
       document.getElementById('pt-unit-novedad').value = '';
+      
+      const deleteBtn = document.getElementById('btn-delete-pt-unit');
+      if (deleteBtn) deleteBtn.style.display = 'none';
+      
       window._ptDuplicateEditInterno = null;
       window._ptDuplicateEditList = null;
+    }
+  }
+}
+
+// Permanently delete the unit from taller state
+async function deletePtUnit() {
+  // Resolve which internally stored string to search for
+  let targetInterno = currentEditingPtInterno;
+  if (!targetInterno && window._ptDuplicateEditInterno) {
+    targetInterno = window._ptDuplicateEditInterno;
+  }
+  if (!targetInterno) return;
+
+  if (!confirm(`¿Estás seguro de que deseas eliminar la unidad #${targetInterno} del taller?`)) {
+    return;
+  }
+
+  const deleteBtn = document.getElementById('btn-delete-pt-unit');
+  if (deleteBtn) {
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = 'Eliminando...';
+  }
+
+  try {
+    if (!window._ptState) return;
+    const state = window._ptState;
+    const lists = ['servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
+    let removed = false;
+
+    lists.forEach(listName => {
+      if (state[listName]) {
+        const idx = state[listName].findIndex(u => String(u.interno).trim() === targetInterno);
+        if (idx !== -1) {
+          state[listName].splice(idx, 1);
+          removed = true;
+        }
+      }
+    });
+
+    if (!removed) {
+      throw new Error('No se encontró la unidad en el taller.');
+    }
+
+    // Save state to Google Sheets
+    const res = await fetch('/api/parte-taller/novedad', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accion: 'save_state',
+        state: state
+      })
+    });
+    if (!res.ok) throw new Error('Error al guardar los cambios en el Parte Taller.');
+
+    showToast(`Unidad #${targetInterno} eliminada con éxito ✓`, 'success');
+    closePtUnitModal();
+    fetchParteTallerEstado();
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || 'Error al eliminar la unidad.', 'danger');
+  } finally {
+    if (deleteBtn) {
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = 'Eliminar de Taller';
     }
   }
 }
