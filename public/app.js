@@ -6673,10 +6673,14 @@ function renderParteTallerDashboard(state) {
   if (el('pt-out-count')) el('pt-out-count').textContent = fueraDeServicio.length;
   if (el('pt-fuera-tbody')) {
     if (fueraDeServicio.length === 0) {
-      el('pt-fuera-tbody').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades fuera de servicio.</td></tr>';
+      el('pt-fuera-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades fuera de servicio.</td></tr>';
     } else {
+      // Build lookup map for safe onclick usage
+      window._ptFueraMap = {};
+      fueraDeServicio.forEach(item => { window._ptFueraMap[String(item.interno)] = item; });
+
       el('pt-fuera-tbody').innerHTML = fueraDeServicio.map(item => {
-        const novedades = Array.isArray(item.novedades) ? item.novedades.join('; ') : (item.novedad || item.falla || '—');
+        const internoPT = String(item.interno || '');
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         let diasParado = item.dias_en_reparacion ? (item.dias_en_reparacion + ' días') : '—';
         if (diasParado === '—' && desde !== '—') {
@@ -6689,16 +6693,69 @@ function renderParteTallerDashboard(state) {
             }
           } catch(e) {}
         }
+
+        // Get PENDING items only (remove [X] done items)
+        let pendingItems = [];
+        if (Array.isArray(item.novedad_items) && item.novedad_items.length > 0) {
+          pendingItems = item.novedad_items
+            .filter(x => !x.hecho)
+            .map(x => x.texto.replace(/^\[\s*\]\s*/, '').trim())
+            .filter(Boolean);
+        } else if (item.novedad) {
+          item.novedad.split('\n').forEach(line => {
+            const l = line.trim();
+            if (l && !l.startsWith('[X]') && !l.startsWith('[x]')) {
+              const clean = l.replace(/^\[\s*\]\s*/, '').trim();
+              if (clean) pendingItems.push(clean);
+            }
+          });
+        }
+
+        const checklistHtml = pendingItems.length > 0
+          ? `<div style="display:flex; flex-direction:column; gap:5px;">
+              ${pendingItems.map((txt, idx) => {
+                const safeId = `ptck_${internoPT}_${idx}`;
+                const safeTxt = txt.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                return `<label style="display:flex; align-items:flex-start; gap:6px; font-size:12px; cursor:pointer;">
+                  <input type="checkbox" class="pt-item-checkbox" data-interno="${internoPT}" value="${safeTxt}"
+                    id="${safeId}" style="margin-top:2px; accent-color:var(--primary); flex-shrink:0;">
+                  <span>${txt}</span>
+                </label>`;
+              }).join('')}
+              <button class="btn btn-secondary btn-xs" onclick="ptAsignarSeleccionados('${internoPT}')"
+                style="margin-top:6px; font-size:11px; display:inline-flex; align-items:center; gap:3px; align-self:flex-start;">
+                <span class="material-icons" style="font-size:13px;">assignment</span> Asignar Seleccionados
+              </button>
+            </div>`
+          : '<span style="color:var(--text-muted); font-size:12px;">Sin ítems pendientes</span>';
+
+        // Look up existing open order for this interno
+        const openOrder = activeOrders && activeOrders.find(o =>
+          String(o.interno || '').trim() === internoPT &&
+          (!o.estado || o.estado.toLowerCase() !== 'cerrada')
+        );
+        const ordenBtn = openOrder
+          ? `<button class="btn btn-xs" onclick="editOrder('${openOrder.id}')"
+               style="background:#0288d1; color:white; border-color:#0288d1; font-size:11px; white-space:nowrap; display:inline-flex; align-items:center; gap:3px;">
+               <span class="material-icons" style="font-size:12px;">open_in_browser</span> Abrir Orden
+             </button>`
+          : `<button class="btn btn-xs" onclick="ptCrearOrden('${internoPT}')"
+               style="background:#00897b; color:white; border-color:#00897b; font-size:11px; white-space:nowrap; display:inline-flex; align-items:center; gap:3px;">
+               <span class="material-icons" style="font-size:12px;">add_circle</span> Crear Orden
+             </button>`;
+
         return `<tr>
           <td><strong>${item.interno || '—'}</strong></td>
-          <td>${item.tipo || '—'}</td>
-          <td>${novedades}</td>
-          <td>${diasParado}</td>
-          <td>${desde}</td>
+          <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
+          <td style="min-width:220px;">${checklistHtml}</td>
+          <td style="white-space:nowrap;">${ordenBtn}</td>
+          <td style="white-space:nowrap; font-weight:600; color:${parseInt(item.dias_en_reparacion||0)>30?'#ef4444':'inherit'};">${diasParado}</td>
+          <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
         </tr>`;
       }).join('');
     }
   }
+
 
   // En reparación
   const reparacion = state.reparacion || [];
@@ -6736,5 +6793,80 @@ function renderParteTallerDashboard(state) {
         </tr>`;
       }).join('');
     }
+  }
+}
+
+// ============================================================
+// PARTE TALLER — Orden helpers
+// ============================================================
+
+// Opens the new-order modal pre-filled with an interno from Parte Taller
+function ptCrearOrden(interno) {
+  switchView('orders');
+  openNewOrderModal();
+  const isHerreria = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Herrería');
+  const internoSelect = document.getElementById('form-interno');
+  const internoText  = document.getElementById('form-interno-text');
+  if (isHerreria) {
+    if (internoText) { internoText.value = interno; internoText.dispatchEvent(new Event('change')); }
+  } else {
+    if (internoSelect) {
+      internoSelect.value = interno;
+      if (internoSelect.rebuildSearchable) internoSelect.rebuildSearchable();
+      internoSelect.dispatchEvent(new Event('change'));
+    }
+  }
+  const rodadoOpt = cachedCatalogs.rodados
+    ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
+    : null;
+  if (rodadoOpt) {
+    const rodadoSelect = document.getElementById('form-rodado');
+    const rodadoText   = document.getElementById('form-rodado-text');
+    if (isHerreria) {
+      if (rodadoText) { rodadoText.value = rodadoOpt.label; rodadoText.dispatchEvent(new Event('change')); }
+    } else {
+      if (rodadoSelect) {
+        rodadoSelect.value = rodadoOpt.value;
+        if (rodadoSelect.rebuildSearchable) rodadoSelect.rebuildSearchable();
+        rodadoSelect.dispatchEvent(new Event('change'));
+      }
+    }
+  }
+  const clasificacionEl = document.getElementById('form-clasificacion');
+  if (clasificacionEl) {
+    clasificacionEl.value = 'Correctivo';
+    if (clasificacionEl.rebuildSearchable) clasificacionEl.rebuildSearchable();
+  }
+}
+
+// Reads checked items for a given interno and opens/creates an order with them as a task
+function ptAsignarSeleccionados(interno) {
+  const checkedBoxes = document.querySelectorAll(`.pt-item-checkbox[data-interno="${interno}"]:checked`);
+  if (checkedBoxes.length === 0) {
+    showToast('Seleccioná al menos un ítem para asignar.', 'warning');
+    return;
+  }
+  const selectedTexts = Array.from(checkedBoxes).map(cb => cb.value);
+  const combinedDesc  = selectedTexts.join('\n');
+
+  // Find an existing open order for this interno
+  const existingOrder = activeOrders && activeOrders.find(o =>
+    String(o.interno || '').trim() === String(interno).trim() &&
+    (!o.estado || o.estado.toLowerCase() !== 'cerrada')
+  );
+
+  if (existingOrder) {
+    editOrder(existingOrder.id);
+    // Small delay to let the modal DOM settle
+    setTimeout(() => {
+      addTaskField({ descripcion: combinedDesc, centroCosto: '15', status: 'Pendiente' });
+      showToast(`Ítem(s) agregado(s) a la Orden de Trabajo del Interno ${interno} ✓`, 'success');
+    }, 200);
+  } else {
+    ptCrearOrden(interno);
+    setTimeout(() => {
+      addTaskField({ descripcion: combinedDesc, centroCosto: '15', status: 'Pendiente' });
+      showToast(`Orden creada con los ítems seleccionados para Interno ${interno} ✓`, 'success');
+    }, 200);
   }
 }
