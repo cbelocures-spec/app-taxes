@@ -6649,9 +6649,8 @@ function adjustPtStateLists(state) {
   if (!state) return;
   if (!activeOrders || !Array.isArray(activeOrders)) return;
 
-  // Determine current user sector: Taller = centroCosto '15', Herrería = everything else
-  const currentUserForAdj = localStorage.getItem('currentUserUsername');
-  const isHerreriaAdj = (getSectorByUsername(currentUserForAdj) === 'Herrería');
+  // Determine sector based on active tab/selected sector: Taller = centroCosto '15', Herrería = everything else
+  const isHerreriaAdj = (currentSelectedSector === 'Herrería');
 
   // Helper: does a task match the current user's sector?
   function taskMatchesSector(t) {
