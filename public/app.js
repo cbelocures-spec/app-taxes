@@ -6056,6 +6056,10 @@ function renderPrevFlotaTable() {
     return;
   }
 
+  // Build lookup map for safe onclick usage (avoids string escaping issues)
+  window._prevFlotaMap = {};
+  filtered.forEach(item => { window._prevFlotaMap[item.originalRowIndex] = item; });
+
   tbody.innerHTML = filtered.map(item => {
     const alerta = String(item.alerta || '');
     const isUrgente = alerta.toLowerCase().includes('realizar') || alerta.toLowerCase().includes('urgente') || alerta.toLowerCase().includes('service');
@@ -6064,6 +6068,7 @@ function renderPrevFlotaTable() {
     const km = item.kmReales ? Number(item.kmReales).toLocaleString('es-AR') : 0;
     const hs = item.hsReales ? Number(item.hsReales).toLocaleString('es-AR') : 0;
     const rest = item.restante ? Number(item.restante).toLocaleString('es-AR') : 0;
+    const ri = item.originalRowIndex;
     return `<tr>
       <td><strong>${item.interno}</strong></td>
       <td>${item.modelo}</td>
@@ -6073,10 +6078,10 @@ function renderPrevFlotaTable() {
       <td><span class="badge-prev ${badgeClass}">${badgeText}</span></td>
       <td style="text-align:right;">
         <div style="display:inline-flex; gap:6px;">
-          <button class="btn btn-secondary btn-xs" onclick="openPrevServiceModal(${item.originalRowIndex}, '${item.interno}', '${item.modelo}', ${item.kmReales || 0}, ${item.hsReales || 0})" style="display:inline-flex; align-items:center; gap:2px;">
+          <button class="btn btn-secondary btn-xs" onclick="prevFlotaOpenService(${ri})" style="display:inline-flex; align-items:center; gap:2px;">
             <span class="material-icons" style="font-size:13px;">build</span> Service
           </button>
-          <button class="btn btn-xs" onclick="openPrevOdometerModal(${item.originalRowIndex}, '${item.interno}', '${item.modelo}', ${item.kmReales || 0}, ${item.hsReales || 0})" style="display:inline-flex; align-items:center; gap:2px; background-color: #0288d1; color: white; border-color: #0288d1;">
+          <button class="btn btn-xs" onclick="prevFlotaOpenOdometer(${ri})" style="display:inline-flex; align-items:center; gap:2px; background-color: #0288d1; color: white; border-color: #0288d1;">
             <span class="material-icons" style="font-size:13px;">edit</span> Actualizar
           </button>
         </div>
@@ -6090,6 +6095,7 @@ function renderPrevFlotaTable() {
       const isUrgente = alerta.toLowerCase().includes('realizar') || alerta.toLowerCase().includes('urgente') || alerta.toLowerCase().includes('service');
       const badgeClass = isUrgente ? 'warning' : 'ok';
       const badgeText = isUrgente ? '⚠ Realizar Service' : '✓ Al Día';
+      const ri = item.originalRowIndex;
       return `<div class="prev-mobile-card">
         <div class="prev-mobile-card-header">
           <div><strong style="font-size:16px;">${item.interno}</strong><br><span style="font-size:12px; color:var(--text-muted);">${item.modelo}</span></div>
@@ -6099,16 +6105,28 @@ function renderPrevFlotaTable() {
         <div class="prev-mobile-card-row"><span>Hs Reales</span><strong>${Number(item.hsReales || 0).toLocaleString('es-AR')}</strong></div>
         <div class="prev-mobile-card-row"><span>Restante</span><strong>${Number(item.restante || 0).toLocaleString('es-AR')}</strong></div>
         <div style="display:flex; gap:8px; margin-top:8px;">
-          <button class="btn btn-secondary btn-sm" onclick="openPrevServiceModal(${item.originalRowIndex}, '${item.interno}', '${item.modelo}', ${item.kmReales || 0}, ${item.hsReales || 0})" style="flex:1; display:flex; justify-content:center; align-items:center; gap:4px;">
+          <button class="btn btn-secondary btn-sm" onclick="prevFlotaOpenService(${ri})" style="flex:1; display:flex; justify-content:center; align-items:center; gap:4px;">
             <span class="material-icons" style="font-size:14px;">build</span> Service
           </button>
-          <button class="btn btn-sm" onclick="openPrevOdometerModal(${item.originalRowIndex}, '${item.interno}', '${item.modelo}', ${item.kmReales || 0}, ${item.hsReales || 0})" style="flex:1; display:flex; justify-content:center; align-items:center; gap:4px; background-color: #0288d1; color: white; border-color: #0288d1;">
+          <button class="btn btn-sm" onclick="prevFlotaOpenOdometer(${ri})" style="flex:1; display:flex; justify-content:center; align-items:center; gap:4px; background-color: #0288d1; color: white; border-color: #0288d1;">
             <span class="material-icons" style="font-size:14px;">edit</span> Actualizar
           </button>
         </div>
       </div>`;
     }).join('');
   }
+}
+
+// Safe wrappers — look up item from map to avoid string escaping in onclick attrs
+function prevFlotaOpenService(ri) {
+  const item = window._prevFlotaMap && window._prevFlotaMap[ri];
+  if (!item) return;
+  openPrevServiceModal(item.originalRowIndex, item.interno, item.modelo, item.kmReales || 0, item.hsReales || 0);
+}
+function prevFlotaOpenOdometer(ri) {
+  const item = window._prevFlotaMap && window._prevFlotaMap[ri];
+  if (!item) return;
+  openPrevOdometerModal(item.originalRowIndex, item.interno, item.modelo, item.kmReales || 0, item.hsReales || 0);
 }
 
 async function fetchPrevCombustible() {
