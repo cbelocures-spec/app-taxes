@@ -6709,10 +6709,19 @@ function renderParteTallerDashboard(state) {
     return '<span style="color:var(--text-muted); font-size:12px;">Sin ítems pendientes</span>';
   }
 
+  // Resolve the real Taxes interno from a Parte Taller interno (e.g. "Irineo 27" -> "IRINEO GRAL.")
+  function resolveTaxesInterno(internoPT) {
+    const up = String(internoPT).trim().toUpperCase();
+    if (up.includes('IRINEO')) return 'IRINEO GRAL.';
+    if (up.startsWith('NICO ') || up === 'NICO') return 'VOLQUETE NICO';
+    return internoPT;
+  }
+
   // Order button helper
   function getOrdenBtnHtml(internoPT) {
+    const taxesInterno = resolveTaxesInterno(internoPT);
     const openOrder = activeOrders && activeOrders.find(o =>
-      String(o.interno || '').trim() === internoPT &&
+      String(o.interno || '').trim() === taxesInterno &&
       (!o.estado || o.estado.toLowerCase() !== 'cerrada')
     );
     if (openOrder) {
@@ -6726,6 +6735,7 @@ function renderParteTallerDashboard(state) {
          <span class="material-icons" style="font-size:12px;">add_circle</span> Crear Orden
        </button>`;
   }
+
 
   // Edit pencil helper
   function getEditBtnHtml(internoPT, listName) {
@@ -6822,24 +6832,35 @@ function renderParteTallerDashboard(state) {
 // PARTE TALLER — Orden helpers
 // ============================================================
 
+// Resolve Taxes interno from Parte Taller interno (standalone version used outside renderParteTallerDashboard scope)
+function resolvePtTaxesInterno(internoPT) {
+  const up = String(internoPT).trim().toUpperCase();
+  if (up.includes('IRINEO')) return 'IRINEO GRAL.';
+  if (up.startsWith('NICO ') || up === 'NICO') return 'VOLQUETE NICO';
+  return internoPT;
+}
+
 // Opens the new-order modal pre-filled with an interno from Parte Taller
-function ptCrearOrden(interno) {
+function ptCrearOrden(internoPT) {
+  // Resolve the Taxes interno (Irineo -> IRINEO GRAL., Nico -> VOLQUETE NICO)
+  const taxesInterno = resolvePtTaxesInterno(internoPT);
+
   switchView('orders');
   openNewOrderModal();
   const isHerreria = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Herrería');
   const internoSelect = document.getElementById('form-interno');
   const internoText  = document.getElementById('form-interno-text');
   if (isHerreria) {
-    if (internoText) { internoText.value = interno; internoText.dispatchEvent(new Event('change')); }
+    if (internoText) { internoText.value = taxesInterno; internoText.dispatchEvent(new Event('change')); }
   } else {
     if (internoSelect) {
-      internoSelect.value = interno;
+      internoSelect.value = taxesInterno;
       if (internoSelect.rebuildSearchable) internoSelect.rebuildSearchable();
       internoSelect.dispatchEvent(new Event('change'));
     }
   }
   const rodadoOpt = cachedCatalogs.rodados
-    ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
+    ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(taxesInterno).trim())
     : null;
   if (rodadoOpt) {
     const rodadoSelect = document.getElementById('form-rodado');
@@ -6860,6 +6881,7 @@ function ptCrearOrden(interno) {
     if (clasificacionEl.rebuildSearchable) clasificacionEl.rebuildSearchable();
   }
 }
+
 
 // Reads checked items for a given interno and opens/creates an order with them as a task
 // Reads checked items for a given interno, updates the checklist in Google Sheets (disappearing items/unit if completed), and assigns tasks to the order.
@@ -6953,10 +6975,12 @@ async function ptAsignarSeleccionados(interno) {
   }
 
   // 2. Open or create the work order in Taxes
+  const taxesInterno = resolvePtTaxesInterno(interno);
   const existingOrder = activeOrders && activeOrders.find(o =>
-    String(o.interno || '').trim() === String(interno).trim() &&
+    String(o.interno || '').trim() === String(taxesInterno).trim() &&
     (!o.estado || o.estado.toLowerCase() !== 'cerrada')
   );
+
 
   if (existingOrder) {
     editOrder(existingOrder.id);
@@ -6993,6 +7017,12 @@ function openPtAddUnitModal() {
   document.getElementById('pt-unit-estado').value = 'servicios_pendientes';
   document.getElementById('pt-unit-novedad').value = '';
   
+  // Hide checklist editor, show plain textarea label
+  const checkSection = document.getElementById('pt-unit-checklist-section');
+  if (checkSection) checkSection.style.display = 'none';
+  const novedadLabel = document.getElementById('pt-unit-novedad-label');
+  if (novedadLabel) novedadLabel.textContent = 'Novedad / Diagnóstico / Servicio';
+  
   document.getElementById('pt-unit-modal').classList.add('open');
 }
 
@@ -7024,21 +7054,53 @@ function openPtEditUnitModal(interno, listName) {
 
   document.getElementById('pt-unit-empresa').value = empresaVal;
   document.getElementById('pt-unit-interno').value = inputInternoVal;
-  document.getElementById('pt-unit-interno').disabled = false; // Always keep enabled so user can edit and remove suffix/typos
+  document.getElementById('pt-unit-interno').disabled = false;
   document.getElementById('pt-unit-tipo').value = item.tipo || 'COMPACTADOR';
   document.getElementById('pt-unit-estado').value = listName;
-  
-  // Format novedades: get all texts from item
-  let rawNovedadText = '';
-  if (Array.isArray(item.novedad_items)) {
-    rawNovedadText = item.novedad_items.map(x => {
-      const prefix = x.hecho ? '[X]' : '[ ]';
-      return `${prefix} ${x.texto.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()}`;
-    }).join('\n');
-  } else {
-    rawNovedadText = item.novedad || '';
+
+  // --- Build interactive checklist editor with ALL items (pending + done) ---
+  let allItems = []; // { texto, hecho }
+  if (Array.isArray(item.novedad_items) && item.novedad_items.length > 0) {
+    allItems = item.novedad_items.map(x => ({
+      texto: x.texto.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim(),
+      hecho: !!x.hecho
+    }));
+  } else if (item.novedad) {
+    item.novedad.split('\n').forEach(line => {
+      const l = line.trim();
+      if (!l) return;
+      const hecho = l.startsWith('[X]') || l.startsWith('[x]');
+      const texto = l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
+      if (texto) allItems.push({ texto, hecho });
+    });
   }
-  document.getElementById('pt-unit-novedad').value = rawNovedadText;
+
+  const checkSection = document.getElementById('pt-unit-checklist-section');
+  const checkEditor = document.getElementById('pt-unit-checklist-editor');
+  if (allItems.length > 0 && checkSection && checkEditor) {
+    checkEditor.innerHTML = allItems.map((it, idx) => {
+      const safeId = `ptck_edit_${idx}`;
+      const safeTxt = it.texto.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      const doneStyle = it.hecho
+        ? 'text-decoration:line-through; color:var(--text-muted);'
+        : '';
+      return `<label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; padding:4px 0; border-bottom:1px solid var(--border);">
+        <input type="checkbox" class="pt-edit-item-checkbox" id="${safeId}" data-texto="${safeTxt}"
+          ${it.hecho ? 'checked' : ''}
+          style="margin-top:2px; accent-color:var(--primary); flex-shrink:0; width:16px; height:16px;"
+          onchange="ptToggleEditItem(this)">
+        <span id="${safeId}_lbl" style="font-size:13px; ${doneStyle}">${it.texto}</span>
+      </label>`;
+    }).join('');
+    checkSection.style.display = 'block';
+  } else if (checkSection) {
+    checkSection.style.display = 'none';
+  }
+
+  // Clear the textarea (used for adding NEW items only)
+  document.getElementById('pt-unit-novedad').value = '';
+  const novedadLabel = document.getElementById('pt-unit-novedad-label');
+  if (novedadLabel) novedadLabel.textContent = 'Agregar nuevos ítems (opcional)';
   
   document.getElementById('pt-unit-modal').classList.add('open');
 }
@@ -7048,7 +7110,21 @@ function closePtUnitModal() {
   document.getElementById('pt-unit-modal').classList.remove('open');
 }
 
-// Check if typed Interno + Empresa is already registered in taller
+// Toggles visual style when user checks/unchecks an item in the edit checklist
+function ptToggleEditItem(checkbox) {
+  const idx = checkbox.id.replace('ptck_edit_', '');
+  const lbl = document.getElementById(`ptck_edit_${idx}_lbl`);
+  if (!lbl) return;
+  if (checkbox.checked) {
+    lbl.style.textDecoration = 'line-through';
+    lbl.style.color = 'var(--text-muted)';
+  } else {
+    lbl.style.textDecoration = '';
+    lbl.style.color = '';
+  }
+}
+
+
 function ptCheckForDuplicateUnit() {
   if (currentEditingPtInterno !== null) return; // Ignore if we specifically clicked edit pencil
 
@@ -7160,9 +7236,51 @@ async function savePtUnit() {
     showToast('El número de interno es obligatorio.', 'warning');
     return;
   }
-  if (!novedadText) {
-    showToast('Debe ingresar al menos una novedad.', 'warning');
-    return;
+
+  // In EDIT mode: read from interactive checklist + textarea (new items)
+  // In ADD mode: only textarea — require at least 1 item
+  let novedadFormatted = '';
+
+  if (currentEditingPtInterno || window._ptDuplicateEditInterno) {
+    // EDIT MODE: combine checklist checkbox states + new items from textarea
+    const checkboxes = document.querySelectorAll('#pt-unit-checklist-editor .pt-edit-item-checkbox');
+    const existingLines = Array.from(checkboxes).map(cb => {
+      const txt = cb.dataset.texto || '';
+      const prefix = cb.checked ? '[X]' : '[ ]';
+      return `${prefix} ${txt}`;
+    });
+
+    const newLinesRaw = document.getElementById('pt-unit-novedad').value.trim();
+    const newLines = newLinesRaw ? newLinesRaw.split('\n').map(line => {
+      const l = line.trim();
+      if (!l) return '';
+      if (!l.startsWith('[ ]') && !l.startsWith('[X]') && !l.startsWith('[x]')) {
+        return '[ ] ' + l;
+      }
+      return l;
+    }).filter(Boolean) : [];
+
+    const allLines = [...existingLines, ...newLines];
+    // Filter out fully empty or whitespace-only lines
+    novedadFormatted = allLines.filter(Boolean).join('\n');
+
+    // If no items at all remain, that's allowed in edit mode (unit will be cleaned up)
+    if (!novedadFormatted) novedadFormatted = '';
+  } else {
+    // ADD MODE: require at least 1 novedad in the textarea
+    const novedadText = document.getElementById('pt-unit-novedad').value.trim();
+    if (!novedadText) {
+      showToast('Debe ingresar al menos una novedad.', 'warning');
+      return;
+    }
+    novedadFormatted = novedadText.split('\n').map(line => {
+      const l = line.trim();
+      if (!l) return '';
+      if (!l.startsWith('[ ]') && !l.startsWith('[X]') && !l.startsWith('[x]')) {
+        return '[ ] ' + l;
+      }
+      return l;
+    }).filter(Boolean).join('\n');
   }
 
   // Prevent duplicate submits (disabling button)
@@ -7171,7 +7289,7 @@ async function savePtUnit() {
     saveBtn.textContent = 'Guardando...';
   }
 
-  // Auto-switch to edit mode if we found a duplicate
+  // Auto-switch to edit mode if we found a duplicate via auto-detection
   if (!currentEditingPtInterno && window._ptDuplicateEditInterno) {
     currentEditingPtInterno = window._ptDuplicateEditInterno;
     currentEditingPtOriginalList = window._ptDuplicateEditList;
@@ -7185,19 +7303,10 @@ async function savePtUnit() {
     saveInterno = 'Nico ' + interno;
   }
 
-  // Format novedad lines to guarantee checkbox brackets
-  const novedadFormatted = novedadText.split('\n').map(line => {
-    const l = line.trim();
-    if (!l) return '';
-    if (!l.startsWith('[ ]') && !l.startsWith('[X]') && !l.startsWith('[x]')) {
-      return '[ ] ' + l;
-    }
-    return l;
-  }).filter(Boolean).join('\n');
-
   try {
     // If ADDING a unit
     if (!currentEditingPtInterno) {
+
       // 1. Save to Google Sheets state
       const res = await fetch('/api/parte-taller/novedad', {
         method: 'POST',
@@ -7278,26 +7387,34 @@ async function savePtUnit() {
         }
       });
 
-      if (!foundUnitObj) {
-        foundUnitObj = { interno: saveInterno, tipo, dia_parado: new Date().toLocaleDateString('es-AR') };
-      }
+      // If all items are done and no new items were added → unit is fully resolved, remove it
+      const hasNoItems = !novedadFormatted || novedadFormatted.trim() === '';
+      const hasPendingItems = novedadFormatted && novedadFormatted.split('\n').some(l => l.trim().startsWith('[ ]'));
 
-      // 2. Update properties
-      foundUnitObj.interno = saveInterno;
-      foundUnitObj.tipo = tipo;
-      foundUnitObj.novedad = novedadFormatted;
-      
-      // If moved from operative to inoperative, update dia_parado
-      const oldWasOperative = (currentEditingPtOriginalList === 'servicios_pendientes');
-      const newIsOperative = (estado === 'servicios_pendientes');
-      if (oldWasOperative && !newIsOperative) {
-        foundUnitObj.dia_parado = new Date().toLocaleDateString('es-AR');
-        foundUnitObj.dias_en_reparacion = 0;
-      }
+      if (!hasNoItems) {
+        // Items remain — update and re-add to the target list
+        if (!foundUnitObj) {
+          foundUnitObj = { interno: saveInterno, tipo, dia_parado: new Date().toLocaleDateString('es-AR') };
+        }
 
-      // Add to new list
-      if (!state[estado]) state[estado] = [];
-      state[estado].push(foundUnitObj);
+        // 2. Update properties
+        foundUnitObj.interno = saveInterno;
+        foundUnitObj.tipo = tipo;
+        foundUnitObj.novedad = novedadFormatted;
+        
+        // If moved from operative to inoperative, update dia_parado
+        const oldWasOperative = (currentEditingPtOriginalList === 'servicios_pendientes');
+        const newIsOperative = (estado === 'servicios_pendientes');
+        if (oldWasOperative && !newIsOperative) {
+          foundUnitObj.dia_parado = new Date().toLocaleDateString('es-AR');
+          foundUnitObj.dias_en_reparacion = 0;
+        }
+
+        // Add to new list
+        if (!state[estado]) state[estado] = [];
+        state[estado].push(foundUnitObj);
+      }
+      // else: unit is fully done, it was already removed from all lists above — leave it out
 
       // Recalculate totals client-side
       state.resumen = state.resumen || {};
@@ -7309,13 +7426,16 @@ async function savePtUnit() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accion: 'save_state',
+
           state: state
         })
       });
       if (!res.ok) throw new Error('Error al guardar los cambios en el Parte Taller.');
 
       // 4. Auto-create work order if state changed to reparación or fuera_de_servicio and there's no open order
-      if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
+      if (hasNoItems) {
+        showToast(`Unidad ${saveInterno} quedó operativa al resolverse todos sus ítems pendientes ✓`, 'success');
+      } else if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
         let internoVal = (empresa === 'irineo') ? 'IRINEO GRAL.' : (empresa === 'nico' ? 'VOLQUETE NICO' : interno);
         const hasOpenOrder = activeOrders && activeOrders.some(o =>
           String(o.interno || '').trim() === internoVal &&

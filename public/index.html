@@ -1374,9 +1374,20 @@
             <option value="fuera_de_servicio">❌ Fuera de Servicio (unidad inactiva)</option>
           </select>
         </div>
+        <!-- EDIT MODE: Interactive checklist of existing items -->
+        <div class="form-group" id="pt-unit-checklist-section" style="display:none;">
+          <label style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Ítems Registrados</span>
+            <span style="font-size:11px; color:var(--text-muted); font-weight:normal;">✓ = realizado &nbsp;|&nbsp; desmarcar = revertir a pendiente</span>
+          </label>
+          <div id="pt-unit-checklist-editor" style="border:1px solid var(--border); border-radius:8px; padding:10px; background:var(--surface); display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto;">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+        <!-- ADD new items (always visible) -->
         <div class="form-group">
-          <label>Novedad / Diagnóstico / Servicio</label>
-          <textarea id="pt-unit-novedad" placeholder="Describe los desperfectos o tareas pendientes. Cada ítem en una línea nueva.&#10;Ej:&#10;[ ] colocar comando interno&#10;[ ] Frenos desgastados" rows="5" style="width: 100%; font-family: monospace; font-size: 13px;"></textarea>
+          <label id="pt-unit-novedad-label">Novedad / Diagnóstico / Servicio</label>
+          <textarea id="pt-unit-novedad" placeholder="Describe los desperfectos o tareas pendientes. Cada ítem en una línea nueva.&#10;Ej:&#10;[ ] colocar comando interno&#10;[ ] Frenos desgastados" rows="4" style="width: 100%; font-family: monospace; font-size: 13px;"></textarea>
         </div>
       </div>
       <div class="dialog-footer">
@@ -1392,6 +1403,6 @@
     <!-- Populated dynamically from app.js -->
   </datalist>
 
-  <script src="app.js?v=46"></script>
+  <script src="app.js?v=47"></script>
 </body>
 </html>
