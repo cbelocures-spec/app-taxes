@@ -6663,7 +6663,7 @@ function renderParteTallerDashboard(state) {
   const types = [
     { key: 'COMPACTADOR', opId: 'pt-op-comp', fsId: 'pt-out-comp' },
     { key: 'VOLQUETE',    opId: 'pt-op-volq', fsId: 'pt-out-volq' },
-    { key: 'ROLL-OFF',   opId: 'pt-op-roll', fsId: 'pt-out-roll' },
+    { key: 'ROLL - OFF',   opId: 'pt-op-roll', fsId: 'pt-out-roll' },
     { key: 'PLANCHA',    opId: 'pt-op-plancha', fsId: 'pt-out-plancha' }
   ];
   types.forEach(t => {
@@ -6862,7 +6862,8 @@ function ptCrearOrden(interno) {
 }
 
 // Reads checked items for a given interno and opens/creates an order with them as a task
-function ptAsignarSeleccionados(interno) {
+// Reads checked items for a given interno, updates the checklist in Google Sheets (disappearing items/unit if completed), and assigns tasks to the order.
+async function ptAsignarSeleccionados(interno) {
   const checkedBoxes = document.querySelectorAll(`.pt-item-checkbox[data-interno="${interno}"]:checked`);
   if (checkedBoxes.length === 0) {
     showToast('Seleccioná al menos un ítem para asignar.', 'warning');
@@ -6871,7 +6872,87 @@ function ptAsignarSeleccionados(interno) {
   const selectedTexts = Array.from(checkedBoxes).map(cb => cb.value);
   const combinedDesc  = selectedTexts.join('\n');
 
-  // Find an existing open order for this interno
+  // 1. Update the checklist in Google Sheets
+  if (window._ptState) {
+    const state = window._ptState;
+    const lists = ['fuera_de_servicio', 'reparacion', 'servicios_pendientes'];
+    let foundList = null;
+    let foundUnit = null;
+    let foundIdx = -1;
+
+    for (const listName of lists) {
+      if (state[listName]) {
+        const idx = state[listName].findIndex(u => String(u.interno).trim() === String(interno).trim());
+        if (idx !== -1) {
+          foundList = listName;
+          foundUnit = state[listName][idx];
+          foundIdx = idx;
+          break;
+        }
+      }
+    }
+
+    if (foundUnit) {
+      let lines = [];
+      if (Array.isArray(foundUnit.novedad_items)) {
+        foundUnit.novedad_items.forEach(x => {
+          const textClean = x.texto.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
+          if (selectedTexts.includes(textClean)) {
+            x.hecho = true;
+          }
+        });
+        lines = foundUnit.novedad_items.map(x => {
+          const prefix = x.hecho ? '[X]' : '[ ]';
+          return `${prefix} ${x.texto.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()}`;
+        });
+      } else {
+        const rawLines = (foundUnit.novedad || '').split('\n');
+        lines = rawLines.map(line => {
+          const l = line.trim();
+          if (!l) return '';
+          const cleanText = l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
+          if (selectedTexts.includes(cleanText)) {
+            return `[X] ${cleanText}`;
+          }
+          return l;
+        }).filter(Boolean);
+      }
+
+      foundUnit.novedad = lines.join('\n');
+
+      let pendingCount = 0;
+      if (Array.isArray(foundUnit.novedad_items)) {
+        pendingCount = foundUnit.novedad_items.filter(x => !x.hecho).length;
+      } else {
+        pendingCount = lines.filter(l => l.trim().startsWith('[ ]') || (!l.trim().startsWith('[X]') && !l.trim().startsWith('[x]'))).length;
+      }
+
+      if (pendingCount === 0) {
+        state[foundList].splice(foundIdx, 1);
+        showToast(`Unidad ${interno} quedó operativa al resolverse todos sus ítems pendientes ✓`, 'success');
+      } else {
+        state[foundList][foundIdx] = foundUnit;
+      }
+
+      try {
+        const res = await fetch('/api/parte-taller/novedad', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accion: 'save_state',
+            state: state
+          })
+        });
+        if (res.ok) {
+          fetchParteTallerEstado(); // Refresh table view to reflect item/unit disappearance
+        }
+      } catch (err) {
+        console.error('Error saving state after checklist selection:', err);
+      }
+    }
+  }
+
+  // 2. Open or create the work order in Taxes
   const existingOrder = activeOrders && activeOrders.find(o =>
     String(o.interno || '').trim() === String(interno).trim() &&
     (!o.estado || o.estado.toLowerCase() !== 'cerrada')
@@ -6879,7 +6960,6 @@ function ptAsignarSeleccionados(interno) {
 
   if (existingOrder) {
     editOrder(existingOrder.id);
-    // Small delay to let the modal DOM settle
     setTimeout(() => {
       addTaskField({ descripcion: combinedDesc, centroCosto: '15', status: 'Pendiente' });
       showToast(`Ítem(s) agregado(s) a la Orden de Trabajo del Interno ${interno} ✓`, 'success');
