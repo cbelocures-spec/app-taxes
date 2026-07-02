@@ -6983,6 +6983,7 @@ function openPtAddUnitModal() {
   currentEditingPtOriginalList = null;
   
   document.getElementById('pt-unit-modal-title').textContent = 'Agregar Unidad a Taller';
+  document.getElementById('pt-unit-empresa').value = 'hugo';
   document.getElementById('pt-unit-interno').value = '';
   document.getElementById('pt-unit-interno').disabled = false;
   document.getElementById('pt-unit-tipo').value = 'COMPACTADOR';
@@ -7003,7 +7004,20 @@ function openPtEditUnitModal(interno, listName) {
   currentEditingPtOriginalList = listName;
   
   document.getElementById('pt-unit-modal-title').textContent = `Editar Unidad #${interno}`;
-  document.getElementById('pt-unit-interno').value = interno;
+  
+  // Detect company from prefix
+  let inputInternoVal = String(interno).trim();
+  let empresaVal = 'hugo';
+  if (inputInternoVal.startsWith('Irineo ')) {
+    empresaVal = 'irineo';
+    inputInternoVal = inputInternoVal.replace(/^Irineo\s+/, '');
+  } else if (inputInternoVal.startsWith('Nico ')) {
+    empresaVal = 'nico';
+    inputInternoVal = inputInternoVal.replace(/^Nico\s+/, '');
+  }
+
+  document.getElementById('pt-unit-empresa').value = empresaVal;
+  document.getElementById('pt-unit-interno').value = inputInternoVal;
   document.getElementById('pt-unit-interno').disabled = true;
   document.getElementById('pt-unit-tipo').value = item.tipo || 'COMPACTADOR';
   document.getElementById('pt-unit-estado').value = listName;
@@ -7028,8 +7042,22 @@ function closePtUnitModal() {
   document.getElementById('pt-unit-modal').classList.remove('open');
 }
 
-// Auto-fills unit type from interno selection
+// Handles change of company in the modal
+function ptOnEmpresaChange() {
+  const empresa = document.getElementById('pt-unit-empresa').value;
+  const tipoSelect = document.getElementById('pt-unit-tipo');
+  if (empresa === 'irineo' || empresa === 'nico') {
+    tipoSelect.value = 'VOLQUETE';
+  } else {
+    ptOnInternoChange();
+  }
+}
+
+// Auto-fills unit type from interno selection (only for Hugo)
 function ptOnInternoChange() {
+  const empresa = document.getElementById('pt-unit-empresa').value;
+  if (empresa !== 'hugo') return;
+
   const interno = document.getElementById('pt-unit-interno').value.trim();
   if (!interno) return;
   const rodadoOpt = cachedCatalogs.rodados
@@ -7048,6 +7076,7 @@ function ptOnInternoChange() {
 
 // Submits the unit add/edit data
 async function savePtUnit() {
+  const empresa = document.getElementById('pt-unit-empresa').value;
   const interno = document.getElementById('pt-unit-interno').value.trim();
   const tipo = document.getElementById('pt-unit-tipo').value;
   const estado = document.getElementById('pt-unit-estado').value;
@@ -7061,6 +7090,14 @@ async function savePtUnit() {
   if (!novedadText) {
     showToast('Debe ingresar al menos una novedad.', 'warning');
     return;
+  }
+
+  // Format saved interno with prefix if Irineo or Volquete Nico
+  let saveInterno = interno;
+  if (empresa === 'irineo') {
+    saveInterno = 'Irineo ' + interno;
+  } else if (empresa === 'nico') {
+    saveInterno = 'Nico ' + interno;
   }
 
   // Format novedad lines to guarantee checkbox brackets
@@ -7082,7 +7119,7 @@ async function savePtUnit() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accion: 'actualizar_estado_flota',
-          interno: interno,
+          interno: saveInterno,
           estado: estado,
           motivo: novedadFormatted,
           responsable: currentUser
@@ -7092,19 +7129,29 @@ async function savePtUnit() {
 
       // 2. Automatically generate a Correctivo work order in Taxes if reparación or fuera_de_servicio
       if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
-        const rodadoOpt = cachedCatalogs.rodados
-          ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
-          : null;
-        const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+        let rodadoLabel = '';
+        let internoVal = '';
+        if (empresa === 'irineo') {
+          rodadoLabel = 'IRINEO GRAL. IRINEO GRAL. Interno IRINEO GRAL.';
+          internoVal = 'IRINEO GRAL.';
+        } else if (empresa === 'nico') {
+          rodadoLabel = 'VOLQUETE NICO VOLQUETE NICO Interno VOLQUETE NICO';
+          internoVal = 'VOLQUETE NICO';
+        } else {
+          const rodadoOpt = cachedCatalogs.rodados
+            ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
+            : null;
+          rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+          internoVal = interno;
+        }
+
         const today = new Date().toISOString().split('T')[0];
-        
-        // Clean novedades for the Incident description
         const incidentDesc = novedadFormatted.split('\n').map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()).filter(Boolean).join(', ');
 
         const orderPayload = {
           rodado: rodadoLabel,
           responsable: "AUTO",
-          interno: interno,
+          interno: internoVal,
           clasificacion: "Correctivo",
           fechaEntrega: today,
           horario: "12:00",
@@ -7132,13 +7179,13 @@ async function savePtUnit() {
       if (!window._ptState) return;
       const state = window._ptState;
 
-      // 1. Remove from all three lists to start clean
+      // 1. Remove from all three lists to start clean (using original internally stored interno)
       const lists = ['servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
       let foundUnitObj = null;
 
       lists.forEach(listName => {
         if (state[listName]) {
-          const idx = state[listName].findIndex(u => String(u.interno).trim() === interno);
+          const idx = state[listName].findIndex(u => String(u.interno).trim() === currentEditingPtInterno);
           if (idx !== -1) {
             foundUnitObj = state[listName][idx];
             state[listName].splice(idx, 1);
@@ -7147,10 +7194,11 @@ async function savePtUnit() {
       });
 
       if (!foundUnitObj) {
-        foundUnitObj = { interno, tipo, dia_parado: new Date().toLocaleDateString('es-AR') };
+        foundUnitObj = { interno: saveInterno, tipo, dia_parado: new Date().toLocaleDateString('es-AR') };
       }
 
       // 2. Update properties
+      foundUnitObj.interno = saveInterno;
       foundUnitObj.tipo = tipo;
       foundUnitObj.novedad = novedadFormatted;
       
@@ -7166,7 +7214,7 @@ async function savePtUnit() {
       if (!state[estado]) state[estado] = [];
       state[estado].push(foundUnitObj);
 
-      // Recalculate totals client-side for immediate consistency (it will reload anyway)
+      // Recalculate totals client-side
       state.resumen = state.resumen || {};
       state.resumen.responsable = currentUser;
 
@@ -7183,22 +7231,31 @@ async function savePtUnit() {
 
       // 4. Auto-create work order if state changed to reparación or fuera_de_servicio and there's no open order
       if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
+        let internoVal = (empresa === 'irineo') ? 'IRINEO GRAL.' : (empresa === 'nico' ? 'VOLQUETE NICO' : interno);
         const hasOpenOrder = activeOrders && activeOrders.some(o =>
-          String(o.interno || '').trim() === interno &&
+          String(o.interno || '').trim() === internoVal &&
           (!o.estado || o.estado.toLowerCase() !== 'cerrada')
         );
         if (!hasOpenOrder) {
-          const rodadoOpt = cachedCatalogs.rodados
-            ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
-            : null;
-          const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+          let rodadoLabel = '';
+          if (empresa === 'irineo') {
+            rodadoLabel = 'IRINEO GRAL. IRINEO GRAL. Interno IRINEO GRAL.';
+          } else if (empresa === 'nico') {
+            rodadoLabel = 'VOLQUETE NICO VOLQUETE NICO Interno VOLQUETE NICO';
+          } else {
+            const rodadoOpt = cachedCatalogs.rodados
+              ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
+              : null;
+            rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+          }
+
           const today = new Date().toISOString().split('T')[0];
           const incidentDesc = novedadFormatted.split('\n').map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()).filter(Boolean).join(', ');
 
           const orderPayload = {
             rodado: rodadoLabel,
             responsable: "AUTO",
-            interno: interno,
+            interno: internoVal,
             clasificacion: "Correctivo",
             fechaEntrega: today,
             horario: "12:00",

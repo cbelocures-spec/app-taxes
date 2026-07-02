@@ -1345,8 +1345,16 @@
       </div>
       <div class="dialog-body">
         <div class="form-group">
+          <label>Empresa</label>
+          <select id="pt-unit-empresa" style="width: 100%;" onchange="ptOnEmpresaChange()">
+            <option value="hugo">Contenedores Hugo</option>
+            <option value="irineo">Irineo (Taxes: IRINEO GRAL.)</option>
+            <option value="nico">Volquete Nico (Taxes: VOLQUETE NICO)</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Número de Interno</label>
-          <input type="number" id="pt-unit-interno" placeholder="Ej: 54" style="width: 100%;" onchange="ptOnInternoChange()">
+          <input type="text" id="pt-unit-interno" placeholder="Ej: 54" style="width: 100%;" onchange="ptOnInternoChange()">
         </div>
         <div class="form-group">
           <label>Tipo de Unidad</label>
