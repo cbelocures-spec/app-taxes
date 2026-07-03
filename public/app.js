@@ -7973,10 +7973,7 @@ function getVerificationBadgeHtml(order) {
 async function triggerOrderVerification(orderId) {
   try {
     const res = await fetch(`/api/orders/verify/${orderId}`, { 
-      method: 'POST',
-      headers: {
-        'x-user-username': localStorage.getItem('currentUserUsername') || ''
-      }
+      method: 'POST'
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
