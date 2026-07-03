@@ -1093,6 +1093,27 @@
     </div>
   </div>
 
+  <!-- VERIFICATION ERROR LOG MODAL -->
+  <div class="modal-overlay" id="verification-error-modal">
+    <div class="dialog-modal">
+      <div class="dialog-header error">
+        <h3>Fallo en el Control de Tareas</h3>
+        <button class="dialog-close" onclick="closeVerificationErrorModal()">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <p><strong>Detalle de las discrepancias detectadas por el agente de control:</strong></p>
+        <pre class="error-log" id="verify-error-modal-log" style="white-space: pre-wrap; word-break: break-word; background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 13px; max-height: 200px; overflow-y: auto;"></pre>
+        <p class="error-tip"><span class="material-icons">info</span> Esto significa que los datos de la app no coinciden exactamente con lo registrado en Taxes.com.ar. Puedes corregir los campos y volver a sincronizar/controlar.</p>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="closeVerificationErrorModal()">Cerrar</button>
+        <button class="btn btn-primary" id="btn-modal-reverify" onclick="reverifyOrderFromModal()">
+          <span class="material-icons">sync</span> Volver a Controlar
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ACTIVE MECHANICS MODAL -->
   <div class="modal-overlay" id="active-mechanics-modal">
     <div class="dialog-modal">

@@ -1891,8 +1891,10 @@ function createOrderCardHtml(order) {
               })()}
             </div>
           </div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+          ${statusBadge}
+          ${getVerificationBadgeHtml(order)}
         </div>
-        ${statusBadge}
       </div>
 
       <div class="order-card-footer">
@@ -7922,6 +7924,96 @@ async function savePtUnit() {
     // Clean duplicate edit state variables
     window._ptDuplicateEditInterno = null;
     window._ptDuplicateEditList = null;
+  }
+}
+
+// ============================================================
+// AGENT VERIFICATION SYSTEM FUNCTIONS
+// ============================================================
+
+function getVerificationBadgeHtml(order) {
+  if (order.syncStatus !== 'success') return '';
+
+  const count = order.verifiedCount || 0;
+
+  if (order.verifiedStatus === 'success') {
+    return `
+      <span class="badge-status verified-success" onclick="event.stopPropagation(); triggerOrderVerification('${order.id}')" title="Controlado por el agente. Clic para volver a controlar." style="background-color: #eff6ff; color: #1d4ed8; border: 1px solid rgba(29,78,216,0.15); display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; border-radius: 4px; cursor: pointer; user-select: none;">
+        <span class="material-icons" style="font-size: 13px; color: #1d4ed8; font-weight: bold;">check_circle</span>
+        <span>Controlado x${count || 1}</span>
+      </span>
+    `;
+  } else if (order.verifiedStatus === 'error') {
+    const errorEscaped = String(order.verifiedError || 'Error desconocido').replace(/"/g, '&quot;').replace(/'/g, "\\'");
+    return `
+      <span class="badge-status verified-error" onclick="event.stopPropagation(); openVerificationErrorModal('${errorEscaped}', '${order.id}')" title="Fallo de control. Haga clic para ver errores." style="background-color: #fef2f2; color: #dc2626; border: 1px solid rgba(220,38,38,0.15); display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; border-radius: 4px; cursor: pointer; user-select: none;">
+        <span class="material-icons" style="font-size: 13px; color: #dc2626; font-weight: bold;">cancel</span>
+        <span>Error Control x${count || 1}</span>
+      </span>
+    `;
+  } else if (order.verifiedStatus === 'checking') {
+    return `
+      <span class="badge-status verified-checking" style="background-color: #f9fafb; color: #4b5563; border: 1px solid rgba(75,85,99,0.15); display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; border-radius: 4px;">
+        <span class="material-icons spinner" style="font-size: 13px; animation: spin 1.5s linear infinite; display: inline-block;">autorenew</span>
+        <span>Controlando...</span>
+      </span>
+    `;
+  } else {
+    // Default idle state
+    return `
+      <span class="badge-status verified-idle" onclick="event.stopPropagation(); triggerOrderVerification('${order.id}')" title="Sin controlar. Haga clic para iniciar control en Taxes." style="background-color: #f3f4f6; color: #4b5563; border: 1px solid rgba(75,85,99,0.15); display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; border-radius: 4px; cursor: pointer; user-select: none;">
+        <span class="material-icons" style="font-size: 13px; color: #4b5563;">help_outline</span>
+        <span>Sin Controlar</span>
+      </span>
+    `;
+  }
+}
+
+async function triggerOrderVerification(orderId) {
+  try {
+    const res = await fetch(`/api/orders/verify/${orderId}`, { 
+      method: 'POST',
+      headers: {
+        'x-user-username': localStorage.getItem('currentUserUsername') || ''
+      }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'No se pudo iniciar el control');
+    }
+    showToast("Control encolado. El agente verificará los datos en Taxes en breve.", "info");
+    
+    // Set status to checking locally for instant UI update
+    const order = activeOrders.find(o => o.id === orderId);
+    if (order) {
+      order.verifiedStatus = 'checking';
+      renderOrders();
+    }
+    fetchOrders(); // Refresh in background
+  } catch (error) {
+    showToast(error.message, "danger");
+  }
+}
+
+let currentVerifyOrderId = null;
+
+function openVerificationErrorModal(errorMsg, orderId) {
+  currentVerifyOrderId = orderId;
+  const formattedMsg = String(errorMsg || '').split(' | ').join('\n');
+  document.getElementById('verify-error-modal-log').textContent = formattedMsg || 'No hay detalles de error.';
+  document.getElementById('verification-error-modal').classList.add('open');
+}
+
+function closeVerificationErrorModal() {
+  document.getElementById('verification-error-modal').classList.remove('open');
+  currentVerifyOrderId = null;
+}
+
+async function reverifyOrderFromModal() {
+  if (currentVerifyOrderId) {
+    const orderId = currentVerifyOrderId;
+    closeVerificationErrorModal();
+    await triggerOrderVerification(orderId);
   }
 }
 

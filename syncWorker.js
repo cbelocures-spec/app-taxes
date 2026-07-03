@@ -1552,6 +1552,9 @@ async function syncWorkOrder(orderId) {
         syncError: null
       });
 
+      console.log(`Running post-sync verification for existing OT #${order.interno}...`);
+      await verifyWorkOrderWithPage(page, orderId);
+
       await browser.close();
       return { success: true, message: `Tareas de la Orden ${order.taxesOrderNumber} actualizadas correctamente.` };
     }
@@ -2009,6 +2012,9 @@ async function syncWorkOrder(orderId) {
       tasks: updatedTasks
     });
 
+    console.log(`Running post-sync verification for brand new OT #${order.interno}...`);
+    await verifyWorkOrderWithPage(page, orderId);
+
     await browser.close();
     return { success: true, message: `Orden ${order.interno} sincronizada correctamente.` };
 
@@ -2029,6 +2035,223 @@ async function syncWorkOrder(orderId) {
       syncStatus: "error",
       syncError: error.message
     });
+    if (browser) await browser.close();
+    return { success: false, message: error.message };
+  }
+}
+
+// 2b. AGENT VERIFICATION SYSTEM FOR OT TASKS
+async function verifyWorkOrderWithPage(page, orderId) {
+  const order = db.getWorkOrderById(orderId);
+  if (!order || !order.taxesOrderNumber) {
+    console.log(`[Verification] Cannot verify: order not found or missing Taxes OT number.`);
+    return;
+  }
+  
+  const settings = db.getSettings();
+  console.log(`[Verification] Starting verification for OT #${order.interno} (Taxes OT: ${order.taxesOrderNumber})...`);
+  
+  try {
+    // 1. Navigate to Tareas list page
+    await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+    await delay(3000);
+    
+    // 2. Search for the OT number in the Tareas search box
+    const searchInputSelector = await page.evaluate(() => {
+      const cleanTxt = (str) => {
+        if (!str) return '';
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      };
+      const labels = Array.from(document.querySelectorAll('label, legend, span'));
+      const otLabel = labels.find(l => {
+        const txt = cleanTxt(l.textContent);
+        return (txt.includes('buscar por numero') || txt.includes('titulo de ot')) && !l.querySelector('label, legend, span');
+      });
+      let input = null;
+      if (otLabel) {
+        const parent = otLabel.parentElement ? otLabel.parentElement.parentElement : null;
+        if (parent) {
+          input = parent.querySelector('input[type="text"], input:not([type])');
+        }
+      }
+      if (!input) {
+        const allInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+        input = allInputs[1] || allInputs[0];
+      }
+      if (input) {
+        if (!input.id) {
+          input.id = 'temp-ot-search-input-verify';
+        }
+        return '#' + input.id;
+      }
+      return null;
+    });
+
+    if (searchInputSelector) {
+      await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        if (el) {
+          el.focus();
+          el.select();
+        }
+      }, searchInputSelector);
+      await page.keyboard.press('Backspace');
+      await page.keyboard.type(String(order.taxesOrderNumber));
+    }
+
+    // Click "BUSCAR"
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button, a'));
+      const searchBtn = btns.find(b => b.textContent.toLowerCase().includes('buscar'));
+      if (searchBtn) searchBtn.click();
+    });
+    await delay(3000); // Wait for table reload
+
+    // 3. Extract all rows from the table
+    const tableTasks = await page.evaluate(() => {
+      const results = [];
+      const rows = Array.from(document.querySelectorAll('table tbody tr'));
+      for (const row of rows) {
+        const cells = Array.from(row.querySelectorAll('td'));
+        if (cells.length >= 10) {
+          results.push({
+            ot: cells[2].textContent.trim(),
+            employee: cells[5].textContent.trim(),
+            hours: cells[6].textContent.trim(),
+            description: cells[7].textContent.trim(),
+            realizada: cells[8].textContent.trim().toUpperCase() // "SI" or "NO"
+          });
+        }
+      }
+      return results;
+    });
+
+    console.log(`[Verification] Found ${tableTasks.length} tasks on Taxes for OT ${order.taxesOrderNumber}:`, tableTasks);
+
+    const errors = [];
+    
+    // 4. Verify each task of our order exists on Taxes with correct parameters
+    for (let idx = 0; idx < order.tasks.length; idx++) {
+      const t = order.tasks[idx];
+      const { employeeLabel, finalDescription } = resolveAndMapEmployee(t);
+      
+      const clean = (str) => {
+        if (!str) return '';
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      };
+      
+      const targetEmpClean = clean(employeeLabel);
+      const targetDescBaseClean = clean(t.descripcion);
+      const targetDescFinalClean = clean(finalDescription);
+      
+      // Look for a matching task row
+      const matchingRow = tableTasks.find(row => {
+        const rowEmpClean = clean(row.employee);
+        const rowDescClean = clean(row.description);
+        
+        const empMatches = rowEmpClean.includes(targetEmpClean) || targetEmpClean.includes(rowEmpClean);
+        const descMatches = rowDescClean.includes(targetDescBaseClean) || 
+                            rowDescClean.includes(targetDescFinalClean) || 
+                            targetDescBaseClean.includes(rowDescClean) || 
+                            targetDescFinalClean.includes(rowDescClean);
+                            
+        return empMatches && descMatches;
+      });
+      
+      if (!matchingRow) {
+        errors.push(`Tarea #${idx + 1}: No encontrada en Taxes (Empleado: ${employeeLabel}, Descripción: ${t.descripcion.substring(0, 30)}...)`);
+      } else {
+        // Verify Hours
+        const expectedHours = parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0;
+        const actualHours = parseFloat(String(matchingRow.hours).replace(',', '.')) || 0;
+        if (Math.abs(expectedHours - actualHours) > 0.01) {
+          errors.push(`Tarea #${idx + 1}: Horas no coinciden (Esperado: ${expectedHours.toFixed(2)}, Encontrado: ${actualHours.toFixed(2)})`);
+        }
+        
+        // Verify Realizada Status
+        if (t.status === 'Finalizada' && matchingRow.realizada !== 'SI') {
+          errors.push(`Tarea #${idx + 1}: No marcada como Realizada (SI) en Taxes`);
+        }
+      }
+    }
+    
+    // 5. Update verification fields
+    const count = (order.verifiedCount || 0) + 1;
+    if (errors.length > 0) {
+      console.log(`[Verification] Failed! Errors found:`, errors);
+      db.updateWorkOrder(orderId, {
+        verifiedStatus: "error",
+        verifiedCount: count,
+        verifiedError: errors.join(' | ')
+      });
+    } else {
+      console.log(`[Verification] Success! All tasks matched and verified.`);
+      db.updateWorkOrder(orderId, {
+        verifiedStatus: "success",
+        verifiedCount: count,
+        verifiedError: null
+      });
+    }
+    
+  } catch (err) {
+    console.error(`[Verification] Error during verification execution:`, err);
+    // Increment count but set error status to reflect verification system failure
+    const count = (order.verifiedCount || 0) + 1;
+    db.updateWorkOrder(orderId, {
+      verifiedStatus: "error",
+      verifiedCount: count,
+      verifiedError: `Error del agente verificador: ${err.message}`
+    });
+  }
+}
+
+// Standalone verify function for manual verification triggers
+async function verifyWorkOrder(orderId) {
+  const order = db.getWorkOrderById(orderId);
+  if (!order) return { success: false, message: "Order not found" };
+
+  const settings = db.getSettings();
+  let username = settings.username;
+  let password = settings.password;
+
+  if (order.createdBy) {
+    const user = db.getUser(order.createdBy);
+    if (user && user.password) {
+      username = user.username;
+      password = user.password;
+    }
+  }
+
+  if (!username || !password) {
+    return { success: false, message: "Faltan credenciales del supervisor" };
+  }
+
+  let browser = null;
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
+      protocolTimeout: 120000
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 900 });
+
+    await autoLogin(page, username, password, settings.portalUrl);
+    await verifyWorkOrderWithPage(page, orderId);
+
+    await browser.close();
+    
+    // Get updated status
+    const updated = db.getWorkOrderById(orderId);
+    return { 
+      success: updated.verifiedStatus === 'success', 
+      status: updated.verifiedStatus, 
+      error: updated.verifiedError, 
+      count: updated.verifiedCount 
+    };
+  } catch (error) {
     if (browser) await browser.close();
     return { success: false, message: error.message };
   }
@@ -2094,6 +2317,7 @@ module.exports = {
   startWorker,
   stopWorker,
   syncWorkOrder,
+  verifyWorkOrder,
   scrapeCatalogs,
   isScraping
 };

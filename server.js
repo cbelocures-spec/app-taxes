@@ -518,6 +518,49 @@ app.post('/api/orders/retry/:id', async (req, res) => {
   }
 });
 
+// Force verification of a work order on Taxes
+app.post('/api/orders/verify/:id', async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const order = db.getWorkOrderById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: "Orden no encontrada" });
+    }
+    if (!order.taxesOrderNumber) {
+      return res.status(400).json({ error: "La orden no tiene número de OT asignado (no sincronizada)." });
+    }
+
+    const requester = req.headers['x-user-username'] || null;
+    const sector = getSectorByUsername(requester);
+
+    // Check sector permission
+    const existingCls = order.clasificacion;
+    if (sector === 'Herrería' && existingCls !== 'Herrería') {
+      return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
+    }
+    if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
+      return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
+    }
+    if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
+      return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
+    }
+
+    // Set checking status
+    db.updateWorkOrder(orderId, { verifiedStatus: "checking" });
+
+    // Call verifyWorkOrder in background
+    worker.verifyWorkOrder(orderId).then(result => {
+      console.log(`Background verification completed for order ${orderId}:`, result);
+    }).catch(err => {
+      console.error(`Background verification failed for order ${orderId}:`, err);
+    });
+
+    res.json({ success: true, message: "Control encolado." });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get current Taxes connection settings
 app.get('/api/settings', (req, res) => {
   try {
