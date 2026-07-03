@@ -997,6 +997,14 @@ app.post('/api/preventivos/odometer', async (req, res) => {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
     const data = await response.json();
+
+    // Always update the local override with the new value so it shows immediately
+    // (bypasses Apps Script cache which can take up to 6 hours to reflect changes)
+    if (interno) {
+      db.setOdometerOverride(interno, km || undefined, hs || undefined);
+      console.log(`[OdometerOverride] Updated override for interno ${interno}: km=${km}, hs=${hs}`);
+    }
+
     res.json(data);
   } catch (error) {
     console.error("Error updating preventivos odometer:", error);
