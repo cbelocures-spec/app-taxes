@@ -380,10 +380,15 @@
         </button>
       </div>
 
-      <!-- SEARCH BAR -->
-      <div class="search-bar" style="margin-bottom: 16px;">
-        <span class="material-icons search-icon">search</span>
-        <input type="text" id="prev-search-input" placeholder="Buscar por Interno o Modelo..." oninput="applyPrevFilters()">
+      <!-- SEARCH BAR + REFRESH -->
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+        <div class="search-bar" style="flex: 1; margin-bottom: 0;">
+          <span class="material-icons search-icon">search</span>
+          <input type="text" id="prev-search-input" placeholder="Buscar por Interno o Modelo..." oninput="applyPrevFilters()">
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="fetchPreventivoFlota()" title="Recargar datos desde Google Sheets" style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+          <span class="material-icons" style="font-size: 16px;">refresh</span> Actualizar
+        </button>
       </div>
 
       <!-- SUB-VIEW: DASHBOARD (KM/HS) -->

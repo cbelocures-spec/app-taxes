@@ -6131,7 +6131,7 @@ async function fetchPreventivoFlota() {
   try {
     document.getElementById('prev-dashboard-tbody').innerHTML =
       '<tr><td colspan="7" style="text-align:center; padding:20px;"><span class="material-icons" style="animation:spin 1.5s linear infinite; vertical-align:middle;">sync</span> Cargando datos de Google Sheets...</td></tr>';
-    const res = await fetch('/api/preventivos/flota');
+    const res = await fetch(`/api/preventivos/flota?_=${Date.now()}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `HTTP ${res.status}`);

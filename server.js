@@ -847,7 +847,8 @@ app.get('/api/preventivos/flota', async (req, res) => {
     return res.status(400).json({ error: "URL del script de preventivos no configurada." });
   }
   try {
-    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=getFleetData`;
+    const sep = scriptUrl.includes('?') ? '&' : '?';
+    const url = `${scriptUrl}${sep}accion=getFleetData&_t=${Date.now()}`;
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
     const data = await response.json();
