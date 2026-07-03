@@ -851,10 +851,47 @@ app.get('/api/preventivos/flota', async (req, res) => {
     const url = `${scriptUrl}${sep}accion=getFleetData&_t=${Date.now()}`;
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
-    const data = await response.json();
+    let data = await response.json();
+
+    // Apply local overrides (bypass Google Apps Script cache for manual corrections)
+    const overrides = db.getOdometerOverrides();
+    if (Array.isArray(data) && Object.keys(overrides).length > 0) {
+      data = data.map(item => {
+        const key = String(item.interno || '').trim();
+        const ov = overrides[key];
+        if (!ov) return item;
+        const patched = { ...item };
+        if (ov.km !== undefined && !isNaN(ov.km)) patched.kmReales = ov.km;
+        if (ov.hs !== undefined && !isNaN(ov.hs)) patched.hsReales = ov.hs;
+        return patched;
+      });
+    }
+
     res.json(data);
   } catch (error) {
     console.error("Error fetching preventivos fleet:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Set a manual km/hs override for a specific interno (bypasses Apps Script cache)
+app.post('/api/preventivos/odometer-override', (req, res) => {
+  try {
+    const { interno, km, hs } = req.body;
+    if (!interno) return res.status(400).json({ error: "interno requerido" });
+    const result = db.setOdometerOverride(interno, km, hs);
+    res.json({ success: true, override: result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Clear a manual override (once Google Sheets data is fresh again)
+app.delete('/api/preventivos/odometer-override/:interno', (req, res) => {
+  try {
+    db.clearOdometerOverride(req.params.interno);
+    res.json({ success: true });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });

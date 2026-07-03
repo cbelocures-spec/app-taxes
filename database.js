@@ -370,6 +370,36 @@ class LocalDB {
     this.write(db);
     return true;
   }
+
+  // --- Odometer Overrides ---
+  // Stores manual km/hs corrections keyed by interno (string)
+  // that take priority over Google Apps Script cached data.
+  getOdometerOverrides() {
+    const db = this.read();
+    return db.odometerOverrides || {};
+  }
+
+  setOdometerOverride(interno, km, hs) {
+    const db = this.read();
+    if (!db.odometerOverrides) db.odometerOverrides = {};
+    const key = String(interno).trim();
+    db.odometerOverrides[key] = {
+      interno: key,
+      km: km !== undefined && km !== '' ? Number(String(km).replace(',', '.')) : undefined,
+      hs: hs !== undefined && hs !== '' ? Number(String(hs).replace(',', '.')) : undefined,
+      updatedAt: new Date().toISOString()
+    };
+    this.write(db);
+    return db.odometerOverrides[key];
+  }
+
+  clearOdometerOverride(interno) {
+    const db = this.read();
+    if (db.odometerOverrides) {
+      delete db.odometerOverrides[String(interno).trim()];
+      this.write(db);
+    }
+  }
 }
 
 module.exports = new LocalDB();
