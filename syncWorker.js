@@ -2313,11 +2313,107 @@ function stopWorker() {
   console.log("Background Sync Worker stopped.");
 }
 
+/**
+ * Verify multiple orders efficiently by grouping them by credentials
+ * and reusing the same browser session for each credential group.
+ * Up to MAX_PARALLEL_BROWSERS groups run simultaneously.
+ */
+const MAX_PARALLEL_BROWSERS = 3;
+
+async function verifyMultipleOrders(orderIds) {
+  const settings = db.getSettings();
+
+  // Group order IDs by their credential key (username)
+  const groups = new Map(); // key: username → { username, password, ids: [] }
+  for (const id of orderIds) {
+    const order = db.getWorkOrderById(id);
+    if (!order || !order.taxesOrderNumber) continue;
+
+    let username = settings.username;
+    let password = settings.password;
+    if (order.createdBy) {
+      const user = db.getUser(order.createdBy);
+      if (user && user.password) {
+        username = user.username;
+        password = user.password;
+      }
+    }
+    if (!username || !password) continue;
+
+    if (!groups.has(username)) {
+      groups.set(username, { username, password, ids: [] });
+    }
+    groups.get(username).ids.push(id);
+  }
+
+  const groupList = Array.from(groups.values());
+  console.log(`[VerifyAll] ${orderIds.length} orders grouped into ${groupList.length} credential group(s). Running up to ${MAX_PARALLEL_BROWSERS} browsers in parallel.`);
+
+  // Process groups in batches of MAX_PARALLEL_BROWSERS
+  for (let i = 0; i < groupList.length; i += MAX_PARALLEL_BROWSERS) {
+    const batch = groupList.slice(i, i + MAX_PARALLEL_BROWSERS);
+    await Promise.allSettled(batch.map(group => verifyGroupWithBrowser(group, settings)));
+  }
+
+  console.log(`[VerifyAll] All verifications complete.`);
+}
+
+async function verifyGroupWithBrowser(group, settings) {
+  let browser = null;
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
+      protocolTimeout: 120000
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 900 });
+
+    // Login once for the whole group
+    await autoLogin(page, group.username, group.password, settings.portalUrl);
+    console.log(`[VerifyAll] Logged in as ${group.username}. Verifying ${group.ids.length} order(s)...`);
+
+    // Verify each order in this group sequentially (same browser session)
+    for (const orderId of group.ids) {
+      try {
+        await verifyWorkOrderWithPage(page, orderId);
+      } catch (err) {
+        console.error(`[VerifyAll] Error verifying order ${orderId}:`, err.message);
+        const order = db.getWorkOrderById(orderId);
+        const count = (order ? order.verifiedCount || 0 : 0) + 1;
+        db.updateWorkOrder(orderId, {
+          verifiedStatus: 'error',
+          verifiedCount: count,
+          verifiedError: `Error del agente: ${err.message}`
+        });
+      }
+    }
+
+    await browser.close();
+  } catch (err) {
+    console.error(`[VerifyAll] Browser/login error for user ${group.username}:`, err.message);
+    if (browser) try { await browser.close(); } catch (_) {}
+    // Mark all orders in this group as error
+    for (const orderId of group.ids) {
+      const order = db.getWorkOrderById(orderId);
+      const count = (order ? order.verifiedCount || 0 : 0) + 1;
+      db.updateWorkOrder(orderId, {
+        verifiedStatus: 'error',
+        verifiedCount: count,
+        verifiedError: `Error de conexión: ${err.message}`
+      });
+    }
+  }
+}
+
 module.exports = {
   startWorker,
   stopWorker,
   syncWorkOrder,
   verifyWorkOrder,
+  verifyMultipleOrders,
   scrapeCatalogs,
   isScraping
 };

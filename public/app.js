@@ -8010,38 +8010,40 @@ async function verifyAllOrders() {
     btn.innerHTML = '<span class="material-icons" style="font-size:16px; animation: spin 1s linear infinite;">sync</span> Controlando...';
   }
 
-  showToast(`Encolando control de ${toVerify.length} orden(es)...`, "info");
+  try {
+    const res = await fetch('/api/orders/verify-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderIds: toVerify.map(o => o.id) })
+    });
 
-  let ok = 0;
-  let fail = 0;
-  for (const order of toVerify) {
-    try {
-      const res = await fetch(`/api/orders/verify/${order.id}`, { method: 'POST' });
-      if (res.ok) {
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      showToast(data.error || 'Error al iniciar control masivo', 'danger');
+    } else {
+      // Mark locally as checking for instant UI update
+      for (const order of toVerify) {
         order.verifiedStatus = 'checking';
-        ok++;
-      } else {
-        fail++;
       }
-    } catch (e) {
-      fail++;
+      renderOrders();
+      showToast(`✅ ${data.queued} orden(es) enviadas al agente verificador. Los resultados aparecerán en breve.`, 'success');
+      // Auto-refresh every 15s for up to 3 minutes to pick up results
+      let polls = 0;
+      const maxPolls = 12;
+      const pollInterval = setInterval(async () => {
+        await fetchOrders();
+        polls++;
+        if (polls >= maxPolls) clearInterval(pollInterval);
+      }, 15000);
     }
-    // Small delay between requests to avoid overloading
-    await new Promise(r => setTimeout(r, 400));
+  } catch (err) {
+    showToast('Error de conexión al controlar: ' + err.message, 'danger');
   }
 
   if (btn) {
     btn.disabled = false;
     btn.innerHTML = '<span class="material-icons" style="font-size:16px;">fact_check</span> Controlar Todas';
-  }
-
-  renderOrders();
-  fetchOrders();
-
-  if (fail === 0) {
-    showToast(`✅ ${ok} orden(es) enviadas a controlar en Taxes.`, "success");
-  } else {
-    showToast(`${ok} encoladas, ${fail} fallaron. Revisá la conexión.`, "warning");
   }
 }
 

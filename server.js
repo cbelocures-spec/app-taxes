@@ -561,6 +561,42 @@ app.post('/api/orders/verify/:id', async (req, res) => {
   }
 });
 
+// Verify ALL given order IDs at once using parallel browser sessions
+app.post('/api/orders/verify-all', async (req, res) => {
+  try {
+    const { orderIds } = req.body;
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({ error: "orderIds must be a non-empty array" });
+    }
+
+    // Only accept orders that are synced and currently not already checking
+    const eligible = orderIds.filter(id => {
+      const order = db.getWorkOrderById(id);
+      return order && order.taxesOrderNumber && order.verifiedStatus !== 'checking';
+    });
+
+    if (eligible.length === 0) {
+      return res.json({ success: true, queued: 0, message: "No hay órdenes elegibles para controlar." });
+    }
+
+    // Mark all as checking immediately
+    for (const id of eligible) {
+      db.updateWorkOrder(id, { verifiedStatus: 'checking' });
+    }
+
+    // Run verifyMultipleOrders in background (no await — respond immediately)
+    worker.verifyMultipleOrders(eligible).then(() => {
+      console.log(`[VerifyAll] Background verification of ${eligible.length} order(s) complete.`);
+    }).catch(err => {
+      console.error(`[VerifyAll] Background error:`, err);
+    });
+
+    res.json({ success: true, queued: eligible.length, message: `${eligible.length} orden(es) encoladas para control.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get current Taxes connection settings
 app.get('/api/settings', (req, res) => {
   try {
