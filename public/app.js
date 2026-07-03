@@ -1891,7 +1891,8 @@ function createOrderCardHtml(order) {
               })()}
             </div>
           </div>
-        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;">
           ${statusBadge}
           ${getVerificationBadgeHtml(order)}
         </div>
