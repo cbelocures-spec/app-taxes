@@ -1,3 +1,13 @@
+/* Prevent Google Translate from translating Material Icon names */
+.material-icons {
+  font-family: 'Material Icons' !important;
+  -webkit-font-feature-settings: 'liga';
+}
+.material-icons::before,
+.material-icons::after {
+  content: none !important;
+}
+
 :root {
   --primary: #1a73e8;
   --primary-hover: #1557b0;

@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- Prevent Google Translate from breaking Material Icons -->
+  <meta name="google" content="notranslate">
   <title>Taller - Contenedores Hugo</title>
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -10,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=32">
+  <link rel="stylesheet" href="style.css?v=33">
 </head>
 <body>
 
@@ -26,9 +28,9 @@
     </div>
 
     <div class="header-actions">
-      <span class="material-icons logout-btn" id="header-logout-btn" onclick="logoutUser()" title="Cerrar Sesión" style="margin-right: 8px;">logout</span>
-      <span class="material-icons refresh-btn" id="header-refresh-btn" onclick="location.reload()" title="Refrescar Pantalla">refresh</span>
-      <span class="material-icons sync-indicator idle" id="global-sync-icon">sync</span>
+      <span class="material-icons logout-btn" id="header-logout-btn" onclick="logoutUser()" title="Cerrar Sesión" style="margin-right: 8px;" translate="no">logout</span>
+      <span class="material-icons refresh-btn" id="header-refresh-btn" onclick="location.reload()" title="Refrescar Pantalla" translate="no">refresh</span>
+      <span class="material-icons sync-indicator idle" id="global-sync-icon" translate="no">sync</span>
     </div>
   </header>
 
