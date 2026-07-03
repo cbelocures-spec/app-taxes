@@ -1833,7 +1833,15 @@ function createOrderCardHtml(order) {
     statusBadge = `<span class="badge-status syncing"><span class="material-icons spinner">autorenew</span> Sincronizando</span>`;
   } else if (order.syncStatus === 'success') {
     const otText = order.taxesOrderNumber ? ` O.T.: ${order.taxesOrderNumber}` : '';
-    statusBadge = `<span class="badge-status success"><span class="material-icons">check_circle</span> Sincronizado${otText}</span>`;
+    statusBadge = `
+      <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px;">
+        <span class="material-icons">check_circle</span> 
+        <span>Sincronizado${otText}</span>
+        <button onclick="event.stopPropagation(); retrySync('${order.id}')" title="Volver a Sincronizar con Taxes" style="background: none; border: none; padding: 2px; margin-left: 4px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #065f46; outline: none;" onmouseover="this.style.color='#047857'" onmouseout="this.style.color='#065f46'">
+          <span class="material-icons" style="font-size: 14px; font-weight: bold;">sync</span>
+        </button>
+      </span>
+    `;
   } else if (order.syncStatus === 'error') {
     statusBadge = `<span class="badge-status error" onclick="openErrorModal(\`${order.syncError.replace(/"/g, '&quot;')}\`, '${order.id}')"><span class="material-icons">error</span> Error</span>`;
   } else if (order.syncStatus === 'local') {
@@ -1895,6 +1903,9 @@ function createOrderCardHtml(order) {
         </div>
         <div class="task-employees-detail" id="task-emp-${order.id}" style="display:none; width:100%; margin-top:6px; padding:6px 8px; background:var(--bg-secondary); border-radius:6px; font-size:12px;"></div>
         <div class="card-actions">
+          <button class="icon-btn primary" onclick="viewOrder('${order.id}')" title="Ver Orden (Solo Lectura)">
+            <span class="material-icons">visibility</span>
+          </button>
           ${(order.syncStatus !== 'pending' && order.syncStatus !== 'syncing') ? `
             <button class="icon-btn warning" onclick="editOrder('${order.id}')" title="Editar Orden">
               <span class="material-icons">edit</span>
