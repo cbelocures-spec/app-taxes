@@ -7993,6 +7993,58 @@ async function triggerOrderVerification(orderId) {
   }
 }
 
+async function verifyAllOrders() {
+  // Only verify orders that are synced (have a taxesOrderNumber) and not already checking
+  const toVerify = activeOrders.filter(o =>
+    o.taxesOrderNumber && o.verifiedStatus !== 'checking'
+  );
+
+  if (toVerify.length === 0) {
+    showToast("No hay órdenes sincronizadas para controlar.", "info");
+    return;
+  }
+
+  const btn = document.getElementById('btn-verify-all');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons" style="font-size:16px; animation: spin 1s linear infinite;">sync</span> Controlando...';
+  }
+
+  showToast(`Encolando control de ${toVerify.length} orden(es)...`, "info");
+
+  let ok = 0;
+  let fail = 0;
+  for (const order of toVerify) {
+    try {
+      const res = await fetch(`/api/orders/verify/${order.id}`, { method: 'POST' });
+      if (res.ok) {
+        order.verifiedStatus = 'checking';
+        ok++;
+      } else {
+        fail++;
+      }
+    } catch (e) {
+      fail++;
+    }
+    // Small delay between requests to avoid overloading
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons" style="font-size:16px;">fact_check</span> Controlar Todas';
+  }
+
+  renderOrders();
+  fetchOrders();
+
+  if (fail === 0) {
+    showToast(`✅ ${ok} orden(es) enviadas a controlar en Taxes.`, "success");
+  } else {
+    showToast(`${ok} encoladas, ${fail} fallaron. Revisá la conexión.`, "warning");
+  }
+}
+
 let currentVerifyOrderId = null;
 
 function openVerificationErrorModal(errorMsg, orderId) {
