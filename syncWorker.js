@@ -1410,16 +1410,16 @@ async function syncWorkOrder(orderId) {
           await delay(3000); // Wait for table reload
 
           // Click "eye" icon for the matching row
-          const employeeObj = (db.getCatalogs().empleados || []).find(e => String(e.value) === String(task.empleado));
-          const employeeLabel = employeeObj ? employeeObj.label : task.empleado;
+          const { employeeLabel, finalDescription } = resolveAndMapEmployee(task);
 
-          const eyeClicked = await page.evaluate((empName, descText) => {
+          const eyeClicked = await page.evaluate((empName, descTextBase, descTextFinal) => {
             const clean = (str) => {
               if (!str) return '';
               return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
             };
             const cleanEmp = clean(empName);
-            const cleanDesc = clean(descText);
+            const cleanDescBase = clean(descTextBase);
+            const cleanDescFinal = clean(descTextFinal);
             
             const rows = Array.from(document.querySelectorAll('table tbody tr'));
             for (const row of rows) {
@@ -1427,19 +1427,53 @@ async function syncWorkOrder(orderId) {
               if (cells.length >= 10) {
                 const rowEmp = clean(cells[5].textContent);
                 const rowDesc = clean(cells[7].textContent);
-                if ((rowEmp.includes(cleanEmp) || cleanEmp.includes(rowEmp)) &&
-                    (rowDesc.includes(cleanDesc) || cleanDesc.includes(rowDesc))) {
+                
+                // Match employee: either exact match or part-of
+                const empMatches = rowEmp.includes(cleanEmp) || cleanEmp.includes(rowEmp);
+                
+                // Match description: check if either base or final description matches or is contained
+                const descMatches = rowDesc.includes(cleanDescBase) || 
+                                    rowDesc.includes(cleanDescFinal) || 
+                                    cleanDescBase.includes(rowDesc) || 
+                                    cleanDescFinal.includes(rowDesc);
+                                    
+                if (empMatches && descMatches) {
                   const eyeBtn = cells[9].querySelector('a, button');
                   if (eyeBtn) { eyeBtn.click(); return true; }
                 }
               }
             }
             return false;
-          }, employeeLabel, task.descripcion);
+          }, employeeLabel, task.descripcion, finalDescription);
 
           if (!eyeClicked) {
-            console.log(`Warning: Task #${i+1} matching "${employeeLabel}" and "${task.descripcion}" was not found on the Tareas table. It might have been deleted on Taxes.`);
-            continue;
+            console.log(`Warning: Task #${i+1} matching "${employeeLabel}" was not found. Trying fallback search by description only...`);
+            const fallbackEyeClicked = await page.evaluate((descTextBase, descTextFinal) => {
+              const clean = (str) => {
+                if (!str) return '';
+                return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+              };
+              const cleanDescBase = clean(descTextBase);
+              const cleanDescFinal = clean(descTextFinal);
+              
+              const rows = Array.from(document.querySelectorAll('table tbody tr'));
+              for (const row of rows) {
+                const cells = Array.from(row.querySelectorAll('td'));
+                if (cells.length >= 10) {
+                  const rowDesc = clean(cells[7].textContent);
+                  if (rowDesc.includes(cleanDescBase) || rowDesc.includes(cleanDescFinal)) {
+                    const eyeBtn = cells[9].querySelector('a, button');
+                    if (eyeBtn) { eyeBtn.click(); return true; }
+                  }
+                }
+              }
+              return false;
+            }, task.descripcion, finalDescription);
+            
+            if (!fallbackEyeClicked) {
+              console.log(`Warning: Task #${i+1} matching description was not found. Skipping.`);
+              continue;
+            }
           }
 
           await delay(3000); // Wait for task form page to load
