@@ -1312,28 +1312,20 @@ async function syncWorkOrder(orderId) {
         await page.keyboard.press('Backspace');
         await page.keyboard.type(otNumClean, { delay: 80 });
         await delay(500);
-        console.log(`[Reconcile] Typed OT number "${otNumClean}" into Numero field`);
+        console.log(`[Reconcile] Typed OT number "${otNumClean}". Navigating to BUSCAR via Tab...`);
+        await page.keyboard.press('Tab');
+        await delay(200);
+        await page.keyboard.press('Tab');
+        await delay(200);
+        await page.keyboard.press('Tab');
+        await delay(200);
+        await page.keyboard.press('Enter');
+        console.log(`[Reconcile] Pressed Enter on focused BUSCAR button`);
+        await delay(1000);
       } else {
         console.warn(`[Reconcile] Could not find Numero input field`);
       }
 
-      // Click BUSCAR natively
-      const buscarBtnId = await page.evaluate(() => {
-        const all = Array.from(document.querySelectorAll('button, a, [role="button"], .btn'));
-        const btn = all.find(b => {
-          const t = b.textContent.trim().toUpperCase();
-          return t.includes('BUSCAR') || t === 'BUSCAR';
-        });
-        if (btn) {
-          if (!btn.id) btn.id = 'rc-buscar-btn-v3';
-          return btn.id;
-        }
-        return null;
-      });
-      if (buscarBtnId) {
-        await page.click(`#${buscarBtnId}`).catch(() => {});
-        console.log(`[Reconcile] Clicked BUSCAR button natively`);
-      }
       console.log(`[Reconcile] Waiting up to 12s for OT row "${otNumClean}" to appear in table...`);
       let foundOTRow = false;
       for (let attempt = 1; attempt <= 12; attempt++) {
@@ -2172,28 +2164,20 @@ async function verifyWorkOrderWithPage(page, orderId) {
       await page.keyboard.press('Backspace');
       await page.keyboard.type(otNumClean, { delay: 80 });
       await delay(500);
-      console.log(`[Verify] Typed OT number "${otNumClean}" into Numero field`);
+      console.log(`[Verify] Typed OT number "${otNumClean}". Navigating to BUSCAR via Tab...`);
+      await page.keyboard.press('Tab');
+      await delay(200);
+      await page.keyboard.press('Tab');
+      await delay(200);
+      await page.keyboard.press('Tab');
+      await delay(200);
+      await page.keyboard.press('Enter');
+      console.log(`[Verify] Pressed Enter on focused BUSCAR button`);
+      await delay(1000);
     } else {
       console.warn(`[Verify] Could not find Numero input field`);
     }
 
-    // 3. Click BUSCAR natively
-    const buscarBtnId = await page.evaluate(() => {
-      const all = Array.from(document.querySelectorAll('button, a, [role="button"], .btn'));
-      const btn = all.find(b => {
-        const t = b.textContent.trim().toUpperCase();
-        return t.includes('BUSCAR') || t === 'BUSCAR';
-      });
-      if (btn) {
-        if (!btn.id) btn.id = 'vf-buscar-btn-v3';
-        return btn.id;
-      }
-      return null;
-    });
-    if (buscarBtnId) {
-      await page.click(`#${buscarBtnId}`).catch(() => {});
-      console.log(`[Verify] Clicked BUSCAR button natively`);
-    }
     console.log(`[Verify] Waiting up to 12s for OT row "${otNumClean}" to appear in table...`);
     let foundOTRow = false;
     for (let attempt = 1; attempt <= 12; attempt++) {
