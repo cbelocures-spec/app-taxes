@@ -1276,59 +1276,24 @@ async function syncWorkOrder(orderId) {
           const empFilled = await fillSearchableSelect(page, 'Empleado', employeeLabel);
           if (!empFilled) throw new Error(`No se pudo seleccionar el Empleado: "${employeeLabel}"`);
 
-          // Horas Estimadas — find by label first, then associated input
-          const hoursInputSelector1 = await page.evaluate(() => {
-            // Strategy 1: find label/span with exact text, then sibling/child input
-            const allEls = Array.from(document.querySelectorAll('label, span, p, div'));
-            const hoursLabel = allEls.find(el =>
-              el.children.length === 0 &&
-              el.textContent.trim().toLowerCase().replace(/\s+/g, ' ') === 'horas estimadas'
-            );
-            if (hoursLabel) {
-              // Try sibling input
-              const parent = hoursLabel.parentElement;
-              if (parent) {
-                const siblingInput = parent.querySelector('input');
-                if (siblingInput) {
-                  if (!siblingInput.id) siblingInput.id = 'temp-hours-1';
-                  return '#' + siblingInput.id;
-                }
-              }
-              // Try next sibling
-              let next = hoursLabel.nextElementSibling;
-              while (next) {
-                const inp = next.tagName === 'INPUT' ? next : next.querySelector('input');
-                if (inp) { if (!inp.id) inp.id = 'temp-hours-1'; return '#' + inp.id; }
-                next = next.nextElementSibling;
-              }
+          // Horas Estimadas — input[name="horas_estimadas"], type="number", so use period format
+          const hoursInputId1 = await page.evaluate(() => {
+            const inp = document.querySelector('input[name="horas_estimadas"]');
+            if (inp) {
+              if (!inp.id) inp.id = 'temp-hours-1';
+              return inp.id;
             }
-            // Strategy 2: input whose closest container has 'horas estimadas' text (but NOT other fields)
-            const inp2 = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])')).find(i => {
-              const col = i.closest('.col') || i.closest('.col-md-4') || i.closest('.col-md-3') || i.closest('.col-md-6');
-              if (col) {
-                const txt = col.textContent.toLowerCase();
-                return txt.includes('horas estimadas') && !txt.includes('empleado') && !txt.includes('descripcion');
-              }
-              return false;
-            });
-            if (inp2) { if (!inp2.id) inp2.id = 'temp-hours-1'; return '#' + inp2.id; }
-            // Strategy 3: first number/step input
-            const inp3 = document.querySelector('input[type="number"]') || document.querySelector('input[step]');
-            if (inp3) { if (!inp3.id) inp3.id = 'temp-hours-1'; return '#' + inp3.id; }
             return null;
           });
+          const hoursInputSelector1 = hoursInputId1 ? '#' + hoursInputId1 : null;
 
-          console.log(`[Sync] Horas input selector: ${hoursInputSelector1}, value to set: ${task.horasEstimadas}`);
+          console.log(`[Sync] Horas input found: ${!!hoursInputSelector1}, value to set: ${task.horasEstimadas}`);
           if (hoursInputSelector1) {
-            // Try comma format first (portal uses 0,00 European format), also period as fallback
-            const rawVal = parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0;
-            const hoursValComma = rawVal.toFixed(2).replace('.', ','); // e.g. "1,12"
-            const hoursValDot = rawVal.toFixed(2); // e.g. "1.12"
-            await page.evaluate((sel, valComma, valDot) => {
+            // type="number" always uses period as decimal separator
+            const hoursVal = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
+            await page.evaluate((sel, val) => {
               const el = document.querySelector(sel);
               if (!el) return;
-              const isNumberType = el.type === 'number';
-              const val = isNumberType ? valDot : valComma;
               try {
                 const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                 nativeSetter.call(el, val);
@@ -1337,14 +1302,13 @@ async function syncWorkOrder(orderId) {
               el.dispatchEvent(new Event('input', { bubbles: true }));
               el.dispatchEvent(new Event('change', { bubbles: true }));
               el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-            }, hoursInputSelector1, hoursValComma, hoursValDot);
-            // Also type via keyboard (triple-click to select all, then type)
+            }, hoursInputSelector1, hoursVal);
+            // Triple-click to select all, then type
             await page.click(hoursInputSelector1, { clickCount: 3 }).catch(() => {});
-            const hoursType = await page.evaluate(sel => document.querySelector(sel)?.type, hoursInputSelector1);
-            await page.keyboard.type(hoursType === 'number' ? hoursValDot : hoursValComma);
+            await page.keyboard.type(hoursVal);
             await delay(400);
           } else {
-            console.warn(`[Sync] WARNING: No se encontró el campo Horas Estimadas en el formulario`);
+            console.warn(`[Sync] WARNING: No se encontró input[name="horas_estimadas"] en el formulario`);
           }
 
           // Descripcion
@@ -1527,49 +1491,23 @@ async function syncWorkOrder(orderId) {
 
           await delay(3000); // Wait for task form page to load
 
-          // Fill Horas Estimadas — same label-first strategy
-          const hoursInputSelector2 = await page.evaluate(() => {
-            const allEls = Array.from(document.querySelectorAll('label, span, p, div'));
-            const hoursLabel = allEls.find(el =>
-              el.children.length === 0 &&
-              el.textContent.trim().toLowerCase().replace(/\s+/g, ' ') === 'horas estimadas'
-            );
-            if (hoursLabel) {
-              const parent = hoursLabel.parentElement;
-              if (parent) {
-                const siblingInput = parent.querySelector('input');
-                if (siblingInput) { if (!siblingInput.id) siblingInput.id = 'temp-hours-2'; return '#' + siblingInput.id; }
-              }
-              let next = hoursLabel.nextElementSibling;
-              while (next) {
-                const inp = next.tagName === 'INPUT' ? next : next.querySelector('input');
-                if (inp) { if (!inp.id) inp.id = 'temp-hours-2'; return '#' + inp.id; }
-                next = next.nextElementSibling;
-              }
+          // Fill Horas Estimadas — input[name="horas_estimadas"], type="number"
+          const hoursInputId2 = await page.evaluate(() => {
+            const inp = document.querySelector('input[name="horas_estimadas"]');
+            if (inp) {
+              if (!inp.id) inp.id = 'temp-hours-2';
+              return inp.id;
             }
-            const inp2 = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])')).find(i => {
-              const col = i.closest('.col') || i.closest('.col-md-4') || i.closest('.col-md-3') || i.closest('.col-md-6');
-              if (col) {
-                const txt = col.textContent.toLowerCase();
-                return txt.includes('horas estimadas') && !txt.includes('empleado') && !txt.includes('descripcion');
-              }
-              return false;
-            });
-            if (inp2) { if (!inp2.id) inp2.id = 'temp-hours-2'; return '#' + inp2.id; }
-            const inp3 = document.querySelector('input[type="number"]') || document.querySelector('input[step]');
-            if (inp3) { if (!inp3.id) inp3.id = 'temp-hours-2'; return '#' + inp3.id; }
             return null;
           });
+          const hoursInputSelector2 = hoursInputId2 ? '#' + hoursInputId2 : null;
 
-          console.log(`[Sync] Horas input selector (update): ${hoursInputSelector2}, value to set: ${task.horasEstimadas}`);
+          console.log(`[Sync] Horas input found (update): ${!!hoursInputSelector2}, value: ${task.horasEstimadas}`);
           if (hoursInputSelector2) {
-            const rawVal2 = parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0;
-            const hoursValComma2 = rawVal2.toFixed(2).replace('.', ',');
-            const hoursValDot2 = rawVal2.toFixed(2);
-            await page.evaluate((sel, valComma, valDot) => {
+            const hoursVal2 = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
+            await page.evaluate((sel, val) => {
               const el = document.querySelector(sel);
               if (!el) return;
-              const val = el.type === 'number' ? valDot : valComma;
               try {
                 const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                 nativeSetter.call(el, val);
@@ -1578,10 +1516,9 @@ async function syncWorkOrder(orderId) {
               el.dispatchEvent(new Event('input', { bubbles: true }));
               el.dispatchEvent(new Event('change', { bubbles: true }));
               el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-            }, hoursInputSelector2, hoursValComma2, hoursValDot2);
+            }, hoursInputSelector2, hoursVal2);
             await page.click(hoursInputSelector2, { clickCount: 3 }).catch(() => {});
-            const hoursType2 = await page.evaluate(sel => document.querySelector(sel)?.type, hoursInputSelector2);
-            await page.keyboard.type(hoursType2 === 'number' ? hoursValDot2 : hoursValComma2);
+            await page.keyboard.type(hoursVal2);
             await delay(400);
           }
 
@@ -1911,12 +1848,13 @@ async function syncWorkOrder(orderId) {
         throw new Error(`No se pudo seleccionar el Empleado para la tarea ${i+1}.`);
       }
 
-      // 3. Fill Hours (use nativeInputValueSetter + events to properly trigger React/Vue)
+      // 3. Fill Hours — input[name="horas_estimadas"], type="number", index i
       console.log(`Setting Horas Estimadas: ${task.horasEstimadas}`);
-      const hoursVal3 = String(task.horasEstimadas || '0').replace(',', '.');
-      const hoursSelector = `input#horas_${i}`;
-      const hoursFilled = await page.evaluate((sel, val) => {
-        const el = document.querySelector(sel);
+      const hoursVal3 = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
+      const hoursFilled = await page.evaluate((idx, val) => {
+        // There are multiple inputs with name="horas_estimadas" — one per task
+        const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
+        const el = inputs[idx];
         if (!el) return false;
         try {
           const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -1925,14 +1863,22 @@ async function syncWorkOrder(orderId) {
         el.focus();
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
         return true;
-      }, hoursSelector, hoursVal3).catch(() => false);
-      // Also type via keyboard
-      await page.focus(hoursSelector).catch(() => {});
-      await page.keyboard.down('Control'); await page.keyboard.press('A'); await page.keyboard.up('Control');
-      await page.keyboard.press('Backspace');
-      await page.type(hoursSelector, hoursVal3, { delay: 50 });
-      console.log(`Horas filled via selector: ${hoursFilled}, value: ${hoursVal3}`);
+      }, i, hoursVal3).catch(() => false);
+      // Also type via keyboard — assign ID first, then triple-click + type
+      const hoursId3 = await page.evaluate((idx) => {
+        const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
+        const el = inputs[idx];
+        if (!el) return null;
+        if (!el.id) el.id = `temp-horas-${idx}`;
+        return el.id;
+      }, i);
+      if (hoursId3) {
+        await page.click(`#${hoursId3}`, { clickCount: 3 }).catch(() => {});
+        await page.keyboard.type(hoursVal3);
+      }
+      console.log(`Horas filled: ${hoursFilled}, value: ${hoursVal3}, inputs found: via querySelectorAll`);
 
       // 4. Fill Description
       console.log(`Setting Descripción: "${finalDescription}"`);
