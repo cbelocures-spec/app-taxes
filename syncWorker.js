@@ -1411,8 +1411,8 @@ async function syncWorkOrder(orderId) {
 
 
       // 3. Wait for OT edit form to load (task cards)
-      await page.waitForSelector('input[name="horas_estimadas"], .card, .task-card', { timeout: 15000 }).catch(() => delay(4000));
-      await delay(2000);
+      await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 8000 }).catch(() => {});
+      await delay(3500);
 
       // 4. Read ALL task cards currently in the form
       //    Each card has: empleado input/text, horas input, descripcion textarea, realizada checkbox, red trash button
