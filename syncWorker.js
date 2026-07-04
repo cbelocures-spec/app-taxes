@@ -761,7 +761,7 @@ async function scrapeCatalogs(triggerUsername = null) {
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
-      protocolTimeout: 120000
+      protocolTimeout: 300000
     });
 
     const page = await browser.newPage();
@@ -1207,7 +1207,7 @@ async function syncWorkOrder(orderId) {
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
-      protocolTimeout: 120000
+      protocolTimeout: 300000
     });
 
     const page = await browser.newPage();
@@ -2237,7 +2237,7 @@ async function verifyWorkOrder(orderId) {
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
-      protocolTimeout: 120000
+      protocolTimeout: 300000
     });
 
     const page = await browser.newPage();
@@ -2370,7 +2370,7 @@ async function verifyGroupWithBrowser(group, settings) {
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
-      protocolTimeout: 120000
+      protocolTimeout: 300000
     });
 
     const page = await browser.newPage();
