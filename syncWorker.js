@@ -1176,15 +1176,18 @@ async function syncWorkOrder(orderId) {
 
   const settings = db.getSettings();
   
-  // Resolve user credentials for this order
+  // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
+  // fallback to order creator's credentials only if global settings are empty.
   let username = settings.username;
   let password = settings.password;
 
-  if (order.createdBy) {
-    const user = db.getUser(order.createdBy);
-    if (user && user.password) {
-      username = user.username;
-      password = user.password;
+  if (!username || !password) {
+    if (order.createdBy) {
+      const user = db.getUser(order.createdBy);
+      if (user && user.password) {
+        username = user.username;
+        password = user.password;
+      }
     }
   }
 
@@ -2358,15 +2361,18 @@ async function verifyWorkOrder(orderId) {
   const order = db.getWorkOrderById(orderId);
   if (!order) return { success: false, message: "Order not found" };
 
-  const settings = db.getSettings();
+  // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
+  // fallback to order creator's credentials only if global settings are empty.
   let username = settings.username;
   let password = settings.password;
 
-  if (order.createdBy) {
-    const user = db.getUser(order.createdBy);
-    if (user && user.password) {
-      username = user.username;
-      password = user.password;
+  if (!username || !password) {
+    if (order.createdBy) {
+      const user = db.getUser(order.createdBy);
+      if (user && user.password) {
+        username = user.username;
+        password = user.password;
+      }
     }
   }
 
@@ -2479,11 +2485,13 @@ async function verifyMultipleOrders(orderIds) {
 
     let username = settings.username;
     let password = settings.password;
-    if (order.createdBy) {
-      const user = db.getUser(order.createdBy);
-      if (user && user.password) {
-        username = user.username;
-        password = user.password;
+    if (!username || !password) {
+      if (order.createdBy) {
+        const user = db.getUser(order.createdBy);
+        if (user && user.password) {
+          username = user.username;
+          password = user.password;
+        }
       }
     }
     if (!username || !password) continue;
