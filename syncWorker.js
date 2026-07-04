@@ -1561,7 +1561,98 @@ async function syncWorkOrder(orderId) {
           await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
           await delay(2000);
         }
-      }
+
+        // Case 3: EXISTING task already synced but needs hours updated (verifier detected mismatch)
+        else if (task.synced === true && task.needsHoursUpdate === true) {
+          console.log(`Task #${i+1} needs hours update. Finding task in Taxes and updating...`);
+          
+          // Search by OT number in the list
+          await page.evaluate((otNum) => {
+            const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+            const searchInput = inputs.find(inp => {
+              const p = inp.closest('.form-group') || inp.closest('div');
+              return p && (p.textContent.toLowerCase().includes('buscar') || p.textContent.toLowerCase().includes('ot'));
+            }) || inputs[1] || inputs[0];
+            if (searchInput) {
+              searchInput.focus();
+              searchInput.value = String(otNum);
+              searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          }, order.taxesOrderNumber);
+          await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button'));
+            const searchBtn = btns.find(b => b.textContent.toLowerCase().includes('buscar'));
+            if (searchBtn) searchBtn.click();
+          });
+          await page.waitForSelector('table tbody tr', { timeout: 8000 }).catch(() => delay(2000));
+          await delay(1000);
+
+          // Find and click the eye button of the matching row
+          const { employeeLabel, finalDescription } = resolveAndMapEmployee(task);
+          const editClicked3 = await page.evaluate((empName, descBase, descFinal) => {
+            const clean = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+            const rows = Array.from(document.querySelectorAll('table tbody tr'));
+            for (const row of rows) {
+              const cells = Array.from(row.querySelectorAll('td'));
+              if (cells.length < 6) continue;
+              const rowEmp = clean(cells[5]?.textContent || '');
+              const rowDesc = clean(cells[7]?.textContent || '');
+              const empOk = rowEmp.includes(clean(empName)) || clean(empName).includes(rowEmp);
+              const descOk = rowDesc.includes(clean(descBase)) || rowDesc.includes(clean(descFinal)) ||
+                             clean(descBase).includes(rowDesc) || clean(descFinal).includes(rowDesc);
+              if (empOk && descOk) {
+                const btn = (cells[cells.length-1] || cells[9])?.querySelector('a, button');
+                if (btn) { btn.click(); return true; }
+              }
+            }
+            return false;
+          }, employeeLabel, task.descripcion, finalDescription);
+
+          if (!editClicked3) {
+            console.warn(`[Sync Case 3] No se encontró la tarea para actualizar horas. Se omite.`);
+          } else {
+            await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 8000 }).catch(() => delay(3000));
+            await delay(1000);
+
+            const hoursVal3u = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
+            const hoursId3u = await page.evaluate((val) => {
+              const el = document.querySelector('input[name="horas_estimadas"]');
+              if (!el) return null;
+              try {
+                const ns = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                ns.call(el, val);
+              } catch(e) { el.value = val; }
+              el.focus();
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+              if (!el.id) el.id = 'temp-hours-3u';
+              return el.id;
+            }, hoursVal3u);
+            if (hoursId3u) {
+              await page.click(`#${hoursId3u}`, { clickCount: 3 }).catch(() => {});
+              await page.keyboard.type(hoursVal3u);
+            }
+            await delay(400);
+
+            // Save
+            const saved3 = await page.evaluate(() => {
+              const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
+              if (btn) { btn.click(); return true; }
+              return false;
+            });
+            if (saved3) {
+              await delay(4000);
+              task.needsHoursUpdate = false;
+              db.updateWorkOrder(orderId, { tasks: order.tasks });
+              console.log(`[Sync Case 3] Horas actualizadas a ${hoursVal3u} para tarea #${i+1}`);
+            }
+          }
+
+          await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+          await delay(2000);
+        }
+      } // end for tasks loop
 
       db.updateWorkOrder(orderId, {
         syncStatus: "success",
@@ -2238,6 +2329,12 @@ async function verifyWorkOrderWithPage(page, orderId) {
         
         if (Math.abs(expectedHours - actualHours) > 0.05) {
           errors.push(`Tarea #${idx + 1}: Horas no coinciden (Esperado: ${expectedHours.toFixed(2)}, Encontrado: ${actualHours.toFixed(2)})`);
+          // Mark the task for hours update on next sync
+          if (order.tasks && order.tasks[idx]) {
+            order.tasks[idx].needsHoursUpdate = true;
+            db.updateWorkOrder(orderId, { tasks: order.tasks });
+            console.log(`[Verification] Marked task #${idx+1} as needsHoursUpdate=true for next sync`);
+          }
         }
         if (t.status === 'Finalizada' && matchingRow.realizada !== 'SI') {
           errors.push(`Tarea #${idx + 1}: No marcada como Realizada (SI) en Taxes`);
