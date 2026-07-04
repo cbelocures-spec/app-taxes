@@ -1276,32 +1276,59 @@ async function syncWorkOrder(orderId) {
           const empFilled = await fillSearchableSelect(page, 'Empleado', employeeLabel);
           if (!empFilled) throw new Error(`No se pudo seleccionar el Empleado: "${employeeLabel}"`);
 
-          // Horas Estimadas
+          // Horas Estimadas — find by label first, then associated input
           const hoursInputSelector1 = await page.evaluate(() => {
-            const input = Array.from(document.querySelectorAll('input')).find(i => {
-              const parent = i.closest('.form-group') || i.closest('.taxes-form-group') ||
-                             i.closest('.col') || i.closest('.col-md-6') || i.closest('.col-md-4') ||
-                             i.closest('div') || i.parentElement;
-              return parent && (
-                parent.textContent.toLowerCase().includes('horas estimadas') ||
-                (i.getAttribute('placeholder') || '').toLowerCase().includes('horas')
-              );
-            }) ||
-            document.querySelector('input[type="number"]') ||
-            document.querySelector('input[step]');
-            if (input) {
-              if (!input.id) input.id = 'temp-hours-input-1';
-              return '#' + input.id;
+            // Strategy 1: find label/span with exact text, then sibling/child input
+            const allEls = Array.from(document.querySelectorAll('label, span, p, div'));
+            const hoursLabel = allEls.find(el =>
+              el.children.length === 0 &&
+              el.textContent.trim().toLowerCase().replace(/\s+/g, ' ') === 'horas estimadas'
+            );
+            if (hoursLabel) {
+              // Try sibling input
+              const parent = hoursLabel.parentElement;
+              if (parent) {
+                const siblingInput = parent.querySelector('input');
+                if (siblingInput) {
+                  if (!siblingInput.id) siblingInput.id = 'temp-hours-1';
+                  return '#' + siblingInput.id;
+                }
+              }
+              // Try next sibling
+              let next = hoursLabel.nextElementSibling;
+              while (next) {
+                const inp = next.tagName === 'INPUT' ? next : next.querySelector('input');
+                if (inp) { if (!inp.id) inp.id = 'temp-hours-1'; return '#' + inp.id; }
+                next = next.nextElementSibling;
+              }
             }
+            // Strategy 2: input whose closest container has 'horas estimadas' text (but NOT other fields)
+            const inp2 = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])')).find(i => {
+              const col = i.closest('.col') || i.closest('.col-md-4') || i.closest('.col-md-3') || i.closest('.col-md-6');
+              if (col) {
+                const txt = col.textContent.toLowerCase();
+                return txt.includes('horas estimadas') && !txt.includes('empleado') && !txt.includes('descripcion');
+              }
+              return false;
+            });
+            if (inp2) { if (!inp2.id) inp2.id = 'temp-hours-1'; return '#' + inp2.id; }
+            // Strategy 3: first number/step input
+            const inp3 = document.querySelector('input[type="number"]') || document.querySelector('input[step]');
+            if (inp3) { if (!inp3.id) inp3.id = 'temp-hours-1'; return '#' + inp3.id; }
             return null;
           });
 
           console.log(`[Sync] Horas input selector: ${hoursInputSelector1}, value to set: ${task.horasEstimadas}`);
           if (hoursInputSelector1) {
-            const hoursVal = String(task.horasEstimadas || '0').replace(',', '.');
-            await page.evaluate((sel, val) => {
+            // Try comma format first (portal uses 0,00 European format), also period as fallback
+            const rawVal = parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0;
+            const hoursValComma = rawVal.toFixed(2).replace('.', ','); // e.g. "1,12"
+            const hoursValDot = rawVal.toFixed(2); // e.g. "1.12"
+            await page.evaluate((sel, valComma, valDot) => {
               const el = document.querySelector(sel);
               if (!el) return;
+              const isNumberType = el.type === 'number';
+              const val = isNumberType ? valDot : valComma;
               try {
                 const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                 nativeSetter.call(el, val);
@@ -1309,11 +1336,15 @@ async function syncWorkOrder(orderId) {
               el.focus();
               el.dispatchEvent(new Event('input', { bubbles: true }));
               el.dispatchEvent(new Event('change', { bubbles: true }));
-            }, hoursInputSelector1, hoursVal);
-            await page.click(hoursInputSelector1).catch(() => {});
-            await page.keyboard.down('Control'); await page.keyboard.press('A'); await page.keyboard.up('Control');
-            await page.keyboard.type(hoursVal);
-            await delay(300);
+              el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+            }, hoursInputSelector1, hoursValComma, hoursValDot);
+            // Also type via keyboard (triple-click to select all, then type)
+            await page.click(hoursInputSelector1, { clickCount: 3 }).catch(() => {});
+            const hoursType = await page.evaluate(sel => document.querySelector(sel)?.type, hoursInputSelector1);
+            await page.keyboard.type(hoursType === 'number' ? hoursValDot : hoursValComma);
+            await delay(400);
+          } else {
+            console.warn(`[Sync] WARNING: No se encontró el campo Horas Estimadas en el formulario`);
           }
 
           // Descripcion
@@ -1496,29 +1527,49 @@ async function syncWorkOrder(orderId) {
 
           await delay(3000); // Wait for task form page to load
 
-          // Fill Horas Estimadas
+          // Fill Horas Estimadas — same label-first strategy
           const hoursInputSelector2 = await page.evaluate(() => {
-            const input = Array.from(document.querySelectorAll('input')).find(i => {
-              const parent = i.closest('.form-group') || i.closest('.taxes-form-group') ||
-                             i.closest('.col') || i.closest('.col-md-6') || i.closest('.col-md-4') ||
-                             i.closest('div') || i.parentElement;
-              return parent && parent.textContent.toLowerCase().includes('horas estimadas');
-            }) ||
-            document.querySelector('input[type="number"]') ||
-            document.querySelector('input[step]');
-            if (input) {
-              if (!input.id) input.id = 'temp-hours-input-2';
-              return '#' + input.id;
+            const allEls = Array.from(document.querySelectorAll('label, span, p, div'));
+            const hoursLabel = allEls.find(el =>
+              el.children.length === 0 &&
+              el.textContent.trim().toLowerCase().replace(/\s+/g, ' ') === 'horas estimadas'
+            );
+            if (hoursLabel) {
+              const parent = hoursLabel.parentElement;
+              if (parent) {
+                const siblingInput = parent.querySelector('input');
+                if (siblingInput) { if (!siblingInput.id) siblingInput.id = 'temp-hours-2'; return '#' + siblingInput.id; }
+              }
+              let next = hoursLabel.nextElementSibling;
+              while (next) {
+                const inp = next.tagName === 'INPUT' ? next : next.querySelector('input');
+                if (inp) { if (!inp.id) inp.id = 'temp-hours-2'; return '#' + inp.id; }
+                next = next.nextElementSibling;
+              }
             }
+            const inp2 = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])')).find(i => {
+              const col = i.closest('.col') || i.closest('.col-md-4') || i.closest('.col-md-3') || i.closest('.col-md-6');
+              if (col) {
+                const txt = col.textContent.toLowerCase();
+                return txt.includes('horas estimadas') && !txt.includes('empleado') && !txt.includes('descripcion');
+              }
+              return false;
+            });
+            if (inp2) { if (!inp2.id) inp2.id = 'temp-hours-2'; return '#' + inp2.id; }
+            const inp3 = document.querySelector('input[type="number"]') || document.querySelector('input[step]');
+            if (inp3) { if (!inp3.id) inp3.id = 'temp-hours-2'; return '#' + inp3.id; }
             return null;
           });
 
           console.log(`[Sync] Horas input selector (update): ${hoursInputSelector2}, value to set: ${task.horasEstimadas}`);
           if (hoursInputSelector2) {
-            const hoursVal2 = String(task.horasEstimadas || '0').replace(',', '.');
-            await page.evaluate((sel, val) => {
+            const rawVal2 = parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0;
+            const hoursValComma2 = rawVal2.toFixed(2).replace('.', ',');
+            const hoursValDot2 = rawVal2.toFixed(2);
+            await page.evaluate((sel, valComma, valDot) => {
               const el = document.querySelector(sel);
               if (!el) return;
+              const val = el.type === 'number' ? valDot : valComma;
               try {
                 const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                 nativeSetter.call(el, val);
@@ -1526,11 +1577,12 @@ async function syncWorkOrder(orderId) {
               el.focus();
               el.dispatchEvent(new Event('input', { bubbles: true }));
               el.dispatchEvent(new Event('change', { bubbles: true }));
-            }, hoursInputSelector2, hoursVal2);
-            await page.click(hoursInputSelector2).catch(() => {});
-            await page.keyboard.down('Control'); await page.keyboard.press('A'); await page.keyboard.up('Control');
-            await page.keyboard.type(hoursVal2);
-            await delay(300);
+              el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+            }, hoursInputSelector2, hoursValComma2, hoursValDot2);
+            await page.click(hoursInputSelector2, { clickCount: 3 }).catch(() => {});
+            const hoursType2 = await page.evaluate(sel => document.querySelector(sel)?.type, hoursInputSelector2);
+            await page.keyboard.type(hoursType2 === 'number' ? hoursValDot2 : hoursValComma2);
+            await delay(400);
           }
 
           // Toggle "Realizada" to ON
