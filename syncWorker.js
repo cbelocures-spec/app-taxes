@@ -1279,9 +1279,16 @@ async function syncWorkOrder(orderId) {
           // Horas Estimadas
           const hoursInputSelector1 = await page.evaluate(() => {
             const input = Array.from(document.querySelectorAll('input')).find(i => {
-              const parent = i.closest('.form-group') || i.closest('.taxes-form-group') || i.parentElement;
-              return parent && parent.textContent.toLowerCase().includes('horas estimadas');
-            });
+              const parent = i.closest('.form-group') || i.closest('.taxes-form-group') ||
+                             i.closest('.col') || i.closest('.col-md-6') || i.closest('.col-md-4') ||
+                             i.closest('div') || i.parentElement;
+              return parent && (
+                parent.textContent.toLowerCase().includes('horas estimadas') ||
+                (i.getAttribute('placeholder') || '').toLowerCase().includes('horas')
+              );
+            }) ||
+            document.querySelector('input[type="number"]') ||
+            document.querySelector('input[step]');
             if (input) {
               if (!input.id) input.id = 'temp-hours-input-1';
               return '#' + input.id;
@@ -1295,7 +1302,6 @@ async function syncWorkOrder(orderId) {
             await page.evaluate((sel, val) => {
               const el = document.querySelector(sel);
               if (!el) return;
-              // Use native setter to bypass React/Vue controlled component state
               try {
                 const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                 nativeSetter.call(el, val);
@@ -1304,7 +1310,6 @@ async function syncWorkOrder(orderId) {
               el.dispatchEvent(new Event('input', { bubbles: true }));
               el.dispatchEvent(new Event('change', { bubbles: true }));
             }, hoursInputSelector1, hoursVal);
-            // Also type via keyboard as extra insurance
             await page.click(hoursInputSelector1).catch(() => {});
             await page.keyboard.down('Control'); await page.keyboard.press('A'); await page.keyboard.up('Control');
             await page.keyboard.type(hoursVal);
@@ -1494,9 +1499,13 @@ async function syncWorkOrder(orderId) {
           // Fill Horas Estimadas
           const hoursInputSelector2 = await page.evaluate(() => {
             const input = Array.from(document.querySelectorAll('input')).find(i => {
-              const parent = i.closest('.form-group') || i.closest('.taxes-form-group') || i.parentElement;
+              const parent = i.closest('.form-group') || i.closest('.taxes-form-group') ||
+                             i.closest('.col') || i.closest('.col-md-6') || i.closest('.col-md-4') ||
+                             i.closest('div') || i.parentElement;
               return parent && parent.textContent.toLowerCase().includes('horas estimadas');
-            });
+            }) ||
+            document.querySelector('input[type="number"]') ||
+            document.querySelector('input[step]');
             if (input) {
               if (!input.id) input.id = 'temp-hours-input-2';
               return '#' + input.id;
@@ -2229,10 +2238,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
         
         console.log(`[Verification] Task #${idx+1} hours check — expected: ${expectedHours}, found: '${matchingRow.hours}' (${actualHours}), all cells: ${JSON.stringify(matchingRow._allCells)}`);
         
-        if (actualHours === 0 && expectedHours > 0) {
-          // Hours cell was 0 — likely a scraping/column issue, not a real mismatch. Log as warning only.
-          console.warn(`[Verification] Task #${idx+1}: Hours found as 0 — possible column detection issue. Skipping hours check. Expected: ${expectedHours}`);
-        } else if (Math.abs(expectedHours - actualHours) > 0.05) {
+        if (Math.abs(expectedHours - actualHours) > 0.05) {
           errors.push(`Tarea #${idx + 1}: Horas no coinciden (Esperado: ${expectedHours.toFixed(2)}, Encontrado: ${actualHours.toFixed(2)})`);
         }
         if (t.status === 'Finalizada' && matchingRow.realizada !== 'SI') {
