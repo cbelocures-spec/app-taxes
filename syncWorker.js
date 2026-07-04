@@ -1312,9 +1312,7 @@ async function syncWorkOrder(orderId) {
         await page.keyboard.press('Backspace');
         await page.keyboard.type(otNumClean, { delay: 80 });
         await delay(500);
-        console.log(`[Reconcile] Typed OT number "${otNumClean}" into Numero field. Submitting with Enter...`);
-        await page.keyboard.press('Enter');
-        await delay(1000);
+        console.log(`[Reconcile] Typed OT number "${otNumClean}" into Numero field`);
       } else {
         console.warn(`[Reconcile] Could not find Numero input field`);
       }
@@ -2172,9 +2170,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
       await page.keyboard.press('Backspace');
       await page.keyboard.type(otNumClean, { delay: 80 });
       await delay(500);
-      console.log(`[Verify] Typed OT number "${otNumClean}" into Numero field. Submitting with Enter...`);
-      await page.keyboard.press('Enter');
-      await delay(1000);
+      console.log(`[Verify] Typed OT number "${otNumClean}" into Numero field`);
     } else {
       console.warn(`[Verify] Could not find Numero input field`);
     }
