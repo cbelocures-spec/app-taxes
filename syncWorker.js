@@ -1444,28 +1444,26 @@ async function syncWorkOrder(orderId) {
           // Delete in reverse order so indices stay valid
           for (let di = toDelete.length - 1; di >= 0; di--) {
             const rowIdx = toDelete[di];
+            // Register dialog handler BEFORE clicking (browser dialogs fire synchronously)
+            page.once('dialog', d => d.accept().catch(() => {}));
             const deleted = await page.evaluate((idx) => {
               const rows = Array.from(document.querySelectorAll('table tbody tr'));
               const row = rows[idx];
               if (!row) return false;
               const cells = Array.from(row.querySelectorAll('td'));
               const lastCell = cells[cells.length - 1];
-              // Red delete button: look for button/link with red color class or trash icon
-              const delBtn = lastCell?.querySelector(
-                'a.btn-danger, button.btn-danger, a[class*="danger"], button[class*="danger"], .fa-trash, .fa-times'
-              )?.closest('a, button') ||
-              // Fallback: last button in the actions cell
-              Array.from(lastCell?.querySelectorAll('a, button') || []).reverse()[0];
+              // Red delete button
+              const allBtns = Array.from(lastCell?.querySelectorAll('a, button') || []);
+              const delBtn = allBtns.find(b =>
+                b.className.includes('danger') || b.className.includes('red') ||
+                b.querySelector('.fa-trash, .fa-times, .fa-remove') ||
+                (b.style && b.style.backgroundColor && b.style.backgroundColor.includes('red'))
+              ) || allBtns[allBtns.length - 1]; // fallback: last button
               if (delBtn) { delBtn.click(); return true; }
               return false;
             }, rowIdx);
             console.log(`[Reconcile] Delete row ${rowIdx}: ${deleted}`);
-            if (deleted) {
-              await delay(2000); // Wait for confirmation dialog if any
-              // Confirm any alert/dialog
-              page.once('dialog', d => d.accept().catch(() => {}));
-              await delay(1500);
-            }
+            if (deleted) await delay(3000);
           }
           // Re-read after deduplication
           taxesTasks = await readTaxesTasks();
@@ -2142,17 +2140,18 @@ async function verifyWorkOrderWithPage(page, orderId) {
       const rows = Array.from(document.querySelectorAll('table tbody tr'));
       for (const row of rows) {
         const cells = Array.from(row.querySelectorAll('td'));
-        // Strip '#' and whitespace from each cell before comparing
+        // Strip '#', spaces, newlines — then check if cell contains the OT number
         const hasOT = cells.some(c => {
-          const txt = c.textContent.replace(/#/g, '').trim();
-          return txt === otNum;
+          const txt = c.textContent.replace(/#/g, '').replace(/\s+/g, ' ').trim();
+          return txt === otNum || txt.includes(otNum);
         });
         if (hasOT) {
           const lastCell = cells[cells.length - 1];
           const allBtns = Array.from(lastCell?.querySelectorAll('a, button') || []);
-          // Skip red/danger buttons (delete), pick pencil (2nd non-danger btn)
-          const editBtn = allBtns.find((b, i) => i === 1 && !b.className.includes('danger') && !b.className.includes('red'))
-                          || allBtns[1] || allBtns[0];
+          // Pencil = non-red button at position 1 (eye=0, pencil=1, delete=last)
+          const editBtn = allBtns.find((b, i) =>
+            i > 0 && !b.className.includes('danger') && !b.className.includes('red')
+          ) || allBtns[1] || allBtns[0];
           if (editBtn) { editBtn.click(); return true; }
         }
       }
