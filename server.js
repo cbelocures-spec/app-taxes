@@ -1411,6 +1411,21 @@ async function triggerActiveTasksGoogleSheetSync() {
   }
 }
 
+// TEMP MIGRATION ENDPOINT - export full DB for account migration
+app.get('/api/admin/export-db', (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'db.json');
+    const content = fs.readFileSync(DB_PATH, 'utf8');
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="db-backup.json"');
+    res.send(content);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Fallback: serve frontend index.html for SPA routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
