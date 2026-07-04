@@ -765,6 +765,7 @@ async function scrapeCatalogs(triggerUsername = null) {
     });
 
     const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 800 });
 
     // Login
@@ -1214,6 +1215,7 @@ async function syncWorkOrder(orderId) {
     });
 
     const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 900 });
 
     // 1. LOGIN
@@ -2440,6 +2442,7 @@ async function verifyWorkOrder(orderId) {
     });
 
     const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 900 });
 
     await autoLogin(page, username, password, settings.portalUrl);
@@ -2575,6 +2578,7 @@ async function verifyGroupWithBrowser(group, settings) {
     });
 
     const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 900 });
 
     // Login once for the whole group
