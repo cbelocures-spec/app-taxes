@@ -1374,11 +1374,11 @@ async function syncWorkOrder(orderId) {
           console.log(`[Reconcile] Visible inputs:`, JSON.stringify(inputsInfo));
           // Log table rows
           const rowsInfo = await page.evaluate(() =>
-            Array.from(document.querySelectorAll('table tbody tr')).slice(0, 5).map(r =>
+            Array.from(document.querySelectorAll('table tbody tr')).slice(0, 35).map(r =>
               Array.from(r.querySelectorAll('td')).map(c => c.textContent.trim()).join(' | ')
             )
           );
-          console.log(`[Reconcile] Table rows (first 5):`, JSON.stringify(rowsInfo));
+          console.log(`[Reconcile] Table rows (first 35):`, JSON.stringify(rowsInfo));
         } catch(se) { console.warn('[Reconcile] Screenshot failed:', se.message); }
         throw new Error(`No se encontró la OT ${otNumClean} en el listado para editar. Verificar número de OT en Taxes.`);
       }
