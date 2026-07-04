@@ -1220,347 +1220,239 @@ async function syncWorkOrder(orderId) {
       throw new Error(`Credenciales inválidas o el usuario ${username} no existe en Taxes.com.ar`);
     }
 
-    // 2. EXISTING OT — FULL RECONCILIATION AGENT
+    // 2. EXISTING OT — RECONCILIATION VIA OT EDIT FORM (pencil)
+    // Uses the OT edit form directly: reads task cards, deletes duplicates with red trash,
+    // fixes hours/realizada, then GUARDAR. Never touches /tms/produccion/tareas for existing OTs.
     if (order.taxesOrderNumber) {
-      console.log(`[Reconcile] OT ${order.taxesOrderNumber} exists. Starting full reconciliation...`);
+      const otNumClean = String(order.taxesOrderNumber).replace(/^#/, '');
+      console.log(`[Reconcile] OT ${otNumClean} exists. Opening edit form to reconcile...`);
 
-      // Helper: fill hours input on the open task form
-      const fillHorasInput = async (val) => {
-        const hoursId = await page.evaluate((v) => {
-          const el = document.querySelector('input[name="horas_estimadas"]');
-          if (!el) return null;
-          try {
-            const ns = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-            ns.call(el, v);
-          } catch(e) { el.value = v; }
-          el.focus();
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-          el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-          if (!el.id) el.id = 'temp-horas-r';
-          return el.id;
-        }, val);
-        if (hoursId) {
-          await page.click(`#${hoursId}`, { clickCount: 3 }).catch(() => {});
-          await page.keyboard.type(val);
-        }
-        return !!hoursId;
-      };
-
-      // Helper: clean text for comparison
       const cleanStr = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-      // Helper: navigate to tareas page and search by OT number, return scraped rows
-      const readTaxesTasks = async () => {
-        await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-        await delay(2000);
-        // Search by OT number
-        await page.evaluate((otNum) => {
-          const inputs = Array.from(document.querySelectorAll('input'));
-          // Try to find search input (not hidden, not checkbox)
-          const searchInput = inputs.find(inp =>
-            inp.type !== 'hidden' && inp.type !== 'checkbox' && inp.type !== 'radio'
-          );
-          if (searchInput) {
-            try {
-              const ns = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-              ns.call(searchInput, String(otNum));
-            } catch(e) { searchInput.value = String(otNum); }
-            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-            searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+      // 1. Go to OT list, fill Numero field, BUSCAR
+      await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
+      await page.waitForSelector('input', { timeout: 10000 }).catch(() => {});
+      await delay(1500);
+
+      // Fill Numero field (5th visible input or label-proximate)
+      await page.evaluate((otNum) => {
+        const inputs = Array.from(document.querySelectorAll('input')).filter(i =>
+          i.type !== 'hidden' && i.type !== 'checkbox' && i.type !== 'radio'
+        );
+        const numLabel = Array.from(document.querySelectorAll('label, span, div')).find(l =>
+          l.children.length === 0 && l.textContent.trim().toLowerCase() === 'numero'
+        );
+        let inp = null;
+        if (numLabel) {
+          const p = numLabel.closest('.form-group') || numLabel.closest('.col') || numLabel.closest('div');
+          if (p) inp = p.querySelector('input');
+        }
+        if (!inp) inp = inputs[4] || inputs[inputs.length - 1];
+        if (inp) {
+          try { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(inp, otNum); }
+          catch(e) { inp.value = otNum; }
+          inp.dispatchEvent(new Event('input', { bubbles: true }));
+          inp.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }, otNumClean);
+
+      // Click BUSCAR
+      await page.evaluate(() => {
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase() === 'BUSCAR' || b.textContent.toLowerCase().includes('buscar'));
+        if (btn) btn.click();
+      });
+      await page.waitForSelector('table tbody tr', { timeout: 10000 }).catch(() => delay(2000));
+      await delay(1000);
+
+      // 2. Click pencil (edit) on the matching row
+      const pencilClicked = await page.evaluate((otNum) => {
+        const rows = Array.from(document.querySelectorAll('table tbody tr'));
+        for (const row of rows) {
+          const cells = Array.from(row.querySelectorAll('td'));
+          const hasOT = cells.some(c => c.textContent.replace(/#/g, '').replace(/\s+/g, ' ').trim().includes(otNum));
+          if (hasOT) {
+            const lastCell = cells[cells.length - 1];
+            const allBtns = Array.from(lastCell?.querySelectorAll('a, button') || []);
+            // Pencil = non-danger button at index > 0
+            const editBtn = allBtns.find((b, i) => i > 0 && !b.className.includes('danger') && !b.className.includes('red'))
+                            || allBtns[1] || allBtns[0];
+            if (editBtn) { editBtn.click(); return true; }
           }
-        }, order.taxesOrderNumber);
-        // Click Buscar
-        await page.evaluate(() => {
-          const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('buscar'));
-          if (btn) btn.click();
-        });
-        await page.waitForSelector('table tbody tr', { timeout: 8000 }).catch(() => delay(2000));
-        await delay(1000);
-        // Read rows
+        }
+        return false;
+      }, otNumClean);
+
+      if (!pencilClicked) {
+        throw new Error(`No se encontró la OT ${otNumClean} en el listado para editar.`);
+      }
+
+      // 3. Wait for OT edit form to load (task cards)
+      await page.waitForSelector('input[name="horas_estimadas"], .card, .task-card', { timeout: 15000 }).catch(() => delay(4000));
+      await delay(2000);
+
+      // 4. Read ALL task cards currently in the form
+      //    Each card has: empleado input/text, horas input, descripcion textarea, realizada checkbox, red trash button
+      const readFormCards = async () => {
         return await page.evaluate(() => {
-          const rows = Array.from(document.querySelectorAll('table tbody tr'));
-          return rows.map(row => {
-            const cells = Array.from(row.querySelectorAll('td'));
-            if (cells.length < 6) return null;
-            return {
-              ot: (cells[2]?.textContent || '').trim(),
-              employee: (cells[5]?.textContent || '').trim(),
-              hours: (cells[6]?.textContent || '0').trim(),
-              description: (cells[7]?.textContent || '').trim(),
-              realizada: (cells[8]?.textContent || '').trim().toUpperCase(),
-            };
-          }).filter(Boolean);
-        });
-      };
+          const clean = s => (s || '').trim();
+          // Each task card is a container with horas_estimadas input
+          const horasInputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
+          const empInputs = Array.from(document.querySelectorAll('input[name="empleado_id"], input[name="empleado"], .multiselect__input'));
+          const descTextareas = Array.from(document.querySelectorAll('textarea'));
+          const switches = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
+          // Red trash/delete buttons — one per card
+          const trashBtns = Array.from(document.querySelectorAll('button.btn-danger, a.btn-danger, [class*="danger"]'))
+            .filter(b => b.querySelector('.fa-trash, .fa-times, .fa-remove') || b.textContent.trim() === '' || b.title?.toLowerCase().includes('elim'));
 
-      // Helper: click edit (eye) button for a specific row by employee+description
-      const clickEditForTask = async (empName, descBase, descFinal) => {
-        return await page.evaluate((emp, db, df) => {
-          const clean = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
-          const rows = Array.from(document.querySelectorAll('table tbody tr'));
-          for (const row of rows) {
-            const cells = Array.from(row.querySelectorAll('td'));
-            if (cells.length < 6) continue;
-            const rowEmp = clean(cells[5]?.textContent || '');
-            const rowDesc = clean(cells[7]?.textContent || '');
-            const empOk = rowEmp.includes(clean(emp)) || clean(emp).includes(rowEmp);
-            const descOk = rowDesc.includes(clean(db)) || clean(db).includes(rowDesc) ||
-                           rowDesc.includes(clean(df)) || clean(df).includes(rowDesc);
-            if (empOk && descOk) {
-              // Try the eye/edit button (first button or link in last cell)
-              const lastCell = cells[cells.length - 1];
-              const btn = lastCell?.querySelector('a[href], button') ||
-                          cells[9]?.querySelector('a[href], button');
-              if (btn) { btn.click(); return true; }
+          // Get employee from display text (multiselect shows selected option text)
+          const getEmpText = (i) => {
+            // Try multiselect tags first
+            const multiselectContainers = Array.from(document.querySelectorAll('.multiselect'));
+            if (multiselectContainers[i]) {
+              const tag = multiselectContainers[i].querySelector('.multiselect__single, .multiselect__tag span, .multiselect__option--selected');
+              if (tag) return clean(tag.textContent);
             }
-          }
-          return false;
-        }, empName, descBase, descFinal);
-      };
+            return '';
+          };
 
-      // Helper: save the open task form
-      const saveTaskForm = async () => {
-        const saved = await page.evaluate(() => {
-          const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
-          if (btn) { btn.click(); return true; }
-          return false;
+          return horasInputs.map((inp, i) => ({
+            index: i,
+            hours: clean(inp.value),
+            employee: getEmpText(i),
+            description: descTextareas[i] ? clean(descTextareas[i].value) : '',
+            realizada: switches[i] ? (switches[i].querySelector('input[type="checkbox"]')?.checked || false) : false,
+            hasTrashBtn: !!trashBtns[i],
+            _debug: { emp: getEmpText(i), hrs: inp.value }
+          }));
         });
-        if (saved) await delay(4000);
-        return saved;
       };
 
-      // Helper: create a brand-new tarea for this OT (NUEVO flow)
-      const createTaskInTaxes = async (task, employeeLabel, finalDescription) => {
-        const newClicked = await page.evaluate(() => {
-          const btns = Array.from(document.querySelectorAll('button, a'));
-          const btn = btns.find(b => b.textContent.trim().toUpperCase().includes('NUEVO'));
-          if (btn) { btn.click(); return true; }
-          return false;
-        });
-        if (!newClicked) throw new Error('No se encontró botón NUEVO');
-        await delay(3000);
+      let formCards = await readFormCards();
+      console.log(`[Reconcile] OT edit form has ${formCards.length} task cards. App has ${order.tasks.length} tasks.`);
+      console.log(`[Reconcile] Form cards:`, JSON.stringify(formCards));
 
-        // N° OT
-        const otFilled = await fillSearchableSelect(page, 'N° OT', order.taxesOrderNumber);
-        if (!otFilled) throw new Error(`No se pudo seleccionar OT ${order.taxesOrderNumber}`);
-        await delay(1000);
+      // 5. DELETE duplicate/extra cards (reverse order to keep indices valid)
+      //    Strategy: for each app task, find ONE matching form card. Mark rest for deletion.
+      const usedCardIndices = new Set();
+      const cardToAppMap = []; // for each form card index: matched app task index or -1
 
-        // Centro de Costo
-        const ccCatalog = db.getCatalogs().centrosCosto || [];
-        const ccObj = ccCatalog.find(c => c.value === task.centroCosto);
-        const ccLabel = ccObj ? ccObj.label : task.centroCosto;
-        const ccSelected = await page.evaluate((ccVal) => {
-          const sel = document.querySelector('select');
-          if (!sel) return false;
-          const clean = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
-          const opt = Array.from(sel.options).find(o => clean(o.text).includes(clean(ccVal)) || clean(o.value) === clean(ccVal));
-          if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; }
-          return false;
-        }, ccLabel);
-        if (!ccSelected) {
-          // try fillSearchableSelect fallback
-          await fillSearchableSelect(page, 'Centro de Costo', ccLabel).catch(() => {});
-        }
-        await delay(1000);
-
-        // Empleado
-        const empFilled = await fillSearchableSelect(page, 'Empleado', employeeLabel);
-        if (!empFilled) throw new Error(`No se pudo seleccionar empleado: ${employeeLabel}`);
-
-        // Horas Estimadas
-        const hoursVal = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
-        const hoursInputId = await page.evaluate((v) => {
-          const el = document.querySelector('input[name="horas_estimadas"]');
-          if (!el) return null;
-          try {
-            const ns = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-            ns.call(el, v);
-          } catch(e) { el.value = v; }
-          el.focus();
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-          el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-          if (!el.id) el.id = 'temp-horas-new';
-          return el.id;
-        }, hoursVal);
-        if (hoursInputId) {
-          await page.click(`#${hoursInputId}`, { clickCount: 3 }).catch(() => {});
-          await page.keyboard.type(hoursVal);
-          await delay(300);
-        }
-
-        // Descripción
-        await page.evaluate((desc) => {
-          const ta = document.querySelector('textarea');
-          if (ta) {
-            ta.focus();
-            const ns = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-            ns.call(ta, desc);
-            ta.dispatchEvent(new Event('input', { bubbles: true }));
-            ta.dispatchEvent(new Event('change', { bubbles: true }));
+      for (let ai = 0; ai < order.tasks.length; ai++) {
+        const appTask = order.tasks[ai];
+        const { employeeLabel, finalDescription } = resolveAndMapEmployee(appTask);
+        for (let ci = 0; ci < formCards.length; ci++) {
+          if (usedCardIndices.has(ci)) continue;
+          const card = formCards[ci];
+          const empOk = cleanStr(card.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(card.employee)) || card.employee === '';
+          const descOk = cleanStr(card.description).includes(cleanStr(appTask.descripcion)) || cleanStr(appTask.descripcion).includes(cleanStr(card.description)) || card.description === '';
+          if (empOk || descOk) { // loose match — one of the two must match
+            usedCardIndices.add(ci);
+            cardToAppMap[ci] = ai;
+            break;
           }
-        }, finalDescription);
-
-        // Realizada toggle
-        if (task.status && task.status.toLowerCase() === 'finalizada') {
-          await page.evaluate(() => {
-            const sw = Array.from(document.querySelectorAll('.custom-control.custom-switch')).find(el =>
-              (el.querySelector('.custom-control-label, label') || {}).textContent?.toLowerCase().includes('realizada')
-            );
-            if (sw) {
-              const cb = sw.querySelector('input[type="checkbox"]');
-              if (cb && !cb.checked) {
-                const lbl = sw.querySelector('label') || sw.querySelector('.custom-control-label');
-                if (lbl) lbl.click(); else cb.click();
-              }
-            }
-          });
-        }
-
-        await saveTaskForm();
-      };
-
-      // ── STEP 0: DEDUPLICATION ── Delete duplicate tasks in Taxes (same employee appears >1 time for this OT)
-      console.log(`[Reconcile] Running deduplication check for OT ${order.taxesOrderNumber}...`);
-      let taxesTasks = await readTaxesTasks();
-      console.log(`[Reconcile] Taxes has ${taxesTasks.length} tasks for OT ${order.taxesOrderNumber}`);
-
-      if (taxesTasks.length > order.tasks.length) {
-        console.log(`[Reconcile] Detected ${taxesTasks.length} tasks in Taxes but app has ${order.tasks.length}. Deduplicating...`);
-        // Group by employee (normalized) — keep first occurrence, delete rest
-        const seen = new Set();
-        const toDelete = []; // indices in the table (0-based)
-        for (let ri = 0; ri < taxesTasks.length; ri++) {
-          const key = cleanStr(taxesTasks[ri].employee);
-          if (seen.has(key)) {
-            toDelete.push(ri);
-          } else {
-            seen.add(key);
-          }
-        }
-        if (toDelete.length > 0) {
-          console.log(`[Reconcile] Deleting ${toDelete.length} duplicate task rows at indices: ${toDelete.join(', ')}`);
-          // Delete in reverse order so indices stay valid
-          for (let di = toDelete.length - 1; di >= 0; di--) {
-            const rowIdx = toDelete[di];
-            // Register dialog handler BEFORE clicking (browser dialogs fire synchronously)
-            page.once('dialog', d => d.accept().catch(() => {}));
-            const deleted = await page.evaluate((idx) => {
-              const rows = Array.from(document.querySelectorAll('table tbody tr'));
-              const row = rows[idx];
-              if (!row) return false;
-              const cells = Array.from(row.querySelectorAll('td'));
-              const lastCell = cells[cells.length - 1];
-              // Red delete button
-              const allBtns = Array.from(lastCell?.querySelectorAll('a, button') || []);
-              const delBtn = allBtns.find(b =>
-                b.className.includes('danger') || b.className.includes('red') ||
-                b.querySelector('.fa-trash, .fa-times, .fa-remove') ||
-                (b.style && b.style.backgroundColor && b.style.backgroundColor.includes('red'))
-              ) || allBtns[allBtns.length - 1]; // fallback: last button
-              if (delBtn) { delBtn.click(); return true; }
-              return false;
-            }, rowIdx);
-            console.log(`[Reconcile] Delete row ${rowIdx}: ${deleted}`);
-            if (deleted) await delay(3000);
-          }
-          // Re-read after deduplication
-          taxesTasks = await readTaxesTasks();
-          console.log(`[Reconcile] After dedup: ${taxesTasks.length} tasks remain`);
         }
       }
 
-
-      for (let i = 0; i < order.tasks.length; i++) {
-        const task = order.tasks[i];
-        const { employeeLabel, finalDescription } = resolveAndMapEmployee(task);
-        const expectedHours = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
-
-        // Find matching task in Taxes
-        const matching = taxesTasks.find(tt => {
-          const empOk = cleanStr(tt.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(tt.employee));
-          const descOk = cleanStr(tt.description).includes(cleanStr(task.descripcion)) ||
-                         cleanStr(task.descripcion).includes(cleanStr(tt.description)) ||
-                         cleanStr(tt.description).includes(cleanStr(finalDescription)) ||
-                         cleanStr(finalDescription).includes(cleanStr(tt.description));
-          return empOk && descOk;
-        });
-
-        if (!matching) {
-          // ── MISSING TASK → CREATE ──
-          console.log(`[Reconcile] Task #${i+1} (${employeeLabel}) NOT found in Taxes. Creating...`);
-          try {
-            await createTaskInTaxes(task, employeeLabel, finalDescription);
-            task.synced = true;
-            task.needsHoursUpdate = false;
-            if (task.status === 'Finalizada') task.taxesRealizadaSynced = true;
-            db.updateWorkOrder(orderId, { tasks: order.tasks });
-            console.log(`[Reconcile] Task #${i+1} created OK.`);
-            // Re-read table after creating
-            taxesTasks = await readTaxesTasks();
-          } catch (createErr) {
-            console.error(`[Reconcile] Failed to create task #${i+1}:`, createErr.message);
-          }
-        } else {
-          // ── TASK FOUND → CHECK FIELDS ──
-          const actualHours = parseFloat(String(matching.hours).replace(',', '.')) || 0;
-          const hoursMatch = Math.abs(parseFloat(expectedHours) - actualHours) <= 0.05;
-          const needsRealizada = task.status === 'Finalizada' && matching.realizada !== 'SI';
-
-          if (!hoursMatch || needsRealizada) {
-            console.log(`[Reconcile] Task #${i+1} needs update — hoursMatch:${hoursMatch} (exp:${expectedHours} got:${actualHours}), needsRealizada:${needsRealizada}`);
-
-            // Click edit button
-            const edited = await clickEditForTask(employeeLabel, task.descripcion, finalDescription);
-            if (!edited) {
-              console.warn(`[Reconcile] Task #${i+1}: Could not find edit button. Skipping.`);
-            } else {
-              await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 8000 }).catch(() => delay(3000));
-              await delay(1000);
-
-              // Update hours if needed
-              if (!hoursMatch) {
-                console.log(`[Reconcile] Updating hours to ${expectedHours}...`);
-                await fillHorasInput(expectedHours);
-                await delay(300);
-              }
-
-              // Toggle realizada if needed
-              if (needsRealizada) {
-                console.log(`[Reconcile] Toggling Realizada...`);
-                await page.evaluate(() => {
-                  const sw = Array.from(document.querySelectorAll('.custom-control.custom-switch')).find(el =>
-                    (el.querySelector('.custom-control-label, label') || {}).textContent?.toLowerCase().includes('realizada')
-                  );
-                  if (sw) {
-                    const cb = sw.querySelector('input[type="checkbox"]');
-                    if (cb && !cb.checked) {
-                      const lbl = sw.querySelector('label') || sw.querySelector('.custom-control-label');
-                      if (lbl) lbl.click(); else cb.click();
-                    }
-                  }
-                });
-                await delay(500);
-              }
-
-              await saveTaskForm();
-              task.synced = true;
-              task.needsHoursUpdate = false;
-              if (needsRealizada) task.taxesRealizadaSynced = true;
-              db.updateWorkOrder(orderId, { tasks: order.tasks });
-              console.log(`[Reconcile] Task #${i+1} updated OK.`);
-              // Re-read table
-              taxesTasks = await readTaxesTasks();
-            }
-          } else {
-            console.log(`[Reconcile] Task #${i+1} is already correct in Taxes (hours:${actualHours}, realizada:${matching.realizada}). No update needed.`);
-            task.synced = true;
-            task.needsHoursUpdate = false;
-            db.updateWorkOrder(orderId, { tasks: order.tasks });
-          }
-        }
+      // Cards not matched to any app task → delete
+      const toDeleteIndices = [];
+      for (let ci = 0; ci < formCards.length; ci++) {
+        if (!usedCardIndices.has(ci)) toDeleteIndices.push(ci);
       }
+
+      if (toDeleteIndices.length > 0) {
+        console.log(`[Reconcile] Deleting ${toDeleteIndices.length} extra/unmatched cards at indices: ${toDeleteIndices.join(', ')}`);
+        // Delete in reverse order
+        for (let di = toDeleteIndices.length - 1; di >= 0; di--) {
+          const cardIdx = toDeleteIndices[di];
+          page.once('dialog', d => d.accept().catch(() => {}));
+          const deleted = await page.evaluate((idx) => {
+            const trashBtns = Array.from(document.querySelectorAll('button.btn-danger, a.btn-danger, [class*="danger"]'))
+              .filter(b => b.querySelector('.fa-trash, .fa-times, .fa-remove') || b.textContent.trim() === '' || b.title?.toLowerCase().includes('elim'));
+            const btn = trashBtns[idx];
+            if (btn) { btn.click(); return true; }
+            // Fallback: any red button in the task card container (each card has one at top-right)
+            const cards = Array.from(document.querySelectorAll('[class*="card"], [class*="task"], .col-12')).filter(c => c.querySelector('input[name="horas_estimadas"]'));
+            const card = cards[idx];
+            if (card) {
+              const redBtn = card.querySelector('button.btn-danger, a.btn-danger, button[style*="red"]');
+              if (redBtn) { redBtn.click(); return true; }
+            }
+            return false;
+          }, cardIdx);
+          console.log(`[Reconcile] Delete card ${cardIdx}: ${deleted}`);
+          if (deleted) await delay(3000);
+        }
+        // Re-read form after deletions
+        formCards = await readFormCards();
+        console.log(`[Reconcile] After deletion: ${formCards.length} cards remain`);
+      }
+
+      // 6. Update each remaining card with correct hours and realizada
+      for (let ci = 0; ci < formCards.length; ci++) {
+        const appIdx = cardToAppMap[ci];
+        if (appIdx === undefined || appIdx === null || appIdx < 0) continue;
+        const appTask = order.tasks[appIdx];
+        if (!appTask) continue;
+
+        const expectedHours = (parseFloat(String(appTask.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
+        const actualHours = parseFloat(formCards[ci].hours.replace(',', '.')) || 0;
+        const hoursOk = Math.abs(parseFloat(expectedHours) - actualHours) <= 0.05;
+        const realizadaNeeded = appTask.status === 'Finalizada' && !formCards[ci].realizada;
+
+        console.log(`[Reconcile] Card #${ci}: hours exp=${expectedHours} actual=${actualHours} ok=${hoursOk} | realizada needed=${realizadaNeeded}`);
+
+        if (!hoursOk) {
+          console.log(`[Reconcile] Fixing hours for card #${ci}...`);
+          const hoursId = await page.evaluate((idx, val) => {
+            const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
+            const el = inputs[idx];
+            if (!el) return null;
+            try { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, val); }
+            catch(e) { el.value = val; }
+            el.focus();
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+            if (!el.id) el.id = `rc-hours-${idx}`;
+            return el.id;
+          }, ci, expectedHours);
+          if (hoursId) {
+            await page.click(`#${hoursId}`, { clickCount: 3 }).catch(() => {});
+            await page.keyboard.type(expectedHours);
+            await delay(300);
+          }
+          appTask.needsHoursUpdate = false;
+        }
+
+        if (realizadaNeeded) {
+          console.log(`[Reconcile] Toggling Realizada for card #${ci}...`);
+          await page.evaluate((idx) => {
+            const switches = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
+            const sw = switches[idx];
+            if (!sw) return;
+            const cb = sw.querySelector('input[type="checkbox"]');
+            if (cb && !cb.checked) {
+              const lbl = sw.querySelector('label, .custom-control-label');
+              if (lbl) lbl.click(); else cb.click();
+            }
+          }, ci);
+          await delay(400);
+          appTask.taxesRealizadaSynced = true;
+        }
+
+        appTask.synced = true;
+        appTask.needsHoursUpdate = false;
+      }
+
+      db.updateWorkOrder(orderId, { tasks: order.tasks });
+
+      // 7. GUARDAR
+      const saved = await page.evaluate(() => {
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
+        if (btn) { btn.click(); return true; }
+        return false;
+      });
+      console.log(`[Reconcile] Guardar: ${saved}`);
+      if (saved) await delay(4000);
 
       db.updateWorkOrder(orderId, {
         syncStatus: 'success',
@@ -1572,8 +1464,9 @@ async function syncWorkOrder(orderId) {
       await verifyWorkOrderWithPage(page, orderId);
 
       await browser.close();
-      return { success: true, message: `Orden ${order.taxesOrderNumber} reconciliada correctamente.` };
+      return { success: true, message: `Orden ${otNumClean} reconciliada correctamente.` };
     }
+
 
 
     console.log("Navigating directly to Ordenes de Trabajo list page...");
