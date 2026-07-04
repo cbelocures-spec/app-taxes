@@ -767,6 +767,7 @@ async function scrapeCatalogs(triggerUsername = null) {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
+    await page.emulateTimezone('America/Argentina/Buenos_Aires');
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
     });
@@ -1221,6 +1222,7 @@ async function syncWorkOrder(orderId) {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
+    await page.emulateTimezone('America/Argentina/Buenos_Aires');
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
     });
@@ -2452,6 +2454,7 @@ async function verifyWorkOrder(orderId) {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
+    await page.emulateTimezone('America/Argentina/Buenos_Aires');
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
     });
@@ -2592,6 +2595,7 @@ async function verifyGroupWithBrowser(group, settings) {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
+    await page.emulateTimezone('America/Argentina/Buenos_Aires');
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
     });
