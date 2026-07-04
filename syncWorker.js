@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer');
+﻿const puppeteer = require('puppeteer');
 const db = require('./database');
 
 // Mock data based on screenshots to pre-populate catalogs if scraping hasn't run yet
@@ -758,7 +758,7 @@ async function scrapeCatalogs(triggerUsername = null) {
   try {
     db.saveSettings({ catalogSyncStatus: "syncing", catalogSyncError: null });
     browser = await puppeteer.launch({
-      headless: true,
+      headless: false,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
       protocolTimeout: 300000
@@ -1204,7 +1204,7 @@ async function syncWorkOrder(orderId) {
   try {
     // Launch browser
     browser = await puppeteer.launch({
-      headless: true,
+      headless: false,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
       protocolTimeout: 300000
@@ -1233,6 +1233,14 @@ async function syncWorkOrder(orderId) {
       await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
       await page.waitForSelector('input', { timeout: 10000 }).catch(() => {});
       await delay(2000);
+
+      // Click "En Proceso" tab — the page opens on "Indicadores" by default
+      await page.evaluate(() => {
+        const tabs = Array.from(document.querySelectorAll('a, button, li, .nav-link, [role="tab"]'));
+        const enProceso = tabs.find(t => t.textContent.trim().toLowerCase().includes('en proceso') || t.textContent.trim().toLowerCase().includes('proceso'));
+        if (enProceso) { enProceso.click(); console.log('[rc] Clicked En Proceso tab'); }
+      }).catch(() => {});
+      await delay(1500);
 
       // Find and click the Numero input — try by label text first, then by position
       const numInputId = await page.evaluate(() => {
@@ -1328,6 +1336,29 @@ async function syncWorkOrder(orderId) {
       }
 
       if (!pencilClicked) {
+        // Save screenshot for debugging
+        try {
+          const path = require('path');
+          const screenshotPath = path.join(__dirname, 'public', 'last_ot_search_debug.png');
+          await page.screenshot({ path: screenshotPath, fullPage: false });
+          console.log(`[Reconcile] Debug screenshot saved to: ${screenshotPath}`);
+          // Also log current URL and page title
+          console.log(`[Reconcile] Current URL: ${page.url()}`);
+          // Log all visible inputs and their values
+          const inputsInfo = await page.evaluate(() =>
+            Array.from(document.querySelectorAll('input')).filter(i => i.offsetParent).map(i => ({
+              id: i.id, name: i.name, type: i.type, value: i.value, placeholder: i.placeholder
+            }))
+          );
+          console.log(`[Reconcile] Visible inputs:`, JSON.stringify(inputsInfo));
+          // Log table rows
+          const rowsInfo = await page.evaluate(() =>
+            Array.from(document.querySelectorAll('table tbody tr')).slice(0, 5).map(r =>
+              Array.from(r.querySelectorAll('td')).map(c => c.textContent.trim()).join(' | ')
+            )
+          );
+          console.log(`[Reconcile] Table rows (first 5):`, JSON.stringify(rowsInfo));
+        } catch(se) { console.warn('[Reconcile] Screenshot failed:', se.message); }
         throw new Error(`No se encontró la OT ${otNumClean} en el listado para editar. Verificar número de OT en Taxes.`);
       }
 
@@ -2311,7 +2342,7 @@ async function verifyWorkOrder(orderId) {
   let browser = null;
   try {
     browser = await puppeteer.launch({
-      headless: true,
+      headless: false,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
       protocolTimeout: 300000
@@ -2444,7 +2475,7 @@ async function verifyGroupWithBrowser(group, settings) {
   let browser = null;
   try {
     browser = await puppeteer.launch({
-      headless: true,
+      headless: false,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
       protocolTimeout: 300000
