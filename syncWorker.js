@@ -2059,47 +2059,44 @@ async function verifyWorkOrderWithPage(page, orderId) {
   try {
     // 1. Navigate to Tareas list page
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-    await delay(1500);
+    // Wait for page inputs to appear instead of fixed delay
+    await page.waitForSelector('input', { timeout: 10000 }).catch(() => {});
+    await delay(500);
     
-    // 2. Search for the OT number in the Tareas search box
-    const searchInputSelector = await page.evaluate(() => {
-      const cleanTxt = (str) => {
-        if (!str) return '';
-        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-      };
-      const labels = Array.from(document.querySelectorAll('label, legend, span'));
-      const otLabel = labels.find(l => {
-        const txt = cleanTxt(l.textContent);
-        return (txt.includes('buscar por numero') || txt.includes('titulo de ot')) && !l.querySelector('label, legend, span');
+    // 2. Find the OT search input
+    let searchInputSelector = null;
+    try {
+      searchInputSelector = await page.evaluate(() => {
+        const cleanTxt = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : '';
+        const labels = Array.from(document.querySelectorAll('label, legend, span'));
+        const otLabel = labels.find(l => {
+          const txt = cleanTxt(l.textContent);
+          return (txt.includes('buscar por numero') || txt.includes('titulo de ot')) && !l.querySelector('label, legend, span');
+        });
+        let input = null;
+        if (otLabel) {
+          const parent = otLabel.parentElement ? otLabel.parentElement.parentElement : null;
+          if (parent) input = parent.querySelector('input[type="text"], input:not([type])');
+        }
+        if (!input) {
+          const allInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+          input = allInputs[1] || allInputs[0];
+        }
+        if (input) {
+          if (!input.id) input.id = 'temp-ot-search-input-verify';
+          return '#' + input.id;
+        }
+        return null;
       });
-      let input = null;
-      if (otLabel) {
-        const parent = otLabel.parentElement ? otLabel.parentElement.parentElement : null;
-        if (parent) {
-          input = parent.querySelector('input[type="text"], input:not([type])');
-        }
-      }
-      if (!input) {
-        const allInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
-        input = allInputs[1] || allInputs[0];
-      }
-      if (input) {
-        if (!input.id) {
-          input.id = 'temp-ot-search-input-verify';
-        }
-        return '#' + input.id;
-      }
-      return null;
-    });
+    } catch (e) {
+      console.warn(`[Verification] Could not find search input:`, e.message);
+    }
 
     if (searchInputSelector) {
       await page.evaluate((sel) => {
         const el = document.querySelector(sel);
-        if (el) {
-          el.focus();
-          el.select();
-        }
-      }, searchInputSelector);
+        if (el) { el.value = ''; el.focus(); el.select(); }
+      }, searchInputSelector).catch(() => {});
       await page.keyboard.press('Backspace');
       await page.keyboard.type(String(order.taxesOrderNumber));
     }
@@ -2109,10 +2106,13 @@ async function verifyWorkOrderWithPage(page, orderId) {
       const btns = Array.from(document.querySelectorAll('button, a'));
       const searchBtn = btns.find(b => b.textContent.toLowerCase().includes('buscar'));
       if (searchBtn) searchBtn.click();
-    });
-    await delay(1500); // Wait for table reload
+    }).catch(() => {});
 
-    // 3. Extract all rows from the table
+    // Wait for table to load results (waitForSelector is faster than fixed delay)
+    await page.waitForSelector('table tbody tr', { timeout: 8000 }).catch(() => delay(2000));
+    await delay(500);
+
+    // 3. Extract rows from the table
     const tableTasks = await page.evaluate(() => {
       const results = [];
       const rows = Array.from(document.querySelectorAll('table tbody tr'));
@@ -2124,7 +2124,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
             employee: cells[5].textContent.trim(),
             hours: cells[6].textContent.trim(),
             description: cells[7].textContent.trim(),
-            realizada: cells[8].textContent.trim().toUpperCase() // "SI" or "NO"
+            realizada: cells[8].textContent.trim().toUpperCase()
           });
         }
       }
@@ -2149,31 +2149,25 @@ async function verifyWorkOrderWithPage(page, orderId) {
       const targetDescBaseClean = clean(t.descripcion);
       const targetDescFinalClean = clean(finalDescription);
       
-      // Look for a matching task row
       const matchingRow = tableTasks.find(row => {
         const rowEmpClean = clean(row.employee);
         const rowDescClean = clean(row.description);
-        
         const empMatches = rowEmpClean.includes(targetEmpClean) || targetEmpClean.includes(rowEmpClean);
         const descMatches = rowDescClean.includes(targetDescBaseClean) || 
                             rowDescClean.includes(targetDescFinalClean) || 
                             targetDescBaseClean.includes(rowDescClean) || 
                             targetDescFinalClean.includes(rowDescClean);
-                            
         return empMatches && descMatches;
       });
       
       if (!matchingRow) {
-        errors.push(`Tarea #${idx + 1}: No encontrada en Taxes (Empleado: ${employeeLabel}, Descripción: ${t.descripcion.substring(0, 30)}...)`);
+        errors.push(`Tarea #${idx + 1}: No encontrada en Taxes (Empleado: ${employeeLabel}, Descripci\u00f3n: ${t.descripcion.substring(0, 30)}...)`);
       } else {
-        // Verify Hours
         const expectedHours = parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0;
         const actualHours = parseFloat(String(matchingRow.hours).replace(',', '.')) || 0;
         if (Math.abs(expectedHours - actualHours) > 0.01) {
           errors.push(`Tarea #${idx + 1}: Horas no coinciden (Esperado: ${expectedHours.toFixed(2)}, Encontrado: ${actualHours.toFixed(2)})`);
         }
-        
-        // Verify Realizada Status
         if (t.status === 'Finalizada' && matchingRow.realizada !== 'SI') {
           errors.push(`Tarea #${idx + 1}: No marcada como Realizada (SI) en Taxes`);
         }
@@ -2184,29 +2178,21 @@ async function verifyWorkOrderWithPage(page, orderId) {
     const count = (order.verifiedCount || 0) + 1;
     if (errors.length > 0) {
       console.log(`[Verification] Failed! Errors found:`, errors);
-      db.updateWorkOrder(orderId, {
-        verifiedStatus: "error",
-        verifiedCount: count,
-        verifiedError: errors.join(' | ')
-      });
+      db.updateWorkOrder(orderId, { verifiedStatus: "error", verifiedCount: count, verifiedError: errors.join(' | ') });
     } else {
       console.log(`[Verification] Success! All tasks matched and verified.`);
-      db.updateWorkOrder(orderId, {
-        verifiedStatus: "success",
-        verifiedCount: count,
-        verifiedError: null
-      });
+      db.updateWorkOrder(orderId, { verifiedStatus: "success", verifiedCount: count, verifiedError: null });
     }
     
   } catch (err) {
     console.error(`[Verification] Error during verification execution:`, err);
-    // Increment count but set error status to reflect verification system failure
     const count = (order.verifiedCount || 0) + 1;
     db.updateWorkOrder(orderId, {
       verifiedStatus: "error",
       verifiedCount: count,
       verifiedError: `Error del agente verificador: ${err.message}`
     });
+    throw err; // Re-throw so retry logic in verifyGroupWithBrowser can catch it
   }
 }
 
@@ -2323,7 +2309,7 @@ function stopWorker() {
  * and reusing the same browser session for each credential group.
  * Up to MAX_PARALLEL_BROWSERS groups run simultaneously.
  */
-const MAX_PARALLEL_BROWSERS = 5;
+const MAX_PARALLEL_BROWSERS = 2;
 
 async function verifyMultipleOrders(orderIds) {
   const settings = db.getSettings();
@@ -2380,22 +2366,34 @@ async function verifyGroupWithBrowser(group, settings) {
     await autoLogin(page, group.username, group.password, settings.portalUrl);
     console.log(`[VerifyAll] Logged in as ${group.username}. Verifying ${group.ids.length} order(s)...`);
 
-    // Verify each order in this group sequentially (same browser session)
+    // Verify each order in this group sequentially, with auto-retry on timeout
     for (const orderId of group.ids) {
-      try {
-        // Per-order timeout: if it hangs for >90s, mark as error and move on
-        await Promise.race([
-          verifyWorkOrderWithPage(page, orderId),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout: verificaci\u00f3n tard\u00f3 m\u00e1s de 90 segundos')), 90000))
-        ]);
-      } catch (err) {
-        console.error(`[VerifyAll] Error verifying order ${orderId}:`, err.message);
+      let lastErr = null;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          await Promise.race([
+            verifyWorkOrderWithPage(page, orderId),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout: verificaci\u00f3n tard\u00f3 m\u00e1s de 90 segundos')), 90000))
+          ]);
+          lastErr = null;
+          break; // success — go to next order
+        } catch (err) {
+          lastErr = err;
+          console.warn(`[VerifyAll] Order ${orderId} attempt ${attempt}/2 failed: ${err.message}`);
+          if (attempt < 2) {
+            console.log(`[VerifyAll] Retrying order ${orderId} after 3s...`);
+            await delay(3000);
+          }
+        }
+      }
+      // If both attempts failed, mark as error
+      if (lastErr) {
         const order = db.getWorkOrderById(orderId);
         const count = (order ? order.verifiedCount || 0 : 0) + 1;
         db.updateWorkOrder(orderId, {
           verifiedStatus: 'error',
           verifiedCount: count,
-          verifiedError: `Error del agente: ${err.message}`
+          verifiedError: `Error del agente (2 intentos): ${lastErr.message}`
         });
       }
     }
