@@ -84,7 +84,15 @@ class LocalDB {
         fs.mkdirSync(dir, { recursive: true });
       }
       if (!fs.existsSync(DB_PATH)) {
-        this.write(DEFAULT_DB);
+        // On first startup with a new volume, seed from the bundled db.json
+        // (contains migrated data: orders, users, settings, overrides)
+        const bundledPath = path.join(__dirname, 'db.json');
+        if (DB_PATH !== bundledPath && fs.existsSync(bundledPath)) {
+          console.log(`[DB] Seeding volume DB from bundled db.json → ${DB_PATH}`);
+          fs.copyFileSync(bundledPath, DB_PATH);
+        } else {
+          this.write(DEFAULT_DB);
+        }
       } else {
         // Ensure all root keys exist
         const data = this.read();
