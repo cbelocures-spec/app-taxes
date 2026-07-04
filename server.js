@@ -1411,6 +1411,20 @@ async function triggerActiveTasksGoogleSheetSync() {
   }
 }
 
+// TEMP MIGRATION: export full DB from old server
+app.get('/api/admin/export-db', (req, res) => {
+  try {
+    const fs2 = require('fs');
+    const path2 = require('path');
+    const DP = process.env.DB_PATH || path2.join(__dirname, 'db.json');
+    const content = fs2.readFileSync(DP, 'utf8');
+    res.setHeader('Content-Type', 'application/json');
+    res.send(content);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // TEMP MIGRATION: bulk import endpoint to seed new server
 app.post('/api/admin/import-db', (req, res) => {
   try {
