@@ -1,4 +1,4 @@
-﻿const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer');
 const db = require('./database');
 
 // Mock data based on screenshots to pre-populate catalogs if scraping hasn't run yet
@@ -1229,42 +1229,38 @@ async function syncWorkOrder(orderId) {
 
       const cleanStr = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-      // 1. Go to OT list, find Numero field, type with keyboard (Vue needs real keystrokes)
+      // 1. Go to OT list — "En Proceso" tab is already active by default
       await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
       await page.waitForSelector('input', { timeout: 10000 }).catch(() => {});
-      await delay(2000);
+      await delay(3000); // Wait for full page + En Proceso tab content to render
 
-      // Click "En Proceso" tab — the page opens on "Indicadores" by default
-      await page.evaluate(() => {
-        const tabs = Array.from(document.querySelectorAll('a, button, li, .nav-link, [role="tab"]'));
-        const enProceso = tabs.find(t => t.textContent.trim().toLowerCase().includes('en proceso') || t.textContent.trim().toLowerCase().includes('proceso'));
-        if (enProceso) { enProceso.click(); console.log('[rc] Clicked En Proceso tab'); }
-      }).catch(() => {});
-      await delay(1500);
-
-      // Find and click the Numero input — try by label text first, then by position
+      // Find and click the Numero input (index 3 in visible text inputs: [0]FechaDesde [1]FechaHasta [2]Cliente [3]Numero [4]Limite)
       const numInputId = await page.evaluate(() => {
         const normalizeText = s => (s || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-        // Find label with text "numero" or "n°"
+        // First try: find by label text = 'numero'
         const allEls = Array.from(document.querySelectorAll('label, span, p, div, th'));
         const numLabel = allEls.find(l => {
           const t = normalizeText(l.textContent);
-          return (t === 'numero' || t === 'numero ot' || t === 'n° ot') && !l.querySelector('input, select, button');
+          return (t === 'numero' || t === 'n\u00famero') && !l.querySelector('input, select, button');
         });
         let inp = null;
         if (numLabel) {
           const container = numLabel.closest('.form-group, .col, .col-md-2, .col-sm-2, [class*="col"]') || numLabel.parentElement;
-          if (container) inp = container.querySelector('input[type="text"], input:not([type]), input[type="number"]');
+          if (container) inp = container.querySelector('input[type="text"], input:not([type])');
         }
-        // Fallback: visible text inputs — Numero is typically after Cliente/Proveedor (3rd or 4th text input)
+        // Second try: container text includes 'numero'
         if (!inp) {
           const textInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])')).filter(i => i.offsetParent !== null);
-          // Try each with a label check
           for (const i of textInputs) {
             const container = i.closest('.form-group, .col, [class*="col"]');
             if (container && normalizeText(container.textContent).includes('numero')) { inp = i; break; }
           }
-          if (!inp) inp = textInputs[3] || textInputs[4] || textInputs[textInputs.length - 1];
+          // Third try: positional fallback — Numero is index 3 (after FechaDesde, FechaHasta, Cliente)
+          // Skip 'limite' input (has id='limite' or value='10')
+          if (!inp) {
+            const filtered = textInputs.filter(i => i.id !== 'limite' && i.value !== '10');
+            inp = filtered[3] || textInputs[3];
+          }
         }
         if (inp) {
           if (!inp.id) inp.id = 'rc-numero-input';
@@ -1292,7 +1288,7 @@ async function syncWorkOrder(orderId) {
         if (btn) btn.click();
       });
       await page.waitForSelector('table tbody tr', { timeout: 10000 }).catch(() => delay(2000));
-      await delay(1500);
+      await delay(3500); // Wait for OT list to filter and re-render after BUSCAR
 
       // 2. Find the matching row and click pencil (edit)
       const findAndClickPencil = async () => {
