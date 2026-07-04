@@ -704,20 +704,25 @@ async function autoLogin(page, username, password, portalUrl) {
 
   // Wait for navigation or welcome dashboard
   await page.waitForNavigation({ waitUntil: 'load', timeout: 15000 }).catch(() => {});
-  await delay(3000);
+  await delay(3000); // Restored: needs enough time for dashboard to fully load
 
   // Check if login succeeded: we should NOT be on login page anymore
   const stillOnLoginPage = await page.evaluate(() => {
     const inputs = Array.from(document.querySelectorAll('input'));
     const hasPasswordInput = inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
-    // Also check for typical error messages
+    // Check for SPECIFIC error phrases only (avoid false positives from dashboard menus)
     const bodyText = document.body.textContent.toLowerCase();
-    const hasError = bodyText.includes('credenciales') || bodyText.includes('inválido') || bodyText.includes('incorrecta');
+    const hasError = bodyText.includes('credenciales inv') ||
+                     bodyText.includes('credenciales incorrecta') ||
+                     bodyText.includes('usuario o contrase') ||
+                     bodyText.includes('contrase\u00f1a incorrecta') ||
+                     bodyText.includes('datos incorrectos') ||
+                     bodyText.includes('acceso denegado');
     return hasPasswordInput || hasError;
   });
 
   if (stillOnLoginPage) {
-    throw new Error("Credenciales inválidas o error al iniciar sesión en Taxes.com.ar");
+    throw new Error("Credenciales inv\u00e1lidas o error al iniciar sesi\u00f3n en Taxes.com.ar");
   }
 
   console.log(`Login successful as ${username}!`);
