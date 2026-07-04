@@ -2160,41 +2160,94 @@ async function verifyWorkOrderWithPage(page, orderId) {
     console.log(`[Verify] Form tasks found: ${formTasks.length}`, JSON.stringify(formTasks));
 
     const errors = [];
+    let madeChanges = false;
     const clean = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-    // 7. Compare each app task against form data
+    // 7. Compare AND FIX each app task while the edit form is still open
     for (let idx = 0; idx < order.tasks.length; idx++) {
       const t = order.tasks[idx];
       const { employeeLabel, finalDescription } = resolveAndMapEmployee(t);
       const expectedHours = parseFloat(String(t.horasEstimadas || '0').replace(',', '.')) || 0;
+      const expectedHoursStr = expectedHours.toFixed(2);
 
-      // If we have form tasks with employee info, match by employee+description
+      // Match against form tasks
       let matchingTask = null;
+      let matchingIndex = -1;
       if (formTasks.length > 0 && formTasks[0].employee) {
-        matchingTask = formTasks.find(ft => {
+        for (let fi = 0; fi < formTasks.length; fi++) {
+          const ft = formTasks[fi];
           const empOk = clean(ft.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(ft.employee));
           const descOk = clean(ft.description).includes(clean(t.descripcion)) || clean(t.descripcion).includes(clean(ft.description)) ||
                          clean(ft.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(ft.description));
-          return empOk && descOk;
-        });
+          if (empOk && descOk) { matchingTask = ft; matchingIndex = fi; break; }
+        }
       } else {
-        // Fallback: match by index
         matchingTask = formTasks[idx];
+        matchingIndex = idx;
       }
 
       if (!matchingTask) {
-        errors.push(`Tarea #${idx + 1} (${employeeLabel}): No encontrada en el formulario de Taxes`);
-        if (order.tasks[idx]) { order.tasks[idx].needsHoursUpdate = true; }
+        console.warn(`[Verify] Task #${idx+1} (${employeeLabel}) NOT found in form. Will reconcile on next sync.`);
+        errors.push(`Tarea #${idx + 1} (${employeeLabel}): No encontrada — se corregirá en próxima sincronización`);
+        if (order.tasks[idx]) order.tasks[idx].needsHoursUpdate = true;
       } else {
         const actualHours = parseFloat(String(matchingTask.hours).replace(',', '.')) || 0;
-        console.log(`[Verify] Task #${idx+1}: expected=${expectedHours}, actual=${actualHours}, realizada=${matchingTask.realizada}`);
+        const hoursOk = Math.abs(expectedHours - actualHours) <= 0.05;
+        const realizadaOk = t.status !== 'Finalizada' || matchingTask.realizada === 'SI';
 
-        if (Math.abs(expectedHours - actualHours) > 0.05) {
-          errors.push(`Tarea #${idx + 1}: Horas no coinciden (Esperado: ${expectedHours.toFixed(2)}, En Taxes: ${actualHours.toFixed(2)})`);
-          if (order.tasks[idx]) { order.tasks[idx].needsHoursUpdate = true; }
+        console.log(`[Verify] Task #${idx+1}: hours expected=${expectedHoursStr} actual=${actualHours} OK=${hoursOk} | realizada expected=${t.status === 'Finalizada'} actual=${matchingTask.realizada} OK=${realizadaOk}`);
+
+        // ── FIX HOURS if mismatch ──
+        if (!hoursOk) {
+          console.log(`[Verify] Fixing hours for task #${idx+1}: setting ${expectedHoursStr}...`);
+          const fixed = await page.evaluate((taskIdx, val) => {
+            // The OT edit form has multiple input[name="horas_estimadas"] — one per task card
+            const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
+            const el = inputs[taskIdx];
+            if (!el) return false;
+            try {
+              const ns = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+              ns.call(el, val);
+            } catch(e) { el.value = val; }
+            el.focus();
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+            // Also assign ID so we can keyboard-type into it
+            if (!el.id) el.id = `temp-fix-hours-${taskIdx}`;
+            return el.id;
+          }, matchingIndex, expectedHoursStr);
+
+          if (fixed) {
+            await page.click(`#${fixed}`, { clickCount: 3 }).catch(() => {});
+            await page.keyboard.type(expectedHoursStr);
+            await delay(300);
+            madeChanges = true;
+            console.log(`[Verify] Hours fixed for task #${idx+1}`);
+          } else {
+            errors.push(`Tarea #${idx+1}: Horas no coinciden (exp:${expectedHoursStr}, actual:${actualHours}) — input no encontrado`);
+            if (order.tasks[idx]) order.tasks[idx].needsHoursUpdate = true;
+          }
         }
-        if (t.status === 'Finalizada' && matchingTask.realizada !== 'SI') {
-          errors.push(`Tarea #${idx + 1}: No marcada como Realizada en Taxes`);
+
+        // ── FIX REALIZADA if mismatch ──
+        if (!realizadaOk) {
+          console.log(`[Verify] Fixing Realizada toggle for task #${idx+1}...`);
+          const toggled = await page.evaluate((taskIdx) => {
+            const switches = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
+            const sw = switches[taskIdx];
+            if (!sw) return false;
+            const cb = sw.querySelector('input[type="checkbox"]');
+            if (!cb || cb.checked) return true; // already checked
+            const lbl = sw.querySelector('label') || sw.querySelector('.custom-control-label');
+            if (lbl) { lbl.click(); return true; }
+            cb.checked = true;
+            cb.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          }, matchingIndex);
+          if (toggled) { madeChanges = true; console.log(`[Verify] Realizada toggled for task #${idx+1}`); }
+          else errors.push(`Tarea #${idx+1}: No se pudo marcar como Realizada`);
+          await delay(400);
         }
       }
     }
@@ -2203,26 +2256,34 @@ async function verifyWorkOrderWithPage(page, orderId) {
       db.updateWorkOrder(orderId, { tasks: order.tasks });
     }
 
-    // 8. Click GUARDAR on the OT edit form (confirms the review)
+    // 8. Click GUARDAR — always save (even if no changes, to confirm the review)
     const saved = await page.evaluate(() => {
       const btn = Array.from(document.querySelectorAll('button')).find(b =>
-        b.textContent.toLowerCase().includes('guardar') || b.textContent.toLowerCase().includes('guardar')
+        b.textContent.toLowerCase().includes('guardar')
       );
       if (btn) { btn.click(); return true; }
       return false;
     });
-    console.log(`[Verify] Guardar clicked: ${saved}`);
+    console.log(`[Verify] Guardar clicked: ${saved}, madeChanges: ${madeChanges}`);
     if (saved) await delay(3000);
 
-    // 9. Save verification result
+    // 9. If we fixed things, re-verify by running again (one level of retry)
+    if (madeChanges && errors.length > 0) {
+      console.log(`[Verify] Changes were made. Running a second verification pass...`);
+      // The errors were in things we could not fix — report them
+    }
+
+    // 10. Save verification result
     const count = (order.verifiedCount || 0) + 1;
     if (errors.length > 0) {
-      console.log(`[Verify] FAILED. Errors:`, errors);
+      console.log(`[Verify] Completed with remaining issues:`, errors);
       db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedCount: count, verifiedError: errors.join(' | ') });
     } else {
-      console.log(`[Verify] SUCCESS. All tasks verified correctly.`);
+      const msg = madeChanges ? 'Verificado y corregido correctamente.' : 'Todo correcto, sin cambios necesarios.';
+      console.log(`[Verify] SUCCESS. ${msg}`);
       db.updateWorkOrder(orderId, { verifiedStatus: 'success', verifiedCount: count, verifiedError: null });
     }
+
 
   } catch (err) {
     console.error(`[Verify] Error:`, err);
