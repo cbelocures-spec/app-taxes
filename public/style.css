@@ -2741,6 +2741,45 @@ body {
 }
 
 /* Media query to switch table/cards */
+/* Parte Taller mobile cards */
+.pt-mobile-cards-list {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 16px 0;
+}
+.pt-mobile-card {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  border: 1px solid var(--border);
+}
+.pt-mobile-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+.pt-mobile-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  gap: 8px;
+}
+.pt-mobile-card-row:last-of-type { border-bottom: none; }
+.pt-section-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
 @media (max-width: 600px) {
   .prev-table-container {
     display: none;
@@ -2748,9 +2787,28 @@ body {
   .prev-card-list {
     display: flex;
   }
+  /* Compact 3-column metrics on mobile */
   .prev-metrics-grid {
-    grid-template-columns: 1fr;
-    gap: 8px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .prev-metric-card {
+    padding: 10px 8px;
+  }
+  .prev-metric-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+  .prev-metric-info h4 {
+    font-size: 10px;
+  }
+  .prev-metric-info p {
+    font-size: 20px;
+  }
+  /* Show PT mobile cards on mobile */
+  .pt-mobile-cards-list {
+    display: flex;
   }
   .partetaller-grid-4 {
     grid-template-columns: repeat(2, 1fr);

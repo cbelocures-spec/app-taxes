@@ -4768,6 +4768,15 @@ function switchSector(sector) {
     }
   });
 
+  // Hide/show Preventivos nav tab based on sector
+  const navPrev = document.getElementById('nav-preventivos');
+  if (navPrev) navPrev.style.display = (sector === 'Herrer\u00eda') ? 'none' : '';
+  // If currently on preventivos view and switching to Herrería, go home
+  const activeViewEl = document.querySelector('.app-view.active');
+  if (sector === 'Herrer\u00eda' && activeViewEl && activeViewEl.id === 'view-preventivos') {
+    switchView('home');
+  }
+
   // Re-filter and render
   renderOrders();
   renderDashboard();
@@ -6125,6 +6134,13 @@ function applyPrevFilters() {
 function filterByAlertState(state) {
   prevCurrentFilter = state;
   renderPrevFlotaTable();
+  // Auto-scroll to the internos list on mobile
+  if (state !== 'all') {
+    setTimeout(() => {
+      const cardsList = document.getElementById('prev-dashboard-cards');
+      if (cardsList) cardsList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+  }
 }
 
 async function fetchPreventivoFlota() {
@@ -6327,11 +6343,52 @@ function renderPrevCombustibleTable() {
           </td>
         </tr>`;
       }).join('');
+
+  // Mobile cards
+  const mobileCards = document.getElementById('prev-combustible-cards');
+  if (mobileCards) {
+    if (filtered.length === 0) {
+      mobileCards.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">No hay unidades que coincidan.</div>';
+    } else {
+      mobileCards.innerHTML = filtered.map(item => {
+        const a5 = String(item.alerta5k || '');
+        const a10 = String(item.alerta10k || '');
+        const hasAlert5 = ['realizar','urgente','service'].some(w => a5.toLowerCase().includes(w));
+        const hasAlert10 = ['realizar','urgente','service'].some(w => a10.toLowerCase().includes(w));
+        const hasAlert = hasAlert5 || hasAlert10;
+        const ri = item.originalRowIndex;
+        const a5Safe = a5.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+        const a10Safe = a10.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+        return `<div class="prev-mobile-card">
+          <div class="prev-mobile-card-header">
+            <div><strong style="font-size:16px;">${item.interno}</strong><br><span style="font-size:12px;color:var(--text-muted);">${item.modelo}</span></div>
+            <span class="badge-prev ${hasAlert ? 'warning' : 'ok'}">${hasAlert ? '⚠ Con Alerta' : '✓ Al Día'}</span>
+          </div>
+          <div class="prev-mobile-card-row"><span>Litros Totales</span><strong>${Number(item.litrosTotales||0).toLocaleString('es-AR')}</strong></div>
+          <div class="prev-mobile-card-row"><span>Alerta 5k</span><strong style="color:${hasAlert5?'#ef4444':'#10b981'}">${item.alerta5k||'—'}</strong></div>
+          <div class="prev-mobile-card-row"><span>Alerta 10k</span><strong style="color:${hasAlert10?'#ef4444':'#10b981'}">${item.alerta10k||'—'}</strong></div>
+          <div class="prev-mobile-card-row"><span>Último Service</span><strong>${item.lastService||'—'}</strong></div>
+          <div style="margin-top:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="openPrevCombustibleModal(${ri},'${item.interno}','${a5Safe}','${a10Safe}',${item.litrosTotales||0})" style="width:100%;display:flex;justify-content:center;align-items:center;gap:4px;">
+              <span class="material-icons" style="font-size:14px;">local_gas_station</span> Service
+            </button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
 }
 
 function filterCombustibleByAlert(state) {
   fuelAlertFilter = state;
   renderPrevCombustibleTable();
+  // Auto-scroll to internos list on mobile
+  if (state !== 'all') {
+    setTimeout(() => {
+      const cardsList = document.getElementById('prev-combustible-cards');
+      if (cardsList) cardsList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+  }
 }
 
 async function fetchPrevHistorial() {
@@ -7190,6 +7247,24 @@ function renderParteTallerDashboard(state) {
       }).join('');
     }
   }
+  // Mobile cards for Fuera de Servicio
+  const fueraMobile = el('pt-fuera-mobile-cards');
+  if (fueraMobile) {
+    fueraMobile.innerHTML = fueraDeServicio.length === 0
+      ? '<p style="text-align:center;color:var(--text-muted);padding:12px 0;">No hay unidades fuera de servicio.</p>'
+      : fueraDeServicio.map(item => {
+          const internoPT = String(item.interno || '');
+          const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
+          return `<div class="pt-mobile-card">
+            <div class="pt-mobile-card-header">
+              <div><strong style="font-size:15px;">${internoPT}</strong>${item.tipo ? `<br><span style="font-size:12px;color:var(--text-muted);">${item.tipo}</span>` : ''}</div>
+              ${getDiasParadoHtml(item, desde)}
+            </div>
+            <div class="pt-mobile-card-row"><span>Desde</span><strong>${desde}</strong></div>
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">${getOrdenBtnHtml(internoPT)} ${getEditBtnHtml(internoPT,'fuera_de_servicio')}</div>
+          </div>`;
+        }).join('');
+  }
 
   // 2. En reparación
   const reparacion = (displayState.reparacion || []).filter(matchesPtSector).sort((a, b) => getDaysValue(b) - getDaysValue(a));
@@ -7216,6 +7291,24 @@ function renderParteTallerDashboard(state) {
       }).join('');
     }
   }
+  // Mobile cards for En Reparación
+  const repMobile = el('pt-rep-mobile-cards');
+  if (repMobile) {
+    repMobile.innerHTML = reparacion.length === 0
+      ? '<p style="text-align:center;color:var(--text-muted);padding:12px 0;">No hay unidades en reparación.</p>'
+      : reparacion.map(item => {
+          const internoPT = String(item.interno || '');
+          const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
+          return `<div class="pt-mobile-card">
+            <div class="pt-mobile-card-header">
+              <div><strong style="font-size:15px;">${internoPT}</strong>${item.tipo ? `<br><span style="font-size:12px;color:var(--text-muted);">${item.tipo}</span>` : ''}</div>
+              ${getDiasParadoHtml(item, desde)}
+            </div>
+            <div class="pt-mobile-card-row"><span>Desde</span><strong>${desde}</strong></div>
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">${getOrdenBtnHtml(internoPT)} ${getEditBtnHtml(internoPT,'reparacion')}</div>
+          </div>`;
+        }).join('');
+  }
 
   // 3. Servicios pendientes
   const pendientes = displayState.servicios_pendientes || [];
@@ -7241,7 +7334,35 @@ function renderParteTallerDashboard(state) {
       }).join('');
     }
   }
+  // Mobile cards for Servicios Pendientes
+  const pendMobile = el('pt-pend-mobile-cards');
+  if (pendMobile) {
+    pendMobile.innerHTML = pendientes.length === 0
+      ? '<p style="text-align:center;color:var(--text-muted);padding:12px 0;">No hay servicios pendientes.</p>'
+      : pendientes.map(item => {
+          const internoPT = String(item.interno || '');
+          const servicio = item.servicio || item.tipo_servicio || '—';
+          return `<div class="pt-mobile-card">
+            <div class="pt-mobile-card-header">
+              <div><strong style="font-size:15px;">${internoPT}</strong>${item.tipo ? `<br><span style="font-size:12px;color:var(--text-muted);">${item.tipo}</span>` : ''}</div>
+              <span class="badge" style="background:#2196f3;color:white;font-size:11px;">${servicio}</span>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">${getOrdenBtnHtml(internoPT)} ${getEditBtnHtml(internoPT,'servicios_pendientes')}</div>
+          </div>`;
+        }).join('');
+  }
 }
+
+// Toggle Parte Taller section expand/collapse on mobile
+function togglePtSection(sectionId) {
+  const cards = document.getElementById(`pt-${sectionId}-mobile-cards`);
+  const icon = document.getElementById(`pt-${sectionId}-toggle-icon`);
+  if (!cards) return;
+  const isVisible = cards.style.display !== 'none' && cards.style.display !== '';
+  cards.style.display = isVisible ? 'none' : 'flex';
+  if (icon) icon.textContent = isVisible ? 'expand_more' : 'expand_less';
+}
+
 
 // ============================================================
 // PARTE TALLER — Orden helpers

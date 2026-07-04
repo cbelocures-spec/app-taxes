@@ -609,9 +609,15 @@
       </div>
 
       <!-- Fuera de Servicio and Under Repair -->
-      <div class="partetaller-section-header">
-        <h3 style="font-size: 14px; font-weight: 700; margin: 0;">Fuera de Servicio / En Taller</h3>
-        <span class="badge" style="background-color: #ef4444; color: white;" id="pt-out-count">0</span>
+      <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('fuera')">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3 style="font-size: 14px; font-weight: 700; margin: 0;">Fuera de Servicio / En Taller</h3>
+          <span class="badge" style="background-color: #ef4444; color: white;" id="pt-out-count">0</span>
+        </div>
+        <span class="material-icons" id="pt-fuera-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
+      </div>
+      <div id="pt-fuera-mobile-cards" class="pt-mobile-cards-list">
+        <!-- Mobile dynamic -->
       </div>
 
       <div class="prev-table-container">
@@ -634,9 +640,15 @@
         </table>
       </div>
 
-      <div class="partetaller-section-header">
-        <h3 style="font-size: 14px; font-weight: 700; margin: 0;">En Reparación</h3>
-        <span class="badge" style="background-color: #ff9800; color: white;" id="pt-rep-count">0</span>
+      <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('rep')">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3 style="font-size: 14px; font-weight: 700; margin: 0;">En Reparación</h3>
+          <span class="badge" style="background-color: #ff9800; color: white;" id="pt-rep-count">0</span>
+        </div>
+        <span class="material-icons" id="pt-rep-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
+      </div>
+      <div id="pt-rep-mobile-cards" class="pt-mobile-cards-list">
+        <!-- Mobile dynamic -->
       </div>
 
       <div class="prev-table-container">
@@ -659,9 +671,15 @@
         </table>
       </div>
 
-      <div class="partetaller-section-header">
-        <h3 style="font-size: 14px; font-weight: 700; margin: 0;">Servicios Pendientes</h3>
-        <span class="badge" style="background-color: #2196f3; color: white;" id="pt-pend-count">0</span>
+      <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('pend')">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3 style="font-size: 14px; font-weight: 700; margin: 0;">Servicios Pendientes</h3>
+          <span class="badge" style="background-color: #2196f3; color: white;" id="pt-pend-count">0</span>
+        </div>
+        <span class="material-icons" id="pt-pend-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
+      </div>
+      <div id="pt-pend-mobile-cards" class="pt-mobile-cards-list">
+        <!-- Mobile dynamic -->
       </div>
 
       <div class="prev-table-container">

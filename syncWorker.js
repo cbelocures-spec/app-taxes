@@ -2054,7 +2054,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
   try {
     // 1. Navigate to Tareas list page
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-    await delay(3000);
+    await delay(1500);
     
     // 2. Search for the OT number in the Tareas search box
     const searchInputSelector = await page.evaluate(() => {
@@ -2105,7 +2105,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
       const searchBtn = btns.find(b => b.textContent.toLowerCase().includes('buscar'));
       if (searchBtn) searchBtn.click();
     });
-    await delay(3000); // Wait for table reload
+    await delay(1500); // Wait for table reload
 
     // 3. Extract all rows from the table
     const tableTasks = await page.evaluate(() => {
@@ -2318,7 +2318,7 @@ function stopWorker() {
  * and reusing the same browser session for each credential group.
  * Up to MAX_PARALLEL_BROWSERS groups run simultaneously.
  */
-const MAX_PARALLEL_BROWSERS = 3;
+const MAX_PARALLEL_BROWSERS = 5;
 
 async function verifyMultipleOrders(orderIds) {
   const settings = db.getSettings();
@@ -2378,7 +2378,11 @@ async function verifyGroupWithBrowser(group, settings) {
     // Verify each order in this group sequentially (same browser session)
     for (const orderId of group.ids) {
       try {
-        await verifyWorkOrderWithPage(page, orderId);
+        // Per-order timeout: if it hangs for >90s, mark as error and move on
+        await Promise.race([
+          verifyWorkOrderWithPage(page, orderId),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout: verificaci\u00f3n tard\u00f3 m\u00e1s de 90 segundos')), 90000))
+        ]);
       } catch (err) {
         console.error(`[VerifyAll] Error verifying order ${orderId}:`, err.message);
         const order = db.getWorkOrderById(orderId);
