@@ -1229,55 +1229,67 @@ async function syncWorkOrder(orderId) {
 
       const cleanStr = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-      // 1. Go to OT list — "En Proceso" tab is already active by default
+      // 1. Go to OT list
       await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
       await page.waitForSelector('input', { timeout: 10000 }).catch(() => {});
-      await delay(3000); // Wait for full page + En Proceso tab content to render
+      await delay(2500);
 
-      // Find and click the Numero input (index 3 in visible text inputs: [0]FechaDesde [1]FechaHasta [2]Cliente [3]Numero [4]Limite)
+      // Click "En Proceso" tab
+      console.log(`[Reconcile] Clicking 'En Proceso' tab...`);
+      await page.evaluate(() => {
+        const navLinks = Array.from(document.querySelectorAll('a.nav-link, [role="tab"], .nav-tabs li a, .nav li a'));
+        const tab = navLinks.find(t => t.textContent.trim().toLowerCase().includes('en proceso'));
+        if (tab) { tab.click(); return; }
+        const all = Array.from(document.querySelectorAll('a, button, li'));
+        const fb  = all.find(t => t.textContent.trim().toLowerCase() === 'en proceso');
+        if (fb) { fb.click(); }
+      }).catch(() => {});
+      await delay(2500);
+
+      // Find and click the Numero input using the exact logic from test_ot_search.js
       const numInputId = await page.evaluate(() => {
         const normalizeText = s => (s || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-        // First try: find by label text = 'numero'
-        const allEls = Array.from(document.querySelectorAll('label, span, p, div, th'));
-        const numLabel = allEls.find(l => {
-          const t = normalizeText(l.textContent);
-          return (t === 'numero' || t === 'n\u00famero') && !l.querySelector('input, select, button');
-        });
-        let inp = null;
-        if (numLabel) {
-          const container = numLabel.closest('.form-group, .col, .col-md-2, .col-sm-2, [class*="col"]') || numLabel.parentElement;
-          if (container) inp = container.querySelector('input[type="text"], input:not([type])');
-        }
-        // Second try: container text includes 'numero'
-        if (!inp) {
-          const textInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])')).filter(i => i.offsetParent !== null);
-          for (const i of textInputs) {
-            const container = i.closest('.form-group, .col, [class*="col"]');
-            if (container && normalizeText(container.textContent).includes('numero')) { inp = i; break; }
-          }
-          // Third try: positional fallback — Numero is index 3 (after FechaDesde, FechaHasta, Cliente)
-          // Skip 'limite' input (has id='limite' or value='10')
-          if (!inp) {
-            const filtered = textInputs.filter(i => i.id !== 'limite' && i.value !== '10');
-            inp = filtered[3] || textInputs[3];
+        // 1. Look for exact "Numero" label
+        const allEls = Array.from(document.querySelectorAll('label, span, small, p, .col > div'));
+        for (const el of allEls) {
+          const t = normalizeText(el.textContent);
+          if (t === 'numero') {
+            const container = el.closest('.form-group, .col, [class*="col"]') || el.parentElement?.parentElement;
+            const inp = container?.querySelector('input');
+            if (inp) {
+              if (!inp.id) inp.id = 'rc-numero-input-v2';
+              return inp.id;
+            }
           }
         }
+        // 2. Container text includes "numero"
+        const vis = Array.from(document.querySelectorAll('input[type="text"], input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])')).filter(i => i.offsetParent);
+        for (const inp of vis) {
+          const par = inp.closest('.form-group, .col, [class*="col"]');
+          if (par && normalizeText(par.textContent).includes('numero')) {
+            if (!inp.id) inp.id = 'rc-numero-input-v2-fb';
+            return inp.id;
+          }
+        }
+        // 3. Positional fallback (usually index 3)
+        const inp = vis[3] || vis[2];
         if (inp) {
-          if (!inp.id) inp.id = 'rc-numero-input';
+          if (!inp.id) inp.id = 'rc-numero-input-v2-fb2';
           return inp.id;
         }
         return null;
       });
 
+      console.log(`[Reconcile] Numero input ID: ${numInputId}`);
+
       if (numInputId) {
-        // Click → select all → type the number (real keyboard events, Vue-compatible)
         await page.click(`#${numInputId}`, { clickCount: 3 }).catch(() => {});
         await page.keyboard.press('Backspace');
         await page.keyboard.type(otNumClean, { delay: 80 });
         await delay(500);
         console.log(`[Reconcile] Typed OT number "${otNumClean}" into Numero field`);
       } else {
-        console.warn(`[Reconcile] Could not find Numero input field, trying keyboard Tab approach...`);
+        console.warn(`[Reconcile] Could not find Numero input field`);
       }
 
       // Click BUSCAR
@@ -2061,45 +2073,72 @@ async function verifyWorkOrderWithPage(page, orderId) {
     // 1. Go to Ordenes de Trabajo list
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
     await page.waitForSelector('input', { timeout: 10000 }).catch(() => {});
-    await delay(1500);
+    await delay(2500);
 
-    // 2. Fill the "Numero" filter field (5th filter on the page) with the OT number
-    const numFilled = await page.evaluate((otNum) => {
-      const inputs = Array.from(document.querySelectorAll('input')).filter(i =>
-        i.type !== 'hidden' && i.type !== 'checkbox' && i.type !== 'radio'
-      );
-      // Try to find specifically the "Numero" input by label proximity
-      const labels = Array.from(document.querySelectorAll('label, span, th, div'));
-      const numLabel = labels.find(l =>
-        l.children.length === 0 && l.textContent.trim().toLowerCase() === 'numero'
-      );
-      let inp = null;
-      if (numLabel) {
-        const parent = numLabel.closest('.form-group') || numLabel.closest('.col') || numLabel.closest('div');
-        if (parent) inp = parent.querySelector('input');
+    // Click "En Proceso" tab
+    console.log(`[Verify] Clicking 'En Proceso' tab...`);
+    await page.evaluate(() => {
+      const navLinks = Array.from(document.querySelectorAll('a.nav-link, [role="tab"], .nav-tabs li a, .nav li a'));
+      const tab = navLinks.find(t => t.textContent.trim().toLowerCase().includes('en proceso'));
+      if (tab) { tab.click(); return; }
+      const all = Array.from(document.querySelectorAll('a, button, li'));
+      const fb  = all.find(t => t.textContent.trim().toLowerCase() === 'en proceso');
+      if (fb) { fb.click(); }
+    }).catch(() => {});
+    await delay(2500);
+
+    // Find and click the Numero input using the exact robust logic
+    const numInputId = await page.evaluate(() => {
+      const normalizeText = s => (s || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const allEls = Array.from(document.querySelectorAll('label, span, small, p, .col > div'));
+      for (const el of allEls) {
+        const t = normalizeText(el.textContent);
+        if (t === 'numero') {
+          const container = el.closest('.form-group, .col, [class*="col"]') || el.parentElement?.parentElement;
+          const inp = container?.querySelector('input');
+          if (inp) {
+            if (!inp.id) inp.id = 'vf-numero-input-v2';
+            return inp.id;
+          }
+        }
       }
-      // Fallback: use the 5th visible input (index 4) as the user described
-      if (!inp) inp = inputs[4] || inputs[inputs.length - 1];
+      const vis = Array.from(document.querySelectorAll('input[type="text"], input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])')).filter(i => i.offsetParent);
+      for (const inp of vis) {
+        const par = inp.closest('.form-group, .col, [class*="col"]');
+        if (par && normalizeText(par.textContent).includes('numero')) {
+          if (!inp.id) inp.id = 'vf-numero-input-v2-fb';
+          return inp.id;
+        }
+      }
+      const inp = vis[3] || vis[2];
       if (inp) {
-        try {
-          const ns = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-          ns.call(inp, String(otNum));
-        } catch(e) { inp.value = String(otNum); }
-        inp.dispatchEvent(new Event('input', { bubbles: true }));
-        inp.dispatchEvent(new Event('change', { bubbles: true }));
-        return true;
+        if (!inp.id) inp.id = 'vf-numero-input-v2-fb2';
+        return inp.id;
       }
-      return false;
-    }, otNumClean);
-    console.log(`[Verify] Filled Numero field with: ${otNumClean}, success: ${numFilled}`);
+      return null;
+    });
+
+    console.log(`[Verify] Numero input ID: ${numInputId}`);
+
+    if (numInputId) {
+      await page.click(`#${numInputId}`, { clickCount: 3 }).catch(() => {});
+      await page.keyboard.press('Backspace');
+      await page.keyboard.type(otNumClean, { delay: 80 });
+      await delay(500);
+      console.log(`[Verify] Typed OT number "${otNumClean}" into Numero field`);
+    } else {
+      console.warn(`[Verify] Could not find Numero input field`);
+    }
 
     // 3. Click BUSCAR
     await page.evaluate(() => {
-      const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase() === 'BUSCAR' || b.textContent.toLowerCase().includes('buscar'));
+      const btn = Array.from(document.querySelectorAll('button')).find(b =>
+        b.textContent.trim().toUpperCase() === 'BUSCAR' || b.textContent.toLowerCase().includes('buscar')
+      );
       if (btn) btn.click();
     });
     await page.waitForSelector('table tbody tr', { timeout: 10000 }).catch(() => delay(2000));
-    await delay(1000);
+    await delay(3500); // Wait for list to filter
 
     // 4. Click the pencil (edit) icon ✏️ on the matching row
     const editClicked = await page.evaluate((otNum) => {
