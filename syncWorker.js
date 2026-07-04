@@ -1319,11 +1319,13 @@ async function syncWorkOrder(orderId) {
 
       // Click BUSCAR natively
       const buscarBtnId = await page.evaluate(() => {
-        const btn = Array.from(document.querySelectorAll('button')).find(b =>
-          b.textContent.trim().toUpperCase() === 'BUSCAR' || b.textContent.toLowerCase().includes('buscar')
-        );
+        const all = Array.from(document.querySelectorAll('button, a, [role="button"], .btn'));
+        const btn = all.find(b => {
+          const t = b.textContent.trim().toUpperCase();
+          return t.includes('BUSCAR') || t === 'BUSCAR';
+        });
         if (btn) {
-          if (!btn.id) btn.id = 'rc-buscar-btn-v2';
+          if (!btn.id) btn.id = 'rc-buscar-btn-v3';
           return btn.id;
         }
         return null;
@@ -2177,11 +2179,13 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     // 3. Click BUSCAR natively
     const buscarBtnId = await page.evaluate(() => {
-      const btn = Array.from(document.querySelectorAll('button')).find(b =>
-        b.textContent.trim().toUpperCase() === 'BUSCAR' || b.textContent.toLowerCase().includes('buscar')
-      );
+      const all = Array.from(document.querySelectorAll('button, a, [role="button"], .btn'));
+      const btn = all.find(b => {
+        const t = b.textContent.trim().toUpperCase();
+        return t.includes('BUSCAR') || t === 'BUSCAR';
+      });
       if (btn) {
-        if (!btn.id) btn.id = 'vf-buscar-btn-v2';
+        if (!btn.id) btn.id = 'vf-buscar-btn-v3';
         return btn.id;
       }
       return null;
