@@ -65,7 +65,14 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// Disable caching for API, JS, CSS, and HTML files (including /) so browsers always load the latest version/data
+// If REDIRECT_TO is set, redirect ALL traffic to new server (for old account migration)
+if (process.env.REDIRECT_TO) {
+  const redirectTarget = process.env.REDIRECT_TO.replace(/\/$/, '');
+  app.use((req, res) => {
+    res.redirect(301, redirectTarget + req.originalUrl);
+  });
+}
+
 app.use((req, res, next) => {
   const isApi = req.path.startsWith('/api');
   const isWebAsset = req.path.endsWith('.js') || req.path.endsWith('.css') || req.path.endsWith('.html') || req.path === '/';
