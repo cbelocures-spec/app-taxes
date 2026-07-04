@@ -5,7 +5,7 @@ const path = require('path');
 const url = 'https://app-taxes-production.up.railway.app/last_ot_search_debug.png';
 const dest = path.join(__dirname, 'last_ot_search_debug.png');
 
-console.log(`Downloading debug image from: ${url}`);
+console.log(`Downloading last_ot_search_debug image from: ${url}`);
 const file = fs.createWriteStream(dest);
 
 https.get(url, (response) => {

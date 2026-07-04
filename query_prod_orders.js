@@ -1,31 +1,34 @@
 const https = require('https');
 
-const url = 'https://app-taxes-production.up.railway.app/api/orders';
-const headers = { 'x-user-username': 'paniol@contenedoreshugo.com.ar' };
+const host = 'app-taxes-production.up.railway.app';
+const username = 'paniol@contenedoreshugo.com.ar';
 
-console.log(`Fetching orders from: ${url}`);
+function get(path, callback) {
+  https.get({
+    hostname: host,
+    path: path,
+    headers: { 'x-user-username': username }
+  }, (res) => {
+    let data = '';
+    res.on('data', (chunk) => { data += chunk; });
+    res.on('end', () => { callback(null, data); });
+  }).on('error', (err) => { callback(err); });
+}
 
-const req = https.get(url, { headers }, (res) => {
-  let data = '';
-  res.on('data', (chunk) => { data += chunk; });
-  res.on('end', () => {
-    try {
-      const orders = JSON.parse(data);
-      const ot = orders.find(o => String(o.taxesOrderNumber) === '25530');
-      if (ot) {
-        console.log('Found OT 25530 on production server:');
-        console.log(JSON.stringify(ot, null, 2));
-      } else {
-        console.log('OT 25530 NOT found in production orders list!');
-        console.log(`All orders:`, orders.map(o => o.taxesOrderNumber).join(', '));
-      }
-    } catch (e) {
-      console.error('Error parsing response:', e.message);
-      console.log('Raw response:', data.slice(0, 500));
-    }
-  });
-});
-
-req.on('error', (err) => {
-  console.error('Request error:', err.message);
+get('/api/orders', (err, data) => {
+  if (err) {
+    console.error('Error:', err.message);
+    return;
+  }
+  try {
+    const orders = JSON.parse(data);
+    console.log(`Total Orders: ${orders.length}`);
+    const pending = orders.filter(o => o.syncStatus === 'pending' || o.syncStatus === 'syncing');
+    console.log(`Pending/Syncing Orders: ${pending.length}`);
+    pending.forEach(o => {
+      console.log(`  - ID: ${o.id} | OT: ${o.taxesOrderNumber} | Status: ${o.syncStatus}`);
+    });
+  } catch (e) {
+    console.error('Parse error:', e.message);
+  }
 });
