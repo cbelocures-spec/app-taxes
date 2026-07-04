@@ -1411,6 +1411,38 @@ async function triggerActiveTasksGoogleSheetSync() {
   }
 }
 
+// TEMP MIGRATION: bulk import endpoint to seed new server
+app.post('/api/admin/import-db', (req, res) => {
+  try {
+    const incoming = req.body;
+    if (!incoming || typeof incoming !== 'object') {
+      return res.status(400).json({ error: 'Invalid data' });
+    }
+    const current = db.read();
+    // Merge: only overwrite if incoming has more data
+    if (Array.isArray(incoming.workOrders) && incoming.workOrders.length > (current.workOrders || []).length) {
+      current.workOrders = incoming.workOrders;
+    }
+    if (incoming.users && Object.keys(incoming.users).length > Object.keys(current.users || {}).length) {
+      current.users = incoming.users;
+    }
+    if (incoming.settings && incoming.settings.preventivoScriptUrl) {
+      current.settings = { ...current.settings, ...incoming.settings };
+    }
+    if (incoming.catalogs) current.catalogs = incoming.catalogs;
+    if (incoming.activeMechanics) current.activeMechanics = incoming.activeMechanics;
+    if (incoming.odometerOverrides) current.odometerOverrides = incoming.odometerOverrides;
+    db.write ? null : null; // db.write is a method on instance
+    const fs = require('fs');
+    const path = require('path');
+    const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'db.json');
+    fs.writeFileSync(DB_PATH, JSON.stringify(current, null, 2), 'utf8');
+    res.json({ success: true, orders: current.workOrders.length, users: Object.keys(current.users || {}).length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Fallback: serve frontend index.html for SPA routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
