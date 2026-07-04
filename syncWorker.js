@@ -1542,7 +1542,7 @@ async function syncWorkOrder(orderId) {
           if (hoursId) {
             await page.click(`#${hoursId}`, { clickCount: 3 }).catch(() => {});
             await page.keyboard.type(expectedHours);
-            await delay(300);
+            await delay(3500); // 3.5s delay to show typed hours in slow motion
           }
           appTask.needsHoursUpdate = false;
         }
@@ -1559,7 +1559,7 @@ async function syncWorkOrder(orderId) {
               if (lbl) lbl.click(); else cb.click();
             }
           }, ci);
-          await delay(400);
+          await delay(3500); // 3.5s delay to show toggled Realizada switch in slow motion
           appTask.taxesRealizadaSynced = true;
         }
 
@@ -1570,6 +1570,8 @@ async function syncWorkOrder(orderId) {
       db.updateWorkOrder(orderId, { tasks: order.tasks });
 
       // 7. GUARDAR
+      console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
+      await delay(4000);
       const saved = await page.evaluate(() => {
         const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
         if (btn) { btn.click(); return true; }

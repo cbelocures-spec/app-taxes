@@ -11,11 +11,11 @@ worker.syncWorkOrder('1782926000451')
   .then((res) => {
     console.log('=== Sincronización Local Completada con Éxito ===');
     console.log('Resultado:', JSON.stringify(res, null, 2));
-    // Esperar 10 segundos antes de cerrar para que el usuario pueda mirar el navegador
-    setTimeout(() => { process.exit(0); }, 10000);
+    // Esperar 35 segundos antes de cerrar para que el usuario pueda mirar el navegador
+    setTimeout(() => { process.exit(0); }, 35000);
   })
   .catch((err) => {
     console.error('=== ERROR en la Sincronización Local ===');
     console.error(err);
-    setTimeout(() => { process.exit(1); }, 10000);
+    setTimeout(() => { process.exit(1); }, 35000);
   });
