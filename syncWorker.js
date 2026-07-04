@@ -1220,452 +1220,314 @@ async function syncWorkOrder(orderId) {
       throw new Error(`Credenciales inválidas o el usuario ${username} no existe en Taxes.com.ar`);
     }
 
-    // 2. NAVIGATE TO CORRECT PAGE
+    // 2. EXISTING OT — FULL RECONCILIATION AGENT
     if (order.taxesOrderNumber) {
-      console.log(`Order already has a Taxes OT number (${order.taxesOrderNumber}). Running task update/creation flow...`);
-      
-      // Go to Tareas OT page
-      await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-      await delay(3000);
+      console.log(`[Reconcile] OT ${order.taxesOrderNumber} exists. Starting full reconciliation...`);
+
+      // Helper: fill hours input on the open task form
+      const fillHorasInput = async (val) => {
+        const hoursId = await page.evaluate((v) => {
+          const el = document.querySelector('input[name="horas_estimadas"]');
+          if (!el) return null;
+          try {
+            const ns = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            ns.call(el, v);
+          } catch(e) { el.value = v; }
+          el.focus();
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+          if (!el.id) el.id = 'temp-horas-r';
+          return el.id;
+        }, val);
+        if (hoursId) {
+          await page.click(`#${hoursId}`, { clickCount: 3 }).catch(() => {});
+          await page.keyboard.type(val);
+        }
+        return !!hoursId;
+      };
+
+      // Helper: clean text for comparison
+      const cleanStr = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      // Helper: navigate to tareas page and search by OT number, return scraped rows
+      const readTaxesTasks = async () => {
+        await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+        await delay(2000);
+        // Search by OT number
+        await page.evaluate((otNum) => {
+          const inputs = Array.from(document.querySelectorAll('input'));
+          // Try to find search input (not hidden, not checkbox)
+          const searchInput = inputs.find(inp =>
+            inp.type !== 'hidden' && inp.type !== 'checkbox' && inp.type !== 'radio'
+          );
+          if (searchInput) {
+            try {
+              const ns = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+              ns.call(searchInput, String(otNum));
+            } catch(e) { searchInput.value = String(otNum); }
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }, order.taxesOrderNumber);
+        // Click Buscar
+        await page.evaluate(() => {
+          const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('buscar'));
+          if (btn) btn.click();
+        });
+        await page.waitForSelector('table tbody tr', { timeout: 8000 }).catch(() => delay(2000));
+        await delay(1000);
+        // Read rows
+        return await page.evaluate(() => {
+          const rows = Array.from(document.querySelectorAll('table tbody tr'));
+          return rows.map(row => {
+            const cells = Array.from(row.querySelectorAll('td'));
+            if (cells.length < 6) return null;
+            return {
+              ot: (cells[2]?.textContent || '').trim(),
+              employee: (cells[5]?.textContent || '').trim(),
+              hours: (cells[6]?.textContent || '0').trim(),
+              description: (cells[7]?.textContent || '').trim(),
+              realizada: (cells[8]?.textContent || '').trim().toUpperCase(),
+            };
+          }).filter(Boolean);
+        });
+      };
+
+      // Helper: click edit (eye) button for a specific row by employee+description
+      const clickEditForTask = async (empName, descBase, descFinal) => {
+        return await page.evaluate((emp, db, df) => {
+          const clean = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+          const rows = Array.from(document.querySelectorAll('table tbody tr'));
+          for (const row of rows) {
+            const cells = Array.from(row.querySelectorAll('td'));
+            if (cells.length < 6) continue;
+            const rowEmp = clean(cells[5]?.textContent || '');
+            const rowDesc = clean(cells[7]?.textContent || '');
+            const empOk = rowEmp.includes(clean(emp)) || clean(emp).includes(rowEmp);
+            const descOk = rowDesc.includes(clean(db)) || clean(db).includes(rowDesc) ||
+                           rowDesc.includes(clean(df)) || clean(df).includes(rowDesc);
+            if (empOk && descOk) {
+              // Try the eye/edit button (first button or link in last cell)
+              const lastCell = cells[cells.length - 1];
+              const btn = lastCell?.querySelector('a[href], button') ||
+                          cells[9]?.querySelector('a[href], button');
+              if (btn) { btn.click(); return true; }
+            }
+          }
+          return false;
+        }, empName, descBase, descFinal);
+      };
+
+      // Helper: save the open task form
+      const saveTaskForm = async () => {
+        const saved = await page.evaluate(() => {
+          const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
+          if (btn) { btn.click(); return true; }
+          return false;
+        });
+        if (saved) await delay(4000);
+        return saved;
+      };
+
+      // Helper: create a brand-new tarea for this OT (NUEVO flow)
+      const createTaskInTaxes = async (task, employeeLabel, finalDescription) => {
+        const newClicked = await page.evaluate(() => {
+          const btns = Array.from(document.querySelectorAll('button, a'));
+          const btn = btns.find(b => b.textContent.trim().toUpperCase().includes('NUEVO'));
+          if (btn) { btn.click(); return true; }
+          return false;
+        });
+        if (!newClicked) throw new Error('No se encontró botón NUEVO');
+        await delay(3000);
+
+        // N° OT
+        const otFilled = await fillSearchableSelect(page, 'N° OT', order.taxesOrderNumber);
+        if (!otFilled) throw new Error(`No se pudo seleccionar OT ${order.taxesOrderNumber}`);
+        await delay(1000);
+
+        // Centro de Costo
+        const ccCatalog = db.getCatalogs().centrosCosto || [];
+        const ccObj = ccCatalog.find(c => c.value === task.centroCosto);
+        const ccLabel = ccObj ? ccObj.label : task.centroCosto;
+        const ccSelected = await page.evaluate((ccVal) => {
+          const sel = document.querySelector('select');
+          if (!sel) return false;
+          const clean = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+          const opt = Array.from(sel.options).find(o => clean(o.text).includes(clean(ccVal)) || clean(o.value) === clean(ccVal));
+          if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; }
+          return false;
+        }, ccLabel);
+        if (!ccSelected) {
+          // try fillSearchableSelect fallback
+          await fillSearchableSelect(page, 'Centro de Costo', ccLabel).catch(() => {});
+        }
+        await delay(1000);
+
+        // Empleado
+        const empFilled = await fillSearchableSelect(page, 'Empleado', employeeLabel);
+        if (!empFilled) throw new Error(`No se pudo seleccionar empleado: ${employeeLabel}`);
+
+        // Horas Estimadas
+        const hoursVal = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
+        const hoursInputId = await page.evaluate((v) => {
+          const el = document.querySelector('input[name="horas_estimadas"]');
+          if (!el) return null;
+          try {
+            const ns = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            ns.call(el, v);
+          } catch(e) { el.value = v; }
+          el.focus();
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+          if (!el.id) el.id = 'temp-horas-new';
+          return el.id;
+        }, hoursVal);
+        if (hoursInputId) {
+          await page.click(`#${hoursInputId}`, { clickCount: 3 }).catch(() => {});
+          await page.keyboard.type(hoursVal);
+          await delay(300);
+        }
+
+        // Descripción
+        await page.evaluate((desc) => {
+          const ta = document.querySelector('textarea');
+          if (ta) {
+            ta.focus();
+            const ns = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+            ns.call(ta, desc);
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+            ta.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }, finalDescription);
+
+        // Realizada toggle
+        if (task.status && task.status.toLowerCase() === 'finalizada') {
+          await page.evaluate(() => {
+            const sw = Array.from(document.querySelectorAll('.custom-control.custom-switch')).find(el =>
+              (el.querySelector('.custom-control-label, label') || {}).textContent?.toLowerCase().includes('realizada')
+            );
+            if (sw) {
+              const cb = sw.querySelector('input[type="checkbox"]');
+              if (cb && !cb.checked) {
+                const lbl = sw.querySelector('label') || sw.querySelector('.custom-control-label');
+                if (lbl) lbl.click(); else cb.click();
+              }
+            }
+          });
+        }
+
+        await saveTaskForm();
+      };
+
+      // ── MAIN RECONCILIATION LOOP ──
+      let taxesTasks = await readTaxesTasks();
+      console.log(`[Reconcile] Taxes has ${taxesTasks.length} tasks for OT ${order.taxesOrderNumber}`);
 
       for (let i = 0; i < order.tasks.length; i++) {
         const task = order.tasks[i];
+        const { employeeLabel, finalDescription } = resolveAndMapEmployee(task);
+        const expectedHours = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
 
-        // Case 1: NEW task (not yet synced to Taxes)
-        if (task.synced === false) {
-          console.log(`Task #${i+1} is not synced. Adding as a new task to OT ${order.taxesOrderNumber}...`);
-          
-          // Click "+ NUEVO"
-          const newClicked = await page.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll('button, a'));
-            const newBtn = btns.find(b => b.textContent.toLowerCase().includes('nuevo') || b.textContent.toLowerCase().includes('+ nuevo'));
-            if (newBtn) { newBtn.click(); return true; }
-            return false;
-          });
-          if (!newClicked) throw new Error("No se pudo encontrar el botón NUEVO en la página de Tareas.");
-          await delay(3000);
+        // Find matching task in Taxes
+        const matching = taxesTasks.find(tt => {
+          const empOk = cleanStr(tt.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(tt.employee));
+          const descOk = cleanStr(tt.description).includes(cleanStr(task.descripcion)) ||
+                         cleanStr(task.descripcion).includes(cleanStr(tt.description)) ||
+                         cleanStr(tt.description).includes(cleanStr(finalDescription)) ||
+                         cleanStr(finalDescription).includes(cleanStr(tt.description));
+          return empOk && descOk;
+        });
 
-          // Fill form
-          // N° OT
-          const otFilled = await fillSearchableSelect(page, 'N° OT', order.taxesOrderNumber);
-          if (!otFilled) throw new Error(`No se pudo seleccionar la Orden de Trabajo N°: "${order.taxesOrderNumber}"`);
-          
-          // Centro de Costo
-          const ccSelected = await page.evaluate((ccVal) => {
-            const select = Array.from(document.querySelectorAll('select')).find(s => {
-              const parent = s.closest('.form-group') || s.closest('.taxes-form-group') || s.parentElement;
-              return parent && parent.textContent.toLowerCase().includes('centro de costo');
-            });
-            if (select) {
-              const clean = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-              const target = clean(ccVal);
-              const opt = Array.from(select.options).find(o => clean(o.text).includes(target) || clean(o.value) === target);
-              if (opt) {
-                select.value = opt.value;
-                select.dispatchEvent(new Event('change', { bubbles: true }));
-                return true;
-              }
-            }
-            return false;
-          }, task.centroCosto);
-          if (!ccSelected) throw new Error(`No se pudo seleccionar el Centro de Costo: "${task.centroCosto}"`);
-          await delay(1000);
-
-          // Empleado & Descripcion
-          const { employeeLabel, finalDescription } = resolveAndMapEmployee(task);
-          const empFilled = await fillSearchableSelect(page, 'Empleado', employeeLabel);
-          if (!empFilled) throw new Error(`No se pudo seleccionar el Empleado: "${employeeLabel}"`);
-
-          // Horas Estimadas — input[name="horas_estimadas"], type="number", so use period format
-          const hoursInputId1 = await page.evaluate(() => {
-            const inp = document.querySelector('input[name="horas_estimadas"]');
-            if (inp) {
-              if (!inp.id) inp.id = 'temp-hours-1';
-              return inp.id;
-            }
-            return null;
-          });
-          const hoursInputSelector1 = hoursInputId1 ? '#' + hoursInputId1 : null;
-
-          console.log(`[Sync] Horas input found: ${!!hoursInputSelector1}, value to set: ${task.horasEstimadas}`);
-          if (hoursInputSelector1) {
-            // type="number" always uses period as decimal separator
-            const hoursVal = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
-            await page.evaluate((sel, val) => {
-              const el = document.querySelector(sel);
-              if (!el) return;
-              try {
-                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                nativeSetter.call(el, val);
-              } catch(e) { el.value = val; }
-              el.focus();
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-              el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-            }, hoursInputSelector1, hoursVal);
-            // Triple-click to select all, then type
-            await page.click(hoursInputSelector1, { clickCount: 3 }).catch(() => {});
-            await page.keyboard.type(hoursVal);
-            await delay(400);
-          } else {
-            console.warn(`[Sync] WARNING: No se encontró input[name="horas_estimadas"] en el formulario`);
+        if (!matching) {
+          // ── MISSING TASK → CREATE ──
+          console.log(`[Reconcile] Task #${i+1} (${employeeLabel}) NOT found in Taxes. Creating...`);
+          try {
+            await createTaskInTaxes(task, employeeLabel, finalDescription);
+            task.synced = true;
+            task.needsHoursUpdate = false;
+            if (task.status === 'Finalizada') task.taxesRealizadaSynced = true;
+            db.updateWorkOrder(orderId, { tasks: order.tasks });
+            console.log(`[Reconcile] Task #${i+1} created OK.`);
+            // Re-read table after creating
+            taxesTasks = await readTaxesTasks();
+          } catch (createErr) {
+            console.error(`[Reconcile] Failed to create task #${i+1}:`, createErr.message);
           }
+        } else {
+          // ── TASK FOUND → CHECK FIELDS ──
+          const actualHours = parseFloat(String(matching.hours).replace(',', '.')) || 0;
+          const hoursMatch = Math.abs(parseFloat(expectedHours) - actualHours) <= 0.05;
+          const needsRealizada = task.status === 'Finalizada' && matching.realizada !== 'SI';
 
-          // Descripcion
-          await page.evaluate((desc) => {
-            const textarea = document.querySelector('textarea');
-            if (textarea) {
-              textarea.focus();
-              textarea.value = desc;
-              textarea.dispatchEvent(new Event('input', { bubbles: true }));
-              textarea.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-          }, finalDescription);
+          if (!hoursMatch || needsRealizada) {
+            console.log(`[Reconcile] Task #${i+1} needs update — hoursMatch:${hoursMatch} (exp:${expectedHours} got:${actualHours}), needsRealizada:${needsRealizada}`);
 
-          // Realizada Toggle (if Finalizada)
-          if (task.status && task.status.toLowerCase() === 'finalizada') {
-            await page.evaluate(() => {
-              const switchGroups = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
-              const switchEl = switchGroups.find(el => {
-                const label = el.querySelector('.custom-control-label');
-                return label && label.textContent.toLowerCase().includes('realizada');
-              });
-              if (switchEl) {
-                const checkbox = switchEl.querySelector('input[type="checkbox"]');
-                if (checkbox && !checkbox.checked) {
-                  const label = switchEl.querySelector('.custom-control-label') || switchEl.querySelector('label');
-                  if (label) {
-                    label.click();
-                  } else {
-                    checkbox.click();
+            // Click edit button
+            const edited = await clickEditForTask(employeeLabel, task.descripcion, finalDescription);
+            if (!edited) {
+              console.warn(`[Reconcile] Task #${i+1}: Could not find edit button. Skipping.`);
+            } else {
+              await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 8000 }).catch(() => delay(3000));
+              await delay(1000);
+
+              // Update hours if needed
+              if (!hoursMatch) {
+                console.log(`[Reconcile] Updating hours to ${expectedHours}...`);
+                await fillHorasInput(expectedHours);
+                await delay(300);
+              }
+
+              // Toggle realizada if needed
+              if (needsRealizada) {
+                console.log(`[Reconcile] Toggling Realizada...`);
+                await page.evaluate(() => {
+                  const sw = Array.from(document.querySelectorAll('.custom-control.custom-switch')).find(el =>
+                    (el.querySelector('.custom-control-label, label') || {}).textContent?.toLowerCase().includes('realizada')
+                  );
+                  if (sw) {
+                    const cb = sw.querySelector('input[type="checkbox"]');
+                    if (cb && !cb.checked) {
+                      const lbl = sw.querySelector('label') || sw.querySelector('.custom-control-label');
+                      if (lbl) lbl.click(); else cb.click();
+                    }
                   }
-                }
+                });
+                await delay(500);
               }
-            });
-          }
 
-          // GUARDAR
-          const saveClicked = await page.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll('button'));
-            const saveBtn = btns.find(b => b.textContent.toLowerCase().includes('guardar'));
-            if (saveBtn) { saveBtn.click(); return true; }
-            return false;
-          });
-          if (!saveClicked) throw new Error("No se pudo guardar la nueva tarea.");
-          
-          await delay(4000); // Wait for database save and redirect
-
-          // Update database task synced flags
-          task.synced = true;
-          if (task.status === "Finalizada") {
-            task.taxesRealizadaSynced = true;
-          }
-          db.updateWorkOrder(orderId, { tasks: order.tasks });
-          
-          // Go back to the Tareas list page for the next task
-          await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-          await delay(2000);
-        }
-        
-        // Case 2: EXISTING task that is now "Finalizada" but not yet marked as completed on Taxes
-        else if (task.status === "Finalizada" && task.taxesRealizadaSynced !== true) {
-          console.log(`Task #${i+1} was previously synced but is now Finalizada. Updating status to Realizada on Taxes...`);
-          
-           // Search for OT number on the Tareas page search input
-          const searchInputSelector = await page.evaluate(() => {
-            const cleanTxt = (str) => {
-              if (!str) return '';
-              return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-            };
-            const labels = Array.from(document.querySelectorAll('label, legend, span'));
-            const otLabel = labels.find(l => {
-              const txt = cleanTxt(l.textContent);
-              return (txt.includes('buscar por numero') || txt.includes('titulo de ot')) && !l.querySelector('label, legend, span');
-            });
-            let input = null;
-            if (otLabel) {
-              const parent = otLabel.parentElement ? otLabel.parentElement.parentElement : null;
-              if (parent) {
-                input = parent.querySelector('input[type="text"], input:not([type])');
-              }
-            }
-            if (!input) {
-              const allInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
-              input = allInputs[1] || allInputs[0];
-            }
-            if (input) {
-              if (!input.id) {
-                input.id = 'temp-ot-search-input';
-              }
-              return '#' + input.id;
-            }
-            return null;
-          });
-
-          if (searchInputSelector) {
-            await page.evaluate((sel) => {
-              const el = document.querySelector(sel);
-              if (el) {
-                el.focus();
-                el.select();
-              }
-            }, searchInputSelector);
-            await page.keyboard.press('Backspace');
-            await page.keyboard.type(String(order.taxesOrderNumber));
-          }
-
-          // Click "BUSCAR"
-          await page.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll('button, a'));
-            const searchBtn = btns.find(b => b.textContent.toLowerCase().includes('buscar'));
-            if (searchBtn) searchBtn.click();
-          });
-          await delay(3000); // Wait for table reload
-
-          // Click "eye" icon for the matching row
-          const { employeeLabel, finalDescription } = resolveAndMapEmployee(task);
-
-          const eyeClicked = await page.evaluate((empName, descTextBase, descTextFinal) => {
-            const clean = (str) => {
-              if (!str) return '';
-              return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
-            };
-            const cleanEmp = clean(empName);
-            const cleanDescBase = clean(descTextBase);
-            const cleanDescFinal = clean(descTextFinal);
-            
-            const rows = Array.from(document.querySelectorAll('table tbody tr'));
-            for (const row of rows) {
-              const cells = Array.from(row.querySelectorAll('td'));
-              if (cells.length >= 10) {
-                const rowEmp = clean(cells[5].textContent);
-                const rowDesc = clean(cells[7].textContent);
-                
-                // Match employee: either exact match or part-of
-                const empMatches = rowEmp.includes(cleanEmp) || cleanEmp.includes(rowEmp);
-                
-                // Match description: check if either base or final description matches or is contained
-                const descMatches = rowDesc.includes(cleanDescBase) || 
-                                    rowDesc.includes(cleanDescFinal) || 
-                                    cleanDescBase.includes(rowDesc) || 
-                                    cleanDescFinal.includes(rowDesc);
-                                    
-                if (empMatches && descMatches) {
-                  const eyeBtn = cells[9].querySelector('a, button');
-                  if (eyeBtn) { eyeBtn.click(); return true; }
-                }
-              }
-            }
-            return false;
-          }, employeeLabel, task.descripcion, finalDescription);
-
-          if (!eyeClicked) {
-            console.log(`Warning: Task #${i+1} matching "${employeeLabel}" was not found. Trying fallback search by description only...`);
-            const fallbackEyeClicked = await page.evaluate((descTextBase, descTextFinal) => {
-              const clean = (str) => {
-                if (!str) return '';
-                return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
-              };
-              const cleanDescBase = clean(descTextBase);
-              const cleanDescFinal = clean(descTextFinal);
-              
-              const rows = Array.from(document.querySelectorAll('table tbody tr'));
-              for (const row of rows) {
-                const cells = Array.from(row.querySelectorAll('td'));
-                if (cells.length >= 10) {
-                  const rowDesc = clean(cells[7].textContent);
-                  if (rowDesc.includes(cleanDescBase) || rowDesc.includes(cleanDescFinal)) {
-                    const eyeBtn = cells[9].querySelector('a, button');
-                    if (eyeBtn) { eyeBtn.click(); return true; }
-                  }
-                }
-              }
-              return false;
-            }, task.descripcion, finalDescription);
-            
-            if (!fallbackEyeClicked) {
-              console.log(`Warning: Task #${i+1} matching description was not found. Skipping.`);
-              continue;
-            }
-          }
-
-          await delay(3000); // Wait for task form page to load
-
-          // Fill Horas Estimadas — input[name="horas_estimadas"], type="number"
-          const hoursInputId2 = await page.evaluate(() => {
-            const inp = document.querySelector('input[name="horas_estimadas"]');
-            if (inp) {
-              if (!inp.id) inp.id = 'temp-hours-2';
-              return inp.id;
-            }
-            return null;
-          });
-          const hoursInputSelector2 = hoursInputId2 ? '#' + hoursInputId2 : null;
-
-          console.log(`[Sync] Horas input found (update): ${!!hoursInputSelector2}, value: ${task.horasEstimadas}`);
-          if (hoursInputSelector2) {
-            const hoursVal2 = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
-            await page.evaluate((sel, val) => {
-              const el = document.querySelector(sel);
-              if (!el) return;
-              try {
-                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                nativeSetter.call(el, val);
-              } catch(e) { el.value = val; }
-              el.focus();
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-              el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-            }, hoursInputSelector2, hoursVal2);
-            await page.click(hoursInputSelector2, { clickCount: 3 }).catch(() => {});
-            await page.keyboard.type(hoursVal2);
-            await delay(400);
-          }
-
-          // Toggle "Realizada" to ON
-          await page.evaluate(() => {
-            const switchGroups = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
-            const switchEl = switchGroups.find(el => {
-              const label = el.querySelector('.custom-control-label');
-              return label && label.textContent.toLowerCase().includes('realizada');
-            });
-            if (switchEl) {
-              const checkbox = switchEl.querySelector('input[type="checkbox"]');
-              if (checkbox && !checkbox.checked) {
-                const label = switchEl.querySelector('.custom-control-label') || switchEl.querySelector('label');
-                if (label) {
-                  label.click();
-                } else {
-                  checkbox.click();
-                }
-              }
-            }
-          });
-
-          // Click GUARDAR
-          const saveClicked = await page.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll('button'));
-            const saveBtn = btns.find(b => b.textContent.toLowerCase().includes('guardar'));
-            if (saveBtn) { saveBtn.click(); return true; }
-            return false;
-          });
-          if (!saveClicked) throw new Error("No se pudo guardar la actualización de la tarea.");
-          
-          await delay(4000); // Wait for save and redirect
-
-          // Update database task
-          task.taxesRealizadaSynced = true;
-          db.updateWorkOrder(orderId, { tasks: order.tasks });
-
-          // Go back to the Tareas list page for the next task
-          await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-          await delay(2000);
-        }
-
-        // Case 3: EXISTING task already synced but needs hours updated (verifier detected mismatch)
-        else if (task.synced === true && task.needsHoursUpdate === true) {
-          console.log(`Task #${i+1} needs hours update. Finding task in Taxes and updating...`);
-          
-          // Search by OT number in the list
-          await page.evaluate((otNum) => {
-            const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
-            const searchInput = inputs.find(inp => {
-              const p = inp.closest('.form-group') || inp.closest('div');
-              return p && (p.textContent.toLowerCase().includes('buscar') || p.textContent.toLowerCase().includes('ot'));
-            }) || inputs[1] || inputs[0];
-            if (searchInput) {
-              searchInput.focus();
-              searchInput.value = String(otNum);
-              searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-          }, order.taxesOrderNumber);
-          await page.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll('button'));
-            const searchBtn = btns.find(b => b.textContent.toLowerCase().includes('buscar'));
-            if (searchBtn) searchBtn.click();
-          });
-          await page.waitForSelector('table tbody tr', { timeout: 8000 }).catch(() => delay(2000));
-          await delay(1000);
-
-          // Find and click the eye button of the matching row
-          const { employeeLabel, finalDescription } = resolveAndMapEmployee(task);
-          const editClicked3 = await page.evaluate((empName, descBase, descFinal) => {
-            const clean = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
-            const rows = Array.from(document.querySelectorAll('table tbody tr'));
-            for (const row of rows) {
-              const cells = Array.from(row.querySelectorAll('td'));
-              if (cells.length < 6) continue;
-              const rowEmp = clean(cells[5]?.textContent || '');
-              const rowDesc = clean(cells[7]?.textContent || '');
-              const empOk = rowEmp.includes(clean(empName)) || clean(empName).includes(rowEmp);
-              const descOk = rowDesc.includes(clean(descBase)) || rowDesc.includes(clean(descFinal)) ||
-                             clean(descBase).includes(rowDesc) || clean(descFinal).includes(rowDesc);
-              if (empOk && descOk) {
-                const btn = (cells[cells.length-1] || cells[9])?.querySelector('a, button');
-                if (btn) { btn.click(); return true; }
-              }
-            }
-            return false;
-          }, employeeLabel, task.descripcion, finalDescription);
-
-          if (!editClicked3) {
-            console.warn(`[Sync Case 3] No se encontró la tarea para actualizar horas. Se omite.`);
-          } else {
-            await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 8000 }).catch(() => delay(3000));
-            await delay(1000);
-
-            const hoursVal3u = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
-            const hoursId3u = await page.evaluate((val) => {
-              const el = document.querySelector('input[name="horas_estimadas"]');
-              if (!el) return null;
-              try {
-                const ns = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                ns.call(el, val);
-              } catch(e) { el.value = val; }
-              el.focus();
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-              el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-              if (!el.id) el.id = 'temp-hours-3u';
-              return el.id;
-            }, hoursVal3u);
-            if (hoursId3u) {
-              await page.click(`#${hoursId3u}`, { clickCount: 3 }).catch(() => {});
-              await page.keyboard.type(hoursVal3u);
-            }
-            await delay(400);
-
-            // Save
-            const saved3 = await page.evaluate(() => {
-              const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
-              if (btn) { btn.click(); return true; }
-              return false;
-            });
-            if (saved3) {
-              await delay(4000);
+              await saveTaskForm();
+              task.synced = true;
               task.needsHoursUpdate = false;
+              if (needsRealizada) task.taxesRealizadaSynced = true;
               db.updateWorkOrder(orderId, { tasks: order.tasks });
-              console.log(`[Sync Case 3] Horas actualizadas a ${hoursVal3u} para tarea #${i+1}`);
+              console.log(`[Reconcile] Task #${i+1} updated OK.`);
+              // Re-read table
+              taxesTasks = await readTaxesTasks();
             }
+          } else {
+            console.log(`[Reconcile] Task #${i+1} is already correct in Taxes (hours:${actualHours}, realizada:${matching.realizada}). No update needed.`);
+            task.synced = true;
+            task.needsHoursUpdate = false;
+            db.updateWorkOrder(orderId, { tasks: order.tasks });
           }
-
-          await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-          await delay(2000);
         }
-      } // end for tasks loop
+      }
 
       db.updateWorkOrder(orderId, {
-        syncStatus: "success",
+        syncStatus: 'success',
         syncDate: new Date().toISOString(),
         syncError: null
       });
 
-      console.log(`Running post-sync verification for existing OT #${order.interno}...`);
+      console.log(`[Reconcile] Running verification for OT #${order.interno}...`);
       await verifyWorkOrderWithPage(page, orderId);
 
       await browser.close();
-      return { success: true, message: `Tareas de la Orden ${order.taxesOrderNumber} actualizadas correctamente.` };
+      return { success: true, message: `Orden ${order.taxesOrderNumber} reconciliada correctamente.` };
     }
+
 
     console.log("Navigating directly to Ordenes de Trabajo list page...");
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
@@ -2174,193 +2036,203 @@ async function syncWorkOrder(orderId) {
 async function verifyWorkOrderWithPage(page, orderId) {
   const order = db.getWorkOrderById(orderId);
   if (!order || !order.taxesOrderNumber) {
-    console.log(`[Verification] Cannot verify: order not found or missing Taxes OT number.`);
+    console.log(`[Verify] Cannot verify: order not found or missing Taxes OT number.`);
     return;
   }
-  
   const settings = db.getSettings();
-  console.log(`[Verification] Starting verification for OT #${order.interno} (Taxes OT: ${order.taxesOrderNumber})...`);
-  
+  console.log(`[Verify] Starting OT-edit verification for OT #${order.interno} (Taxes: ${order.taxesOrderNumber})...`);
+
   try {
-    // 1. Navigate to Tareas list page
-    await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-    // Wait for page inputs to appear instead of fixed delay
+    // 1. Go to Ordenes de Trabajo list
+    await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
     await page.waitForSelector('input', { timeout: 10000 }).catch(() => {});
-    await delay(500);
-    
-    // 2. Find the OT search input
-    let searchInputSelector = null;
-    try {
-      searchInputSelector = await page.evaluate(() => {
-        const cleanTxt = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : '';
-        const labels = Array.from(document.querySelectorAll('label, legend, span'));
-        const otLabel = labels.find(l => {
-          const txt = cleanTxt(l.textContent);
-          return (txt.includes('buscar por numero') || txt.includes('titulo de ot')) && !l.querySelector('label, legend, span');
-        });
-        let input = null;
-        if (otLabel) {
-          const parent = otLabel.parentElement ? otLabel.parentElement.parentElement : null;
-          if (parent) input = parent.querySelector('input[type="text"], input:not([type])');
-        }
-        if (!input) {
-          const allInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
-          input = allInputs[1] || allInputs[0];
-        }
-        if (input) {
-          if (!input.id) input.id = 'temp-ot-search-input-verify';
-          return '#' + input.id;
-        }
-        return null;
-      });
-    } catch (e) {
-      console.warn(`[Verification] Could not find search input:`, e.message);
-    }
+    await delay(1500);
 
-    if (searchInputSelector) {
-      await page.evaluate((sel) => {
-        const el = document.querySelector(sel);
-        if (el) { el.value = ''; el.focus(); el.select(); }
-      }, searchInputSelector).catch(() => {});
-      await page.keyboard.press('Backspace');
-      await page.keyboard.type(String(order.taxesOrderNumber));
-    }
-
-    // Click "BUSCAR"
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button, a'));
-      const searchBtn = btns.find(b => b.textContent.toLowerCase().includes('buscar'));
-      if (searchBtn) searchBtn.click();
-    }).catch(() => {});
-
-    // Wait for table to load results (waitForSelector is faster than fixed delay)
-    await page.waitForSelector('table tbody tr', { timeout: 8000 }).catch(() => delay(2000));
-    await delay(500);
-
-    // 3. Extract rows from the table — also grab header to detect column positions
-    const tableTasks = await page.evaluate(() => {
-      const results = [];
-
-      // Try to detect column positions from table header
-      let colOt = 2, colEmployee = 5, colHours = 6, colDesc = 7, colRealizada = 8;
-      const headerCells = Array.from(document.querySelectorAll('table thead th, table thead td'));
-      if (headerCells.length > 0) {
-        headerCells.forEach((th, i) => {
-          const txt = th.textContent.trim().toLowerCase();
-          if (txt.includes('ot') || txt.includes('orden') || txt.includes('n°')) colOt = i;
-          if (txt.includes('empleado') || txt.includes('personal') || txt.includes('usuario')) colEmployee = i;
-          if (txt.includes('hora') || txt.includes('hs') || txt.includes('tiempo')) colHours = i;
-          if (txt.includes('descrip') || txt.includes('tarea') || txt.includes('detalle')) colDesc = i;
-          if (txt.includes('realiz') || txt.includes('estado') || txt.includes('complet')) colRealizada = i;
-        });
+    // 2. Fill the "Numero" filter field (5th filter on the page) with the OT number
+    const numFilled = await page.evaluate((otNum) => {
+      const inputs = Array.from(document.querySelectorAll('input')).filter(i =>
+        i.type !== 'hidden' && i.type !== 'checkbox' && i.type !== 'radio'
+      );
+      // Try to find specifically the "Numero" input by label proximity
+      const labels = Array.from(document.querySelectorAll('label, span, th, div'));
+      const numLabel = labels.find(l =>
+        l.children.length === 0 && l.textContent.trim().toLowerCase() === 'numero'
+      );
+      let inp = null;
+      if (numLabel) {
+        const parent = numLabel.closest('.form-group') || numLabel.closest('.col') || numLabel.closest('div');
+        if (parent) inp = parent.querySelector('input');
       }
+      // Fallback: use the 5th visible input (index 4) as the user described
+      if (!inp) inp = inputs[4] || inputs[inputs.length - 1];
+      if (inp) {
+        try {
+          const ns = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+          ns.call(inp, String(otNum));
+        } catch(e) { inp.value = String(otNum); }
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      }
+      return false;
+    }, order.taxesOrderNumber);
+    console.log(`[Verify] Filled Numero field: ${numFilled}`);
 
+    // 3. Click BUSCAR
+    await page.evaluate(() => {
+      const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase() === 'BUSCAR' || b.textContent.toLowerCase().includes('buscar'));
+      if (btn) btn.click();
+    });
+    await page.waitForSelector('table tbody tr', { timeout: 10000 }).catch(() => delay(2000));
+    await delay(1000);
+
+    // 4. Click the pencil (edit) icon ✏️ on the matching row
+    const editClicked = await page.evaluate((otNum) => {
       const rows = Array.from(document.querySelectorAll('table tbody tr'));
       for (const row of rows) {
         const cells = Array.from(row.querySelectorAll('td'));
-        if (cells.length < 6) continue;
-
-        const getText = (i) => (cells[i] ? cells[i].textContent.trim() : '');
-
-        // Extract raw values by detected column
-        let hoursRaw = getText(colHours);
-
-        // Fallback: if hours cell is empty or 0, scan nearby columns for a decimal number
-        if (!hoursRaw || hoursRaw === '0' || hoursRaw === '0.00' || hoursRaw === '0,00') {
-          for (let ci = 3; ci < Math.min(cells.length, 12); ci++) {
-            const v = getText(ci);
-            // A valid hours value looks like: 1.5, 1,5, 0.5, 2.25, etc.
-            if (/^\d+[.,]\d+$/.test(v) || /^\d+$/.test(v)) {
-              const num = parseFloat(v.replace(',', '.'));
-              if (num > 0 && num < 24) { hoursRaw = v; break; }
-            }
-          }
+        // Check if any cell contains our OT number
+        const hasOT = cells.some(c => c.textContent.trim().includes(String(otNum)));
+        if (hasOT) {
+          // Find edit/pencil button — usually the 2nd action icon (pencil = ✏️ or fa-edit)
+          const lastCell = cells[cells.length - 1];
+          // Try to find pencil specifically
+          const pencil = lastCell?.querySelector('a[href*="edit"], button[title*="edit"], a[title*="editar"], .fa-edit, .fa-pencil, [class*="edit"]')?.closest('a, button');
+          // Fallback: get all buttons/links and pick the 2nd one (eye=1st, pencil=2nd)
+          const allBtns = Array.from(lastCell?.querySelectorAll('a, button') || []);
+          const editBtn = pencil || allBtns[1] || allBtns[0];
+          if (editBtn) { editBtn.click(); return true; }
         }
-
-        results.push({
-          ot: getText(colOt),
-          employee: getText(colEmployee),
-          hours: hoursRaw,
-          description: getText(colDesc),
-          realizada: getText(colRealizada).toUpperCase(),
-          // Include all cells as fallback for debugging
-          _allCells: cells.map(c => c.textContent.trim())
-        });
       }
-      return results;
+      return false;
+    }, order.taxesOrderNumber);
+    console.log(`[Verify] Edit button clicked: ${editClicked}`);
+
+    if (!editClicked) {
+      console.warn(`[Verify] Could not find/click edit button for OT ${order.taxesOrderNumber}. Verification skipped.`);
+      db.updateWorkOrder(orderId, {
+        verifiedStatus: 'error',
+        verifiedCount: (order.verifiedCount || 0) + 1,
+        verifiedError: `No se encontró la OT ${order.taxesOrderNumber} en el listado de Taxes`
+      });
+      return;
+    }
+
+    // 5. Wait for OT edit form to load
+    await page.waitForSelector('input[name="horas_estimadas"], .taxes-formulario-tareas, table', { timeout: 15000 }).catch(() => delay(4000));
+    await delay(2000);
+
+    // 6. Read all tasks from the OT edit form
+    const formTasks = await page.evaluate(() => {
+      // Tasks in the OT edit form are usually rendered as cards or rows
+      // Try to read from the tasks table inside the form
+      const clean = s => (s || '').trim();
+
+      // Try table rows
+      const taskRows = Array.from(document.querySelectorAll('.taxes-formulario-tareas table tbody tr, .card-tareas tr, table tbody tr'));
+      if (taskRows.length > 0) {
+        return taskRows.map(row => {
+          const cells = Array.from(row.querySelectorAll('td'));
+          if (cells.length < 2) return null;
+          return {
+            employee: clean(cells[1]?.textContent || cells[0]?.textContent || ''),
+            hours: clean(cells[2]?.textContent || ''),
+            description: clean(cells[3]?.textContent || cells[2]?.textContent || ''),
+            realizada: (cells[4]?.textContent || cells[cells.length-1]?.textContent || '').trim().toUpperCase(),
+            _allCells: cells.map(c => clean(c.textContent))
+          };
+        }).filter(Boolean);
+      }
+
+      // Fallback: read from individual task inputs (when tasks are in expandable cards)
+      const horasInputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
+      const descInputs = Array.from(document.querySelectorAll('textarea[name="descripcion"]'));
+      const switches = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
+
+      return horasInputs.map((inp, i) => ({
+        hours: inp.value || '0',
+        description: descInputs[i] ? descInputs[i].value : '',
+        realizada: switches[i] ? (switches[i].querySelector('input[type="checkbox"]')?.checked ? 'SI' : 'NO') : '',
+        _allCells: [`hours:${inp.value}`]
+      }));
     });
 
-    console.log(`[Verification] Found ${tableTasks.length} tasks on Taxes for OT ${order.taxesOrderNumber}:`, tableTasks);
+    console.log(`[Verify] Form tasks found: ${formTasks.length}`, JSON.stringify(formTasks));
 
     const errors = [];
-    
-    // 4. Verify each task of our order exists on Taxes with correct parameters
+    const clean = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // 7. Compare each app task against form data
     for (let idx = 0; idx < order.tasks.length; idx++) {
       const t = order.tasks[idx];
       const { employeeLabel, finalDescription } = resolveAndMapEmployee(t);
-      
-      const clean = (str) => {
-        if (!str) return '';
-        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
-      };
-      
-      const targetEmpClean = clean(employeeLabel);
-      const targetDescBaseClean = clean(t.descripcion);
-      const targetDescFinalClean = clean(finalDescription);
-      
-      const matchingRow = tableTasks.find(row => {
-        const rowEmpClean = clean(row.employee);
-        const rowDescClean = clean(row.description);
-        const empMatches = rowEmpClean.includes(targetEmpClean) || targetEmpClean.includes(rowEmpClean);
-        const descMatches = rowDescClean.includes(targetDescBaseClean) || 
-                            rowDescClean.includes(targetDescFinalClean) || 
-                            targetDescBaseClean.includes(rowDescClean) || 
-                            targetDescFinalClean.includes(rowDescClean);
-        return empMatches && descMatches;
-      });
-      
-      if (!matchingRow) {
-        errors.push(`Tarea #${idx + 1}: No encontrada en Taxes (Empleado: ${employeeLabel}, Descripci\u00f3n: ${t.descripcion.substring(0, 30)}...)`);
+      const expectedHours = parseFloat(String(t.horasEstimadas || '0').replace(',', '.')) || 0;
+
+      // If we have form tasks with employee info, match by employee+description
+      let matchingTask = null;
+      if (formTasks.length > 0 && formTasks[0].employee) {
+        matchingTask = formTasks.find(ft => {
+          const empOk = clean(ft.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(ft.employee));
+          const descOk = clean(ft.description).includes(clean(t.descripcion)) || clean(t.descripcion).includes(clean(ft.description)) ||
+                         clean(ft.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(ft.description));
+          return empOk && descOk;
+        });
       } else {
-        const expectedHours = parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0;
-        const actualHours = parseFloat(String(matchingRow.hours).replace(',', '.')) || 0;
-        
-        console.log(`[Verification] Task #${idx+1} hours check — expected: ${expectedHours}, found: '${matchingRow.hours}' (${actualHours}), all cells: ${JSON.stringify(matchingRow._allCells)}`);
-        
+        // Fallback: match by index
+        matchingTask = formTasks[idx];
+      }
+
+      if (!matchingTask) {
+        errors.push(`Tarea #${idx + 1} (${employeeLabel}): No encontrada en el formulario de Taxes`);
+        if (order.tasks[idx]) { order.tasks[idx].needsHoursUpdate = true; }
+      } else {
+        const actualHours = parseFloat(String(matchingTask.hours).replace(',', '.')) || 0;
+        console.log(`[Verify] Task #${idx+1}: expected=${expectedHours}, actual=${actualHours}, realizada=${matchingTask.realizada}`);
+
         if (Math.abs(expectedHours - actualHours) > 0.05) {
-          errors.push(`Tarea #${idx + 1}: Horas no coinciden (Esperado: ${expectedHours.toFixed(2)}, Encontrado: ${actualHours.toFixed(2)})`);
-          // Mark the task for hours update on next sync
-          if (order.tasks && order.tasks[idx]) {
-            order.tasks[idx].needsHoursUpdate = true;
-            db.updateWorkOrder(orderId, { tasks: order.tasks });
-            console.log(`[Verification] Marked task #${idx+1} as needsHoursUpdate=true for next sync`);
-          }
+          errors.push(`Tarea #${idx + 1}: Horas no coinciden (Esperado: ${expectedHours.toFixed(2)}, En Taxes: ${actualHours.toFixed(2)})`);
+          if (order.tasks[idx]) { order.tasks[idx].needsHoursUpdate = true; }
         }
-        if (t.status === 'Finalizada' && matchingRow.realizada !== 'SI') {
-          errors.push(`Tarea #${idx + 1}: No marcada como Realizada (SI) en Taxes`);
+        if (t.status === 'Finalizada' && matchingTask.realizada !== 'SI') {
+          errors.push(`Tarea #${idx + 1}: No marcada como Realizada en Taxes`);
         }
       }
     }
-    
-    // 5. Update verification fields
+
+    if (order.tasks.some(t => t.needsHoursUpdate)) {
+      db.updateWorkOrder(orderId, { tasks: order.tasks });
+    }
+
+    // 8. Click GUARDAR on the OT edit form (confirms the review)
+    const saved = await page.evaluate(() => {
+      const btn = Array.from(document.querySelectorAll('button')).find(b =>
+        b.textContent.toLowerCase().includes('guardar') || b.textContent.toLowerCase().includes('guardar')
+      );
+      if (btn) { btn.click(); return true; }
+      return false;
+    });
+    console.log(`[Verify] Guardar clicked: ${saved}`);
+    if (saved) await delay(3000);
+
+    // 9. Save verification result
     const count = (order.verifiedCount || 0) + 1;
     if (errors.length > 0) {
-      console.log(`[Verification] Failed! Errors found:`, errors);
-      db.updateWorkOrder(orderId, { verifiedStatus: "error", verifiedCount: count, verifiedError: errors.join(' | ') });
+      console.log(`[Verify] FAILED. Errors:`, errors);
+      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedCount: count, verifiedError: errors.join(' | ') });
     } else {
-      console.log(`[Verification] Success! All tasks matched and verified.`);
-      db.updateWorkOrder(orderId, { verifiedStatus: "success", verifiedCount: count, verifiedError: null });
+      console.log(`[Verify] SUCCESS. All tasks verified correctly.`);
+      db.updateWorkOrder(orderId, { verifiedStatus: 'success', verifiedCount: count, verifiedError: null });
     }
-    
+
   } catch (err) {
-    console.error(`[Verification] Error during verification execution:`, err);
+    console.error(`[Verify] Error:`, err);
     const count = (order.verifiedCount || 0) + 1;
     db.updateWorkOrder(orderId, {
-      verifiedStatus: "error",
+      verifiedStatus: 'error',
       verifiedCount: count,
-      verifiedError: `Error del agente verificador: ${err.message}`
+      verifiedError: `Error del verificador: ${err.message}`
     });
-    throw err; // Re-throw so retry logic in verifyGroupWithBrowser can catch it
+    throw err;
   }
 }
 
