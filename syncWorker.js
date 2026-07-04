@@ -1312,8 +1312,26 @@ async function syncWorkOrder(orderId) {
         await page.click(`#${buscarBtnId}`).catch(() => {});
         console.log(`[Reconcile] Clicked BUSCAR button natively`);
       }
-      await page.waitForSelector('table tbody tr', { timeout: 10000 }).catch(() => delay(2000));
-      await delay(3500); // Wait for OT list to filter and re-render after BUSCAR
+      console.log(`[Reconcile] Waiting up to 12s for OT row "${otNumClean}" to appear in table...`);
+      let foundOTRow = false;
+      for (let attempt = 1; attempt <= 12; attempt++) {
+        foundOTRow = await page.evaluate((otNum) => {
+          const rows = Array.from(document.querySelectorAll('table tbody tr'));
+          return rows.some(row => {
+            const cells = Array.from(row.querySelectorAll('td'));
+            return cells.some(c => {
+              const txt = c.textContent.replace(/#/g, '').replace(/\s+/g, ' ').trim();
+              return txt === otNum || txt.includes(otNum);
+            });
+          });
+        }, otNumClean);
+
+        if (foundOTRow) {
+          console.log(`[Reconcile] OT row found after ${attempt}s!`);
+          break;
+        }
+        await delay(1000);
+      }
 
       // 2. Find the matching row and click pencil (edit)
       const findAndClickPencil = async () => {
@@ -1335,12 +1353,6 @@ async function syncWorkOrder(orderId) {
               if (editBtn) { editBtn.click(); return true; }
             }
           }
-          // Log all cells for debugging
-          console.log('[debug] rows:', rows.length, 'looking for:', otNum);
-          rows.slice(0,3).forEach((r,i) => {
-            const cs = Array.from(r.querySelectorAll('td')).map(c=>c.textContent.trim());
-            console.log(`[debug] row${i}:`, cs.join(' | '));
-          });
           return false;
         }, otNumClean);
       };
@@ -2160,8 +2172,26 @@ async function verifyWorkOrderWithPage(page, orderId) {
       await page.click(`#${buscarBtnId}`).catch(() => {});
       console.log(`[Verify] Clicked BUSCAR button natively`);
     }
-    await page.waitForSelector('table tbody tr', { timeout: 10000 }).catch(() => delay(2000));
-    await delay(3500); // Wait for list to filter
+    console.log(`[Verify] Waiting up to 12s for OT row "${otNumClean}" to appear in table...`);
+    let foundOTRow = false;
+    for (let attempt = 1; attempt <= 12; attempt++) {
+      foundOTRow = await page.evaluate((otNum) => {
+        const rows = Array.from(document.querySelectorAll('table tbody tr'));
+        return rows.some(row => {
+          const cells = Array.from(row.querySelectorAll('td'));
+          return cells.some(c => {
+            const txt = c.textContent.replace(/#/g, '').replace(/\s+/g, ' ').trim();
+            return txt === otNum || txt.includes(otNum);
+          });
+        });
+      }, otNumClean);
+
+      if (foundOTRow) {
+        console.log(`[Verify] OT row found after ${attempt}s!`);
+        break;
+      }
+      await delay(1000);
+    }
 
     // 4. Click the pencil (edit) icon ✏️ on the matching row
     const editClicked = await page.evaluate((otNum) => {
