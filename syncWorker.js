@@ -1421,9 +1421,58 @@ async function syncWorkOrder(orderId) {
         await saveTaskForm();
       };
 
-      // ── MAIN RECONCILIATION LOOP ──
+      // ── STEP 0: DEDUPLICATION ── Delete duplicate tasks in Taxes (same employee appears >1 time for this OT)
+      console.log(`[Reconcile] Running deduplication check for OT ${order.taxesOrderNumber}...`);
       let taxesTasks = await readTaxesTasks();
       console.log(`[Reconcile] Taxes has ${taxesTasks.length} tasks for OT ${order.taxesOrderNumber}`);
+
+      if (taxesTasks.length > order.tasks.length) {
+        console.log(`[Reconcile] Detected ${taxesTasks.length} tasks in Taxes but app has ${order.tasks.length}. Deduplicating...`);
+        // Group by employee (normalized) — keep first occurrence, delete rest
+        const seen = new Set();
+        const toDelete = []; // indices in the table (0-based)
+        for (let ri = 0; ri < taxesTasks.length; ri++) {
+          const key = cleanStr(taxesTasks[ri].employee);
+          if (seen.has(key)) {
+            toDelete.push(ri);
+          } else {
+            seen.add(key);
+          }
+        }
+        if (toDelete.length > 0) {
+          console.log(`[Reconcile] Deleting ${toDelete.length} duplicate task rows at indices: ${toDelete.join(', ')}`);
+          // Delete in reverse order so indices stay valid
+          for (let di = toDelete.length - 1; di >= 0; di--) {
+            const rowIdx = toDelete[di];
+            const deleted = await page.evaluate((idx) => {
+              const rows = Array.from(document.querySelectorAll('table tbody tr'));
+              const row = rows[idx];
+              if (!row) return false;
+              const cells = Array.from(row.querySelectorAll('td'));
+              const lastCell = cells[cells.length - 1];
+              // Red delete button: look for button/link with red color class or trash icon
+              const delBtn = lastCell?.querySelector(
+                'a.btn-danger, button.btn-danger, a[class*="danger"], button[class*="danger"], .fa-trash, .fa-times'
+              )?.closest('a, button') ||
+              // Fallback: last button in the actions cell
+              Array.from(lastCell?.querySelectorAll('a, button') || []).reverse()[0];
+              if (delBtn) { delBtn.click(); return true; }
+              return false;
+            }, rowIdx);
+            console.log(`[Reconcile] Delete row ${rowIdx}: ${deleted}`);
+            if (deleted) {
+              await delay(2000); // Wait for confirmation dialog if any
+              // Confirm any alert/dialog
+              page.once('dialog', d => d.accept().catch(() => {}));
+              await delay(1500);
+            }
+          }
+          // Re-read after deduplication
+          taxesTasks = await readTaxesTasks();
+          console.log(`[Reconcile] After dedup: ${taxesTasks.length} tasks remain`);
+        }
+      }
+
 
       for (let i = 0; i < order.tasks.length; i++) {
         const task = order.tasks[i];
@@ -2040,7 +2089,9 @@ async function verifyWorkOrderWithPage(page, orderId) {
     return;
   }
   const settings = db.getSettings();
-  console.log(`[Verify] Starting OT-edit verification for OT #${order.interno} (Taxes: ${order.taxesOrderNumber})...`);
+  // Strip '#' prefix if stored as '#25530' instead of '25530'
+  const otNumClean = String(order.taxesOrderNumber).replace(/^#/, '');
+  console.log(`[Verify] Starting OT-edit verification for OT #${order.interno} (Taxes: ${otNumClean})...`);
 
   try {
     // 1. Go to Ordenes de Trabajo list
@@ -2075,8 +2126,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
         return true;
       }
       return false;
-    }, order.taxesOrderNumber);
-    console.log(`[Verify] Filled Numero field: ${numFilled}`);
+    }, otNumClean);
+    console.log(`[Verify] Filled Numero field with: ${otNumClean}, success: ${numFilled}`);
 
     // 3. Click BUSCAR
     await page.evaluate(() => {
@@ -2091,21 +2142,22 @@ async function verifyWorkOrderWithPage(page, orderId) {
       const rows = Array.from(document.querySelectorAll('table tbody tr'));
       for (const row of rows) {
         const cells = Array.from(row.querySelectorAll('td'));
-        // Check if any cell contains our OT number
-        const hasOT = cells.some(c => c.textContent.trim().includes(String(otNum)));
+        // Strip '#' and whitespace from each cell before comparing
+        const hasOT = cells.some(c => {
+          const txt = c.textContent.replace(/#/g, '').trim();
+          return txt === otNum;
+        });
         if (hasOT) {
-          // Find edit/pencil button — usually the 2nd action icon (pencil = ✏️ or fa-edit)
           const lastCell = cells[cells.length - 1];
-          // Try to find pencil specifically
-          const pencil = lastCell?.querySelector('a[href*="edit"], button[title*="edit"], a[title*="editar"], .fa-edit, .fa-pencil, [class*="edit"]')?.closest('a, button');
-          // Fallback: get all buttons/links and pick the 2nd one (eye=1st, pencil=2nd)
           const allBtns = Array.from(lastCell?.querySelectorAll('a, button') || []);
-          const editBtn = pencil || allBtns[1] || allBtns[0];
+          // Skip red/danger buttons (delete), pick pencil (2nd non-danger btn)
+          const editBtn = allBtns.find((b, i) => i === 1 && !b.className.includes('danger') && !b.className.includes('red'))
+                          || allBtns[1] || allBtns[0];
           if (editBtn) { editBtn.click(); return true; }
         }
       }
       return false;
-    }, order.taxesOrderNumber);
+    }, otNumClean);
     console.log(`[Verify] Edit button clicked: ${editClicked}`);
 
     if (!editClicked) {
@@ -2113,7 +2165,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
       db.updateWorkOrder(orderId, {
         verifiedStatus: 'error',
         verifiedCount: (order.verifiedCount || 0) + 1,
-        verifiedError: `No se encontró la OT ${order.taxesOrderNumber} en el listado de Taxes`
+        verifiedError: `No se encontró la OT ${otNumClean} en el listado de Taxes`
       });
       return;
     }
