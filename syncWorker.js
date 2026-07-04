@@ -1229,62 +1229,108 @@ async function syncWorkOrder(orderId) {
 
       const cleanStr = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-      // 1. Go to OT list, fill Numero field, BUSCAR
+      // 1. Go to OT list, find Numero field, type with keyboard (Vue needs real keystrokes)
       await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
       await page.waitForSelector('input', { timeout: 10000 }).catch(() => {});
-      await delay(1500);
+      await delay(2000);
 
-      // Fill Numero field (5th visible input or label-proximate)
-      await page.evaluate((otNum) => {
-        const inputs = Array.from(document.querySelectorAll('input')).filter(i =>
-          i.type !== 'hidden' && i.type !== 'checkbox' && i.type !== 'radio'
-        );
-        const numLabel = Array.from(document.querySelectorAll('label, span, div')).find(l =>
-          l.children.length === 0 && l.textContent.trim().toLowerCase() === 'numero'
-        );
+      // Find and click the Numero input — try by label text first, then by position
+      const numInputId = await page.evaluate(() => {
+        const normalizeText = s => (s || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        // Find label with text "numero" or "n°"
+        const allEls = Array.from(document.querySelectorAll('label, span, p, div, th'));
+        const numLabel = allEls.find(l => {
+          const t = normalizeText(l.textContent);
+          return (t === 'numero' || t === 'numero ot' || t === 'n° ot') && !l.querySelector('input, select, button');
+        });
         let inp = null;
         if (numLabel) {
-          const p = numLabel.closest('.form-group') || numLabel.closest('.col') || numLabel.closest('div');
-          if (p) inp = p.querySelector('input');
+          const container = numLabel.closest('.form-group, .col, .col-md-2, .col-sm-2, [class*="col"]') || numLabel.parentElement;
+          if (container) inp = container.querySelector('input[type="text"], input:not([type]), input[type="number"]');
         }
-        if (!inp) inp = inputs[4] || inputs[inputs.length - 1];
+        // Fallback: visible text inputs — Numero is typically after Cliente/Proveedor (3rd or 4th text input)
+        if (!inp) {
+          const textInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])')).filter(i => i.offsetParent !== null);
+          // Try each with a label check
+          for (const i of textInputs) {
+            const container = i.closest('.form-group, .col, [class*="col"]');
+            if (container && normalizeText(container.textContent).includes('numero')) { inp = i; break; }
+          }
+          if (!inp) inp = textInputs[3] || textInputs[4] || textInputs[textInputs.length - 1];
+        }
         if (inp) {
-          try { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(inp, otNum); }
-          catch(e) { inp.value = otNum; }
-          inp.dispatchEvent(new Event('input', { bubbles: true }));
-          inp.dispatchEvent(new Event('change', { bubbles: true }));
+          if (!inp.id) inp.id = 'rc-numero-input';
+          return inp.id;
         }
-      }, otNumClean);
+        return null;
+      });
+
+      if (numInputId) {
+        // Click → select all → type the number (real keyboard events, Vue-compatible)
+        await page.click(`#${numInputId}`, { clickCount: 3 }).catch(() => {});
+        await page.keyboard.press('Backspace');
+        await page.keyboard.type(otNumClean, { delay: 80 });
+        await delay(500);
+        console.log(`[Reconcile] Typed OT number "${otNumClean}" into Numero field`);
+      } else {
+        console.warn(`[Reconcile] Could not find Numero input field, trying keyboard Tab approach...`);
+      }
 
       // Click BUSCAR
       await page.evaluate(() => {
-        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase() === 'BUSCAR' || b.textContent.toLowerCase().includes('buscar'));
+        const btn = Array.from(document.querySelectorAll('button')).find(b =>
+          b.textContent.trim().toUpperCase() === 'BUSCAR' || b.textContent.toLowerCase().includes('buscar')
+        );
         if (btn) btn.click();
       });
       await page.waitForSelector('table tbody tr', { timeout: 10000 }).catch(() => delay(2000));
-      await delay(1000);
+      await delay(1500);
 
-      // 2. Click pencil (edit) on the matching row
-      const pencilClicked = await page.evaluate((otNum) => {
-        const rows = Array.from(document.querySelectorAll('table tbody tr'));
-        for (const row of rows) {
-          const cells = Array.from(row.querySelectorAll('td'));
-          const hasOT = cells.some(c => c.textContent.replace(/#/g, '').replace(/\s+/g, ' ').trim().includes(otNum));
-          if (hasOT) {
-            const lastCell = cells[cells.length - 1];
-            const allBtns = Array.from(lastCell?.querySelectorAll('a, button') || []);
-            // Pencil = non-danger button at index > 0
-            const editBtn = allBtns.find((b, i) => i > 0 && !b.className.includes('danger') && !b.className.includes('red'))
-                            || allBtns[1] || allBtns[0];
-            if (editBtn) { editBtn.click(); return true; }
+      // 2. Find the matching row and click pencil (edit)
+      const findAndClickPencil = async () => {
+        return await page.evaluate((otNum) => {
+          const rows = Array.from(document.querySelectorAll('table tbody tr'));
+          for (const row of rows) {
+            const cells = Array.from(row.querySelectorAll('td'));
+            // Check ALL cells: strip #, spaces, find our number
+            const hasOT = cells.some(c => {
+              const txt = c.textContent.replace(/#/g, '').replace(/\s+/g, ' ').trim();
+              return txt === otNum || txt.includes(otNum);
+            });
+            if (hasOT) {
+              const lastCell = cells[cells.length - 1];
+              const allBtns = Array.from(lastCell?.querySelectorAll('a, button') || []);
+              // eye=index 0, pencil=index 1 (non-red), delete=last (red)
+              const editBtn = allBtns.find((b, i) => i > 0 && !b.className.includes('danger') && !b.className.includes('red'))
+                              || allBtns[1] || allBtns[0];
+              if (editBtn) { editBtn.click(); return true; }
+            }
           }
-        }
-        return false;
-      }, otNumClean);
+          // Log all cells for debugging
+          console.log('[debug] rows:', rows.length, 'looking for:', otNum);
+          rows.slice(0,3).forEach((r,i) => {
+            const cs = Array.from(r.querySelectorAll('td')).map(c=>c.textContent.trim());
+            console.log(`[debug] row${i}:`, cs.join(' | '));
+          });
+          return false;
+        }, otNumClean);
+      };
+
+      let pencilClicked = await findAndClickPencil();
+
+      // If not found, maybe search didn't apply — try pressing Enter in the Numero field and retry
+      if (!pencilClicked && numInputId) {
+        console.warn(`[Reconcile] Row not found after BUSCAR. Pressing Enter in Numero field and retrying...`);
+        await page.click(`#${numInputId}`).catch(() => {});
+        await page.keyboard.press('Enter');
+        await delay(2000);
+        pencilClicked = await findAndClickPencil();
+      }
 
       if (!pencilClicked) {
-        throw new Error(`No se encontró la OT ${otNumClean} en el listado para editar.`);
+        throw new Error(`No se encontró la OT ${otNumClean} en el listado para editar. Verificar número de OT en Taxes.`);
       }
+
 
       // 3. Wait for OT edit form to load (task cards)
       await page.waitForSelector('input[name="horas_estimadas"], .card, .task-card', { timeout: 15000 }).catch(() => delay(4000));
