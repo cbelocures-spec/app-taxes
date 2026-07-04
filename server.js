@@ -1418,28 +1418,6 @@ async function triggerActiveTasksGoogleSheetSync() {
   }
 }
 
-// TEMP: export DB for verification
-app.get('/api/admin/export-db', (req, res) => {
-  try { res.json(db.read()); } catch (e) { res.status(500).json({ error: e.message }); }
-});
-// TEMP: import DB using db.write() to properly persist to volume
-app.post('/api/admin/import-db', (req, res) => {
-  try {
-    const incoming = req.body;
-    if (!incoming || !Array.isArray(incoming.workOrders)) return res.status(400).json({ error: 'Invalid data' });
-    const current = db.read();
-    if (incoming.workOrders.length > (current.workOrders || []).length) current.workOrders = incoming.workOrders;
-    if (incoming.users && Object.keys(incoming.users).length > Object.keys(current.users || {}).length) current.users = incoming.users;
-    if (incoming.settings?.preventivoScriptUrl) current.settings = { ...current.settings, ...incoming.settings };
-    if (incoming.catalogs) current.catalogs = incoming.catalogs;
-    if (incoming.activeMechanics) current.activeMechanics = incoming.activeMechanics;
-    if (incoming.odometerOverrides) current.odometerOverrides = incoming.odometerOverrides;
-    db.write(current);
-    const verify = db.read();
-    res.json({ success: true, orders: verify.workOrders?.length, users: Object.keys(verify.users || {}).length });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 // Fallback: serve frontend index.html for SPA routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
