@@ -1290,18 +1290,28 @@ async function syncWorkOrder(orderId) {
         await page.keyboard.press('Backspace');
         await page.keyboard.type(otNumClean, { delay: 80 });
         await delay(500);
-        console.log(`[Reconcile] Typed OT number "${otNumClean}" into Numero field`);
+        console.log(`[Reconcile] Typed OT number "${otNumClean}" into Numero field. Submitting with Enter...`);
+        await page.keyboard.press('Enter');
+        await delay(1000);
       } else {
         console.warn(`[Reconcile] Could not find Numero input field`);
       }
 
-      // Click BUSCAR
-      await page.evaluate(() => {
+      // Click BUSCAR natively
+      const buscarBtnId = await page.evaluate(() => {
         const btn = Array.from(document.querySelectorAll('button')).find(b =>
           b.textContent.trim().toUpperCase() === 'BUSCAR' || b.textContent.toLowerCase().includes('buscar')
         );
-        if (btn) btn.click();
+        if (btn) {
+          if (!btn.id) btn.id = 'rc-buscar-btn-v2';
+          return btn.id;
+        }
+        return null;
       });
+      if (buscarBtnId) {
+        await page.click(`#${buscarBtnId}`).catch(() => {});
+        console.log(`[Reconcile] Clicked BUSCAR button natively`);
+      }
       await page.waitForSelector('table tbody tr', { timeout: 10000 }).catch(() => delay(2000));
       await delay(3500); // Wait for OT list to filter and re-render after BUSCAR
 
@@ -2128,18 +2138,28 @@ async function verifyWorkOrderWithPage(page, orderId) {
       await page.keyboard.press('Backspace');
       await page.keyboard.type(otNumClean, { delay: 80 });
       await delay(500);
-      console.log(`[Verify] Typed OT number "${otNumClean}" into Numero field`);
+      console.log(`[Verify] Typed OT number "${otNumClean}" into Numero field. Submitting with Enter...`);
+      await page.keyboard.press('Enter');
+      await delay(1000);
     } else {
       console.warn(`[Verify] Could not find Numero input field`);
     }
 
-    // 3. Click BUSCAR
-    await page.evaluate(() => {
+    // 3. Click BUSCAR natively
+    const buscarBtnId = await page.evaluate(() => {
       const btn = Array.from(document.querySelectorAll('button')).find(b =>
         b.textContent.trim().toUpperCase() === 'BUSCAR' || b.textContent.toLowerCase().includes('buscar')
       );
-      if (btn) btn.click();
+      if (btn) {
+        if (!btn.id) btn.id = 'vf-buscar-btn-v2';
+        return btn.id;
+      }
+      return null;
     });
+    if (buscarBtnId) {
+      await page.click(`#${buscarBtnId}`).catch(() => {});
+      console.log(`[Verify] Clicked BUSCAR button natively`);
+    }
     await page.waitForSelector('table tbody tr', { timeout: 10000 }).catch(() => delay(2000));
     await delay(3500); // Wait for list to filter
 
