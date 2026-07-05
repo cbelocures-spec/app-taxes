@@ -1419,22 +1419,20 @@ async function syncWorkOrder(orderId) {
       const readFormCards = async () => {
         return await page.evaluate(() => {
           const clean = s => (s || '').trim();
-          // Each task card is a container with horas_estimadas input
-          const horasInputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
-          const empInputs = Array.from(document.querySelectorAll('input[name="empleado_id"], input[name="empleado"], .multiselect__input'));
-          const descTextareas = Array.from(document.querySelectorAll('textarea'));
+          // Each task card is a container with horas_estimadas or horas_X input
+          const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
+          const descTextareas = Array.from(document.querySelectorAll('textarea[id^="descripcion_"], textarea[placeholder*="Describe las actividades"]'));
           const switches = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
           // Red trash/delete buttons — one per card
           const trashBtns = Array.from(document.querySelectorAll('button.btn-danger, a.btn-danger, [class*="danger"]'))
             .filter(b => b.querySelector('.fa-trash, .fa-times, .fa-remove') || b.textContent.trim() === '' || b.title?.toLowerCase().includes('elim'));
 
-          // Get employee from display text (multiselect shows selected option text)
+          // Get employee from display text/value
           const getEmpText = (i) => {
-            // Try multiselect tags first
-            const multiselectContainers = Array.from(document.querySelectorAll('.multiselect'));
-            if (multiselectContainers[i]) {
-              const tag = multiselectContainers[i].querySelector('.multiselect__single, .multiselect__tag span, .multiselect__option--selected');
-              if (tag) return clean(tag.textContent);
+            const wrappers = Array.from(document.querySelectorAll('.searchable-select-wrapper, .multiselect'));
+            if (wrappers[i]) {
+              const tag = wrappers[i].querySelector('.multiselect__single, .multiselect__tag span, .multiselect__option--selected, .searchable-input');
+              if (tag) return clean(tag.value || tag.textContent || '');
             }
             return '';
           };
@@ -2294,35 +2292,25 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     // 6. Read all tasks from the OT edit form
     const formTasks = await page.evaluate(() => {
-      // Tasks in the OT edit form are usually rendered as cards or rows
-      // Try to read from the tasks table inside the form
       const clean = s => (s || '').trim();
-
-      // Try table rows
-      const taskRows = Array.from(document.querySelectorAll('.taxes-formulario-tareas table tbody tr, .card-tareas tr, table tbody tr'));
-      if (taskRows.length > 0) {
-        return taskRows.map(row => {
-          const cells = Array.from(row.querySelectorAll('td'));
-          if (cells.length < 2) return null;
-          return {
-            employee: clean(cells[1]?.textContent || cells[0]?.textContent || ''),
-            hours: clean(cells[2]?.textContent || ''),
-            description: clean(cells[3]?.textContent || cells[2]?.textContent || ''),
-            realizada: (cells[4]?.textContent || cells[cells.length-1]?.textContent || '').trim().toUpperCase(),
-            _allCells: cells.map(c => clean(c.textContent))
-          };
-        }).filter(Boolean);
-      }
-
-      // Fallback: read from individual task inputs (when tasks are in expandable cards)
-      const horasInputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
-      const descInputs = Array.from(document.querySelectorAll('textarea[name="descripcion"]'));
+      const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
+      const descInputs = Array.from(document.querySelectorAll('textarea[id^="descripcion_"], textarea[placeholder*="Describe las actividades"]'));
       const switches = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
+      
+      const getEmpText = (i) => {
+        const wrappers = Array.from(document.querySelectorAll('.searchable-select-wrapper, .multiselect'));
+        if (wrappers[i]) {
+          const tag = wrappers[i].querySelector('.multiselect__single, .multiselect__tag span, .multiselect__option--selected, .searchable-input');
+          if (tag) return clean(tag.value || tag.textContent || '');
+        }
+        return '';
+      };
 
       return horasInputs.map((inp, i) => ({
+        employee: getEmpText(i),
         hours: inp.value || '0',
         description: descInputs[i] ? descInputs[i].value : '',
-        realizada: switches[i] ? (switches[i].querySelector('input[type="checkbox"]')?.checked ? 'SI' : 'NO') : '',
+        realizada: switches[i] ? (switches[i].querySelector('input[type="checkbox"]')?.checked ? 'SI' : 'NO') : 'NO',
         _allCells: [`hours:${inp.value}`]
       }));
     });

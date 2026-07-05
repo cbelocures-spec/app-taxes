@@ -1,0 +1,643 @@
+{
+  "headers": [
+    "ORDENES DE TRABAJO",
+    "ORDENES DE TRABAJO",
+    "ORDENES DE TRABAJO",
+    "ORDENES DE TRABAJO",
+    "ORDENES DE TRABAJO",
+    "ORDENES DE TRABAJO",
+    "Soporte",
+    "Solo se toman tickets de soporte a través del sistema. Tiempo de respuesta hasta 48hs como máximo.",
+    "Reclamos",
+    "Por falta de atencion de soporte tecnico o administracion contactarse al:",
+    "Por falta de atencion de soporte tecnico o administracion contactarse al:",
+    "Belocures, Cesar Hernán paniol@contenedoreshugo.com.ar",
+    "Belocures, Cesar Hernán",
+    "paniol@contenedoreshugo.com.ar",
+    "CONTENEDORES HUGO SA 30-68967475-1",
+    "CONTENEDORES HUGO SA 30-68967475-1",
+    "CONTENEDORES HUGO SA 30-68967475-1",
+    "CONTENEDORES HUGO SA",
+    "30-68967475-1",
+    "CONTENEDORES HUGO SA 30-68967475-1",
+    "CONTENEDORES HUGO SA",
+    "30-68967475-1",
+    "Masters",
+    "Prov-Clientes",
+    "Sueldos",
+    "SIRADIG",
+    "Gestion Empresarial",
+    "Tienda Nube",
+    "Portal Proveedores Clientes",
+    "Usuarios",
+    "Comprobantes",
+    "Comunicaciones",
+    "Compras",
+    "Requerimientos",
+    "Remito de Gastos",
+    "Cotizaciones",
+    "Ordenes de Compra",
+    "Prov - Clientes",
+    "Revocacion",
+    "Pañol",
+    "Pañol",
+    "Requerimientos",
+    "Remitos",
+    "Stock",
+    "Reportes Stock",
+    "Taller",
+    "Firmar Horas",
+    "Ordenes de Trabajo",
+    "Firmar Remitos",
+    "Tareas OT"
+  ],
+  "inputs": [
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "es_empresa_externa",
+      "value": "0",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "userType",
+      "value": "3",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "user_id",
+      "value": "10335",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "loginUser",
+      "value": "paniol@contenedoreshugo.com.ar",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "is_user_empresa",
+      "value": "",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "person_user_current",
+      "value": "{\"id\":70390,\"user_id\":10300,\"field_name1\":\"BELOCURES CESAR HERNAN\",\"fantasy_name\":null,\"codigo\":\"70390\",\"field_name2\":null,\"document_type\":\"cuit\",\"document\":\"20-38467811-5\",\"cond_frente_al_iva_id\":null,\"cond_contratacion_id\":null,\"country_id\":null,\"state_id\":23,\"zone_id\":23,\"plan_cuenta_id\":null,\"iva_creditos_tipo_id\":null,\"created_at\":\"2024-04-15T18:41:57.000000Z\",\"updated_at\":\"2024-04-15T18:41:57.000000Z\",\"activity_id\":null,\"address\":\"DOMINGO PURITA 3246\",\"latitud\":null,\"longitud\":null,\"localidad_id\":null,\"person_type_id\":1,\"fa_iva_condition_id\":null,\"fa_codigo_postal\":null,\"comentario\":null,\"email\":null,\"iva_per_regimen_id\":null,\"iva_ret_regimen_id\":null,\"obligation_iibb\":null,\"deleted_at\":null}",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "user_permisos",
+      "value": "[{\"id\":16765,\"user_id\":10335,\"tusers_PermisosLevel1_id\":1,\"tusers_PermisosLevel2_id\":1,\"created_at\":\"2024-10-21T19:19:48.000000Z\",\"updated_at\":\"2024-10-21T19:19:48.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":1,\"descripcion\":\"Productos\",\"classIcon\":\"fa fa-product-hunt\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permiso_level_2\":{\"id\":1,\"tusers_PermisosLevel1_id\":1,\"descripcion\":\"Productos\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permisos\":[{\"id\":62425,\"tusers_permisos_id\":16765,\"permiso_type_id\":1,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":1,\"user_id\":null,\"descripcion\":\"Consultar\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62426,\"tusers_permisos_id\":16765,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62427,\"tusers_permisos_id\":16765,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62428,\"tusers_permisos_id\":16765,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":16766,\"user_id\":10335,\"tusers_PermisosLevel1_id\":1,\"tusers_PermisosLevel2_id\":2,\"created_at\":\"2024-10-21T19:19:48.000000Z\",\"updated_at\":\"2024-10-21T19:19:48.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":1,\"descripcion\":\"Productos\",\"classIcon\":\"fa fa-product-hunt\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permiso_level_2\":{\"id\":2,\"tusers_PermisosLevel1_id\":1,\"descripcion\":\"Rubros\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permisos\":[{\"id\":62429,\"tusers_permisos_id\":16766,\"permiso_type_id\":1,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":1,\"user_id\":null,\"descripcion\":\"Consultar\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62430,\"tusers_permisos_id\":16766,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62431,\"tusers_permisos_id\":16766,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62432,\"tusers_permisos_id\":16766,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":16767,\"user_id\":10335,\"tusers_PermisosLevel1_id\":1,\"tusers_PermisosLevel2_id\":3,\"created_at\":\"2024-10-21T19:19:48.000000Z\",\"updated_at\":\"2024-10-21T19:19:48.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":1,\"descripcion\":\"Productos\",\"classIcon\":\"fa fa-product-hunt\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permiso_level_2\":{\"id\":3,\"tusers_PermisosLevel1_id\":1,\"descripcion\":\"Sub Rubros\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permisos\":[{\"id\":62433,\"tusers_permisos_id\":16767,\"permiso_type_id\":1,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":1,\"user_id\":null,\"descripcion\":\"Consultar\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62434,\"tusers_permisos_id\":16767,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62435,\"tusers_permisos_id\":16767,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62436,\"tusers_permisos_id\":16767,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":16768,\"user_id\":10335,\"tusers_PermisosLevel1_id\":1,\"tusers_PermisosLevel2_id\":4,\"created_at\":\"2024-10-21T19:19:48.000000Z\",\"updated_at\":\"2024-10-21T19:19:48.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":1,\"descripcion\":\"Productos\",\"classIcon\":\"fa fa-product-hunt\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permiso_level_2\":{\"id\":4,\"tusers_PermisosLevel1_id\":1,\"descripcion\":\"Ubicaciones\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permisos\":[{\"id\":62437,\"tusers_permisos_id\":16768,\"permiso_type_id\":1,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":1,\"user_id\":null,\"descripcion\":\"Consultar\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62438,\"tusers_permisos_id\":16768,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62439,\"tusers_permisos_id\":16768,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62440,\"tusers_permisos_id\":16768,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":16769,\"user_id\":10335,\"tusers_PermisosLevel1_id\":1,\"tusers_PermisosLevel2_id\":5,\"created_at\":\"2024-10-21T19:19:48.000000Z\",\"updated_at\":\"2024-10-21T19:19:48.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":1,\"descripcion\":\"Productos\",\"classIcon\":\"fa fa-product-hunt\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permiso_level_2\":{\"id\":5,\"tusers_PermisosLevel1_id\":1,\"descripcion\":\"Depositos\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permisos\":[{\"id\":62441,\"tusers_permisos_id\":16769,\"permiso_type_id\":1,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":1,\"user_id\":null,\"descripcion\":\"Consultar\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62442,\"tusers_permisos_id\":16769,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62443,\"tusers_permisos_id\":16769,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62444,\"tusers_permisos_id\":16769,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":16770,\"user_id\":10335,\"tusers_PermisosLevel1_id\":1,\"tusers_PermisosLevel2_id\":6,\"created_at\":\"2024-10-21T19:19:48.000000Z\",\"updated_at\":\"2024-10-21T19:19:48.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":1,\"descripcion\":\"Productos\",\"classIcon\":\"fa fa-product-hunt\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permiso_level_2\":{\"id\":6,\"tusers_PermisosLevel1_id\":1,\"descripcion\":\"Lista de Precios\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permisos\":[{\"id\":62445,\"tusers_permisos_id\":16770,\"permiso_type_id\":1,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":1,\"user_id\":null,\"descripcion\":\"Consultar\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62446,\"tusers_permisos_id\":16770,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62447,\"tusers_permisos_id\":16770,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":62448,\"tusers_permisos_id\":16770,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":19877,\"user_id\":10335,\"tusers_PermisosLevel1_id\":2,\"tusers_PermisosLevel2_id\":8,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"permiso_level_1\":{\"id\":2,\"descripcion\":\"Ordenes de Trabajo\",\"classIcon\":\"fa fa-gavel\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":\"2025-04-23T21:24:30.000000Z\",\"updated_at\":\"2025-04-23T21:24:30.000000Z\",\"deleted_at\":null},\"permiso_level_2\":{\"id\":8,\"tusers_PermisosLevel1_id\":2,\"descripcion\":\"OTs\",\"habilitado\":1,\"created_at\":\"2025-04-23T21:24:30.000000Z\",\"updated_at\":\"2025-04-23T21:24:30.000000Z\",\"deleted_at\":null},\"permisos\":[{\"id\":70295,\"tusers_permisos_id\":19877,\"permiso_type_id\":1,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":1,\"user_id\":null,\"descripcion\":\"Consultar\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":70296,\"tusers_permisos_id\":19877,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":70297,\"tusers_permisos_id\":19877,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":70298,\"tusers_permisos_id\":19877,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":70299,\"tusers_permisos_id\":19877,\"permiso_type_id\":5,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":5,\"user_id\":null,\"descripcion\":\"Cerrar\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":70300,\"tusers_permisos_id\":19877,\"permiso_type_id\":6,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":6,\"user_id\":null,\"descripcion\":\"Abrir\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":70301,\"tusers_permisos_id\":19877,\"permiso_type_id\":7,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":7,\"user_id\":null,\"descripcion\":\"Imprimir Tarea\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":82576,\"tusers_permisos_id\":19877,\"permiso_type_id\":8,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":8,\"user_id\":null,\"descripcion\":\"Ver Importes\",\"habilitado\":1,\"created_at\":\"2025-04-24T01:46:09.000000Z\",\"updated_at\":\"2025-04-24T01:46:09.000000Z\",\"deleted_at\":null}}]},{\"id\":19878,\"user_id\":10335,\"tusers_PermisosLevel1_id\":2,\"tusers_PermisosLevel2_id\":9,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"permiso_level_1\":{\"id\":2,\"descripcion\":\"Ordenes de Trabajo\",\"classIcon\":\"fa fa-gavel\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":\"2025-04-23T21:24:30.000000Z\",\"updated_at\":\"2025-04-23T21:24:30.000000Z\",\"deleted_at\":null},\"permiso_level_2\":{\"id\":9,\"tusers_PermisosLevel1_id\":2,\"descripcion\":\"OTs Link-Facturas\",\"habilitado\":1,\"created_at\":\"2025-04-23T21:24:30.000000Z\",\"updated_at\":\"2025-04-23T21:24:30.000000Z\",\"deleted_at\":null},\"permisos\":[{\"id\":70302,\"tusers_permisos_id\":19878,\"permiso_type_id\":1,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":1,\"user_id\":null,\"descripcion\":\"Consultar\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":70303,\"tusers_permisos_id\":19878,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":70304,\"tusers_permisos_id\":19878,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":70305,\"tusers_permisos_id\":19878,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":70306,\"tusers_permisos_id\":19878,\"permiso_type_id\":5,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":5,\"user_id\":null,\"descripcion\":\"Cerrar\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":70307,\"tusers_permisos_id\":19878,\"permiso_type_id\":6,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":6,\"user_id\":null,\"descripcion\":\"Abrir\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":70308,\"tusers_permisos_id\":19878,\"permiso_type_id\":7,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":7,\"user_id\":null,\"descripcion\":\"Imprimir Tarea\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":22556,\"user_id\":10335,\"tusers_PermisosLevel1_id\":1,\"tusers_PermisosLevel2_id\":7,\"created_at\":\"2025-04-23T21:24:40.000000Z\",\"updated_at\":\"2025-04-23T21:24:40.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":1,\"descripcion\":\"Productos\",\"classIcon\":\"fa fa-product-hunt\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permiso_level_2\":{\"id\":7,\"tusers_PermisosLevel1_id\":1,\"descripcion\":\"Producto Ubicaciones\",\"habilitado\":1,\"created_at\":\"2025-04-23T21:24:30.000000Z\",\"updated_at\":\"2025-04-23T21:24:30.000000Z\",\"deleted_at\":null},\"permisos\":[{\"id\":81245,\"tusers_permisos_id\":22556,\"permiso_type_id\":1,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":1,\"user_id\":null,\"descripcion\":\"Consultar\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":81246,\"tusers_permisos_id\":22556,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":81247,\"tusers_permisos_id\":22556,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":81248,\"tusers_permisos_id\":22556,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":27065,\"user_id\":10335,\"tusers_PermisosLevel1_id\":1,\"tusers_PermisosLevel2_id\":10,\"created_at\":\"2025-08-04T12:03:15.000000Z\",\"updated_at\":\"2025-08-04T12:03:15.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":1,\"descripcion\":\"Productos\",\"classIcon\":\"fa fa-product-hunt\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},\"permiso_level_2\":{\"id\":10,\"tusers_PermisosLevel1_id\":1,\"descripcion\":\"Variantes\",\"habilitado\":1,\"created_at\":\"2025-08-04T12:02:54.000000Z\",\"updated_at\":\"2025-08-04T12:02:54.000000Z\",\"deleted_at\":null},\"permisos\":[{\"id\":100856,\"tusers_permisos_id\":27065,\"permiso_type_id\":1,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":1,\"user_id\":null,\"descripcion\":\"Consultar\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":100857,\"tusers_permisos_id\":27065,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":100858,\"tusers_permisos_id\":27065,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":100859,\"tusers_permisos_id\":27065,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":75990,\"user_id\":10335,\"tusers_PermisosLevel1_id\":6,\"tusers_PermisosLevel2_id\":27,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":6,\"descripcion\":\"Facturacion Presupuestos\",\"classIcon\":\"fa fa-file-invoice-dollar\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permiso_level_2\":{\"id\":27,\"tusers_PermisosLevel1_id\":6,\"descripcion\":\"ABM\",\"habilitado\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permisos\":[{\"id\":221244,\"tusers_permisos_id\":75990,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221245,\"tusers_permisos_id\":75990,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221246,\"tusers_permisos_id\":75990,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":75991,\"user_id\":10335,\"tusers_PermisosLevel1_id\":6,\"tusers_PermisosLevel2_id\":28,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":6,\"descripcion\":\"Facturacion Presupuestos\",\"classIcon\":\"fa fa-file-invoice-dollar\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permiso_level_2\":{\"id\":28,\"tusers_PermisosLevel1_id\":6,\"descripcion\":\"Firmar\",\"habilitado\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permisos\":[{\"id\":221247,\"tusers_permisos_id\":75991,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221248,\"tusers_permisos_id\":75991,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221249,\"tusers_permisos_id\":75991,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":75992,\"user_id\":10335,\"tusers_PermisosLevel1_id\":6,\"tusers_PermisosLevel2_id\":29,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":6,\"descripcion\":\"Facturacion Presupuestos\",\"classIcon\":\"fa fa-file-invoice-dollar\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permiso_level_2\":{\"id\":29,\"tusers_PermisosLevel1_id\":6,\"descripcion\":\"Facturar\",\"habilitado\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permisos\":[{\"id\":221250,\"tusers_permisos_id\":75992,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221251,\"tusers_permisos_id\":75992,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221252,\"tusers_permisos_id\":75992,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":75993,\"user_id\":10335,\"tusers_PermisosLevel1_id\":6,\"tusers_PermisosLevel2_id\":30,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":6,\"descripcion\":\"Facturacion Presupuestos\",\"classIcon\":\"fa fa-file-invoice-dollar\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permiso_level_2\":{\"id\":30,\"tusers_PermisosLevel1_id\":6,\"descripcion\":\"Pendientes del Cliente\",\"habilitado\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permisos\":[{\"id\":221253,\"tusers_permisos_id\":75993,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221254,\"tusers_permisos_id\":75993,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221255,\"tusers_permisos_id\":75993,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":75994,\"user_id\":10335,\"tusers_PermisosLevel1_id\":6,\"tusers_PermisosLevel2_id\":31,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":6,\"descripcion\":\"Facturacion Presupuestos\",\"classIcon\":\"fa fa-file-invoice-dollar\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permiso_level_2\":{\"id\":31,\"tusers_PermisosLevel1_id\":6,\"descripcion\":\"Revocar\",\"habilitado\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permisos\":[{\"id\":221256,\"tusers_permisos_id\":75994,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221257,\"tusers_permisos_id\":75994,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221258,\"tusers_permisos_id\":75994,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":75995,\"user_id\":10335,\"tusers_PermisosLevel1_id\":6,\"tusers_PermisosLevel2_id\":32,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":6,\"descripcion\":\"Facturacion Presupuestos\",\"classIcon\":\"fa fa-file-invoice-dollar\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permiso_level_2\":{\"id\":32,\"tusers_PermisosLevel1_id\":6,\"descripcion\":\"Reportes\",\"habilitado\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permisos\":[{\"id\":221259,\"tusers_permisos_id\":75995,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221260,\"tusers_permisos_id\":75995,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221261,\"tusers_permisos_id\":75995,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]},{\"id\":75996,\"user_id\":10335,\"tusers_PermisosLevel1_id\":6,\"tusers_PermisosLevel2_id\":33,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"permiso_level_1\":{\"id\":6,\"descripcion\":\"Facturacion Presupuestos\",\"classIcon\":\"fa fa-file-invoice-dollar\",\"habilitado\":1,\"auto_asignar\":1,\"created_at\":\"2026-05-14T02:27:08.000000Z\",\"updated_at\":\"2026-05-14T02:27:08.000000Z\",\"deleted_at\":null},\"permiso_level_2\":{\"id\":33,\"tusers_PermisosLevel1_id\":6,\"descripcion\":\"Presupuestos Descriptivos\",\"habilitado\":1,\"created_at\":\"2026-05-14T02:27:09.000000Z\",\"updated_at\":\"2026-05-14T02:27:09.000000Z\",\"deleted_at\":null},\"permisos\":[{\"id\":221262,\"tusers_permisos_id\":75996,\"permiso_type_id\":2,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":2,\"user_id\":null,\"descripcion\":\"Alta\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221263,\"tusers_permisos_id\":75996,\"permiso_type_id\":3,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":3,\"user_id\":null,\"descripcion\":\"Baja\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}},{\"id\":221264,\"tusers_permisos_id\":75996,\"permiso_type_id\":4,\"habilitado\":1,\"created_at\":\"2026-05-14T02:38:13.000000Z\",\"updated_at\":\"2026-05-14T02:38:13.000000Z\",\"deleted_at\":null,\"type\":{\"id\":4,\"user_id\":null,\"descripcion\":\"Modificacion\",\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null}}]}]",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "_token",
+      "id": "",
+      "value": "lgccHUe6MArvO4AWaTvXkKpW0hg7dWknqo3QCGA8",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "person_current_email",
+      "value": "admin@contenedoreshugo.com.ar",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "person_current_telefono",
+      "value": "",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "empleador_id",
+      "value": "40817",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "empleador_field_name1",
+      "value": "CONTENEDORES HUGO SA",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "empleador_document",
+      "value": "30-68967475-1",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "person_parent_dbtaxes_id",
+      "value": "2740",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "person_parent_dbtaxes_field_name1",
+      "value": "CONTENEDORES HUGO SA          ",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "person_parent_dbtaxes_document",
+      "value": "30-68967475-1",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "taxes_servicios",
+      "value": "[{\"id\":1,\"descripcion\":\"Liquidacion Impuesto\",\"importe\":\"0.00\",\"dias_de_prueba\":0,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},{\"id\":2,\"descripcion\":\"Portal Empleado\",\"importe\":\"0.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2026-05-29T18:44:16.000000Z\",\"deleted_at\":null},{\"id\":3,\"descripcion\":\"Convenios Actualizados\",\"importe\":\"0.00\",\"dias_de_prueba\":0,\"habilitado\":0,\"created_at\":null,\"updated_at\":\"2026-05-27T20:20:20.000000Z\",\"deleted_at\":null},{\"id\":4,\"descripcion\":\"Gestion de Stock\",\"importe\":\"35000.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2025-07-18T01:03:33.000000Z\",\"deleted_at\":null},{\"id\":5,\"descripcion\":\"Mercado Libre\",\"importe\":\"0.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2022-06-08T13:50:47.000000Z\",\"deleted_at\":null},{\"id\":6,\"descripcion\":\"Tickets\",\"importe\":\"0.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2022-06-08T13:50:47.000000Z\",\"deleted_at\":null},{\"id\":7,\"descripcion\":\"Landing\",\"importe\":\"0.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":\"2023-06-09T12:53:31.000000Z\",\"updated_at\":\"2023-06-09T12:53:31.000000Z\",\"deleted_at\":null},{\"id\":8,\"descripcion\":\"WhatsApp\",\"importe\":\"0.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},{\"id\":9,\"descripcion\":\"Agenda\",\"importe\":\"0.00\",\"dias_de_prueba\":30,\"habilitado\":0,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},{\"id\":10,\"descripcion\":\"Turnos\",\"importe\":\"0.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},{\"id\":11,\"descripcion\":\"Tesoreria\",\"importe\":\"35000.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2025-07-18T01:03:33.000000Z\",\"deleted_at\":null},{\"id\":12,\"descripcion\":\"Portal Proveedores Clientes\",\"importe\":\"0.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":\"2024-07-13T05:07:51.000000Z\",\"updated_at\":\"2024-07-13T05:07:51.000000Z\",\"deleted_at\":null},{\"id\":13,\"descripcion\":\"Factura Electronica\",\"importe\":\"0.00\",\"dias_de_prueba\":0,\"habilitado\":1,\"created_at\":\"2025-06-09T01:03:20.000000Z\",\"updated_at\":\"2025-06-09T01:03:20.000000Z\",\"deleted_at\":null},{\"id\":14,\"descripcion\":\"Ventanilla Electronica\",\"importe\":\"0.00\",\"dias_de_prueba\":0,\"habilitado\":0,\"created_at\":\"2025-06-09T01:03:21.000000Z\",\"updated_at\":\"2026-05-27T20:20:14.000000Z\",\"deleted_at\":null},{\"id\":15,\"descripcion\":\"Simulador Ganancias\",\"importe\":\"0.00\",\"dias_de_prueba\":0,\"habilitado\":0,\"created_at\":\"2026-01-12T20:56:51.000000Z\",\"updated_at\":\"2026-05-27T20:20:12.000000Z\",\"deleted_at\":null},{\"id\":16,\"descripcion\":\"Tienda Nube\",\"importe\":\"0.00\",\"dias_de_prueba\":0,\"habilitado\":1,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},{\"id\":17,\"descripcion\":\"RRHH\",\"importe\":\"0.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":\"2026-05-11T21:40:50.000000Z\",\"updated_at\":\"2026-05-11T21:40:50.000000Z\",\"deleted_at\":null},{\"id\":18,\"descripcion\":\"Inteligencia Artificial\",\"importe\":\"0.00\",\"dias_de_prueba\":30,\"habilitado\":0,\"created_at\":\"2026-05-18T12:25:31.000000Z\",\"updated_at\":\"2026-05-27T20:20:11.000000Z\",\"deleted_at\":null},{\"id\":19,\"descripcion\":\"Clubes-Torneos\",\"importe\":\"0.00\",\"dias_de_prueba\":0,\"habilitado\":1,\"created_at\":\"2026-05-27T20:18:49.000000Z\",\"updated_at\":\"2026-05-27T20:18:49.000000Z\",\"deleted_at\":null},{\"id\":20,\"descripcion\":\"Payment Flow\",\"importe\":\"0.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":\"2026-05-28T21:32:30.000000Z\",\"updated_at\":\"2026-05-28T21:32:30.000000Z\",\"deleted_at\":null}]",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "taxes_servicios_details",
+      "value": "[{\"id\":317,\"user_id\":6189,\"taxes_servicio_id\":4,\"person_id\":2740,\"person_id_relationed\":2740,\"comentario\":\"Factura del MES\",\"comentario_fecha\":\"2025-05-07 12:03:16\",\"habilitado\":1,\"importe\":\"911500.00\",\"total\":\"911500.00\",\"moneda_id\":1,\"cotizacion\":\"1.0000\",\"metodo_pago_id\":null,\"suscrip_plan_id\":8,\"show_deuda\":0,\"prox_contacto\":null,\"tarjeta_titular\":null,\"tarjeta_num\":null,\"tarjeta_taxes_id\":null,\"tarjeta_adhesion\":0,\"estado_id\":21,\"cuit_facturacion\":null,\"created_at\":\"2023-03-08T01:38:37.000000Z\",\"updated_at\":\"2025-05-07T15:03:16.000000Z\",\"deleted_at\":null,\"fecha_vto_del_servicio\":\"ACTIVO\",\"servicio\":{\"id\":4,\"descripcion\":\"Gestion de Stock\",\"importe\":\"35000.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2025-07-18T01:03:33.000000Z\",\"deleted_at\":null}},{\"id\":662,\"user_id\":6189,\"taxes_servicio_id\":11,\"person_id\":2740,\"person_id_relationed\":2740,\"comentario\":\"Factura del MES\",\"comentario_fecha\":\"2025-05-07 12:03:16\",\"habilitado\":1,\"importe\":\"911500.00\",\"total\":\"911500.00\",\"moneda_id\":1,\"cotizacion\":\"1.0000\",\"metodo_pago_id\":null,\"suscrip_plan_id\":8,\"show_deuda\":0,\"prox_contacto\":null,\"tarjeta_titular\":null,\"tarjeta_num\":null,\"tarjeta_taxes_id\":null,\"tarjeta_adhesion\":0,\"estado_id\":21,\"cuit_facturacion\":null,\"created_at\":\"2023-03-08T01:38:37.000000Z\",\"updated_at\":\"2025-05-07T15:03:16.000000Z\",\"deleted_at\":null,\"fecha_vto_del_servicio\":\"ACTIVO\",\"servicio\":{\"id\":11,\"descripcion\":\"Tesoreria\",\"importe\":\"35000.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2025-07-18T01:03:33.000000Z\",\"deleted_at\":null}},{\"id\":760,\"user_id\":1,\"taxes_servicio_id\":12,\"person_id\":2740,\"person_id_relationed\":2740,\"comentario\":\"Factura del MES\",\"comentario_fecha\":\"2025-05-07 12:03:16\",\"habilitado\":1,\"importe\":\"0.00\",\"total\":\"0.00\",\"moneda_id\":1,\"cotizacion\":\"1.0000\",\"metodo_pago_id\":null,\"suscrip_plan_id\":null,\"show_deuda\":0,\"prox_contacto\":null,\"tarjeta_titular\":null,\"tarjeta_num\":null,\"tarjeta_taxes_id\":null,\"tarjeta_adhesion\":0,\"estado_id\":4,\"cuit_facturacion\":null,\"created_at\":\"2024-07-17T12:56:20.000000Z\",\"updated_at\":\"2025-05-07T15:03:16.000000Z\",\"deleted_at\":null,\"fecha_vto_del_servicio\":\"VENCIDO\",\"servicio\":{\"id\":12,\"descripcion\":\"Portal Proveedores Clientes\",\"importe\":\"0.00\",\"dias_de_prueba\":30,\"habilitado\":1,\"created_at\":\"2024-07-13T05:07:51.000000Z\",\"updated_at\":\"2024-07-13T05:07:51.000000Z\",\"deleted_at\":null}},{\"id\":1843,\"user_id\":1,\"taxes_servicio_id\":13,\"person_id\":2740,\"person_id_relationed\":2740,\"comentario\":null,\"comentario_fecha\":null,\"habilitado\":1,\"importe\":\"0.00\",\"total\":\"0.00\",\"moneda_id\":1,\"cotizacion\":\"1.0000\",\"metodo_pago_id\":null,\"suscrip_plan_id\":null,\"show_deuda\":0,\"prox_contacto\":null,\"tarjeta_titular\":null,\"tarjeta_num\":null,\"tarjeta_taxes_id\":null,\"tarjeta_adhesion\":0,\"estado_id\":4,\"cuit_facturacion\":null,\"created_at\":\"2024-05-10T14:50:06.000000Z\",\"updated_at\":\"2024-05-10T14:50:48.000000Z\",\"deleted_at\":null,\"fecha_vto_del_servicio\":\"VENCIDO\",\"servicio\":{\"id\":13,\"descripcion\":\"Factura Electronica\",\"importe\":\"0.00\",\"dias_de_prueba\":0,\"habilitado\":1,\"created_at\":\"2025-06-09T01:03:20.000000Z\",\"updated_at\":\"2025-06-09T01:03:20.000000Z\",\"deleted_at\":null}}]",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "suscripciones",
+      "value": "[{\"id\":1,\"user_id\":0,\"descripcion\":\"PRUEBA\",\"importe\":\"0.00\",\"link_mercado_pago\":null,\"orden\":1,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2023-06-28T12:59:48.000000Z\",\"deleted_at\":null},{\"id\":2,\"user_id\":0,\"descripcion\":\"BASICO\",\"importe\":\"55000.00\",\"link_mercado_pago\":\"https:\\/\\/mpago.la\\/2QoHppJ\",\"orden\":3,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2025-07-18T01:03:33.000000Z\",\"deleted_at\":null},{\"id\":3,\"user_id\":0,\"descripcion\":\"MEDIO\",\"importe\":\"95000.00\",\"link_mercado_pago\":\"https:\\/\\/mpago.la\\/2udEgqV\",\"orden\":4,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2025-07-18T01:03:33.000000Z\",\"deleted_at\":null},{\"id\":4,\"user_id\":0,\"descripcion\":\"FULL\",\"importe\":\"125000.00\",\"link_mercado_pago\":\"https:\\/\\/mpago.la\\/2jcD1Bs\",\"orden\":5,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2025-07-18T01:03:33.000000Z\",\"deleted_at\":null},{\"id\":5,\"user_id\":0,\"descripcion\":\"FULL + BASICO\",\"importe\":\"175000.00\",\"link_mercado_pago\":\"https:\\/\\/mpago.la\\/2P72nR7\",\"orden\":6,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2025-07-18T01:03:33.000000Z\",\"deleted_at\":null},{\"id\":6,\"user_id\":0,\"descripcion\":\"GRATIS\",\"importe\":\"0.01\",\"link_mercado_pago\":null,\"orden\":null,\"habilitado\":0,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},{\"id\":7,\"user_id\":0,\"descripcion\":\"FULL + MEDIO\",\"importe\":\"210000.00\",\"link_mercado_pago\":\"https:\\/\\/mpago.la\\/2P72nR7\",\"orden\":7,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2025-07-18T01:03:33.000000Z\",\"deleted_at\":null},{\"id\":8,\"user_id\":1,\"descripcion\":\"PERSONALIZADO\",\"importe\":\"1.00\",\"link_mercado_pago\":null,\"orden\":null,\"habilitado\":0,\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},{\"id\":9,\"user_id\":0,\"descripcion\":\"INICIAL\",\"importe\":\"35000.00\",\"link_mercado_pago\":\"https:\\/\\/mpago.la\\/2sEuuC3\",\"orden\":2,\"habilitado\":1,\"created_at\":null,\"updated_at\":\"2025-07-18T01:03:33.000000Z\",\"deleted_at\":null}]",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "person_config",
+      "value": "{\"id\":6,\"user_id\":10300,\"person_id\":40817,\"period_id\":null,\"zone_id\":null,\"settle_calc_by_coef\":0,\"created_at\":\"2024-03-30T10:32:17.000000Z\",\"updated_at\":\"2026-06-30T13:30:49.000000Z\",\"active\":2,\"enviarMail\":1,\"honorario\":\"0.00\",\"cta_cte_tesoreria_cuenta_id\":null,\"month_close\":12,\"iva_condition_id\":2,\"obligation_sell\":0,\"obligation_buy\":0,\"obligation_iva\":0,\"obligation_electronic_receipt\":0,\"obligation_iibb\":4,\"obligation_other_taxes\":null,\"liquidation_start_period\":\"2015-07\",\"obligation_salaries\":1,\"empleada_domestica\":0,\"prorratear_iva\":0,\"is_itc\":0,\"priority_order\":2,\"person_id_administrador\":46879,\"person_id_titular\":40817,\"logo_path\":null,\"certificado_afip_path\":null,\"llave_afip_path\":null,\"access_electronic_receipt\":0,\"stock_baja_momento\":\"remito\",\"stock_alta_momento\":\"remito_ingreso\",\"ruta_logo_fa\":\"img\\/\\/30689674751\\/logo.png\",\"inicio_actividades\":\"1997-01-01T03:00:00.000000Z\",\"fecha_de_mono_to_ri\":\"-000001-11-30T03:53:48.000000Z\",\"iibb\":\"30-68967475-1\",\"fe_leyenda\":null,\"atencion_iva\":0,\"atencion_iva_comentario\":null,\"atencion_iibb\":0,\"atencion_iibb_comentario\":null,\"usar_multimoneda\":1,\"is_ag_per_ret\":1,\"deleted_at\":null,\"barcode_columns\":3,\"barcode_rows\":10,\"barcode_width_cm\":\"6.50\",\"barcode_height_cm\":\"2.50\",\"barcode_page_size\":\"A4\",\"cmv_plan_cuenta_id\":217,\"mercaderias_plan_cuenta_id\":392,\"cheques_rechazados_plan_cuenta_id\":13}",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "is_empresa_grande",
+      "value": "1",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "ppc_user_id",
+      "value": "",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "person_custom_form",
+      "value": "[{\"id\":1,\"user_id\":null,\"person_id\":40817,\"p_c_servicio_id\":1,\"configuracion\":\"{\\\"show_importe\\\": true, \\\"name_label_titulo\\\": \\\"Interno de la Unidad\\\", \\\"show_documentacion\\\": true, \\\"show_field_cliente\\\": false, \\\"show_field_pantente\\\": false, \\\"show_field_rodado_id\\\": true, \\\"person_id_relationed_default\\\": 40817}\",\"created_at\":null,\"updated_at\":null,\"deleted_at\":null},{\"id\":2,\"user_id\":null,\"person_id\":40817,\"p_c_servicio_id\":2,\"configuracion\":\"{\\\"show_switch_is_garantia\\\": true}\",\"created_at\":\"2025-07-09T18:36:44.000000Z\",\"updated_at\":\"2025-07-09T18:36:44.000000Z\",\"deleted_at\":null},{\"id\":3,\"user_id\":null,\"person_id\":40817,\"p_c_servicio_id\":3,\"configuracion\":\"{\\\"show_switch_is_garantia\\\": true}\",\"created_at\":\"2025-07-09T18:36:44.000000Z\",\"updated_at\":\"2025-07-09T18:36:44.000000Z\",\"deleted_at\":null}]",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "route-company-sons",
+      "value": "https://taxes.com.ar/basics/company/40817/sons",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "route-set-company",
+      "value": "https://taxes.com.ar/basics/company/&id/setCurrent",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "current-person-id",
+      "value": "40817",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "",
+      "id": "app_url",
+      "value": "https://taxes.com.ar",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "select",
+      "type": "select-one",
+      "name": "",
+      "id": "",
+      "value": "",
+      "placeholder": "",
+      "class": "form-control form-control-sm mr-2"
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "id": "",
+      "value": "",
+      "placeholder": "Seleccionar fecha",
+      "class": "form-control input-compact"
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "id": "",
+      "value": "",
+      "placeholder": "Seleccionar fecha",
+      "class": "form-control input-compact"
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "id": "limite",
+      "value": "50",
+      "placeholder": "",
+      "class": "input-compact input-limit"
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "numero",
+      "id": "__BVID__316",
+      "value": "25530",
+      "placeholder": "",
+      "class": "taxes-form-input form-control"
+    },
+    {
+      "tag": "input",
+      "type": "date",
+      "name": "",
+      "id": "__BVID__319",
+      "value": "2026-07-01",
+      "placeholder": "",
+      "class": "form-control form-control taxes-datepicker text-center"
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "fecha",
+      "id": "fecha",
+      "value": "",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "id": "",
+      "value": "12 - 14. Interno IRINEO GRAL. ",
+      "placeholder": "Seleccionar",
+      "class": "form-control searchable-input has-value"
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "rodado_id",
+      "id": "",
+      "value": "163",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "id": "",
+      "value": "Brahim, Hugo Adrian",
+      "placeholder": "Seleccionar",
+      "class": "form-control searchable-input has-value"
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "syj_empleado_id",
+      "id": "",
+      "value": "507",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "date",
+      "name": "",
+      "id": "__BVID__324",
+      "value": "2026-07-01",
+      "placeholder": "",
+      "class": "form-control form-control taxes-datepicker text-center"
+    },
+    {
+      "tag": "input",
+      "type": "hidden",
+      "name": "fecha",
+      "id": "fecha",
+      "value": "",
+      "placeholder": "",
+      "class": ""
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "titulo",
+      "id": "__BVID__330",
+      "value": "IRINEO GRAL.",
+      "placeholder": "",
+      "class": "taxes-form-input form-control"
+    },
+    {
+      "tag": "select",
+      "type": "select-one",
+      "name": "inv_ot_clasificacion_id",
+      "id": "__BVID__332",
+      "value": "3",
+      "placeholder": "",
+      "class": "taxes-form-select custom-select"
+    },
+    {
+      "tag": "input",
+      "type": "file",
+      "name": "",
+      "id": "fileinputmultiple",
+      "value": "",
+      "placeholder": "",
+      "class": "custom-file-input is-valid"
+    },
+    {
+      "tag": "textarea",
+      "type": "textarea",
+      "name": "descripcion",
+      "id": "__BVID__336",
+      "value": "",
+      "placeholder": "Describa el incidente o requisito...",
+      "class": "taxes-form-textarea form-control form-control-lg"
+    },
+    {
+      "tag": "select",
+      "type": "select-one",
+      "name": "",
+      "id": "__BVID__525",
+      "value": "12",
+      "placeholder": "",
+      "class": "custom-select custom-select-sm"
+    },
+    {
+      "tag": "input",
+      "type": "checkbox",
+      "name": "",
+      "id": "__BVID__526",
+      "value": "true",
+      "placeholder": "",
+      "class": "custom-control-input"
+    },
+    {
+      "tag": "select",
+      "type": "select-one",
+      "name": "",
+      "id": "__BVID__723",
+      "value": "12",
+      "placeholder": "",
+      "class": "custom-select custom-select-sm"
+    },
+    {
+      "tag": "input",
+      "type": "checkbox",
+      "name": "",
+      "id": "__BVID__724",
+      "value": "true",
+      "placeholder": "",
+      "class": "custom-control-input"
+    },
+    {
+      "tag": "select",
+      "type": "select-one",
+      "name": "",
+      "id": "__BVID__932",
+      "value": "12",
+      "placeholder": "",
+      "class": "custom-select custom-select-sm"
+    },
+    {
+      "tag": "input",
+      "type": "checkbox",
+      "name": "",
+      "id": "__BVID__933",
+      "value": "true",
+      "placeholder": "",
+      "class": "custom-control-input"
+    },
+    {
+      "tag": "select",
+      "type": "select-one",
+      "name": "",
+      "id": "__BVID__1130",
+      "value": "12",
+      "placeholder": "",
+      "class": "custom-select custom-select-sm"
+    },
+    {
+      "tag": "input",
+      "type": "checkbox",
+      "name": "",
+      "id": "__BVID__1131",
+      "value": "true",
+      "placeholder": "",
+      "class": "custom-control-input"
+    },
+    {
+      "tag": "select",
+      "type": "select-one",
+      "name": "",
+      "id": "__BVID__1331",
+      "value": "12",
+      "placeholder": "",
+      "class": "custom-select custom-select-sm"
+    },
+    {
+      "tag": "input",
+      "type": "checkbox",
+      "name": "",
+      "id": "__BVID__1332",
+      "value": "true",
+      "placeholder": "",
+      "class": "custom-control-input"
+    },
+    {
+      "tag": "select",
+      "type": "select-one",
+      "name": "",
+      "id": "__BVID__1529",
+      "value": "12",
+      "placeholder": "",
+      "class": "custom-select custom-select-sm"
+    },
+    {
+      "tag": "input",
+      "type": "checkbox",
+      "name": "",
+      "id": "__BVID__1530",
+      "value": "true",
+      "placeholder": "",
+      "class": "custom-control-input"
+    },
+    {
+      "tag": "select",
+      "type": "select-one",
+      "name": "",
+      "id": "__BVID__198",
+      "value": "",
+      "placeholder": "",
+      "class": "input-compact custom-select"
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "id": "",
+      "value": "",
+      "placeholder": "Seleccionar fecha",
+      "class": "form-control input-compact"
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "id": "",
+      "value": "",
+      "placeholder": "Seleccionar fecha",
+      "class": "form-control input-compact"
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "id": "",
+      "value": "",
+      "placeholder": "Seleccionar fecha",
+      "class": "form-control input-compact"
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "id": "",
+      "value": "",
+      "placeholder": "Seleccionar fecha",
+      "class": "form-control input-compact"
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "id": "__BVID__219",
+      "value": "",
+      "placeholder": "",
+      "class": "input-compact form-control"
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "id": "",
+      "value": "",
+      "placeholder": "",
+      "class": "input-compact"
+    },
+    {
+      "tag": "select",
+      "type": "select-one",
+      "name": "",
+      "id": "__BVID__221",
+      "value": "0",
+      "placeholder": "",
+      "class": "input-compact custom-select"
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "",
+      "id": "limite",
+      "value": "10",
+      "placeholder": "",
+      "class": "input-compact input-limit"
+    }
+  ],
+  "tareasElements": [],
+  "materialElements": []
+}
