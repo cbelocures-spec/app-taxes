@@ -1455,6 +1455,28 @@ async function syncWorkOrder(orderId) {
       console.log(`[Reconcile] OT edit form has ${formCards.length} task cards. App has ${order.tasks.length} tasks.`);
       console.log(`[Reconcile] Form cards:`, JSON.stringify(formCards));
 
+      // Add missing task cards if app has more tasks than form
+      const diff = order.tasks.length - formCards.length;
+      if (diff > 0) {
+        console.log(`[Reconcile] Form has ${formCards.length} cards, but app has ${order.tasks.length}. Clicking AGREGAR TAREA ${diff} times...`);
+        for (let i = 0; i < diff; i++) {
+          const added = await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button, a, [role="button"], .btn'));
+            const addBtn = btns.find(b => b.textContent.toLowerCase().includes('agregar tarea'));
+            if (addBtn) {
+              addBtn.click();
+              return true;
+            }
+            return false;
+          });
+          console.log(`[Reconcile] Added task card ${i + 1}: ${added}`);
+          await delay(2500); // Wait for the new card to render
+        }
+        // Re-read form cards after adding
+        formCards = await readFormCards();
+        console.log(`[Reconcile] After adding missing tasks: ${formCards.length} cards now in form`);
+      }
+
       // 5. DELETE duplicate/extra cards (reverse order to keep indices valid)
       //    Strategy: for each app task, find ONE matching form card. Mark rest for deletion.
       const usedCardIndices = new Set();
@@ -1516,6 +1538,37 @@ async function syncWorkOrder(orderId) {
         if (appIdx === undefined || appIdx === null || appIdx < 0) continue;
         const appTask = order.tasks[appIdx];
         if (!appTask) continue;
+
+        // Fill Employee if empty
+        const { employeeLabel } = resolveAndMapEmployee(appTask);
+        if (formCards[ci].employee === '') {
+          console.log(`[Reconcile] Card #${ci} has no employee. Selecting: "${employeeLabel}"...`);
+          const empFilled = await fillTaskEmployeeSearchableSelect(page, ci, employeeLabel);
+          console.log(`[Reconcile] Card #${ci} employee select result: ${empFilled}`);
+          await delay(2000);
+        }
+
+        // Fill Description if empty
+        if (formCards[ci].description === '') {
+          console.log(`[Reconcile] Card #${ci} has no description. Writing: "${appTask.descripcion}"...`);
+          const descId = await page.evaluate((idx, val) => {
+            const textareas = Array.from(document.querySelectorAll('textarea'));
+            const el = textareas[idx];
+            if (!el) return null;
+            el.focus();
+            try { Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(el, val); }
+            catch(e) { el.value = val; }
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            if (!el.id) el.id = `rc-desc-${idx}`;
+            return el.id;
+          }, ci, appTask.descripcion || '');
+          if (descId) {
+            await page.click(`#${descId}`, { clickCount: 3 }).catch(() => {});
+            await page.keyboard.type(appTask.descripcion || '');
+            await delay(2000);
+          }
+        }
 
         const expectedHours = (parseFloat(String(appTask.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
         const actualHours = parseFloat(formCards[ci].hours.replace(',', '.')) || 0;
