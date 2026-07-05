@@ -2194,8 +2194,13 @@ async function syncWorkOrder(orderId) {
   }
 }
 
-// 2b. AGENT VERIFICATION SYSTEM FOR OT TASKS
 async function verifyWorkOrderWithPage(page, orderId) {
+  // Register auto-accepting dialog handler to prevent browser hangs on confirm/alert popups
+  page.on('dialog', async d => {
+    console.log(`[BrowserDialog] Auto-accepting dialog: [${d.type()}] "${d.message()}"`);
+    await d.accept().catch(() => {});
+  });
+
   const order = db.getWorkOrderById(orderId);
   if (!order || !order.taxesOrderNumber) {
     console.log(`[Verify] Cannot verify: order not found or missing Taxes OT number.`);
@@ -2203,37 +2208,68 @@ async function verifyWorkOrderWithPage(page, orderId) {
   }
   const settings = db.getSettings();
   const otNumClean = String(order.taxesOrderNumber).replace(/^#/, '').trim();
-  console.log(`[Verify] Starting tasks-list verification for OT #${order.interno} (Taxes: ${otNumClean})...`);
+  console.log(`[Verify] Starting direct tasks-list verification for OT #${order.interno} (Taxes: ${otNumClean})...`);
 
   try {
-    // 1. Navigate to tasks list
-    await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
     const searchInpSelector = 'input[placeholder*="Buscar por Numero"], input[placeholder*="OT"], input[placeholder*="Título"]';
-    await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async () => {
-      console.warn(`[Verify] Search input selector timeout. Page loaded blank? Reloading and retrying...`);
-      await page.reload({ waitUntil: 'load', timeout: 30000 });
-      await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async (err) => {
-        // Save debug info so we can see what page/state the browser actually ended up on.
-        try {
-          const path = require('path');
-          await page.screenshot({ path: path.join(__dirname, 'public', 'last_verify_error.png'), fullPage: true });
-          console.warn(`[Verify] Debug screenshot saved to public/last_verify_error.png. Current URL: ${page.url()}, Title: ${await page.title()}`);
-        } catch (se) { console.warn('[Verify] Debug screenshot failed:', se.message); }
-        throw err;
-      });
-    });
-    await delay(1500);
 
-    // 2. Search for OT number
-    console.log(`[Verify] Searching for OT ${otNumClean} in tasks page...`);
-    await page.click(searchInpSelector, { clickCount: 3 });
-    await page.keyboard.press('Backspace');
-    await page.keyboard.type(otNumClean, { delay: 80 });
-    await delay(500);
-    await page.keyboard.press('Tab');
-    await delay(200);
-    await page.keyboard.press('Enter');
-    await delay(4500); // Wait for results to load
+    // Helper to clear employee tag filter
+    const clearEmployeeFilter = async () => {
+      await page.evaluate(() => {
+        const labels = Array.from(document.querySelectorAll('label, span, div'));
+        const empLabelEl = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
+        if (empLabelEl) {
+          const container = empLabelEl.closest('.form-group, .col, [class*="col"]') || empLabelEl.parentElement;
+          if (container) {
+            const removeBtn = container.querySelector('.multiselect__tag-icon, .multiselect__remove, [class*="remove"], [class*="clear"]');
+            if (removeBtn) removeBtn.click();
+          }
+        }
+      });
+      await delay(500);
+    };
+
+    // Helper to select employee in filter
+    const selectEmployeeInFilter = async (empLabel) => {
+      console.log(`[Verify] Selecting employee "${empLabel}" in filter...`);
+      const opened = await page.evaluate(() => {
+        const labels = Array.from(document.querySelectorAll('label, span, div'));
+        const empLabelEl = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
+        if (!empLabelEl) return false;
+
+        const container = empLabelEl.closest('.form-group, .col, [class*="col"]') || empLabelEl.parentElement;
+        if (!container) return false;
+
+        const multiselect = container.querySelector('.multiselect, .multiselect__select, .multiselect__tags, input');
+        if (multiselect) {
+          multiselect.click();
+          const inp = container.querySelector('input');
+          if (inp) {
+            inp.id = 'temp-emp-filter-input';
+            return true;
+          }
+        }
+        return false;
+      });
+
+      if (opened) {
+        await delay(1000);
+        await page.click('#temp-emp-filter-input', { clickCount: 3 }).catch(() => {});
+        await page.keyboard.press('Backspace');
+        await page.keyboard.type(empLabel, { delay: 80 });
+        await delay(2000);
+        // Try clicking dropdown suggestions first
+        await page.evaluate(() => {
+          const opts = Array.from(document.querySelectorAll('.multiselect__option, .dropdown-item, ul[role="listbox"] li, .multiselect__element'));
+          if (opts.length > 0) opts[0].click();
+        }).catch(() => {});
+        // Press Enter as fallback
+        await page.keyboard.press('Enter');
+        await delay(1000);
+        return true;
+      }
+      return false;
+    };
 
     // Helper to read table tasks
     const readTableTasks = async () => {
@@ -2259,67 +2295,6 @@ async function verifyWorkOrderWithPage(page, orderId) {
       });
     };
 
-    let tableTasks = await readTableTasks();
-    console.log(`[Verify] Found ${tableTasks.length} tasks in Taxes table:`, JSON.stringify(tableTasks));
-
-    // Helper: use the page's own "Empleado" filter (in addition to the OT number
-    // already typed) to narrow results down to the exact task server-side —
-    // far more reliable than comparing description text on our end.
-    const filterByEmployee = async (employeeName) => {
-      try {
-        const empFieldId = await page.evaluate(() => {
-          const labels = Array.from(document.querySelectorAll('label'));
-          const empLabel = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
-          let container = empLabel ? (empLabel.closest('.form-group') || empLabel.parentElement) : null;
-          if (!container) return null;
-          const input = container.querySelector('input[type="text"], input.searchable-input, input:not([type])');
-          if (!input) return null;
-          const id = 'tmp-emp-filter-' + Date.now();
-          input.id = id;
-          return id;
-        });
-        if (!empFieldId) {
-          console.warn('[Verify] Could not locate the "Empleado" filter field on the tasks page.');
-          return false;
-        }
-        await page.click(`#${empFieldId}`, { clickCount: 3 }).catch(() => {});
-        await page.keyboard.press('Backspace').catch(() => {});
-        await page.keyboard.type(employeeName, { delay: 60 });
-        await delay(1200);
-        // If a dropdown suggestion appears, pick the first option
-        await page.evaluate(() => {
-          const opts = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"] li, .multiselect__option, .dropdown-item, ul[role="listbox"] li'));
-          if (opts.length > 0) opts[0].click();
-        }).catch(() => {});
-        await delay(500);
-        const clicked = await page.evaluate(() => {
-          const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase().includes('BUSCAR'));
-          if (btn) { btn.click(); return true; }
-          return false;
-        });
-        if (clicked) await delay(3500);
-        return clicked;
-      } catch (e) {
-        console.warn('[Verify] Employee-narrowed search failed:', e.message);
-        return false;
-      }
-    };
-
-    const clearEmployeeFilterAndResearch = async () => {
-      await page.evaluate(() => {
-        const labels = Array.from(document.querySelectorAll('label'));
-        const empLabel = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
-        const container = empLabel ? (empLabel.closest('.form-group') || empLabel.parentElement) : null;
-        const input = container ? container.querySelector('input') : null;
-        if (input) { input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); }
-      }).catch(() => {});
-      await page.evaluate(() => {
-        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase().includes('BUSCAR'));
-        if (btn) btn.click();
-      }).catch(() => {});
-      await delay(3000);
-    };
-
     const errors = [];
     let madeChanges = false;
     const clean = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -2331,65 +2306,70 @@ async function verifyWorkOrderWithPage(page, orderId) {
       const expectedHoursStr = expectedHours.toFixed(2);
       const expectedHoursComma = expectedHoursStr.replace('.', ',');
 
-      // Find matching row
+      console.log(`[Verify] Filtering tasks page by OT "${otNumClean}" and Employee "${employeeLabel}"...`);
+
+      // 1. Go to tasks list and wait for load
+      await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+      await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async () => {
+        console.warn(`[Verify] Selector timeout on tasks page. Reloading and retrying...`);
+        await page.reload({ waitUntil: 'load', timeout: 30000 });
+        await page.waitForSelector(searchInpSelector, { timeout: 15000 });
+      });
+      await delay(1500);
+
+      // 2. Type OT number
+      await page.click(searchInpSelector, { clickCount: 3 });
+      await page.keyboard.press('Backspace');
+      await page.keyboard.type(otNumClean, { delay: 80 });
+      await delay(500);
+
+      // 3. Clear employee tag and select current task's employee
+      await clearEmployeeFilter();
+      await selectEmployeeInFilter(employeeLabel);
+
+      // 4. Click BUSCAR button
+      console.log(`[Verify] Clicking BUSCAR...`);
+      await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll('button, a'));
+        const buscarBtn = btns.find(b => b.textContent.trim().toUpperCase() === 'BUSCAR');
+        if (buscarBtn) buscarBtn.click();
+      });
+      await delay(4500); // Wait for filtered results
+
+      // 5. Read table rows
+      let tableTasks = await readTableTasks();
+      console.log(`[Verify] Filtered tasks count: ${tableTasks.length}`, JSON.stringify(tableTasks));
+
       let matchedRow = null;
       if (tableTasks.length > 0) {
-        for (const row of tableTasks) {
-          const empOk = clean(row.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(row.employee));
-          const descOk = clean(row.description).includes(clean(t.descripcion)) || clean(t.descripcion).includes(clean(row.description)) ||
-                         clean(row.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(row.description));
-          if (empOk && descOk) {
-            matchedRow = row;
-            break;
-          }
-        }
-        // Fallback: if description was garbled/truncated on Taxes (typing issue on creation),
-        // match by employee alone when unambiguous (only one task and one candidate row).
-        if (!matchedRow && order.tasks.length === 1) {
-          const empCandidates = tableTasks.filter(row =>
-            clean(row.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(row.employee))
-          );
-          if (empCandidates.length === 1) {
-            console.log(`[Verify] Task #${idx+1}: description didn't match but employee matched uniquely. Using loose match.`);
-            matchedRow = empCandidates[0];
-          }
-        }
-      }
-
-      let usedNarrowedSearch = false;
-      if (!matchedRow) {
-        console.log(`[Verify] Task #${idx+1}: no match by description. Narrowing search on Taxes by employee "${employeeLabel}"...`);
-        const narrowed = await filterByEmployee(employeeLabel);
-        if (narrowed) {
-          usedNarrowedSearch = true;
-          const narrowedTasks = await readTableTasks();
-          if (narrowedTasks.length >= 1) {
-            matchedRow = narrowedTasks.find(row =>
-              clean(row.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(row.employee))
-            ) || (narrowedTasks.length === 1 ? narrowedTasks[0] : null);
-            if (matchedRow) {
-              console.log(`[Verify] Task #${idx+1}: found via employee-narrowed search.`);
-              tableTasks = narrowedTasks; // keep this view active — matchedRow.rowIndex refers to it
+        if (tableTasks.length === 1) {
+          matchedRow = tableTasks[0];
+        } else {
+          // If multiple tasks for same employee, match by description
+          for (const row of tableTasks) {
+            const descOk = clean(row.description).includes(clean(t.descripcion)) || clean(t.descripcion).includes(clean(row.description)) ||
+                           clean(row.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(row.description));
+            if (descOk) {
+              matchedRow = row;
+              break;
             }
           }
         }
       }
 
       if (!matchedRow) {
-        if (usedNarrowedSearch) await clearEmployeeFilterAndResearch().then(() => readTableTasks()).then(t => { tableTasks = t; });
-        console.warn(`[Verify] Task #${idx+1} (${employeeLabel}) NOT found in tasks list table.`);
+        console.warn(`[Verify] Task #${idx+1} (${employeeLabel}) NOT found in filtered search results.`);
         errors.push(`Tarea #${idx + 1} (${employeeLabel}): No encontrada en el listado de tareas`);
       } else {
         const actualHours = parseFloat(String(matchedRow.hours).replace(',', '.')) || 0;
         const hoursOk = Math.abs(expectedHours - actualHours) <= 0.05;
         const expectedRealizada = t.status === 'Finalizada' ? 'SI' : 'NO';
         const realizadaOk = matchedRow.realizada.toUpperCase() === expectedRealizada;
-        const descOkFinal = clean(matchedRow.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(matchedRow.description));
 
-        console.log(`[Verify] Task #${idx+1}: hours expected=${expectedHoursStr} actual=${actualHours} OK=${hoursOk} | realizada expected=${expectedRealizada} actual=${matchedRow.realizada} OK=${realizadaOk} | description OK=${descOkFinal}`);
+        console.log(`[Verify] Task #${idx+1}: hours expected=${expectedHoursStr} actual=${actualHours} OK=${hoursOk} | realizada expected=${expectedRealizada} actual=${matchedRow.realizada} OK=${realizadaOk}`);
 
-        if (!hoursOk || !realizadaOk || !descOkFinal) {
-          console.log(`[Verify] Mismatch found for Task #${idx+1}. Clicking eye edit button...`);
+        if (!hoursOk || !realizadaOk) {
+          console.log(`[Verify] Mismatch found for Task #${idx+1}. Opening single task edit form...`);
           const eyeBtnId = await page.evaluate((rowIdx) => {
             const rows = Array.from(document.querySelectorAll('table tbody tr'));
             const row = rows[rowIdx];
@@ -2399,34 +2379,12 @@ async function verifyWorkOrderWithPage(page, orderId) {
             btn.id = id;
             return id;
           }, matchedRow.rowIndex);
+          
           if (eyeBtnId) {
-            try { await page.click(`#${eyeBtnId}`); }
-            catch (e) { console.warn(`[Verify] Native click on eye button raised: ${e.message} (likely navigated away)`); }
+            await page.click(`#${eyeBtnId}`).catch(e => console.warn(`[Verify] Click eye error: ${e.message}`));
           }
           
-          await delay(5000); // Wait for task edit page/modal to load
-
-          // Update description if mismatch
-          if (!descOkFinal) {
-            console.log(`[Verify] Setting description to "${finalDescription}"...`);
-            const descId = await page.evaluate((val) => {
-              const el = document.querySelector('textarea[name="descripcion"]') || document.querySelector('textarea');
-              if (!el) return null;
-              try { Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(el, val); }
-              catch(e) { el.value = val; }
-              el.focus();
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-              if (!el.id) el.id = 'temp-fix-desc-single';
-              return el.id;
-            }, finalDescription);
-            if (descId) {
-              await page.click(`#${descId}`, { clickCount: 3 }).catch(() => {});
-              await page.keyboard.type(finalDescription);
-              await delay(1500);
-              madeChanges = true;
-            }
-          }
+          await delay(5000); // Wait for task edit form to load
 
           // Update hours if mismatch
           if (!hoursOk) {
@@ -2462,7 +2420,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
           if (!realizadaOk) {
             console.log(`[Verify] Setting status to ${t.status}...`);
             await page.evaluate((targetStatus) => {
-              // 1. Try to find a select dropdown first
+              // 1. Try status select dropdown first
               const selects = Array.from(document.querySelectorAll('select'));
               const statusSelect = selects.find(s => {
                 const options = Array.from(s.options).map(o => o.text.toLowerCase());
@@ -2476,7 +2434,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
                   return true;
                 }
               }
-              // 2. Try to find switch toggle next to 'Realizada' text
+              // 2. Try switch toggle next to 'Realizada' text
               if (targetStatus === 'Finalizada') {
                 const labels = Array.from(document.querySelectorAll('label, span, div, .custom-control-label'));
                 const realLabel = labels.find(l => l.textContent.trim().toLowerCase() === 'realizada');
@@ -2496,39 +2454,17 @@ async function verifyWorkOrderWithPage(page, orderId) {
           }
 
           // Click GUARDAR
-          console.log(`[Verify] Saving task edit...`);
-          const guardarBtnId2 = await page.evaluate(() => {
+          console.log(`[Verify] Clicking GUARDAR...`);
+          const saved = await page.evaluate(() => {
             const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
-            if (!btn) return null;
-            const id = 'tmp-guardar-verify-btn-' + Date.now();
-            btn.id = id;
-            return id;
+            if (btn) { btn.click(); return true; }
+            return false;
           });
-          if (guardarBtnId2) {
-            try { await page.click(`#${guardarBtnId2}`); }
-            catch (e) { console.warn(`[Verify] Native click on GUARDAR raised: ${e.message} (likely navigated away)`); }
+          
+          if (saved) {
             await delay(4500);
             console.log(`[Verify] Task edit saved successfully!`);
           }
-
-          // Return to tasks list page and search again to verify remaining tasks
-          await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-          await page.waitForSelector(searchInpSelector, { timeout: 15000 });
-          await page.click(searchInpSelector, { clickCount: 3 });
-          await page.keyboard.press('Backspace');
-          await page.keyboard.type(otNumClean, { delay: 80 });
-          await delay(500);
-          await page.keyboard.press('Tab');
-          await delay(200);
-          await page.keyboard.press('Enter');
-          await delay(4500);
-
-          tableTasks = await readTableTasks();
-        } else if (usedNarrowedSearch) {
-          // Task was fine as-is — still need to reset the employee filter
-          // before the next task in this loop searches again.
-          await clearEmployeeFilterAndResearch();
-          tableTasks = await readTableTasks();
         }
       }
     }
