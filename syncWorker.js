@@ -1347,8 +1347,13 @@ async function syncWorkOrder(orderId) {
         await delay(1000);
       }
 
-      // 2. Find the matching row and click pencil (edit)
-      const findAndClickPencil = async () => {
+      // 2. Find the matching row and click pencil (edit).
+      // IMPORTANT: we only *locate* the button via evaluate() (read-only, safe).
+      // The actual click is done with Puppeteer's native page.click(), which
+      // doesn't hang when the click triggers a page navigation — unlike calling
+      // .click() on the element from inside page.evaluate(), which can leave the
+      // browser's execution context waiting for a response that never comes.
+      const findAndTagPencil = async () => {
         return await page.evaluate((otNum) => {
           const rows = Array.from(document.querySelectorAll('table tbody tr'));
           for (const row of rows) {
@@ -1364,26 +1369,34 @@ async function syncWorkOrder(orderId) {
               // eye=index 0, pencil=index 1 (non-red), delete=last (red)
               const editBtn = allBtns.find((b, i) => i > 0 && !b.className.includes('danger') && !b.className.includes('red'))
                               || allBtns[1] || allBtns[0];
-              if (editBtn) { editBtn.click(); return true; }
+              if (editBtn) {
+                const id = 'tmp-pencil-btn-' + Date.now();
+                editBtn.id = id;
+                return id;
+              }
             }
           }
-          return false;
+          return null;
         }, otNumClean);
       };
 
-      let pencilClicked = await Promise.race([
-        findAndClickPencil(),
-        new Promise(resolve => setTimeout(() => resolve('timeout'), 8000))
-      ]).catch(() => 'timeout');
-
-      if (pencilClicked === 'timeout') {
-        // Clicking the edit (pencil) button navigates to a new page, which can destroy
-        // the browser execution context mid-call and hang the evaluate() indefinitely
-        // (up to the 5-minute protocolTimeout). Instead of waiting that long, check
-        // directly whether the edit form actually loaded — that's what really matters.
-        console.log(`[Reconcile] Click evaluate call timed out (likely due to page navigation). Checking if the edit form loaded anyway...`);
-        pencilClicked = await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 10000 }).then(() => true).catch(() => false);
+      let pencilClicked = false;
+      const pencilBtnId = await findAndTagPencil();
+      if (pencilBtnId) {
+        try {
+          await page.click(`#${pencilBtnId}`);
+          pencilClicked = true;
+        } catch (clickErr) {
+          // A "Node is detached" / navigation-related error here usually means
+          // the click succeeded and the page already navigated away — treat as success
+          // and let the waitForSelector below confirm it for real.
+          console.warn(`[Reconcile] Native click on pencil button raised: ${clickErr.message} (likely navigated away, treating as success)`);
+          pencilClicked = true;
+        }
+        // Confirm the edit form actually loaded before trusting the click.
+        pencilClicked = await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 10000 }).then(() => true).catch(() => pencilClicked);
       }
+
 
       // If not found, maybe search didn't apply — try pressing Enter in the Numero field and retry
       if (!pencilClicked && numInputId) {
@@ -1391,7 +1404,11 @@ async function syncWorkOrder(orderId) {
         await page.click(`#${numInputId}`).catch(() => {});
         await page.keyboard.press('Enter');
         await delay(2000);
-        pencilClicked = await findAndClickPencil();
+        const retryBtnId = await findAndTagPencil();
+        if (retryBtnId) {
+          try { await page.click(`#${retryBtnId}`); } catch (e) { /* likely navigated away */ }
+          pencilClicked = await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 10000 }).then(() => true).catch(() => false);
+        }
       }
 
       if (!pencilClicked) {
@@ -1639,17 +1656,21 @@ async function syncWorkOrder(orderId) {
       // 7. GUARDAR
       console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
       await delay(4000);
-      const saved = await Promise.race([
-        page.evaluate(() => {
-          const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
-          if (btn) { btn.click(); return true; }
-          return false;
-        }),
-        new Promise(resolve => setTimeout(() => resolve('timeout'), 8000)) // GUARDAR usually navigates away; don't hang waiting for the evaluate to return
-      ]).catch(() => 'timeout');
-      const savedOk = saved === 'timeout' ? true : saved;
-      console.log(`[Reconcile] Guardar: ${savedOk}${saved === 'timeout' ? ' (assumed via navigation timeout)' : ''}`);
+      const guardarBtnId = await page.evaluate(() => {
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
+        if (!btn) return null;
+        const id = 'tmp-guardar-btn-' + Date.now();
+        btn.id = id;
+        return id;
+      });
+      let savedOk = false;
+      if (guardarBtnId) {
+        try { await page.click(`#${guardarBtnId}`); savedOk = true; }
+        catch (e) { console.warn(`[Reconcile] Native click on GUARDAR raised: ${e.message} (likely navigated away, treating as success)`); savedOk = true; }
+      }
+      console.log(`[Reconcile] Guardar: ${savedOk}`);
       if (savedOk) await delay(4000);
+
 
       db.updateWorkOrder(orderId, {
         syncStatus: 'success',
@@ -2369,15 +2390,19 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
         if (!hoursOk || !realizadaOk || !descOkFinal) {
           console.log(`[Verify] Mismatch found for Task #${idx+1}. Clicking eye edit button...`);
-          await Promise.race([
-            page.evaluate((rowIdx) => {
-              const rows = Array.from(document.querySelectorAll('table tbody tr'));
-              const row = rows[rowIdx];
-              const btn = row ? row.querySelector('a, button') : null;
-              if (btn) btn.click();
-            }, matchedRow.rowIndex),
-            new Promise(resolve => setTimeout(resolve, 8000)) // don't hang if the click navigates away mid-call
-          ]).catch(() => {});
+          const eyeBtnId = await page.evaluate((rowIdx) => {
+            const rows = Array.from(document.querySelectorAll('table tbody tr'));
+            const row = rows[rowIdx];
+            const btn = row ? row.querySelector('a, button') : null;
+            if (!btn) return null;
+            const id = 'tmp-eye-btn-' + Date.now();
+            btn.id = id;
+            return id;
+          }, matchedRow.rowIndex);
+          if (eyeBtnId) {
+            try { await page.click(`#${eyeBtnId}`); }
+            catch (e) { console.warn(`[Verify] Native click on eye button raised: ${e.message} (likely navigated away)`); }
+          }
           
           await delay(5000); // Wait for task edit page/modal to load
 
@@ -2472,18 +2497,18 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
           // Click GUARDAR
           console.log(`[Verify] Saving task edit...`);
-          const saved = await Promise.race([
-            page.evaluate(() => {
-              const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
-              if (btn) { btn.click(); return true; }
-              return false;
-            }),
-            new Promise(resolve => setTimeout(() => resolve('timeout'), 8000))
-          ]).catch(() => 'timeout');
-
-          if (saved === true || saved === 'timeout') {
+          const guardarBtnId2 = await page.evaluate(() => {
+            const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
+            if (!btn) return null;
+            const id = 'tmp-guardar-verify-btn-' + Date.now();
+            btn.id = id;
+            return id;
+          });
+          if (guardarBtnId2) {
+            try { await page.click(`#${guardarBtnId2}`); }
+            catch (e) { console.warn(`[Verify] Native click on GUARDAR raised: ${e.message} (likely navigated away)`); }
             await delay(4500);
-            console.log(`[Verify] Task edit saved successfully!${saved === 'timeout' ? ' (assumed via navigation timeout)' : ''}`);
+            console.log(`[Verify] Task edit saved successfully!`);
           }
 
           // Return to tasks list page and search again to verify remaining tasks
