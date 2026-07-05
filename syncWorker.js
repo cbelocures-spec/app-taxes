@@ -2225,8 +2225,11 @@ async function verifyWorkOrderWithPage(page, orderId) {
     const goToTareasPage = async () => {
       console.log(`[Verify] Navigating to Tareas page via sidebar (Tms -> Producción -> Tareas)...`);
       const sidebarSuccess = await page.evaluate(() => {
+        const sidebar = document.querySelector('.main-sidebar, .sidebar, aside, #sidebar, [class*="sidebar"]');
+        if (!sidebar) return false;
+
         const findAndClick = (text) => {
-          const els = Array.from(document.querySelectorAll('a, li, span, div, .nav-link, .nav-item'));
+          const els = Array.from(sidebar.querySelectorAll('a, li, span, div, .nav-link, .nav-item'));
           const el = els.find(e => {
             const txt = e.textContent.trim().toLowerCase();
             return txt === text.toLowerCase() || txt.startsWith(text.toLowerCase());
