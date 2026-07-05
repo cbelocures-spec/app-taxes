@@ -2223,16 +2223,13 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     // Helper: Navigate internally via sidebar to avoid white-page SPA loading bugs
     const goToTareasPage = async () => {
-      console.log(`[Verify] Navigating to Tareas page via sidebar (Tms -> Producción -> Tareas)...`);
+      console.log(`[Verify] Navigating to Tareas page via sidebar (Taller -> Tareas OT)...`);
       const sidebarSuccess = await page.evaluate(() => {
-        const sidebar = document.querySelector('.main-sidebar, .sidebar, aside, #sidebar, [class*="sidebar"]');
-        if (!sidebar) return false;
-
         const findAndClick = (text) => {
-          const els = Array.from(sidebar.querySelectorAll('a, li, span, div, .nav-link, .nav-item'));
+          const els = Array.from(document.querySelectorAll('a, li, span, div, button, .nav-link'));
           const el = els.find(e => {
             const txt = e.textContent.trim().toLowerCase();
-            return txt === text.toLowerCase() || txt.startsWith(text.toLowerCase());
+            return txt === text.toLowerCase() || txt.includes(text.toLowerCase());
           });
           if (el) {
             el.click();
@@ -2241,15 +2238,14 @@ async function verifyWorkOrderWithPage(page, orderId) {
           return false;
         };
 
-        findAndClick('Tms');
+        const clickedTaller = findAndClick('Taller');
+        if (!clickedTaller) return false;
+
         return new Promise((resolve) => {
           setTimeout(() => {
-            findAndClick('Producción');
-            setTimeout(() => {
-              const clicked = findAndClick('Tareas');
-              resolve(clicked);
-            }, 600);
-          }, 600);
+            const clickedTareas = findAndClick('Tareas OT') || findAndClick('Tareas');
+            resolve(clickedTareas);
+          }, 800);
         });
       }).catch(() => false);
 
