@@ -1799,7 +1799,7 @@ function createHistoryCardHtml(order) {
       <div class="order-card-footer">
         <div class="tasks-summary">
           <span class="material-icons">format_list_bulleted</span>
-          <span>${order.tasks.length} Tareas &nbsp;·&nbsp; <span class="material-icons" style="font-size:12px;vertical-align:middle;">cloud_upload</span> ${syncDate}</span>
+          <span>${(order.tasks || []).length} Tareas &nbsp;·&nbsp; <span class="material-icons" style="font-size:12px;vertical-align:middle;">cloud_upload</span> ${syncDate}</span>
         </div>
         <div class="card-actions">
           <button class="icon-btn primary" onclick="viewOrder('${order.id}')" title="Ver Orden">
@@ -1925,7 +1925,7 @@ function createOrderCardHtml(order) {
       <div class="order-card-footer">
         <div class="tasks-summary" onclick="toggleTaskEmployees(event, '${order.id}')" style="cursor:pointer;" title="Ver personal asignado">
           <span class="material-icons">format_list_bulleted</span>
-          <span>${order.tasks.length} Tareas asignadas</span>
+          <span>${(order.tasks || []).length} Tareas asignadas</span>
           <span class="material-icons" style="font-size:14px; margin-left:2px; color:var(--text-muted);">expand_more</span>
         </div>
         <div class="task-employees-detail" id="task-emp-${order.id}" style="display:none; width:100%; margin-top:6px; padding:6px 8px; background:var(--bg-secondary); border-radius:6px; font-size:12px;"></div>
