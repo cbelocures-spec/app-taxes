@@ -2354,10 +2354,29 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
       // 1. Go to tasks list and wait for load
       await goToTareasPage();
-      await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async () => {
-        console.warn(`[Verify] Selector timeout on tasks page. Reloading and retrying...`);
+      await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async (err) => {
+        console.warn(`[Verify] Selector timeout on tasks page. Saving debug files...`);
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          const html = await page.content();
+          fs.writeFileSync(path.join(__dirname, 'public', 'last_verify_error.html'), html);
+          await page.screenshot({ path: path.join(__dirname, 'public', 'last_verify_error.png'), fullPage: true });
+          console.warn(`[Verify] Debug files saved to public/last_verify_error.html and .png. URL: ${page.url()}`);
+        } catch (se) { console.warn('[Verify] Debug save failed:', se.message); }
+        
+        console.warn(`[Verify] Reloading and retrying...`);
         await page.reload({ waitUntil: 'load', timeout: 30000 });
-        await page.waitForSelector(searchInpSelector, { timeout: 15000 });
+        await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async (e2) => {
+          try {
+            const fs = require('fs');
+            const path = require('path');
+            const html = await page.content();
+            fs.writeFileSync(path.join(__dirname, 'public', 'last_verify_error_retry.html'), html);
+            await page.screenshot({ path: path.join(__dirname, 'public', 'last_verify_error_retry.png'), fullPage: true });
+          } catch(e) {}
+          throw e2;
+        });
       });
       await delay(1500);
 
