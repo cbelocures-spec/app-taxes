@@ -2191,7 +2191,15 @@ async function verifyWorkOrderWithPage(page, orderId) {
     await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async () => {
       console.warn(`[Verify] Search input selector timeout. Page loaded blank? Reloading and retrying...`);
       await page.reload({ waitUntil: 'load', timeout: 30000 });
-      await page.waitForSelector(searchInpSelector, { timeout: 15000 });
+      await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async (err) => {
+        // Save debug info so we can see what page/state the browser actually ended up on.
+        try {
+          const path = require('path');
+          await page.screenshot({ path: path.join(__dirname, 'public', 'last_verify_error.png'), fullPage: true });
+          console.warn(`[Verify] Debug screenshot saved to public/last_verify_error.png. Current URL: ${page.url()}, Title: ${await page.title()}`);
+        } catch (se) { console.warn('[Verify] Debug screenshot failed:', se.message); }
+        throw err;
+      });
     });
     await delay(1500);
 
@@ -2233,6 +2241,64 @@ async function verifyWorkOrderWithPage(page, orderId) {
     let tableTasks = await readTableTasks();
     console.log(`[Verify] Found ${tableTasks.length} tasks in Taxes table:`, JSON.stringify(tableTasks));
 
+    // Helper: use the page's own "Empleado" filter (in addition to the OT number
+    // already typed) to narrow results down to the exact task server-side —
+    // far more reliable than comparing description text on our end.
+    const filterByEmployee = async (employeeName) => {
+      try {
+        const empFieldId = await page.evaluate(() => {
+          const labels = Array.from(document.querySelectorAll('label'));
+          const empLabel = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
+          let container = empLabel ? (empLabel.closest('.form-group') || empLabel.parentElement) : null;
+          if (!container) return null;
+          const input = container.querySelector('input[type="text"], input.searchable-input, input:not([type])');
+          if (!input) return null;
+          const id = 'tmp-emp-filter-' + Date.now();
+          input.id = id;
+          return id;
+        });
+        if (!empFieldId) {
+          console.warn('[Verify] Could not locate the "Empleado" filter field on the tasks page.');
+          return false;
+        }
+        await page.click(`#${empFieldId}`, { clickCount: 3 }).catch(() => {});
+        await page.keyboard.press('Backspace').catch(() => {});
+        await page.keyboard.type(employeeName, { delay: 60 });
+        await delay(1200);
+        // If a dropdown suggestion appears, pick the first option
+        await page.evaluate(() => {
+          const opts = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"] li, .multiselect__option, .dropdown-item, ul[role="listbox"] li'));
+          if (opts.length > 0) opts[0].click();
+        }).catch(() => {});
+        await delay(500);
+        const clicked = await page.evaluate(() => {
+          const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase().includes('BUSCAR'));
+          if (btn) { btn.click(); return true; }
+          return false;
+        });
+        if (clicked) await delay(3500);
+        return clicked;
+      } catch (e) {
+        console.warn('[Verify] Employee-narrowed search failed:', e.message);
+        return false;
+      }
+    };
+
+    const clearEmployeeFilterAndResearch = async () => {
+      await page.evaluate(() => {
+        const labels = Array.from(document.querySelectorAll('label'));
+        const empLabel = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
+        const container = empLabel ? (empLabel.closest('.form-group') || empLabel.parentElement) : null;
+        const input = container ? container.querySelector('input') : null;
+        if (input) { input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); }
+      }).catch(() => {});
+      await page.evaluate(() => {
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase().includes('BUSCAR'));
+        if (btn) btn.click();
+      }).catch(() => {});
+      await delay(3000);
+    };
+
     const errors = [];
     let madeChanges = false;
     const clean = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -2269,7 +2335,27 @@ async function verifyWorkOrderWithPage(page, orderId) {
         }
       }
 
+      let usedNarrowedSearch = false;
       if (!matchedRow) {
+        console.log(`[Verify] Task #${idx+1}: no match by description. Narrowing search on Taxes by employee "${employeeLabel}"...`);
+        const narrowed = await filterByEmployee(employeeLabel);
+        if (narrowed) {
+          usedNarrowedSearch = true;
+          const narrowedTasks = await readTableTasks();
+          if (narrowedTasks.length >= 1) {
+            matchedRow = narrowedTasks.find(row =>
+              clean(row.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(row.employee))
+            ) || (narrowedTasks.length === 1 ? narrowedTasks[0] : null);
+            if (matchedRow) {
+              console.log(`[Verify] Task #${idx+1}: found via employee-narrowed search.`);
+              tableTasks = narrowedTasks; // keep this view active — matchedRow.rowIndex refers to it
+            }
+          }
+        }
+      }
+
+      if (!matchedRow) {
+        if (usedNarrowedSearch) await clearEmployeeFilterAndResearch().then(() => readTableTasks()).then(t => { tableTasks = t; });
         console.warn(`[Verify] Task #${idx+1} (${employeeLabel}) NOT found in tasks list table.`);
         errors.push(`Tarea #${idx + 1} (${employeeLabel}): No encontrada en el listado de tareas`);
       } else {
@@ -2412,6 +2498,11 @@ async function verifyWorkOrderWithPage(page, orderId) {
           await page.keyboard.press('Enter');
           await delay(4500);
 
+          tableTasks = await readTableTasks();
+        } else if (usedNarrowedSearch) {
+          // Task was fine as-is — still need to reset the employee filter
+          // before the next task in this loop searches again.
+          await clearEmployeeFilterAndResearch();
           tableTasks = await readTableTasks();
         }
       }
