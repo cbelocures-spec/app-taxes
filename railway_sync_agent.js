@@ -66,8 +66,8 @@ async function checkAndSync() {
       }
 
 
-      // Find any order that needs sync (syncStatus is pending or error with browser launch, database, or properties failures)
-      const pending = orders.filter(o => o.syncStatus === 'pending' || (o.syncStatus === 'error' && ((o.syncError || '').includes('Failed to launch') || (o.syncError || '').includes('saveWorkOrder') || (o.syncError || '').includes('properties of undefined'))));
+      // Find any order that needs sync (syncStatus is pending/error or verifiedStatus is error)
+      const pending = orders.filter(o => o.syncStatus === 'pending' || o.syncStatus === 'error' || o.verifiedStatus === 'error');
 
 
       if (pending.length === 0) {
