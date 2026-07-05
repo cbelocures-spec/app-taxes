@@ -1371,7 +1371,19 @@ async function syncWorkOrder(orderId) {
         }, otNumClean);
       };
 
-      let pencilClicked = await findAndClickPencil();
+      let pencilClicked = await Promise.race([
+        findAndClickPencil(),
+        new Promise(resolve => setTimeout(() => resolve('timeout'), 8000))
+      ]).catch(() => 'timeout');
+
+      if (pencilClicked === 'timeout') {
+        // Clicking the edit (pencil) button navigates to a new page, which can destroy
+        // the browser execution context mid-call and hang the evaluate() indefinitely
+        // (up to the 5-minute protocolTimeout). Instead of waiting that long, check
+        // directly whether the edit form actually loaded — that's what really matters.
+        console.log(`[Reconcile] Click evaluate call timed out (likely due to page navigation). Checking if the edit form loaded anyway...`);
+        pencilClicked = await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 10000 }).then(() => true).catch(() => false);
+      }
 
       // If not found, maybe search didn't apply — try pressing Enter in the Numero field and retry
       if (!pencilClicked && numInputId) {
@@ -2263,12 +2275,15 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
         if (!hoursOk || !realizadaOk || !descOkFinal) {
           console.log(`[Verify] Mismatch found for Task #${idx+1}. Clicking eye edit button...`);
-          await page.evaluate((rowIdx) => {
-            const rows = Array.from(document.querySelectorAll('table tbody tr'));
-            const row = rows[rowIdx];
-            const btn = row ? row.querySelector('a, button') : null;
-            if (btn) btn.click();
-          }, matchedRow.rowIndex);
+          await Promise.race([
+            page.evaluate((rowIdx) => {
+              const rows = Array.from(document.querySelectorAll('table tbody tr'));
+              const row = rows[rowIdx];
+              const btn = row ? row.querySelector('a, button') : null;
+              if (btn) btn.click();
+            }, matchedRow.rowIndex),
+            new Promise(resolve => setTimeout(resolve, 8000)) // don't hang if the click navigates away mid-call
+          ]).catch(() => {});
           
           await delay(5000); // Wait for task edit page/modal to load
 
