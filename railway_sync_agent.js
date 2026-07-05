@@ -59,8 +59,16 @@ async function checkAndSync() {
         return;
       }
 
-      // Find any order that needs sync (syncStatus is pending or error with browser launch failures)
-      const pending = orders.filter(o => o.syncStatus === 'pending' || (o.syncStatus === 'error' && (o.syncError || '').includes('Failed to launch')));
+      if (!Array.isArray(orders)) {
+        console.error('[RailwayAgent] Received non-array response from Railway:', orders);
+        isAgentRunning = false;
+        return;
+      }
+
+
+      // Find any order that needs sync (syncStatus is pending or error with browser launch or database failures)
+      const pending = orders.filter(o => o.syncStatus === 'pending' || (o.syncStatus === 'error' && ((o.syncError || '').includes('Failed to launch') || (o.syncError || '').includes('saveWorkOrder'))));
+
       if (pending.length === 0) {
         isAgentRunning = false;
         return;
