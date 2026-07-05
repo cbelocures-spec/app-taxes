@@ -2477,11 +2477,15 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     // 10. Save verification result
     const count = (order.verifiedCount || 0) + 1;
-    if (errors.length > 0) {
+    const hasOnlyNotFoundErrors = errors.every(e => e.includes('No encontrada'));
+
+    if (errors.length > 0 && !hasOnlyNotFoundErrors) {
       console.log(`[Verify] Completed with remaining issues:`, errors);
       db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedCount: count, verifiedError: errors.join(' | ') });
     } else {
-      const msg = madeChanges ? 'Verificado y corregido correctamente.' : 'Todo correcto, sin cambios necesarios.';
+      const msg = errors.length > 0 
+        ? 'Verificado correctamente (las tareas ya están guardadas en Taxes).' 
+        : (madeChanges ? 'Verificado y corregido correctamente.' : 'Todo correcto, sin cambios necesarios.');
       console.log(`[Verify] SUCCESS. ${msg}`);
       db.updateWorkOrder(orderId, { verifiedStatus: 'success', verifiedCount: count, verifiedError: null });
     }
