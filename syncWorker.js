@@ -1541,13 +1541,21 @@ async function syncWorkOrder(orderId) {
             const trashBtns = Array.from(document.querySelectorAll('button.btn-danger, a.btn-danger, [class*="danger"]'))
               .filter(b => b.querySelector('.fa-trash, .fa-times, .fa-remove') || b.textContent.trim() === '' || b.title?.toLowerCase().includes('elim'));
             const btn = trashBtns[idx];
-            if (btn) { btn.click(); return true; }
+            if (btn) {
+              if (typeof btn.click === 'function') btn.click();
+              else btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              return true;
+            }
             // Fallback: any red button in the task card container (each card has one at top-right)
             const cards = Array.from(document.querySelectorAll('[class*="card"], [class*="task"], .col-12')).filter(c => c.querySelector('input[name="horas_estimadas"]'));
             const card = cards[idx];
             if (card) {
               const redBtn = card.querySelector('button.btn-danger, a.btn-danger, button[style*="red"]');
-              if (redBtn) { redBtn.click(); return true; }
+              if (redBtn) {
+                if (typeof redBtn.click === 'function') redBtn.click();
+                else redBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                return true;
+              }
             }
             return false;
           }, cardIdx);
