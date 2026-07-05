@@ -2201,6 +2201,14 @@ async function verifyWorkOrderWithPage(page, orderId) {
     await d.accept().catch(() => {});
   });
 
+  page.on('console', msg => {
+    const txt = msg.text();
+    const type = msg.type();
+    if (type === 'error' || txt.toLowerCase().includes('error') || txt.toLowerCase().includes('fail') || txt.toLowerCase().includes('exception')) {
+      console.log(`[BrowserConsole] [${type.toUpperCase()}] ${txt}`);
+    }
+  });
+
   const order = db.getWorkOrderById(orderId);
   if (!order || !order.taxesOrderNumber) {
     console.log(`[Verify] Cannot verify: order not found or missing Taxes OT number.`);
