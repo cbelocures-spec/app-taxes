@@ -2536,8 +2536,10 @@ async function startWorker() {
         });
 
         if (brokenOrder) {
-          console.log(`[AutoFix] Found order with wrong tasks (ID: ${brokenOrder.id}, attempt ${(brokenOrder.verifiedCount || 0) + 1}/${MAX_AUTO_VERIFY_RETRIES}). Retrying fix...`);
-          await verifyWorkOrder(brokenOrder.id);
+          console.log(`[AutoFix] Found order with wrong tasks (ID: ${brokenOrder.id}, attempt ${(brokenOrder.verifiedCount || 0) + 1}/${MAX_AUTO_VERIFY_RETRIES}). Retrying full reconciliation...`);
+          // Use the full sync/reconcile function (not just verify) so it can also
+          // create tasks that are completely missing on Taxes, not just fix field mismatches.
+          await syncWorkOrder(brokenOrder.id);
         }
       }
     } catch (e) {
