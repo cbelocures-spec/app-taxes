@@ -2259,7 +2259,13 @@ async function verifyWorkOrderWithPage(page, orderId) {
           if (!hoursOk) {
             console.log(`[Verify] Setting hours to ${expectedHoursComma}...`);
             const hoursId = await page.evaluate((val) => {
-              const el = document.querySelector('input[name="horas_estimadas"]');
+              const inputs = Array.from(document.querySelectorAll('input'));
+              const el = inputs.find(i => {
+                const name = (i.name || '').toLowerCase();
+                const placeholder = (i.placeholder || '').toLowerCase();
+                const label = i.closest('.form-group')?.textContent.toLowerCase() || '';
+                return name.includes('horas') || placeholder.includes('horas') || label.includes('horas');
+              });
               if (!el) return null;
               try { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, val); }
               catch(e) { el.value = val; }
@@ -2283,6 +2289,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
           if (!realizadaOk) {
             console.log(`[Verify] Setting status to ${t.status}...`);
             await page.evaluate((targetStatus) => {
+              // 1. Try to find a select dropdown first
               const selects = Array.from(document.querySelectorAll('select'));
               const statusSelect = selects.find(s => {
                 const options = Array.from(s.options).map(o => o.text.toLowerCase());
@@ -2293,8 +2300,23 @@ async function verifyWorkOrderWithPage(page, orderId) {
                 if (opt) {
                   statusSelect.value = opt.value;
                   statusSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                  return true;
                 }
               }
+              // 2. Try to find switch toggle next to 'Realizada' text
+              if (targetStatus === 'Finalizada') {
+                const labels = Array.from(document.querySelectorAll('label, span, div, .custom-control-label'));
+                const realLabel = labels.find(l => l.textContent.trim().toLowerCase() === 'realizada');
+                if (realLabel) {
+                  const parent = realLabel.closest('.custom-control, .form-group') || realLabel.parentElement;
+                  const cb = parent?.querySelector('input[type="checkbox"]');
+                  if (cb && !cb.checked) {
+                    realLabel.click();
+                    return true;
+                  }
+                }
+              }
+              return false;
             }, t.status);
             await delay(1500);
             madeChanges = true;
