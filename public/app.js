@@ -1862,7 +1862,7 @@ function createOrderCardHtml(order) {
               <span class="material-icons" style="font-size: 14px; font-weight: bold;">sync</span>
             </button>
           </span>
-          <span class="badge-status error" onclick="event.stopPropagation(); openErrorModal(null, '${order.id}')" title="Fall\u00f3 el \u00faltimo reintento de sincronizaci\u00f3n. Clic para ver el detalle."><span class="material-icons">error</span> Error al resincronizar</span>
+          <span class="badge-status error" onclick="event.stopPropagation(); openErrorModal(null, '${order.id}')" title="Fall\u00f3 el \u00faltimo reintento de sincronizaci\u00f3n. Clic para ver el detalle."><span class="material-icons">error</span> Error al resincronizar${order.autoSyncRetryCount ? ` x${order.autoSyncRetryCount}` : ''}</span>
         </span>
       `;
     } else {
