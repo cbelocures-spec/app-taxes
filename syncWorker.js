@@ -2213,6 +2213,41 @@ async function verifyWorkOrderWithPage(page, orderId) {
   try {
     const searchInpSelector = 'input[placeholder*="Buscar por Numero"], input[placeholder*="OT"], input[placeholder*="Título"]';
 
+    // Helper: Navigate internally via sidebar to avoid white-page SPA loading bugs
+    const goToTareasPage = async () => {
+      console.log(`[Verify] Navigating to Tareas page via sidebar...`);
+      const sidebarSuccess = await page.evaluate(() => {
+        // Expand "Taller" menu if collapsed
+        const items = Array.from(document.querySelectorAll('a, li, span, div, .nav-item'));
+        const tallerItem = items.find(el => el.textContent.trim() === 'Taller');
+        if (tallerItem) {
+          tallerItem.click();
+        }
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            const subItems = Array.from(document.querySelectorAll('a, li, span'));
+            const tareasItem = subItems.find(el => {
+              const txt = el.textContent.trim().toLowerCase();
+              return txt === 'tareas ot' || txt === 'tareas o.t.' || txt === 'tareas';
+            });
+            if (tareasItem) {
+              tareasItem.click();
+              resolve(true);
+            } else {
+              resolve(false);
+            }
+          }, 600);
+        });
+      }).catch(() => false);
+
+      if (sidebarSuccess) {
+        await delay(2500); // Wait for router view to render
+      } else {
+        console.log(`[Verify] Sidebar navigation failed. Using direct safeGoto fallback...`);
+        await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+      }
+    };
+
     // Helper to clear employee tag filter
     const clearEmployeeFilter = async () => {
       await page.evaluate(() => {
@@ -2309,7 +2344,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
       console.log(`[Verify] Filtering tasks page by OT "${otNumClean}" and Employee "${employeeLabel}"...`);
 
       // 1. Go to tasks list and wait for load
-      await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+      await goToTareasPage();
       await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async () => {
         console.warn(`[Verify] Selector timeout on tasks page. Reloading and retrying...`);
         await page.reload({ waitUntil: 'load', timeout: 30000 });
