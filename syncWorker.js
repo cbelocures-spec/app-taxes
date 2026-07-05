@@ -2168,18 +2168,16 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     // 2. Search for OT number
     console.log(`[Verify] Searching for OT ${otNumClean} in tasks page...`);
-    await page.evaluate((num) => {
-      const inp = document.querySelector('input[placeholder*="Buscar por Numero"]');
-      if (inp) {
-        inp.value = num;
-        inp.dispatchEvent(new Event('input', { bubbles: true }));
-        inp.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    }, otNumClean);
-    
+    const searchInpSelector = 'input[placeholder*="Buscar por Numero"], input[placeholder*="OT"], input[placeholder*="Título"]';
+    await page.waitForSelector(searchInpSelector, { timeout: 15000 });
+    await page.click(searchInpSelector, { clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type(otNumClean, { delay: 80 });
+    await delay(500);
     await page.keyboard.press('Tab');
+    await delay(200);
     await page.keyboard.press('Enter');
-    await delay(3500); // Wait for results
+    await delay(4500); // Wait for results to load
 
     // Helper to read table tasks
     const readTableTasks = async () => {
@@ -2337,21 +2335,15 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
           // Return to tasks list page and search again to verify remaining tasks
           await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-          await page.waitForSelector('input[placeholder*="Buscar por Numero"]', { timeout: 15000 }).catch(() => {});
-          await delay(2000);
-
-          await page.evaluate((num) => {
-            const inp = document.querySelector('input[placeholder*="Buscar por Numero"]');
-            if (inp) {
-              inp.value = num;
-              inp.dispatchEvent(new Event('input', { bubbles: true }));
-              inp.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-          }, otNumClean);
-          
+          await page.waitForSelector(searchInpSelector, { timeout: 15000 });
+          await page.click(searchInpSelector, { clickCount: 3 });
+          await page.keyboard.press('Backspace');
+          await page.keyboard.type(otNumClean, { delay: 80 });
+          await delay(500);
           await page.keyboard.press('Tab');
+          await delay(200);
           await page.keyboard.press('Enter');
-          await delay(3500);
+          await delay(4500);
 
           tableTasks = await readTableTasks();
         }
