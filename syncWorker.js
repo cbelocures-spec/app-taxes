@@ -2219,8 +2219,6 @@ async function verifyWorkOrderWithPage(page, orderId) {
   console.log(`[Verify] Starting direct tasks-list verification for OT #${order.interno} (Taxes: ${otNumClean})...`);
 
   try {
-    const searchInpSelector = 'input[placeholder*="Buscar por Numero"], input[placeholder*="OT"], input[placeholder*="Título"]';
-
     // Helper: Navigate internally via sidebar to avoid white-page SPA loading bugs
     const goToTareasPage = async () => {
       console.log(`[Verify] Navigating to Tareas page via sidebar (Taller -> Tareas OT)...`);
@@ -2257,15 +2255,52 @@ async function verifyWorkOrderWithPage(page, orderId) {
       }
     };
 
+    // Helper: Find OT number search input dynamically by matching its label
+    const findSearchInput = async () => {
+      return await page.evaluate(() => {
+        const labels = Array.from(document.querySelectorAll('label'));
+        const otLabel = labels.find(l => {
+          const txt = l.textContent.toLowerCase();
+          return txt.includes('buscar por numero') || txt.includes('titulo de ot') || txt.includes('ot');
+        });
+        if (!otLabel) return null;
+        const container = otLabel.closest('.field-compact, .form-group') || otLabel.parentElement?.parentElement;
+        if (!container) return null;
+        const inp = container.querySelector('input');
+        if (inp) {
+          if (!inp.id) inp.id = 'temp-ot-search-input';
+          return '#' + inp.id;
+        }
+        return null;
+      });
+    };
+
+    // Helper: Find Employee filter input dynamically by matching its label
+    const findEmployeeFilterInput = async () => {
+      return await page.evaluate(() => {
+        const labels = Array.from(document.querySelectorAll('label'));
+        const empLabel = labels.find(l => l.textContent.trim().toLowerCase() === 'empleado');
+        if (!empLabel) return null;
+        const container = empLabel.closest('.field-compact, .form-group') || empLabel.parentElement?.parentElement;
+        if (!container) return null;
+        const inp = container.querySelector('input');
+        if (inp) {
+          if (!inp.id) inp.id = 'temp-emp-filter-input';
+          return '#' + inp.id;
+        }
+        return null;
+      });
+    };
+
     // Helper to clear employee tag filter
     const clearEmployeeFilter = async () => {
       await page.evaluate(() => {
         const labels = Array.from(document.querySelectorAll('label, span, div'));
         const empLabelEl = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
         if (empLabelEl) {
-          const container = empLabelEl.closest('.form-group, .col, [class*="col"]') || empLabelEl.parentElement;
+          const container = empLabelEl.closest('.form-group, .col, [class*="col"], .field-compact') || empLabelEl.parentElement;
           if (container) {
-            const removeBtn = container.querySelector('.multiselect__tag-icon, .multiselect__remove, [class*="remove"], [class*="clear"]');
+            const removeBtn = container.querySelector('.multiselect__tag-icon, .multiselect__remove, [class*="remove"], [class*="clear"], .clear-button');
             if (removeBtn) removeBtn.click();
           }
         }
@@ -2276,43 +2311,37 @@ async function verifyWorkOrderWithPage(page, orderId) {
     // Helper to select employee in filter
     const selectEmployeeInFilter = async (empLabel) => {
       console.log(`[Verify] Selecting employee "${empLabel}" in filter...`);
-      const opened = await page.evaluate(() => {
-        const labels = Array.from(document.querySelectorAll('label, span, div'));
-        const empLabelEl = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
-        if (!empLabelEl) return false;
+      const empInputSelector = await findEmployeeFilterInput();
+      if (!empInputSelector) {
+        console.warn(`[Verify] Could not find Empleado filter input.`);
+        return false;
+      }
 
-        const container = empLabelEl.closest('.form-group, .col, [class*="col"]') || empLabelEl.parentElement;
+      await page.click(empInputSelector, { clickCount: 3 });
+      await page.keyboard.press('Backspace');
+      await page.keyboard.type(empLabel, { delay: 80 });
+      await delay(2000);
+
+      // Select suggestion from dropdown list
+      const clicked = await page.evaluate((selector) => {
+        const inp = document.querySelector(selector);
+        const container = inp ? inp.closest('.searchable-select-wrapper, .field-compact, .form-group') : null;
         if (!container) return false;
-
-        const multiselect = container.querySelector('.multiselect, .multiselect__select, .multiselect__tags, input');
-        if (multiselect) {
-          multiselect.click();
-          const inp = container.querySelector('input');
-          if (inp) {
-            inp.id = 'temp-emp-filter-input';
-            return true;
-          }
+        
+        const items = Array.from(container.querySelectorAll('li, .dropdown-item, [class*="item"], [class*="option"], .searchable-select-item'));
+        if (items.length > 0) {
+          items[0].click();
+          return true;
         }
         return false;
-      });
+      }, empInputSelector);
 
-      if (opened) {
-        await delay(1000);
-        await page.click('#temp-emp-filter-input', { clickCount: 3 }).catch(() => {});
-        await page.keyboard.press('Backspace');
-        await page.keyboard.type(empLabel, { delay: 80 });
-        await delay(2000);
-        // Try clicking dropdown suggestions first
-        await page.evaluate(() => {
-          const opts = Array.from(document.querySelectorAll('.multiselect__option, .dropdown-item, ul[role="listbox"] li, .multiselect__element'));
-          if (opts.length > 0) opts[0].click();
-        }).catch(() => {});
-        // Press Enter as fallback
+      if (!clicked) {
+        console.log(`[Verify] Suggestion click failed. Pressing Enter as fallback...`);
         await page.keyboard.press('Enter');
-        await delay(1000);
-        return true;
       }
-      return false;
+      await delay(1000);
+      return true;
     };
 
     // Helper to read table tasks
@@ -2352,45 +2381,38 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
       console.log(`[Verify] Filtering tasks page by OT "${otNumClean}" and Employee "${employeeLabel}"...`);
 
-      // 1. Go to tasks list and wait for load
+      // 1. Go to tasks list
       await goToTareasPage();
-      await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async (err) => {
-        console.warn(`[Verify] Selector timeout on tasks page. Saving debug files...`);
-        try {
-          const fs = require('fs');
-          const path = require('path');
-          const html = await page.content();
-          fs.writeFileSync(path.join(__dirname, 'public', 'last_verify_error.html'), html);
-          await page.screenshot({ path: path.join(__dirname, 'public', 'last_verify_error.png'), fullPage: true });
-          console.warn(`[Verify] Debug files saved to public/last_verify_error.html and .png. URL: ${page.url()}`);
-        } catch (se) { console.warn('[Verify] Debug save failed:', se.message); }
-        
-        console.warn(`[Verify] Reloading and retrying...`);
-        await page.reload({ waitUntil: 'load', timeout: 30000 });
-        await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async (e2) => {
-          try {
-            const fs = require('fs');
-            const path = require('path');
-            const html = await page.content();
-            fs.writeFileSync(path.join(__dirname, 'public', 'last_verify_error_retry.html'), html);
-            await page.screenshot({ path: path.join(__dirname, 'public', 'last_verify_error_retry.png'), fullPage: true });
-          } catch(e) {}
-          throw e2;
-        });
-      });
-      await delay(1500);
+      
+      // 2. Locate OT search input dynamically
+      let searchInpSelector = null;
+      for (let i = 0; i < 5; i++) {
+        searchInpSelector = await findSearchInput();
+        if (searchInpSelector) break;
+        await delay(2000);
+      }
 
-      // 2. Type OT number
+      if (!searchInpSelector) {
+        console.warn(`[Verify] Selector timeout. Reloading and retrying...`);
+        await page.reload({ waitUntil: 'load', timeout: 30000 });
+        searchInpSelector = await findSearchInput();
+      }
+
+      if (!searchInpSelector) {
+        throw new Error('No se pudo localizar la caja de búsqueda por número de OT.');
+      }
+
+      // 3. Type OT number
       await page.click(searchInpSelector, { clickCount: 3 });
       await page.keyboard.press('Backspace');
       await page.keyboard.type(otNumClean, { delay: 80 });
       await delay(500);
 
-      // 3. Clear employee tag and select current task's employee
+      // 4. Clear employee tag and select current task's employee
       await clearEmployeeFilter();
       await selectEmployeeInFilter(employeeLabel);
 
-      // 4. Click BUSCAR button
+      // 5. Click BUSCAR button
       console.log(`[Verify] Clicking BUSCAR...`);
       await page.evaluate(() => {
         const btns = Array.from(document.querySelectorAll('button, a'));
@@ -2399,7 +2421,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
       });
       await delay(4500); // Wait for filtered results
 
-      // 5. Read table rows
+      // 6. Read table rows
       let tableTasks = await readTableTasks();
       console.log(`[Verify] Filtered tasks count: ${tableTasks.length}`, JSON.stringify(tableTasks));
 
