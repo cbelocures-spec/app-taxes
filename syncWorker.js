@@ -2226,7 +2226,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
       console.log(`[Verify] Navigating to Tareas page via sidebar (Taller -> Tareas OT)...`);
       const sidebarSuccess = await page.evaluate(() => {
         const findAndClick = (text) => {
-          const els = Array.from(document.querySelectorAll('a, li, span, div, button, .nav-link'));
+          const els = Array.from(document.querySelectorAll('a'));
           const el = els.find(e => {
             const txt = e.textContent.trim().toLowerCase();
             return txt === text.toLowerCase() || txt.includes(text.toLowerCase());
