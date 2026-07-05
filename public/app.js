@@ -901,6 +901,13 @@ function viewOrder(orderId) {
 
 function openErrorModal(errorLog, orderId) {
   currentRetryOrderId = orderId;
+  // Look up the real, current error from the loaded orders list by ID —
+  // safer than embedding the raw error text directly into the HTML/onclick,
+  // which could break if the error message contains quotes or backticks.
+  if (!errorLog && orderId) {
+    const order = (activeOrders || []).find(o => o.id === orderId);
+    errorLog = order ? order.syncError : null;
+  }
   document.getElementById('error-modal-log').textContent = errorLog || "Error desconocido durante la sincronización.";
   document.getElementById('error-modal').classList.add('open');
 }
@@ -1843,7 +1850,24 @@ function createOrderCardHtml(order) {
       </span>
     `;
   } else if (order.syncStatus === 'error') {
-    statusBadge = `<span class="badge-status error" onclick="openErrorModal(\`${order.syncError.replace(/"/g, '&quot;')}\`, '${order.id}')"><span class="material-icons">error</span> Error</span>`;
+    if (order.taxesOrderNumber) {
+      // Already synced before (has an OT number) — keep showing that, plus a small
+      // extra badge indicating the latest re-sync attempt failed.
+      statusBadge = `
+        <span style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px;">
+            <span class="material-icons">check_circle</span>
+            <span>Sincronizado O.T.: ${order.taxesOrderNumber}</span>
+            <button onclick="event.stopPropagation(); retrySync('${order.id}')" title="Volver a Sincronizar con Taxes" style="background: none; border: none; padding: 2px; margin-left: 4px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #065f46; outline: none;" onmouseover="this.style.color='#047857'" onmouseout="this.style.color='#065f46'">
+              <span class="material-icons" style="font-size: 14px; font-weight: bold;">sync</span>
+            </button>
+          </span>
+          <span class="badge-status error" onclick="event.stopPropagation(); openErrorModal(null, '${order.id}')" title="Fall\u00f3 el \u00faltimo reintento de sincronizaci\u00f3n. Clic para ver el detalle."><span class="material-icons">error</span> Error al resincronizar</span>
+        </span>
+      `;
+    } else {
+      statusBadge = `<span class="badge-status error" onclick="event.stopPropagation(); openErrorModal(null, '${order.id}')"><span class="material-icons">error</span> Error</span>`;
+    }
   } else if (order.syncStatus === 'local') {
     if (allCompleted) {
       statusBadge = `<span class="badge-status success" style="background-color:#d1fae5; color:#065f46; border:1px solid rgba(6,95,70,0.2);"><span class="material-icons" style="font-size:12px;">check_circle</span> Completada</span>`;
@@ -8054,7 +8078,7 @@ async function savePtUnit() {
 // ============================================================
 
 function getVerificationBadgeHtml(order) {
-  if (order.syncStatus !== 'success') return '';
+  if (order.syncStatus !== 'success' && !(order.syncStatus === 'error' && order.taxesOrderNumber)) return '';
 
   const count = order.verifiedCount || 0;
 
