@@ -533,13 +533,34 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: "Orden no encontrada" });
     }
-    
+
+    // Normalize status strings coming from external agents, which may use
+    // different wording (e.g. "synced"/"ok") than the canonical values the
+    // app's UI recognizes ("success"/"error"/etc.), so the badges always render.
+    const normalizeSyncStatus = (val) => {
+      if (!val) return val;
+      const v = String(val).toLowerCase();
+      if (['success', 'synced', 'ok', 'done', 'completed', 'completado', 'sincronizado'].includes(v)) return 'success';
+      if (['error', 'failed', 'fail', 'fallo', 'falló'].includes(v)) return 'error';
+      if (['pending', 'pendiente'].includes(v)) return 'pending';
+      if (['syncing', 'sincronizando'].includes(v)) return 'syncing';
+      return val;
+    };
+    const normalizeVerifiedStatus = (val) => {
+      if (!val) return val;
+      const v = String(val).toLowerCase();
+      if (['success', 'ok', 'done', 'correcto'].includes(v)) return 'success';
+      if (['error', 'failed', 'fail', 'fallo', 'falló'].includes(v)) return 'error';
+      if (['checking', 'verificando'].includes(v)) return 'checking';
+      return val;
+    };
+
     db.updateWorkOrder(req.params.id, {
-      syncStatus,
+      syncStatus: normalizeSyncStatus(syncStatus),
       syncError,
       syncDate,
       tasks,
-      verifiedStatus,
+      verifiedStatus: normalizeVerifiedStatus(verifiedStatus),
       verifiedError,
       verifiedCount
     });
