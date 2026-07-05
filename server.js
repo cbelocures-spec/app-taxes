@@ -525,6 +525,32 @@ app.post('/api/orders/retry/:id', async (req, res) => {
   }
 });
 
+// Endpoint for local PC agent to upload sync results directly
+app.post('/api/orders/local-sync-result/:id', (req, res) => {
+  try {
+    const { syncStatus, syncError, syncDate, tasks, verifiedStatus, verifiedError, verifiedCount } = req.body;
+    const existing = db.getWorkOrderById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: "Orden no encontrada" });
+    }
+    
+    db.updateWorkOrder(req.params.id, {
+      syncStatus,
+      syncError,
+      syncDate,
+      tasks,
+      verifiedStatus,
+      verifiedError,
+      verifiedCount
+    });
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 // Force verification of a work order on Taxes
 app.post('/api/orders/verify/:id', async (req, res) => {
   try {
@@ -1513,6 +1539,17 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
 
   // Start the Puppeteer background sync worker
   worker.startWorker();
+
+  // Start Railway sync agent if running locally to bridge the Railway cloud database
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const agent = require('./railway_sync_agent');
+      agent.startAgent();
+    } catch (agentErr) {
+      console.error('[RailwayAgent] Could not start Railway sync agent:', agentErr.message);
+    }
+  }
+
 
   // Start localtunnel for HTTPS access from mobile (no cert issues)
   if (localtunnel) {
