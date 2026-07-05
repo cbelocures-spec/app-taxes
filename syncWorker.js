@@ -2469,19 +2469,42 @@ async function startWorker() {
     console.error("Error resetting stuck orders on startup:", err);
   }
 
+ // Auto-fix settings for tasks that failed verification (wrong hours/status in Taxes)
+  const MAX_AUTO_VERIFY_RETRIES = 5;
+  const AUTO_VERIFY_COOLDOWN_MS = 15 * 60 * 1000; // wait 15 min between auto retries per order
+
   while (isWorkerRunning) {
     try {
       const orders = db.getWorkOrders();
       const pendingOrder = orders.find(o => o.syncStatus === 'pending');
-      
+
       if (pendingOrder) {
         console.log(`Found pending Work Order ID: ${pendingOrder.id}. Launching sync...`);
         await syncWorkOrder(pendingOrder.id);
+      } else {
+        // No new orders to sync — look for orders whose tasks are known to be wrong
+        // in Taxes (verifiedStatus: 'error') and automatically retry fixing them.
+        const brokenOrder = orders.find(o => {
+          if (!o.taxesOrderNumber) return false;
+          if (o.syncStatus !== 'success') return false;
+          if (o.verifiedStatus !== 'error') return false;
+          if ((o.verifiedCount || 0) >= MAX_AUTO_VERIFY_RETRIES) return false;
+          if (o.lastVerifyAttempt) {
+            const elapsed = Date.now() - new Date(o.lastVerifyAttempt).getTime();
+            if (elapsed < AUTO_VERIFY_COOLDOWN_MS) return false;
+          }
+          return true;
+        });
+
+        if (brokenOrder) {
+          console.log(`[AutoFix] Found order with wrong tasks (ID: ${brokenOrder.id}, attempt ${(brokenOrder.verifiedCount || 0) + 1}/${MAX_AUTO_VERIFY_RETRIES}). Retrying fix...`);
+          await verifyWorkOrder(brokenOrder.id);
+        }
       }
     } catch (e) {
       console.error("Error in background sync worker loop:", e);
     }
-    
+
     // Poll every 10 seconds
     await delay(10000);
   }
