@@ -2356,11 +2356,11 @@ async function verifyWorkOrderWithPage(page, orderId) {
     const count = (order.verifiedCount || 0) + 1;
     if (errors.length > 0) {
       console.log(`[Verify] Completed with issues:`, errors);
-      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedCount: count, verifiedError: errors.join(' | ') });
+      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedCount: count, verifiedError: errors.join(' | '), lastVerifyAttempt: new Date().toISOString() });
     } else {
       const msg = madeChanges ? 'Verificado y corregido correctamente vía listado de tareas.' : 'Todo correcto, verificado sin cambios necesarios.';
       console.log(`[Verify] SUCCESS. ${msg}`);
-      db.updateWorkOrder(orderId, { verifiedStatus: 'success', verifiedCount: count, verifiedError: null });
+      db.updateWorkOrder(orderId, { verifiedStatus: 'success', verifiedCount: count, verifiedError: null, lastVerifyAttempt: new Date().toISOString() });
     }
 
   } catch (err) {
@@ -2369,7 +2369,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
     db.updateWorkOrder(orderId, {
       verifiedStatus: 'error',
       verifiedCount: count,
-      verifiedError: `Error del verificador: ${err.message}`
+      verifiedError: `Error del verificador: ${err.message}`,
+      lastVerifyAttempt: new Date().toISOString()
     });
     throw err;
   }
