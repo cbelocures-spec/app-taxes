@@ -2157,111 +2157,20 @@ async function verifyWorkOrderWithPage(page, orderId) {
     return;
   }
   const settings = db.getSettings();
-  // Strip '#' prefix if stored as '#25530' instead of '25530'
-  const otNumClean = String(order.taxesOrderNumber).replace(/^#/, '');
-  console.log(`[Verify] Starting OT-edit verification for OT #${order.interno} (Taxes: ${otNumClean})...`);
+  const otNumClean = String(order.taxesOrderNumber).replace(/^#/, '').trim();
+  console.log(`[Verify] Starting tasks-list verification for OT #${order.interno} (Taxes: ${otNumClean})...`);
 
   try {
-    // 1. Go to Ordenes de Trabajo list
-    await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
-    await page.waitForSelector('input', { timeout: 10000 }).catch(() => {});
-    await delay(2500);
+    // 1. Navigate to tasks list
+    await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+    await page.waitForSelector('input[placeholder*="Buscar por Numero"]', { timeout: 15000 }).catch(() => {});
+    await delay(2000);
 
-    // Click "En Proceso" tab
-    console.log(`[Verify] Clicking 'En Proceso' tab...`);
-    await page.evaluate(() => {
-      const navLinks = Array.from(document.querySelectorAll('a.nav-link, [role="tab"], .nav-tabs li a, .nav li a'));
-      const tab = navLinks.find(t => t.textContent.trim().toLowerCase().includes('en proceso'));
-      if (tab) { tab.click(); return; }
-      const all = Array.from(document.querySelectorAll('a, button, li'));
-      const fb  = all.find(t => t.textContent.trim().toLowerCase() === 'en proceso');
-      if (fb) { fb.click(); }
-    }).catch(() => {});
-    await delay(2500);
-
-    // Find and click the Numero input using the exact robust logic
-    const numInputId = await page.evaluate(() => {
-      const normalizeText = s => (s || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-      const allEls = Array.from(document.querySelectorAll('label, span, small, p, .col > div'));
-      for (const el of allEls) {
-        const t = normalizeText(el.textContent);
-        if (t === 'numero') {
-          const container = el.closest('.form-group, .col, [class*="col"]') || el.parentElement?.parentElement;
-          const inp = container?.querySelector('input');
-          if (inp) {
-            if (!inp.id) inp.id = 'vf-numero-input-v2';
-            return inp.id;
-          }
-        }
-      }
-      const vis = Array.from(document.querySelectorAll('input[type="text"], input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])')).filter(i => i.offsetParent);
-      for (const inp of vis) {
-        const par = inp.closest('.form-group, .col, [class*="col"]');
-        if (par && normalizeText(par.textContent).includes('numero')) {
-          if (!inp.id) inp.id = 'vf-numero-input-v2-fb';
-          return inp.id;
-        }
-      }
-      const inp = vis[3] || vis[2];
+    // 2. Search for OT number
+    console.log(`[Verify] Searching for OT ${otNumClean} in tasks page...`);
+    await page.evaluate((num) => {
+      const inp = document.querySelector('input[placeholder*="Buscar por Numero"]');
       if (inp) {
-        if (!inp.id) inp.id = 'vf-numero-input-v2-fb2';
-        return inp.id;
-      }
-      return null;
-    });
-
-    console.log(`[Verify] Numero input ID: ${numInputId}`);
-
-    if (numInputId) {
-      await page.click(`#${numInputId}`, { clickCount: 3 }).catch(() => {});
-      await page.keyboard.press('Backspace');
-      await page.keyboard.type(otNumClean, { delay: 80 });
-      await delay(500);
-      console.log(`[Verify] Typed OT number "${otNumClean}". Navigating to BUSCAR via Tab...`);
-      await page.keyboard.press('Tab');
-      await delay(200);
-      await page.keyboard.press('Tab');
-      await delay(200);
-      await page.keyboard.press('Tab');
-      await delay(200);
-      await page.keyboard.press('Enter');
-      console.log(`[Verify] Pressed Enter on focused BUSCAR button`);
-      await delay(1000);
-    } else {
-      console.warn(`[Verify] Could not find Numero input field`);
-    }
-
-    console.log(`[Verify] Waiting up to 12s for OT row "${otNumClean}" to appear in table...`);
-    let foundOTRow = false;
-    for (let attempt = 1; attempt <= 12; attempt++) {
-      foundOTRow = await page.evaluate((otNum) => {
-        const rows = Array.from(document.querySelectorAll('table tbody tr'));
-        return rows.some(row => {
-          const cells = Array.from(row.querySelectorAll('td'));
-          return cells.some(c => {
-            const txt = c.textContent.replace(/#/g, '').replace(/\s+/g, ' ').trim();
-            return txt === otNum || txt.includes(otNum);
-          });
-        });
-      }, otNumClean);
-
-      if (foundOTRow) {
-        console.log(`[Verify] OT row found after ${attempt}s!`);
-        break;
-      }
-      await delay(1000);
-    }
-
-    // 4. Click the pencil (edit) icon ✏️ on the matching row
-    const editClicked = await page.evaluate((otNum) => {
-      const rows = Array.from(document.querySelectorAll('table tbody tr'));
-      for (const row of rows) {
-        const cells = Array.from(row.querySelectorAll('td'));
-        // Strip '#', spaces, newlines — then check if cell contains the OT number
-        const hasOT = cells.some(c => {
-          const txt = c.textContent.replace(/#/g, '').replace(/\s+/g, ' ').trim();
-          return txt === otNum || txt.includes(otNum);
-        });
         inp.value = num;
         inp.dispatchEvent(new Event('input', { bubbles: true }));
         inp.dispatchEvent(new Event('change', { bubbles: true }));
