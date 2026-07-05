@@ -1639,18 +1639,23 @@ async function syncWorkOrder(orderId) {
       // 7. GUARDAR
       console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
       await delay(4000);
-      const saved = await page.evaluate(() => {
-        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
-        if (btn) { btn.click(); return true; }
-        return false;
-      });
-      console.log(`[Reconcile] Guardar: ${saved}`);
-      if (saved) await delay(4000);
+      const saved = await Promise.race([
+        page.evaluate(() => {
+          const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
+          if (btn) { btn.click(); return true; }
+          return false;
+        }),
+        new Promise(resolve => setTimeout(() => resolve('timeout'), 8000)) // GUARDAR usually navigates away; don't hang waiting for the evaluate to return
+      ]).catch(() => 'timeout');
+      const savedOk = saved === 'timeout' ? true : saved;
+      console.log(`[Reconcile] Guardar: ${savedOk}${saved === 'timeout' ? ' (assumed via navigation timeout)' : ''}`);
+      if (savedOk) await delay(4000);
 
       db.updateWorkOrder(orderId, {
         syncStatus: 'success',
         syncDate: new Date().toISOString(),
-        syncError: null
+        syncError: null,
+        autoSyncRetryCount: 0
       });
 
       console.log(`[Reconcile] Running verification for OT #${order.interno}...`);
@@ -2133,6 +2138,7 @@ async function syncWorkOrder(orderId) {
       syncStatus: "success",
       syncDate: new Date().toISOString(),
       syncError: null,
+      autoSyncRetryCount: 0,
       taxesOrderNumber: taxesOrderNumber || null,
       tasks: updatedTasks
     });
@@ -2158,7 +2164,9 @@ async function syncWorkOrder(orderId) {
     }
     db.updateWorkOrder(orderId, {
       syncStatus: "error",
-      syncError: error.message
+      syncError: error.message,
+      autoSyncRetryCount: (order.autoSyncRetryCount || 0) + 1,
+      lastAutoSyncAttempt: new Date().toISOString()
     });
     if (browser) await browser.close();
     return { success: false, message: error.message };
@@ -2378,15 +2386,18 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
           // Click GUARDAR
           console.log(`[Verify] Saving task edit...`);
-          const saved = await page.evaluate(() => {
-            const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
-            if (btn) { btn.click(); return true; }
-            return false;
-          });
-          
-          if (saved) {
+          const saved = await Promise.race([
+            page.evaluate(() => {
+              const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
+              if (btn) { btn.click(); return true; }
+              return false;
+            }),
+            new Promise(resolve => setTimeout(() => resolve('timeout'), 8000))
+          ]).catch(() => 'timeout');
+
+          if (saved === true || saved === 'timeout') {
             await delay(4500);
-            console.log(`[Verify] Task edit saved successfully!`);
+            console.log(`[Verify] Task edit saved successfully!${saved === 'timeout' ? ' (assumed via navigation timeout)' : ''}`);
           }
 
           // Return to tasks list page and search again to verify remaining tasks
@@ -2536,22 +2547,26 @@ async function startWorker() {
         console.log(`Found pending Work Order ID: ${pendingOrder.id}. Launching sync...`);
         await syncWorkOrder(pendingOrder.id);
       } else {
-        // No new orders to sync — look for orders whose tasks are known to be wrong
-        // in Taxes (verifiedStatus: 'error') and automatically retry fixing them.
+        // No new orders to sync — look for orders that need an automatic retry:
+        // either their tasks failed the control check (verifiedStatus: 'error'),
+        // or a later re-sync attempt itself failed (syncStatus: 'error') even
+        // though they were already synced before (have a taxesOrderNumber).
         const brokenOrder = orders.find(o => {
           if (!o.taxesOrderNumber) return false;
-          if (o.syncStatus !== 'success') return false;
-          if (o.verifiedStatus !== 'error') return false;
-          if ((o.verifiedCount || 0) >= MAX_AUTO_VERIFY_RETRIES) return false;
-          if (o.lastVerifyAttempt) {
-            const elapsed = Date.now() - new Date(o.lastVerifyAttempt).getTime();
-            if (elapsed < AUTO_VERIFY_COOLDOWN_MS) return false;
-          }
-          return true;
+
+          const needsVerifyRetry = o.syncStatus === 'success' && o.verifiedStatus === 'error' &&
+            (o.verifiedCount || 0) < MAX_AUTO_VERIFY_RETRIES &&
+            (!o.lastVerifyAttempt || (Date.now() - new Date(o.lastVerifyAttempt).getTime()) >= AUTO_VERIFY_COOLDOWN_MS);
+
+          const needsSyncRetry = o.syncStatus === 'error' &&
+            (o.autoSyncRetryCount || 0) < MAX_AUTO_VERIFY_RETRIES &&
+            (!o.lastAutoSyncAttempt || (Date.now() - new Date(o.lastAutoSyncAttempt).getTime()) >= AUTO_VERIFY_COOLDOWN_MS);
+
+          return needsVerifyRetry || needsSyncRetry;
         });
 
         if (brokenOrder) {
-          console.log(`[AutoFix] Found order with wrong tasks (ID: ${brokenOrder.id}, attempt ${(brokenOrder.verifiedCount || 0) + 1}/${MAX_AUTO_VERIFY_RETRIES}). Retrying full reconciliation...`);
+          console.log(`[AutoFix] Found order needing retry (ID: ${brokenOrder.id}, syncStatus=${brokenOrder.syncStatus}, verifiedStatus=${brokenOrder.verifiedStatus}). Retrying full reconciliation...`);
           // Use the full sync/reconcile function (not just verify) so it can also
           // create tasks that are completely missing on Taxes, not just fix field mismatches.
           await syncWorkOrder(brokenOrder.id);
