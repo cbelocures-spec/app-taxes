@@ -2215,33 +2215,35 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     // Helper: Navigate internally via sidebar to avoid white-page SPA loading bugs
     const goToTareasPage = async () => {
-      console.log(`[Verify] Navigating to Tareas page via sidebar...`);
+      console.log(`[Verify] Navigating to Tareas page via sidebar (Tms -> Producción -> Tareas)...`);
       const sidebarSuccess = await page.evaluate(() => {
-        // Expand "Taller" menu if collapsed
-        const items = Array.from(document.querySelectorAll('a, li, span, div, .nav-item'));
-        const tallerItem = items.find(el => el.textContent.trim() === 'Taller');
-        if (tallerItem) {
-          tallerItem.click();
-        }
+        const findAndClick = (text) => {
+          const els = Array.from(document.querySelectorAll('a, li, span, div, .nav-link, .nav-item'));
+          const el = els.find(e => {
+            const txt = e.textContent.trim().toLowerCase();
+            return txt === text.toLowerCase() || txt.startsWith(text.toLowerCase());
+          });
+          if (el) {
+            el.click();
+            return true;
+          }
+          return false;
+        };
+
+        findAndClick('Tms');
         return new Promise((resolve) => {
           setTimeout(() => {
-            const subItems = Array.from(document.querySelectorAll('a, li, span'));
-            const tareasItem = subItems.find(el => {
-              const txt = el.textContent.trim().toLowerCase();
-              return txt === 'tareas ot' || txt === 'tareas o.t.' || txt === 'tareas';
-            });
-            if (tareasItem) {
-              tareasItem.click();
-              resolve(true);
-            } else {
-              resolve(false);
-            }
+            findAndClick('Producción');
+            setTimeout(() => {
+              const clicked = findAndClick('Tareas');
+              resolve(clicked);
+            }, 600);
           }, 600);
         });
       }).catch(() => false);
 
       if (sidebarSuccess) {
-        await delay(2500); // Wait for router view to render
+        await delay(3500); // Wait for router view to render
       } else {
         console.log(`[Verify] Sidebar navigation failed. Using direct safeGoto fallback...`);
         await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
