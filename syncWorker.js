@@ -2472,7 +2472,7 @@ async function startWorker() {
 
  // Auto-fix settings for tasks that failed verification (wrong hours/status in Taxes)
   const MAX_AUTO_VERIFY_RETRIES = 5;
-  const AUTO_VERIFY_COOLDOWN_MS = 15 * 60 * 1000; // wait 15 min between auto retries per order
+  const AUTO_VERIFY_COOLDOWN_MS = 2 * 60 * 1000; // wait 2 min between auto retries per order
 
   while (isWorkerRunning) {
     try {
