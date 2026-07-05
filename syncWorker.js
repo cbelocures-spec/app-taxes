@@ -2163,13 +2163,16 @@ async function verifyWorkOrderWithPage(page, orderId) {
   try {
     // 1. Navigate to tasks list
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-    await page.waitForSelector('input[placeholder*="Buscar por Numero"]', { timeout: 15000 }).catch(() => {});
-    await delay(2000);
+    const searchInpSelector = 'input[placeholder*="Buscar por Numero"], input[placeholder*="OT"], input[placeholder*="Título"]';
+    await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async () => {
+      console.warn(`[Verify] Search input selector timeout. Page loaded blank? Reloading and retrying...`);
+      await page.reload({ waitUntil: 'load', timeout: 30000 });
+      await page.waitForSelector(searchInpSelector, { timeout: 15000 });
+    });
+    await delay(1500);
 
     // 2. Search for OT number
     console.log(`[Verify] Searching for OT ${otNumClean} in tasks page...`);
-    const searchInpSelector = 'input[placeholder*="Buscar por Numero"], input[placeholder*="OT"], input[placeholder*="Título"]';
-    await page.waitForSelector(searchInpSelector, { timeout: 15000 });
     await page.click(searchInpSelector, { clickCount: 3 });
     await page.keyboard.press('Backspace');
     await page.keyboard.type(otNumClean, { delay: 80 });
