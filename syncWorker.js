@@ -2291,7 +2291,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
     await delay(2000);
 
     // 6. Read all tasks from the OT edit form
-    const formTasks = await page.evaluate(() => {
+    let formTasks = await page.evaluate(() => {
       const clean = s => (s || '').trim();
       const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
       const descInputs = Array.from(document.querySelectorAll('textarea[id^="descripcion_"], textarea[placeholder*="Describe las actividades"]'));
@@ -2315,6 +2315,45 @@ async function verifyWorkOrderWithPage(page, orderId) {
       }));
     });
 
+    // ── FALLBACK FOR SAVED TASKS: If 0 cards are active, click the bottom "Tareas" tab and read saved tasks ──
+    if (formTasks.length === 0) {
+      console.log('[Verify] 0 active edit cards found. Attempting to click bottom "Tareas" tab for saved tasks...');
+      const clickedTab = await page.evaluate(() => {
+        const tabs = Array.from(document.querySelectorAll('a.nav-link, [role="tab"]'));
+        const targetTab = tabs.find(t => t.textContent.toLowerCase().includes('tareas -') || t.textContent.toLowerCase().includes('tareas ('));
+        if (targetTab) {
+          targetTab.click();
+          return true;
+        }
+        return false;
+      });
+
+      if (clickedTab) {
+        await delay(2000);
+        // Read bottom table
+        formTasks = await page.evaluate(() => {
+          const tables = Array.from(document.querySelectorAll('table'));
+          const taskTable = tables.find(t => {
+            const headers = Array.from(t.querySelectorAll('th')).map(h => h.textContent.trim().toLowerCase());
+            return headers.includes('técnico') || headers.includes('tecnico');
+          });
+          if (!taskTable) return [];
+          const rows = Array.from(taskTable.querySelectorAll('tbody tr'));
+          return rows.map(r => {
+            const cells = Array.from(r.querySelectorAll('td')).map(c => c.textContent.trim());
+            // Cells: [#, Fecha, Tipo/Prod, Técnico, Descripción, Estado]
+            return {
+              employee: cells[3] || '',
+              hours: '0', // bottom table doesn't list hours directly
+              description: cells[4] || '',
+              realizada: (cells[5] || '').toUpperCase() === 'FINALIZADA' ? 'SI' : 'NO',
+              _allCells: cells
+            };
+          });
+        });
+      }
+    }
+
     console.log(`[Verify] Form tasks found: ${formTasks.length}`, JSON.stringify(formTasks));
 
     const errors = [];
@@ -2331,7 +2370,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
       // Match against form tasks
       let matchingTask = null;
       let matchingIndex = -1;
-      if (formTasks.length > 0 && formTasks[0].employee) {
+      if (formTasks.length > 0) {
         for (let fi = 0; fi < formTasks.length; fi++) {
           const ft = formTasks[fi];
           const empOk = clean(ft.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(ft.employee));
@@ -2339,9 +2378,6 @@ async function verifyWorkOrderWithPage(page, orderId) {
                          clean(ft.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(ft.description));
           if (empOk && descOk) { matchingTask = ft; matchingIndex = fi; break; }
         }
-      } else {
-        matchingTask = formTasks[idx];
-        matchingIndex = idx;
       }
 
       if (!matchingTask) {
@@ -2349,11 +2385,19 @@ async function verifyWorkOrderWithPage(page, orderId) {
         errors.push(`Tarea #${idx + 1} (${employeeLabel}): No encontrada — se corregirá en próxima sincronización`);
         if (order.tasks[idx]) order.tasks[idx].needsHoursUpdate = true;
       } else {
+        // If it's a static verified table (already saved in historical table)
+        const isStatic = matchingTask._allCells.length > 1 && !matchingTask._allCells[0].startsWith('hours:');
+        if (isStatic) {
+          console.log(`[Verify] Task #${idx+1} (${employeeLabel}) found as saved/static. Marking as verified.`);
+          continue;
+        }
+
         const actualHours = parseFloat(String(matchingTask.hours).replace(',', '.')) || 0;
         const hoursOk = Math.abs(expectedHours - actualHours) <= 0.05;
         const realizadaOk = t.status !== 'Finalizada' || matchingTask.realizada === 'SI';
 
         console.log(`[Verify] Task #${idx+1}: hours expected=${expectedHoursStr} actual=${actualHours} OK=${hoursOk} | realizada expected=${t.status === 'Finalizada'} actual=${matchingTask.realizada} OK=${realizadaOk}`);
+
 
         // ── FIX HOURS if mismatch ──
         if (!hoursOk) {
