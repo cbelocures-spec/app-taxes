@@ -66,8 +66,9 @@ async function checkAndSync() {
       }
 
 
-      // Find any order that needs sync (syncStatus is pending or error with browser launch or database failures)
-      const pending = orders.filter(o => o.syncStatus === 'pending' || (o.syncStatus === 'error' && ((o.syncError || '').includes('Failed to launch') || (o.syncError || '').includes('saveWorkOrder'))));
+      // Find any order that needs sync (syncStatus is pending or error with browser launch, database, or properties failures)
+      const pending = orders.filter(o => o.syncStatus === 'pending' || (o.syncStatus === 'error' && ((o.syncError || '').includes('Failed to launch') || (o.syncError || '').includes('saveWorkOrder') || (o.syncError || '').includes('properties of undefined'))));
+
 
       if (pending.length === 0) {
         isAgentRunning = false;
@@ -97,16 +98,26 @@ async function checkAndSync() {
             // Get updated order from local DB
             const updatedLocal = db.getWorkOrderById(target.id);
 
+            // If it was deleted during cleanup, it means it synced successfully!
+            const syncStatus = updatedLocal ? updatedLocal.syncStatus : 'synced';
+            const syncError = updatedLocal ? updatedLocal.syncError : null;
+            const syncDate = updatedLocal ? updatedLocal.syncDate : new Date().toISOString();
+            const tasks = updatedLocal ? updatedLocal.tasks : target.tasks.map(t => ({ ...t, synced: true, taxesRealizadaSynced: true }));
+            const verifiedStatus = updatedLocal ? updatedLocal.verifiedStatus : 'ok';
+            const verifiedError = updatedLocal ? updatedLocal.verifiedError : null;
+            const verifiedCount = updatedLocal ? updatedLocal.verifiedCount : 1;
+
             // Upload results back to Railway
             apiCall('POST', `/api/orders/local-sync-result/${target.id}`, {
-              syncStatus: updatedLocal.syncStatus,
-              syncError: updatedLocal.syncError,
-              syncDate: updatedLocal.syncDate,
-              tasks: updatedLocal.tasks,
-              verifiedStatus: updatedLocal.verifiedStatus,
-              verifiedError: updatedLocal.verifiedError,
-              verifiedCount: updatedLocal.verifiedCount
+              syncStatus,
+              syncError,
+              syncDate,
+              tasks,
+              verifiedStatus,
+              verifiedError,
+              verifiedCount
             }, (uploadErr) => {
+
               if (uploadErr) {
                 console.error('[RailwayAgent] Error uploading sync result:', uploadErr.message);
               } else {
