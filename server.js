@@ -1537,8 +1537,13 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   console.log(`[HTTP] Escuchando en http://localhost:${PORT}`);
   console.log(`[HTTP] Red local:      http://${localIP}:${PORT}`);
 
-  // Start the Puppeteer background sync worker
-  worker.startWorker();
+  // Start the Puppeteer background sync worker only if not on production (Railway)
+  if (process.env.NODE_ENV !== 'production') {
+    worker.startWorker();
+  } else {
+    console.log('[Worker] Disabling Puppeteer background worker on production cloud server.');
+  }
+
 
   // Start Railway sync agent if running locally to bridge the Railway cloud database
   if (process.env.NODE_ENV !== 'production') {
