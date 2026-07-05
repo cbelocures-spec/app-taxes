@@ -75,7 +75,12 @@ async function checkAndSync() {
         setTimeout(async () => {
           try {
             // Update local database copy of this order so syncWorker can read it
-            db.saveWorkOrder(target);
+            const existing = db.getWorkOrderById(target.id);
+            if (existing) {
+              db.updateWorkOrder(target.id, target);
+            } else {
+              db.createWorkOrder(target);
+            }
 
             // Run syncWorker
             const result = await worker.syncWorkOrder(target.id);
