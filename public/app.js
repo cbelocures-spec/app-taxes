@@ -1097,12 +1097,14 @@ async function fetchSettingsPolling() {
     const res = await fetch(`/api/settings?_=${Date.now()}`);
     if (res.ok) {
       const data = await res.json();
+      lastKnownSettings = data;
       updateCatalogSyncUI(data);
     }
   } catch (e) {}
 }
 
 let lastSyncStatus = "idle";
+let lastKnownSettings = null;
 
 function updateCatalogSyncUI(settings) {
   const btn = document.getElementById('btn-sync-catalogs');
@@ -1149,8 +1151,18 @@ function updateCatalogSyncUI(settings) {
     btn.disabled = false;
     spinner.style.animation = "none";
     btnText.textContent = "Sincronizar Catálogos desde Taxes";
-    statusText.style.color = "var(--text-muted)";
-    statusText.innerHTML = `Catálogos locales listos (Mockup activado).`;
+    // Check if we have real catalog data loaded
+    const rodadosCount = (cachedCatalogs && cachedCatalogs.rodados) ? cachedCatalogs.rodados.length : 0;
+    const empleadosCount = (cachedCatalogs && cachedCatalogs.empleados) ? cachedCatalogs.empleados.length : 0;
+    if (rodadosCount > 5) {
+      statusText.style.color = "var(--success)";
+      statusText.style.fontWeight = "600";
+      statusText.innerHTML = `✓ Catálogos de Taxes listos: ${rodadosCount} vehículos, ${empleadosCount} operarios.`;
+    } else {
+      statusText.style.color = "var(--text-muted)";
+      statusText.style.fontWeight = "";
+      statusText.innerHTML = `Catálogos no sincronizados. Hacé clic para conectar con Taxes.`;
+    }
   }
 }
 
@@ -1238,9 +1250,16 @@ async function fetchCatalogs() {
     // Render the bulk vehicle selector list
     renderBulkVehicleSelector();
 
-    // Update status text
-    if (data.rodados && data.rodados.length > 5) {
-      document.getElementById('catalog-status-text').textContent = "Catálogos cargados desde la web de Taxes.";
+    // Update catalog status UI now that cachedCatalogs is populated
+    if (lastKnownSettings) {
+      updateCatalogSyncUI(lastKnownSettings);
+    } else if (data.rodados && data.rodados.length > 5) {
+      const statusEl = document.getElementById('catalog-status-text');
+      if (statusEl) {
+        statusEl.style.color = 'var(--success)';
+        statusEl.style.fontWeight = '600';
+        statusEl.innerHTML = `✓ Catálogos de Taxes listos: ${data.rodados.length} vehículos, ${(data.empleados||[]).length} operarios.`;
+      }
     }
 
     // Refresh UI since catalogs are now available
