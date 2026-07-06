@@ -361,6 +361,13 @@ app.put('/api/orders/:id', (req, res) => {
     const createdBy = existing.createdBy || requester;
     const allTasksCompleted = (tasks || []).length > 0 && (tasks || []).every(t => t.status === "Finalizada");
 
+    // SAFETY: if the incoming tasks array is empty but the order already has tasks,
+    // preserve the existing tasks. This prevents accidental deletion of tasks
+    // when a timer-only update sends a partial payload.
+    const tasksToSave = (tasks && tasks.length > 0)
+      ? tasks
+      : (existing.tasks && existing.tasks.length > 0 ? existing.tasks : []);
+
     const updated = db.updateWorkOrder(req.params.id, {
       rodado,
       responsable,
@@ -375,7 +382,7 @@ app.put('/api/orders/:id', (req, res) => {
       syncDate: null,
       estadoUnidad: estadoUnidad !== undefined ? estadoUnidad : existing.estadoUnidad,
       combustibleReset: combustibleReset !== undefined ? combustibleReset : existing.combustibleReset,
-      tasks: (tasks || []).map((t, idx) => {
+      tasks: tasksToSave.map((t, idx) => {
         const existingTask = existing.tasks ? existing.tasks.find(et => et.id === t.id) : null;
         let synced = existingTask ? (existingTask.synced === true) : false;
         let taxesRealizadaSynced = existingTask ? (existingTask.taxesRealizadaSynced === true) : false;
@@ -392,10 +399,10 @@ app.put('/api/orders/:id', (req, res) => {
           horasEstimadas: parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0,
           descripcion: t.descripcion || "",
           status: t.status || "Pendiente",
-          insumos: t.insumos || "",
+          insumos: t.insumos !== undefined ? t.insumos : (existingTask ? existingTask.insumos || "" : ""),
           timerStart: t.timerStart || null,
           timerStarted: t.timerStarted === true || t.timerStarted === 'true',
-          timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : [],
+          timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : (existingTask ? existingTask.timerHistory || [] : []),
           synced: synced,
           taxesRealizadaSynced: taxesRealizadaSynced
         };
