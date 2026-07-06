@@ -308,7 +308,7 @@ class LocalDB {
 
     // Create new Work Order object with defaults
     const newOrder = {
-      id: Date.now().toString(), // local unique ID
+      id: orderData.id ? String(orderData.id) : Date.now().toString(), // preserve Railway ID if provided
       rodado: orderData.rodado || "",
       responsable: orderData.responsable || "",
       fechaEntrega: orderData.fechaEntrega || "",
