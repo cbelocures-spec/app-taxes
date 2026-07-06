@@ -30,6 +30,9 @@ function apiCall(method, path, bodyData, callback) {
     res.on('data', (chunk) => { data += chunk; });
     res.on('end', () => { callback(null, data); });
   });
+  req.setTimeout(15000, () => {
+    req.destroy(new Error('Request timeout (15s)'));
+  });
   req.on('error', (err) => { callback(err); });
   if (bodyData) req.write(payload);
   req.end();
