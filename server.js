@@ -247,6 +247,7 @@ app.post('/api/orders', (req, res) => {
 
     // Trigger Google Sheets update asynchronously for any finalized tasks
     checkAndTriggerGoogleSheetUpdates(null, newOrder.tasks, responsable, interno);
+    checkAndSendInsumosToSheet(null, newOrder.tasks, responsable, interno);
 
     // Trigger active tasks Google Sheets update
     triggerActiveTasksGoogleSheetSync();
@@ -391,6 +392,7 @@ app.put('/api/orders/:id', (req, res) => {
           horasEstimadas: parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0,
           descripcion: t.descripcion || "",
           status: t.status || "Pendiente",
+          insumos: t.insumos || "",
           timerStart: t.timerStart || null,
           timerStarted: t.timerStarted === true || t.timerStarted === 'true',
           timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : [],
@@ -402,6 +404,7 @@ app.put('/api/orders/:id', (req, res) => {
 
     // Trigger Google Sheets update asynchronously for any newly finalized tasks
     checkAndTriggerGoogleSheetUpdates(existing, updated.tasks, responsable, interno);
+    checkAndSendInsumosToSheet(existing, updated.tasks, responsable, interno);
 
     // Trigger active tasks Google Sheets update
     triggerActiveTasksGoogleSheetSync();
@@ -1376,6 +1379,121 @@ async function checkAndTriggerGoogleSheetUpdates(existingOrder, updatedTasks, su
   } catch (error) {
     console.error("Error in checkAndTriggerGoogleSheetUpdates:", error);
   }
+}
+
+async function checkAndSendInsumosToSheet(existingOrder, updatedTasks, supervisor, orderInterno) {
+  const settings = db.getSettings();
+  const scriptUrl = settings.googleScriptUrl;
+  if (!scriptUrl) {
+    console.log("checkAndSendInsumosToSheet: googleScriptUrl is not configured.");
+    return;
+  }
+
+  // Find newly finalized tasks
+  const newlyFinalized = (updatedTasks || []).filter(t => {
+    if (t.status !== "Finalizada") return false;
+    if (!existingOrder) return true;
+    const oldTask = (existingOrder.tasks || []).find(ot => ot.id === t.id);
+    return !oldTask || oldTask.status !== "Finalizada";
+  });
+
+  if (newlyFinalized.length === 0) return;
+
+  try {
+    const catalogs = db.getCatalogs();
+
+    for (const task of newlyFinalized) {
+      if (!task.insumos || !task.insumos.trim()) continue;
+
+      // Resolve mechanic name
+      const mechanicObj = (catalogs.empleados || []).find(e => String(e.value) === String(task.empleado));
+      const mechanicName = mechanicObj ? mechanicObj.label : (task.empleado || "");
+
+      // Resolve supervisor name
+      let supervisorName = "";
+      const selectedSupervisor = supervisor || (existingOrder ? existingOrder.responsable : '');
+      if (selectedSupervisor && selectedSupervisor !== "AUTO") {
+        const supervisorObj = (catalogs.responsables || []).find(r => String(r.value) === String(selectedSupervisor));
+        if (supervisorObj) supervisorName = supervisorObj.label;
+      }
+      if (!supervisorName || supervisorName === "AUTO") {
+        const email = (settings.username || '').toLowerCase().trim();
+        if (email) {
+          if (email.includes("paniol") || email.includes("belocures") || email.includes("cesar")) {
+            const matched = (catalogs.responsables || []).find(r => r.label.toLowerCase().includes("belocures") || r.label.toLowerCase().includes("cesar"));
+            if (matched) supervisorName = matched.label;
+          } else {
+            const prefix = email.split('@')[0];
+            const parts = prefix.split(/[\._\-]/).filter(p => p.length >= 3);
+            let matched = null;
+            if (parts.length > 0) {
+              matched = (catalogs.responsables || []).find(r => {
+                const lbl = r.label.toLowerCase();
+                return parts.some(part => lbl.includes(part));
+              });
+            }
+            if (!matched && prefix.length > 2) {
+              matched = (catalogs.responsables || []).find(r => r.label.toLowerCase().includes(prefix));
+            }
+            if (matched) supervisorName = matched.label;
+          }
+        }
+        if (!supervisorName) {
+          supervisorName = settings.username || "AUTO";
+        }
+      }
+
+      // Parse the insumos string
+      const parsedInsumos = parseInsumosString(task.insumos);
+      const otNumber = (existingOrder && existingOrder.taxesOrderNumber) ? existingOrder.taxesOrderNumber : "Sin Sincronizar";
+      const interno = orderInterno || (existingOrder ? existingOrder.interno : '');
+
+      for (const item of parsedInsumos) {
+        const queryParams = new URLSearchParams({
+          action: 'addInsumo',
+          interno: interno,
+          numeroOrden: otNumber,
+          insumo: item.insumo,
+          cantidad: item.cantidad,
+          empleado: mechanicName,
+          supervisor: supervisorName
+        });
+
+        const updateUrl = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${queryParams.toString()}`;
+        console.log(`[Google Sheets Insumos] Sending request to Apps Script URL: ${updateUrl}`);
+
+        fetch(updateUrl)
+          .then(async (res) => {
+            const text = await res.text();
+            console.log(`[Google Sheets Insumos] Apps Script Response (Status ${res.status}):`, text);
+          })
+          .catch(err => {
+            console.error("[Google Sheets Insumos] Error calling Apps Script:", err.message);
+          });
+      }
+    }
+  } catch (error) {
+    console.error("Error in checkAndSendInsumosToSheet:", error);
+  }
+}
+
+function parseInsumosString(insumosStr) {
+  if (!insumosStr || !insumosStr.trim()) return [];
+  const parts = insumosStr.split('|');
+  const results = [];
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const colonIdx = trimmed.indexOf(':');
+    if (colonIdx !== -1) {
+      const insumo = trimmed.substring(0, colonIdx).trim();
+      const cantidad = trimmed.substring(colonIdx + 1).trim();
+      results.push({ insumo, cantidad });
+    } else {
+      results.push({ insumo: trimmed, cantidad: "1" });
+    }
+  }
+  return results;
 }
 
 async function triggerFuelServiceReset(order) {
