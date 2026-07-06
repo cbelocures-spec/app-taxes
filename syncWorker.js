@@ -2544,24 +2544,59 @@ async function verifyWorkOrderWithPage(page, orderId) {
           if (!hoursOk) {
             console.log(`[Verify] Setting hours to ${expectedHoursStr}...`);
             const hoursId = await page.evaluate((val) => {
+              // 1. Try finding input by label text containing "horas"
+              const labels = Array.from(document.querySelectorAll('label'));
+              const hoursLabel = labels.find(l => l.textContent.toLowerCase().includes('horas'));
+              if (hoursLabel) {
+                if (hoursLabel.htmlFor) {
+                  const el = document.getElementById(hoursLabel.htmlFor);
+                  if (el) {
+                    try {
+                      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                      nativeSetter.call(el, val);
+                    } catch(e) { el.value = val; }
+                    el.focus();
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+                    return el.id || (el.id = 'temp-fix-hours-single');
+                  }
+                }
+                const parent = hoursLabel.closest('.form-group') || hoursLabel.parentElement;
+                const el = parent?.querySelector('input');
+                if (el) {
+                  try {
+                    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    nativeSetter.call(el, val);
+                  } catch(e) { el.value = val; }
+                  el.focus();
+                  el.dispatchEvent(new Event('input', { bubbles: true }));
+                  el.dispatchEvent(new Event('change', { bubbles: true }));
+                  el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+                  return el.id || (el.id = 'temp-fix-hours-single');
+                }
+              }
+
+              // 2. Fallback to searching name/id/placeholder attributes
               const inputs = Array.from(document.querySelectorAll('input'));
               const el = inputs.find(i => {
                 const name = (i.name || '').toLowerCase();
+                const id = (i.id || '').toLowerCase();
                 const placeholder = (i.placeholder || '').toLowerCase();
-                const label = i.closest('.form-group')?.textContent.toLowerCase() || '';
-                return name.includes('horas') || placeholder.includes('horas') || label.includes('horas');
+                return name.includes('hora') || id.includes('hora') || placeholder.includes('hora');
               });
-              if (!el) return null;
-              try {
-                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                nativeSetter.call(el, val);
-              } catch(e) { el.value = val; }
-              el.focus();
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-              el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-              if (!el.id) el.id = 'temp-fix-hours-single';
-              return el.id;
+              if (el) {
+                try {
+                  const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                  nativeSetter.call(el, val);
+                } catch(e) { el.value = val; }
+                el.focus();
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+                return el.id || (el.id = 'temp-fix-hours-single');
+              }
+              return null;
             }, expectedHoursStr);
 
             if (hoursId) {
@@ -2579,13 +2614,16 @@ async function verifyWorkOrderWithPage(page, orderId) {
               }, hoursId);
               await delay(1500);
               madeChanges = true;
+            } else {
+              console.warn(`[Verify] Could not find hours input field for Task #${idx+1}`);
+              errors.push(`Tarea #${idx+1}: No se encontró el campo de horas en el formulario de edición`);
             }
           }
 
           // Update status if mismatch
           if (!realizadaOk) {
             console.log(`[Verify] Setting status to ${t.status}...`);
-            await page.evaluate((targetStatus) => {
+            const statusUpdated = await page.evaluate((targetStatus) => {
               // 1. Try status select dropdown first
               const selects = Array.from(document.querySelectorAll('select'));
               const statusSelect = selects.find(s => {
@@ -2616,13 +2654,21 @@ async function verifyWorkOrderWithPage(page, orderId) {
               return false;
             }, t.status);
             await delay(1500);
-            madeChanges = true;
+            if (statusUpdated) {
+              madeChanges = true;
+            } else {
+              console.warn(`[Verify] Could not toggle status for Task #${idx+1}`);
+              errors.push(`Tarea #${idx+1}: No se pudo cambiar el estado a '${t.status}'`);
+            }
           }
 
           // Click GUARDAR
           console.log(`[Verify] Clicking GUARDAR...`);
           const saved = await page.evaluate(() => {
-            const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
+            const btn = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn')).find(b => {
+              const text = (b.textContent || b.value || '').toLowerCase().trim();
+              return text.includes('guardar');
+            });
             if (btn) { btn.click(); return true; }
             return false;
           });
@@ -2630,6 +2676,9 @@ async function verifyWorkOrderWithPage(page, orderId) {
           if (saved) {
             await delay(4500);
             console.log(`[Verify] Task edit saved successfully!`);
+          } else {
+            console.warn(`[Verify] Could not find or click GUARDAR button for Task #${idx+1}`);
+            errors.push(`Tarea #${idx+1}: No se encontró el botón GUARDAR`);
           }
         }
       }
