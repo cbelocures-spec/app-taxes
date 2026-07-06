@@ -1,9 +1,8 @@
 FROM node:20-slim
 
-# Install ALL Chromium dependencies needed for headless Chrome in Docker
+# Install Chromium and ALL system dependencies needed for Puppeteer
 RUN apt-get update && apt-get install -y \
     chromium \
-    dbus \
     ca-certificates \
     fonts-liberation \
     fonts-ipafont-gothic \
@@ -38,10 +37,6 @@ RUN apt-get update && apt-get install -y \
 # Tell Puppeteer to use the installed Chromium
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-
-# Prevent Chrome from connecting to DBus (not available in containers)
-ENV DBUS_SESSION_BUS_ADDRESS=/dev/null
-ENV DBUS_SYSTEM_BUS_ADDRESS=/dev/null
 
 # Create app directory
 WORKDIR /app
