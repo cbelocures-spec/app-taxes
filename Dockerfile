@@ -1,15 +1,11 @@
 FROM node:20-slim
 
-# Install Chromium and ALL system dependencies needed for Puppeteer
+# Install wget, gnupg, and Chrome dependencies
 RUN apt-get update && apt-get install -y \
-    chromium \
+    wget \
+    gnupg \
     ca-certificates \
     fonts-liberation \
-    fonts-ipafont-gothic \
-    fonts-wqy-zenhei \
-    fonts-thai-tlwg \
-    fonts-khmeros \
-    fonts-freefont-ttf \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
@@ -31,11 +27,17 @@ RUN apt-get update && apt-get install -y \
     libxss1 \
     libxtst6 \
     xdg-utils \
-    --no-install-recommends \
+    --no-install-recommends
+
+# Add official Google Chrome repository and install Google Chrome Stable
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/googlechrome-keyring.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/googlechrome-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Tell Puppeteer to use the installed Chromium
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+# Tell Puppeteer to use Google Chrome Stable
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 # Create app directory
