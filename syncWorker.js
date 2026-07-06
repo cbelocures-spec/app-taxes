@@ -1673,7 +1673,13 @@ async function syncWorkOrder(orderId) {
       console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
       await delay(4000);
       const guardarBtnId = await page.evaluate(() => {
-        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
+        let btn = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn')).find(b => {
+          const text = (b.textContent || b.value || '').toLowerCase().trim();
+          return text.includes('guardar') || text.includes('crear') || text.includes('aceptar');
+        });
+        if (!btn) {
+          btn = document.querySelector('button.btn-success, input.btn-success, button.btn-primary, input.btn-primary');
+        }
         if (!btn) return null;
         const id = 'tmp-guardar-btn-' + Date.now();
         btn.id = id;
@@ -2677,10 +2683,13 @@ async function verifyWorkOrderWithPage(page, orderId) {
           // Click GUARDAR
           console.log(`[Verify] Clicking GUARDAR...`);
           const saved = await page.evaluate(() => {
-            const btn = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn')).find(b => {
+            let btn = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn')).find(b => {
               const text = (b.textContent || b.value || '').toLowerCase().trim();
               return text.includes('guardar');
             });
+            if (!btn) {
+              btn = document.querySelector('button.btn-success, input.btn-success');
+            }
             if (btn) { btn.click(); return true; }
             return false;
           });
