@@ -115,7 +115,8 @@ async function checkAndSync() {
               tasks,
               verifiedStatus,
               verifiedError,
-              verifiedCount
+              verifiedCount,
+              taxesOrderNumber: updatedLocal ? updatedLocal.taxesOrderNumber : null
             }, (uploadErr) => {
 
               if (uploadErr) {

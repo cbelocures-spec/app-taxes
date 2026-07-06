@@ -528,7 +528,7 @@ app.post('/api/orders/retry/:id', async (req, res) => {
 // Endpoint for local PC agent to upload sync results directly
 app.post('/api/orders/local-sync-result/:id', (req, res) => {
   try {
-    const { syncStatus, syncError, syncDate, tasks, verifiedStatus, verifiedError, verifiedCount } = req.body;
+    const { syncStatus, syncError, syncDate, tasks, verifiedStatus, verifiedError, verifiedCount, taxesOrderNumber } = req.body;
     const existing = db.getWorkOrderById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: "Orden no encontrada" });
@@ -555,7 +555,7 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
       return val;
     };
 
-    db.updateWorkOrder(req.params.id, {
+    const updates = {
       syncStatus: normalizeSyncStatus(syncStatus),
       syncError,
       syncDate,
@@ -563,7 +563,13 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
       verifiedStatus: normalizeVerifiedStatus(verifiedStatus),
       verifiedError,
       verifiedCount
-    });
+    };
+
+    if (taxesOrderNumber !== undefined && taxesOrderNumber !== null) {
+      updates.taxesOrderNumber = taxesOrderNumber;
+    }
+
+    db.updateWorkOrder(req.params.id, updates);
     
     res.json({ success: true });
   } catch (error) {
