@@ -759,9 +759,25 @@ async function scrapeCatalogs(triggerUsername = null) {
   try {
     db.saveSettings({ catalogSyncStatus: "syncing", catalogSyncError: null });
     browser = await puppeteer.launch({
-      headless: process.env.PUPPETEER_EXECUTABLE_PATH ? true : (process.env.NODE_ENV === 'production'),
+      headless: 'new',
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote', '--disable-blink-features=AutomationControlled', '--lang=es-AR,es'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--single-process',
+        '--disable-extensions',
+        '--disable-default-apps',
+        '--disable-background-networking',
+        '--disable-sync',
+        '--disable-ipc-flooding-protection',
+        '--disable-renderer-backgrounding',
+        '--mute-audio',
+        '--disable-blink-features=AutomationControlled',
+        '--lang=es-AR,es'
+      ],
       protocolTimeout: 300000
     });
 
@@ -1221,9 +1237,25 @@ async function syncWorkOrder(orderId) {
   try {
     // Launch browser
     browser = await puppeteer.launch({
-      headless: process.env.PUPPETEER_EXECUTABLE_PATH ? true : (process.env.NODE_ENV === 'production'),
+      headless: 'new',
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote', '--disable-blink-features=AutomationControlled', '--lang=es-AR,es'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--single-process',
+        '--disable-extensions',
+        '--disable-default-apps',
+        '--disable-background-networking',
+        '--disable-sync',
+        '--disable-ipc-flooding-protection',
+        '--disable-renderer-backgrounding',
+        '--mute-audio',
+        '--disable-blink-features=AutomationControlled',
+        '--lang=es-AR,es'
+      ],
       protocolTimeout: 300000
     });
 
@@ -2930,9 +2962,25 @@ async function verifyWorkOrder(orderId) {
   let browser = null;
   try {
     browser = await puppeteer.launch({
-      headless: process.env.PUPPETEER_EXECUTABLE_PATH ? true : (process.env.NODE_ENV === 'production'),
+      headless: 'new',
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote', '--disable-blink-features=AutomationControlled', '--lang=es-AR,es'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--single-process',
+        '--disable-extensions',
+        '--disable-default-apps',
+        '--disable-background-networking',
+        '--disable-sync',
+        '--disable-ipc-flooding-protection',
+        '--disable-renderer-backgrounding',
+        '--mute-audio',
+        '--disable-blink-features=AutomationControlled',
+        '--lang=es-AR,es'
+      ],
       protocolTimeout: 300000
     });
 
@@ -3103,9 +3151,25 @@ async function verifyGroupWithBrowser(group, settings) {
   let browser = null;
   try {
     browser = await puppeteer.launch({
-      headless: process.env.PUPPETEER_EXECUTABLE_PATH ? true : (process.env.NODE_ENV === 'production'),
+      headless: 'new',
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote', '--disable-blink-features=AutomationControlled', '--lang=es-AR,es'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--single-process',
+        '--disable-extensions',
+        '--disable-default-apps',
+        '--disable-background-networking',
+        '--disable-sync',
+        '--disable-ipc-flooding-protection',
+        '--disable-renderer-backgrounding',
+        '--mute-audio',
+        '--disable-blink-features=AutomationControlled',
+        '--lang=es-AR,es'
+      ],
       protocolTimeout: 300000
     });
 

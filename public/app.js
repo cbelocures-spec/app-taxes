@@ -1183,6 +1183,24 @@ async function fetchCatalogs() {
     if (!res.ok) throw new Error("Error fetching catalogs");
     const data = await res.json();
     
+    // --- FALLBACK: if catalogs never synced (empty arrays), use hardcoded defaults ---
+    // This prevents task creation from failing when Puppeteer can't reach Taxes
+    const FALLBACK_CENTROS_COSTO = [
+      { value: '15', label: 'MECANICA' },
+      { value: '16', label: 'HERRERIA' },
+      { value: '17', label: 'EDILICIO' },
+      { value: '18', label: 'LAVADO' },
+      { value: '19', label: 'ADMINISTRACION' }
+    ];
+    if (!data.centrosCosto || data.centrosCosto.length === 0) {
+      data.centrosCosto = FALLBACK_CENTROS_COSTO;
+    }
+    if (!data.empleados || data.empleados.length === 0) {
+      // Build fallback employees from hardcoded lists
+      const fallbackEmps = [...new Set([...MECANICA_EMPLOYEES, ...HERRERIA_EMPLOYEES])];
+      data.empleados = fallbackEmps.map(name => ({ value: name, label: name }));
+    }
+
     cachedCatalogs = data;
     
     // Populate form dropdowns

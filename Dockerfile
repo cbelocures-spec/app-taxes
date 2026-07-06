@@ -1,8 +1,9 @@
 FROM node:20-slim
 
-# Install Chromium dependencies for Puppeteer
+# Install Chromium and required system deps for headless operation
 RUN apt-get update && apt-get install -y \
     chromium \
+    dbus \
     fonts-ipafont-gothic \
     fonts-wqy-zenhei \
     fonts-thai-tlwg \
@@ -14,6 +15,10 @@ RUN apt-get update && apt-get install -y \
 # Tell Puppeteer to use the installed Chromium
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+# Prevent Chrome from trying to connect to DBus (not available in containers)
+ENV DBUS_SESSION_BUS_ADDRESS=/dev/null
+ENV DBUS_SYSTEM_BUS_ADDRESS=/dev/null
 
 # Create app directory
 WORKDIR /app
