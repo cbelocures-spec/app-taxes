@@ -1575,7 +1575,7 @@ async function syncWorkOrder(orderId) {
         if (!appTask) continue;
 
         // Fill Employee if empty
-        const { employeeLabel } = resolveAndMapEmployee(appTask);
+        const { employeeLabel, finalDescription } = resolveAndMapEmployee(appTask);
         if (formCards[ci].employee === '') {
           console.log(`[Reconcile] Card #${ci} has no employee. Selecting: "${employeeLabel}"...`);
           const empFilled = await fillTaskEmployeeSearchableSelect(page, ci, employeeLabel);
@@ -1584,10 +1584,8 @@ async function syncWorkOrder(orderId) {
         }
 
         // Fill/Fix Description if empty or doesn't match what the app has
-        const { finalDescription } = resolveAndMapEmployee(appTask);
         const descMismatch = formCards[ci].description === '' ||
-          (!cleanStr(formCards[ci].description).includes(cleanStr(finalDescription)) &&
-           !cleanStr(finalDescription).includes(cleanStr(formCards[ci].description)));
+          cleanStr(formCards[ci].description) !== cleanStr(finalDescription);
         if (descMismatch) {
           console.log(`[Reconcile] Card #${ci} description mismatch (Taxes: "${formCards[ci].description}"). Writing: "${finalDescription}"...`);
           const descId = await page.evaluate((idx, val) => {
@@ -2533,10 +2531,11 @@ async function verifyWorkOrderWithPage(page, orderId) {
         const hoursOk = Math.abs(expectedHours - actualHours) <= 0.05;
         const expectedRealizada = t.status === 'Finalizada' ? 'SI' : 'NO';
         const realizadaOk = matchedRow.realizada.toUpperCase() === expectedRealizada;
+        const descOk = clean(matchedRow.description) === clean(finalDescription);
 
-        console.log(`[Verify] Task #${idx+1}: hours expected=${expectedHoursStr} actual=${actualHours} OK=${hoursOk} | realizada expected=${expectedRealizada} actual=${matchedRow.realizada} OK=${realizadaOk}`);
+        console.log(`[Verify] Task #${idx+1}: hours expected=${expectedHoursStr} actual=${actualHours} OK=${hoursOk} | realizada expected=${expectedRealizada} actual=${matchedRow.realizada} OK=${realizadaOk} | description OK=${descOk}`);
 
-        if (!hoursOk || !realizadaOk) {
+        if (!hoursOk || !realizadaOk || !descOk) {
           console.log(`[Verify] Mismatch found for Task #${idx+1}. Opening single task edit form...`);
           const eyeBtnId = await page.evaluate((rowIdx) => {
             const rows = Array.from(document.querySelectorAll('table tbody tr'));
@@ -2553,6 +2552,100 @@ async function verifyWorkOrderWithPage(page, orderId) {
           }
           
           await delay(5000); // Wait for task edit form to load
+
+          // Update description if mismatch
+          if (!descOk) {
+            console.log(`[Verify] Setting description to "${finalDescription}"...`);
+            const descId = await page.evaluate((val) => {
+              // 1. Try finding textarea by label text containing "descri" or "actividad"
+              const labels = Array.from(document.querySelectorAll('label'));
+              const descLabel = labels.find(l => {
+                const text = l.textContent.toLowerCase();
+                return text.includes('descri') || text.includes('actividad') || text.includes('detalle');
+              });
+              if (descLabel) {
+                if (descLabel.htmlFor) {
+                  const el = document.getElementById(descLabel.htmlFor);
+                  if (el) {
+                    try {
+                      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+                      nativeSetter.call(el, val);
+                    } catch(e) { el.value = val; }
+                    el.focus();
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    return el.id || (el.id = 'temp-fix-desc-single');
+                  }
+                }
+                const parent = descLabel.closest('.form-group') || descLabel.parentElement;
+                const el = parent?.querySelector('textarea, input');
+                if (el) {
+                  try {
+                    const nativeSetter = Object.getOwnPropertyDescriptor((el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement : window.HTMLInputElement).prototype, 'value').set;
+                    nativeSetter.call(el, val);
+                  } catch(e) { el.value = val; }
+                  el.focus();
+                  el.dispatchEvent(new Event('input', { bubbles: true }));
+                  el.dispatchEvent(new Event('change', { bubbles: true }));
+                  return el.id || (el.id = 'temp-fix-desc-single');
+                }
+              }
+
+              // 2. Fallback to searching all textareas, or name/id/placeholder attributes
+              const ta = document.querySelector('textarea');
+              if (ta) {
+                try {
+                  const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+                  nativeSetter.call(ta, val);
+                } catch(e) { ta.value = val; }
+                ta.focus();
+                ta.dispatchEvent(new Event('input', { bubbles: true }));
+                ta.dispatchEvent(new Event('change', { bubbles: true }));
+                return ta.id || (ta.id = 'temp-fix-desc-single');
+              }
+
+              const inputs = Array.from(document.querySelectorAll('input'));
+              const el = inputs.find(i => {
+                const name = (i.name || '').toLowerCase();
+                const id = (i.id || '').toLowerCase();
+                const placeholder = (i.placeholder || '').toLowerCase();
+                return name.includes('descri') || id.includes('descri') || placeholder.includes('descri');
+              });
+              if (el) {
+                try {
+                  const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                  nativeSetter.call(el, val);
+                } catch(e) { el.value = val; }
+                el.focus();
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                return el.id || (el.id = 'temp-fix-desc-single');
+              }
+              return null;
+            }, finalDescription);
+
+            if (descId) {
+              await page.click(`#${descId}`).catch(() => {});
+              await page.keyboard.down('Control');
+              await page.keyboard.press('A');
+              await page.keyboard.up('Control');
+              await page.keyboard.press('Backspace');
+              await page.keyboard.type(finalDescription);
+              await delay(500);
+              await page.evaluate((id) => {
+                const el = document.getElementById(id);
+                if (el) {
+                  el.dispatchEvent(new Event('input', { bubbles: true }));
+                  el.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+              }, descId);
+              await delay(1500);
+              madeChanges = true;
+            } else {
+              console.warn(`[Verify] Could not find description input field for Task #${idx+1}`);
+              errors.push(`Tarea #${idx+1}: No se encontró el campo de descripción en el formulario de edición`);
+            }
+          }
 
           // Update hours if mismatch
           if (!hoursOk) {
