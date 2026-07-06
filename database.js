@@ -19,6 +19,82 @@ function normalizeEmail(email) {
   return `${localPart}@${domain}`;
 }
 
+function cleanEncoding(text) {
+  if (typeof text !== 'string') return text;
+  return text
+    // Replace common decoding artifacts from ISO-8859-1 vs UTF-8 mismatches
+    .replace(/Jes\u01e7s/g, 'Jesús')
+    .replace(/Jes\u00e7s/g, 'Jesús')
+    .replace(/Jes\uFFFDs/g, 'Jesús')
+    .replace(/Jesgs/gi, 'Jesús')
+    .replace(/Jess/g, 'Jesús')
+    .replace(/Jes\u00ad\u00ads/g, 'Jesús')
+    .replace(/Jesǧs/g, 'Jesús')
+    .replace(/Kev\uFFFDn/g, 'Kevín')
+    .replace(/Kevn/g, 'Kevín')
+    .replace(/Kev\u00ad\u00adn/g, 'Kevín')
+    .replace(/Kevn/g, 'Kevín')
+    .replace(/Mat\uFFFDas/g, 'Matías')
+    .replace(/Matas/g, 'Matías')
+    .replace(/Matas/g, 'Matías')
+    .replace(/Garc\uFFFDa/g, 'García')
+    .replace(/Garca/g, 'García')
+    .replace(/Garca/g, 'García')
+    .replace(/Yamand\u01e7/g, 'Yamandú')
+    .replace(/Yamand/g, 'Yamandú')
+    .replace(/Yamandǧ/g, 'Yamandú')
+    .replace(/V\uFFFDctor/g, 'Víctor')
+    .replace(/Vctor/g, 'Víctor')
+    .replace(/Vctor/g, 'Víctor')
+    .replace(/F\u01e8lix/g, 'Félix')
+    .replace(/Flix/g, 'Félix')
+    .replace(/F\u00d1lix/g, 'Félix')
+    .replace(/F\u017d\u00ad\u00adlix/g, 'Félix')
+    .replace(/F\u017dlix/g, 'Félix')
+    .replace(/FǸlix/g, 'Félix')
+    .replace(/Dami\u01edn/g, 'Damián')
+    .replace(/Dami\u00f1n/g, 'Damián')
+    .replace(/Damin/g, 'Damián')
+    .replace(/Damiǭn/g, 'Damián')
+    .replace(/Damin/g, 'Damián')
+    .replace(/R\uFFFDoS/g, 'Ríos')
+    .replace(/Ros/g, 'Ríos')
+    .replace(/R\u00edos/g, 'Ríos')
+    .replace(/Rios/g, 'Ríos')
+    .replace(/Ros/g, 'Ríos')
+    .replace(/R\u00EDos/g, 'Ríos')
+    .replace(/Hern\uFFFDn/g, 'Hernán')
+    .replace(/Hernn/g, 'Hernán')
+    .replace(/Hernn/g, 'Hernán')
+    .replace(/Sebasti\uFFFDn/g, 'Sebastián')
+    .replace(/Sebastin/g, 'Sebastián')
+    .replace(/Sebastin/g, 'Sebastián')
+    .replace(/Agust\uFFFDn/g, 'Agustín')
+    .replace(/Agustn/g, 'Agustín')
+    .replace(/Agustn/g, 'Agustín')
+    .replace(/Rom\uFFFDn/g, 'Román')
+    .replace(/Romn/g, 'Román')
+    .replace(/Romn/g, 'Román')
+    .replace(/Mart\uFFFDn/g, 'Martín')
+    .replace(/Martn/g, 'Martín')
+    .replace(/Martn/g, 'Martín')
+    .replace(/Nicol\uFFFDs/g, 'Nicolás')
+    .replace(/Nicols/g, 'Nicolás')
+    .replace(/Nicols/g, 'Nicolás')
+    .replace(/Ra\uFFFDu/g, 'Raúl')
+    .replace(/Ral/g, 'Raúl')
+    .replace(/Ral/g, 'Raúl')
+    .replace(/Adri\uFFFDn/g, 'Adrián')
+    .replace(/Adrin/g, 'Adrián')
+    .replace(/Adrin/g, 'Adrián')
+    .replace(/Guzm\uFFFDn/g, 'Guzmán')
+    .replace(/Guzmn/g, 'Guzmán')
+    .replace(/Guzmn/g, 'Guzmán')
+    .replace(/Jes\u00FAa/g, 'Jesús')
+    .replace(/\uFFFD/g, 'i') // general replacement
+    .trim();
+}
+
 const DEFAULT_MECHANICS = [
   "CALOMINO DARIO",
   "Canaviri Fernandez, Jesús",
@@ -244,11 +320,28 @@ class LocalDB {
   // --- Catalogs Methods ---
   getCatalogs() {
     const db = this.read();
-    return db.catalogs || DEFAULT_DB.catalogs;
+    const catalogs = db.catalogs || DEFAULT_DB.catalogs;
+    
+    // Sanitize labels to fix any encoding issues
+    if (Array.isArray(catalogs.empleados)) {
+      catalogs.empleados = catalogs.empleados.map(e => ({ ...e, label: cleanEncoding(e.label) }));
+    }
+    if (Array.isArray(catalogs.responsables)) {
+      catalogs.responsables = catalogs.responsables.map(r => ({ ...r, label: cleanEncoding(r.label) }));
+    }
+    if (Array.isArray(catalogs.rodados)) {
+      catalogs.rodados = catalogs.rodados.map(ro => ({ ...ro, label: cleanEncoding(ro.label) }));
+    }
+    return catalogs;
   }
 
   saveCatalogs(catalogs) {
     const db = this.read();
+    
+    // Sanitize incoming labels
+    const cleanRodados = (catalogs.rodados || []).map(ro => ({ ...ro, label: cleanEncoding(ro.label) }));
+    const cleanResponsables = (catalogs.responsables || []).map(r => ({ ...r, label: cleanEncoding(r.label) }));
+    const cleanIncomingEmps = (catalogs.empleados || []).map(e => ({ ...e, label: cleanEncoding(e.label) }));
     
     // Auto-merge custom mechanics into the synced catalog
     const customEmps = [
@@ -261,8 +354,7 @@ class LocalDB {
       "GODOY DAVID"
     ].map(name => ({ value: name, label: name }));
     
-    const incomingEmps = catalogs.empleados || [];
-    const mergedEmps = [...incomingEmps];
+    const mergedEmps = [...cleanIncomingEmps];
     for (const cEmp of customEmps) {
       if (!mergedEmps.some(e => String(e.value).toLowerCase() === cEmp.value.toLowerCase())) {
         mergedEmps.push(cEmp);
@@ -270,8 +362,8 @@ class LocalDB {
     }
 
     db.catalogs = {
-      rodados: catalogs.rodados || [],
-      responsables: catalogs.responsables || [],
+      rodados: cleanRodados,
+      responsables: cleanResponsables,
       empleados: mergedEmps,
       centrosCosto: catalogs.centrosCosto || []
     };

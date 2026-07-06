@@ -1619,7 +1619,7 @@ async function syncWorkOrder(orderId) {
         if (!hoursOk) {
           console.log(`[Reconcile] Fixing hours for card #${ci}...`);
           const hoursId = await page.evaluate((idx, val) => {
-            const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
+            const inputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
             const el = inputs[idx];
             if (!el) return null;
             try { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, val); }
@@ -1995,8 +1995,8 @@ async function syncWorkOrder(orderId) {
       console.log(`Setting Horas Estimadas: ${effectiveHoras} (original: ${task.horasEstimadas})`);
       const hoursVal3 = effectiveHoras.toFixed(2);
       const hoursFilled = await page.evaluate((idx, val) => {
-        // There are multiple inputs with name="horas_estimadas" — one per task
-        const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
+        // There are multiple inputs with name="horas_estimadas" or id^="horas_" — one per task
+        const inputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
         const el = inputs[idx];
         if (!el) return false;
         try {
@@ -2011,7 +2011,7 @@ async function syncWorkOrder(orderId) {
       }, i, hoursVal3).catch(() => false);
       // Also type via keyboard — assign ID first, then triple-click + type
       const hoursId3 = await page.evaluate((idx) => {
-        const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
+        const inputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
         const el = inputs[idx];
         if (!el) return null;
         if (!el.id) el.id = `temp-horas-${idx}`;
