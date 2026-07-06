@@ -2481,7 +2481,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
           // Update hours if mismatch
           if (!hoursOk) {
-            console.log(`[Verify] Setting hours to ${expectedHoursComma}...`);
+            console.log(`[Verify] Setting hours to ${expectedHoursStr}...`);
             const hoursId = await page.evaluate((val) => {
               const inputs = Array.from(document.querySelectorAll('input'));
               const el = inputs.find(i => {
@@ -2491,19 +2491,31 @@ async function verifyWorkOrderWithPage(page, orderId) {
                 return name.includes('horas') || placeholder.includes('horas') || label.includes('horas');
               });
               if (!el) return null;
-              try { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, val); }
-              catch(e) { el.value = val; }
+              try {
+                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                nativeSetter.call(el, val);
+              } catch(e) { el.value = val; }
               el.focus();
               el.dispatchEvent(new Event('input', { bubbles: true }));
               el.dispatchEvent(new Event('change', { bubbles: true }));
               el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
               if (!el.id) el.id = 'temp-fix-hours-single';
               return el.id;
-            }, expectedHoursComma);
+            }, expectedHoursStr);
 
             if (hoursId) {
               await page.click(`#${hoursId}`, { clickCount: 3 }).catch(() => {});
-              await page.keyboard.type(expectedHoursComma);
+              await page.keyboard.type(expectedHoursStr);
+              await delay(500);
+              // Dispatch input/change/blur again after typing to ensure state commit
+              await page.evaluate((id) => {
+                const el = document.getElementById(id);
+                if (el) {
+                  el.dispatchEvent(new Event('input', { bubbles: true }));
+                  el.dispatchEvent(new Event('change', { bubbles: true }));
+                  el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+                }
+              }, hoursId);
               await delay(1500);
               madeChanges = true;
             }
