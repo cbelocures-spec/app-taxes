@@ -41,6 +41,7 @@ function initMockCatalogs() {
 // Background Worker state
 let isWorkerRunning = false;
 let isScraping = false;
+const activeSyncs = new Set();
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
@@ -1177,10 +1178,17 @@ function resolveAndMapEmployee(task) {
 
 // 2. SYNCHRONIZE SINGLE WORK ORDER
 async function syncWorkOrder(orderId) {
-  const order = db.getWorkOrderById(orderId);
-  if (!order) return { success: false, message: "Order not found" };
+  if (activeSyncs.has(orderId)) {
+    console.log(`[Worker] syncWorkOrder already running for order ID: ${orderId}. Skipping parallel execution.`);
+    return { success: false, message: "Already syncing" };
+  }
+  activeSyncs.add(orderId);
 
-  const settings = db.getSettings();
+  try {
+    const order = db.getWorkOrderById(orderId);
+    if (!order) return { success: false, message: "Order not found" };
+
+    const settings = db.getSettings();
   
   // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
   // fallback to order creator's credentials only if global settings are empty.
@@ -1589,7 +1597,7 @@ async function syncWorkOrder(orderId) {
         if (descMismatch) {
           console.log(`[Reconcile] Card #${ci} description mismatch (Taxes: "${formCards[ci].description}"). Writing: "${finalDescription}"...`);
           const descId = await page.evaluate((idx, val) => {
-            const textareas = Array.from(document.querySelectorAll('textarea'));
+            const textareas = Array.from(document.querySelectorAll('textarea[id^="descripcion_"], textarea[placeholder*="Describe las actividades"]'));
             const el = textareas[idx];
             if (!el) return null;
             el.focus();
@@ -2248,7 +2256,7 @@ async function syncWorkOrder(orderId) {
     console.log(`Running post-sync verification for brand new OT #${order.interno}...`);
     await verifyWorkOrderWithPage(page, orderId);
 
-    await browser.close();
+    browser.close().catch(() => {});
     return { success: true, message: `Orden ${order.interno} sincronizada correctamente.` };
 
   } catch (error) {
@@ -2270,8 +2278,11 @@ async function syncWorkOrder(orderId) {
       autoSyncRetryCount: (order.autoSyncRetryCount || 0) + 1,
       lastAutoSyncAttempt: new Date().toISOString()
     });
-    if (browser) await browser.close();
+    if (browser) browser.close().catch(() => {});
     return { success: false, message: error.message };
+  }
+  } finally {
+    activeSyncs.delete(orderId);
   }
 }
 
@@ -2340,9 +2351,14 @@ async function verifyWorkOrderWithPage(page, orderId) {
     const findSearchInput = async () => {
       return await page.evaluate(() => {
         const labels = Array.from(document.querySelectorAll('label'));
+        // Be specific: only match labels that clearly refer to the OT search field
+        // Avoid generic "ot" substring which can match "Costo", "Moto", etc.
         const otLabel = labels.find(l => {
-          const txt = l.textContent.toLowerCase();
-          return txt.includes('buscar por numero') || txt.includes('titulo de ot') || txt.includes('ot');
+          const txt = l.textContent.toLowerCase().trim();
+          return txt.includes('buscar por numero') || 
+                 txt.includes('titulo de ot') || 
+                 txt === 'ot' ||
+                 (txt.startsWith('buscar') && txt.includes('ot'));
         });
         if (!otLabel) return null;
         const container = otLabel.closest('.field-compact, .form-group') || otLabel.parentElement?.parentElement;
@@ -2389,7 +2405,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
       await delay(500);
     };
 
-    // Helper to select employee in filter
+    // Helper to select employee in filter using searchable-select-dropdown global elements
     const selectEmployeeInFilter = async (empLabel) => {
       console.log(`[Verify] Selecting employee "${empLabel}" in filter...`);
       const empInputSelector = await findEmployeeFilterInput();
@@ -2398,31 +2414,76 @@ async function verifyWorkOrderWithPage(page, orderId) {
         return false;
       }
 
+      // Clear the input first, then type the apellido to search
       await page.click(empInputSelector, { clickCount: 3 });
       await page.keyboard.press('Backspace');
-      await page.keyboard.type(empLabel, { delay: 80 });
-      await delay(2000);
+      await delay(300);
 
-      // Select suggestion from dropdown list
-      const clicked = await page.evaluate((selector) => {
-        const inp = document.querySelector(selector);
-        const container = inp ? inp.closest('.searchable-select-wrapper, .field-compact, .form-group') : null;
-        if (!container) return false;
-        
-        const items = Array.from(container.querySelectorAll('li, .dropdown-item, [class*="item"], [class*="option"], .searchable-select-item'));
-        if (items.length > 0) {
-          items[0].click();
+      // Parse apellido and primer nombre for precise matching
+      const parts = empLabel.split(',');
+      const apellido = parts[0].trim();              // e.g. "Sosa", "Cuba Orosco", "Vera"
+      const primerNombre = parts[1] ? parts[1].trim().split(' ')[0] : ''; // e.g. "Alejandro", "Kevín", "Domingo"
+
+      await page.keyboard.type(apellido, { delay: 80 });
+      await delay(2500); // Wait for dropdown to populate
+
+      // Select from global searchable-select-dropdown elements
+      const clicked = await page.evaluate((targetVal, apel, pNombre) => {
+        const dropdownContainers = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"]'));
+        let visibleOptions = [];
+        dropdownContainers.forEach(container => {
+          if (container.offsetHeight > 0 || container.style.display !== 'none') {
+            const divs = Array.from(container.querySelectorAll('div'));
+            const leafDivs = divs.filter(d => d.querySelectorAll('div').length === 0 && d.textContent.trim().length > 0);
+            visibleOptions.push(...leafDivs);
+          }
+        });
+        if (visibleOptions.length === 0) {
+          dropdownContainers.forEach(container => {
+            const items = Array.from(container.querySelectorAll('li, [class*="item"], [class*="option"]'));
+            if (items.length > 0) visibleOptions.push(...items);
+          });
+        }
+        console.log('[Verify] Dropdown options found:', visibleOptions.map(d => d.textContent.trim()));
+
+        const apelLower = apel.toLowerCase();
+        const pNomLower = pNombre.toLowerCase();
+        const targetLower = targetVal.toLowerCase();
+
+        // Priority 1: exact full name match
+        let match = visibleOptions.find(d => d.textContent.trim().toLowerCase() === targetLower);
+        // Priority 2: contains both apellido and primer nombre
+        if (!match && pNomLower) {
+          match = visibleOptions.find(d => {
+            const t = d.textContent.trim().toLowerCase();
+            return t.includes(apelLower) && t.includes(pNomLower);
+          });
+        }
+        // Priority 3: contains apellido
+        if (!match) {
+          match = visibleOptions.find(d => d.textContent.trim().toLowerCase().includes(apelLower));
+        }
+
+        if (match) {
+          console.log('[Verify] Matched option:', match.textContent.trim());
+          match.click();
           return true;
         }
+        // No match found
+        console.log('[Verify] No dropdown match for employee:', targetVal);
         return false;
-      }, empInputSelector);
+      }, empLabel, apellido, primerNombre);
 
       if (!clicked) {
-        console.log(`[Verify] Suggestion click failed. Pressing Enter as fallback...`);
-        await page.keyboard.press('Enter');
+        console.log(`[Verify] Employee not found in dropdown. Pressing Escape to close...`);
+        await page.keyboard.press('Escape');
+        await delay(300);
+        // Clear the input so filter doesn't apply broken employee name
+        await page.click(empInputSelector, { clickCount: 3 });
+        await page.keyboard.press('Backspace');
       }
-      await delay(1000);
-      return true;
+      await delay(800);
+      return clicked;
     };
 
     // Helper to read table tasks
@@ -2483,11 +2544,23 @@ async function verifyWorkOrderWithPage(page, orderId) {
         throw new Error('No se pudo localizar la caja de búsqueda por número de OT.');
       }
 
-      // 3. Type OT number
-      await page.click(searchInpSelector, { clickCount: 3 });
-      await page.keyboard.press('Backspace');
-      await page.keyboard.type(otNumClean, { delay: 80 });
-      await delay(500);
+      // 3. Fill OT number field — use nativeSetter + Vue events to ensure Vue state updates
+      console.log(`[Verify] Filling OT search field with "${otNumClean}"...`);
+      const otFilled = await page.evaluate((selector, value) => {
+        const el = document.querySelector(selector);
+        if (!el) return false;
+        try {
+          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+          nativeSetter.call(el, value);
+        } catch (e) { el.value = value; }
+        el.focus();
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+        return el.value;
+      }, searchInpSelector, otNumClean);
+      console.log(`[Verify] OT field filled: "${otFilled}"`);
+      await delay(600);
 
       // 4. Clear employee tag and select current task's employee
       await clearEmployeeFilter();
@@ -2823,8 +2896,17 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
 // Standalone verify function for manual verification triggers
 async function verifyWorkOrder(orderId) {
-  const order = db.getWorkOrderById(orderId);
-  if (!order) return { success: false, message: "Order not found" };
+  if (activeSyncs.has(orderId)) {
+    console.log(`[Worker] verifyWorkOrder already running for order ID: ${orderId}. Skipping parallel execution.`);
+    return { success: false, message: "Already syncing" };
+  }
+  activeSyncs.add(orderId);
+
+  try {
+    const order = db.getWorkOrderById(orderId);
+    if (!order) return { success: false, message: "Order not found" };
+
+    const settings = db.getSettings();
 
   // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
   // fallback to order creator's credentials only if global settings are empty.
@@ -2866,7 +2948,7 @@ async function verifyWorkOrder(orderId) {
     await autoLogin(page, username, password, settings.portalUrl);
     await verifyWorkOrderWithPage(page, orderId);
 
-    await browser.close();
+    browser.close().catch(() => {});
     
     // Get updated status
     const updated = db.getWorkOrderById(orderId);
@@ -2877,8 +2959,11 @@ async function verifyWorkOrder(orderId) {
       count: updated.verifiedCount 
     };
   } catch (error) {
-    if (browser) await browser.close();
+    if (browser) browser.close().catch(() => {});
     return { success: false, message: error.message };
+  }
+  } finally {
+    activeSyncs.delete(orderId);
   }
 }
 

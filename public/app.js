@@ -3702,9 +3702,18 @@ function filterBulkVehicles(isFinished = false) {
     return;
   }
 
+  // Check if query ends with a separator (comma, dot, space, semicolon, newline)
+  const endsWithSeparator = /[,\.\s;\n\r]$/.test(query);
+
   // Split query by commas, dots, semicolons, spaces or line breaks
   const rawParts = query.split(/[,\.\s;\n\r]+/);
   const parts = rawParts.map(p => p.trim().toLowerCase()).filter(p => p.length > 0);
+
+  // Define which parts are fully finished/entered (e.g. followed by a separator or Enter/Blur pressed)
+  const finishedParts = parts.filter((p, index) => {
+    if (index < parts.length - 1) return true;
+    return endsWithSeparator || isFinished;
+  });
 
   const isMultiple = parts.length > 1;
   let checkedAny = false;
@@ -3734,11 +3743,16 @@ function filterBulkVehicles(isFinished = false) {
       isMatched = interno.includes(singlePart) || label.includes(singlePart) || patente.includes(singlePart);
     }
 
-    // Auto-check on exact internal number match in real-time
-    if (isMatched && checkbox && !checkbox.checked) {
-      if (parts.includes(interno)) {
+    // Auto-check/uncheck based on query parts in real-time (to avoid accumulation of intermediate exact matches)
+    if (checkbox) {
+      const isPartFinished = finishedParts.includes(interno);
+      if (isPartFinished && !checkbox.checked) {
         checkbox.checked = true;
         item.classList.add('selected');
+        checkedAny = true;
+      } else if (!parts.includes(interno) && checkbox.checked) {
+        checkbox.checked = false;
+        item.classList.remove('selected');
         checkedAny = true;
       }
     }
@@ -3874,7 +3888,7 @@ function addBulkTaskField(initialData = null) {
 
       <div class="form-group" style="margin-bottom: 0;">
         <label style="font-size: 12px; font-weight: 500; margin-bottom: 4px; display: block;">Descripción de la Tarea *</label>
-        <textarea class="bulk-task-desc" placeholder="Ej: Control de agua y aceite" required style="width: 100%; resize: vertical; font-family: monospace;" rows="4"></textarea>
+        <textarea class="bulk-task-desc" placeholder="Ej: Control de agua y aceite" required style="width: 100%; resize: vertical; font-family: monospace;" rows="4" oninput="updateBulkInsumosGrid()"></textarea>
       </div>
     </div>
   `;
@@ -3897,6 +3911,7 @@ function removeBulkTaskField(taskId) {
         if (titleSpan) titleSpan.textContent = `Tarea #${index + 1}`;
       });
     }
+    updateBulkInsumosGrid();
   }
 }
 
@@ -5980,7 +5995,12 @@ function updateBulkInsumosGrid() {
   if (!container || !tbody) return;
 
   const checkboxes = document.querySelectorAll('#bulk-vehicle-list input[type="checkbox"]:checked');
-  if (checkboxes.length === 0) {
+  
+  // Check if Preventivo A description pattern is present in any task
+  const taskDescs = Array.from(document.querySelectorAll('.bulk-task-desc')).map(t => t.value.toLowerCase());
+  const isPreventivoActive = taskDescs.some(desc => desc.includes('ctrol refrigerante') || desc.includes('preventivo a'));
+
+  if (checkboxes.length === 0 || !isPreventivoActive) {
     container.style.display = 'none';
     tbody.innerHTML = '';
     return;
@@ -6062,6 +6082,9 @@ function loadPreventivoIntoBulkTasks(type) {
     // Trigger change to update employee list
     updateBulkEmployeeDropdownForCard(card);
   }
+  
+  // Refresh grid visibility since description changed
+  updateBulkInsumosGrid();
 }
 
 function setupAllFieldsForSector() {
