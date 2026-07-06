@@ -170,6 +170,18 @@ app.get('/api/debug/logs', (req, res) => {
   res.json(lastConsoleErrors);
 });
 
+app.get('/api/debug/chrome-test', (req, res) => {
+  const { exec } = require('child_process');
+  exec('/usr/bin/chromium --version', (err1, stdout1, stderr1) => {
+    exec('/usr/bin/chromium --no-sandbox --headless --disable-gpu --dump-dom https://example.com', (err2, stdout2, stderr2) => {
+      res.json({
+        version: { error: err1 ? err1.message : null, stdout: stdout1, stderr: stderr1 },
+        run: { error: err2 ? err2.message : null, stdout: stdout2 ? stdout2.substring(0, 500) : '', stderr: stderr2 }
+      });
+    });
+  });
+});
+
 // Get all work orders (filtered by user sector)
 app.get('/api/orders', (req, res) => {
   try {
