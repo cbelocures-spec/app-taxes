@@ -1969,8 +1969,31 @@ async function syncWorkOrder(orderId) {
       }
 
       // 3. Fill Hours — input[name="horas_estimadas"], type="number", index i
-      console.log(`Setting Horas Estimadas: ${task.horasEstimadas}`);
-      const hoursVal3 = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
+      // Calculate actual worked hours from timer history if horasEstimadas is 0
+      let effectiveHoras = parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0;
+      if (effectiveHoras === 0 && task.timerHistory && Array.isArray(task.timerHistory) && task.timerHistory.length >= 2) {
+        // Sum up all (Inicio → Fin) pairs in the timer history
+        let totalMs = 0;
+        const history = task.timerHistory;
+        for (let hi = 0; hi < history.length - 1; hi++) {
+          if ((history[hi].type === 'Inició' || history[hi].type === 'Inicio' || history[hi].type === 'Inici\u00f3') &&
+              (history[hi+1].type === 'Fin' || history[hi+1].type === 'FIN')) {
+            totalMs += (history[hi+1].timestamp - history[hi].timestamp);
+            hi++; // skip the Fin entry
+          }
+        }
+        if (totalMs > 0) {
+          effectiveHoras = Math.round((totalMs / 3600000) * 100) / 100; // hours rounded to 2 decimals
+          console.log(`[Hours] Using timer-derived hours: ${effectiveHoras}h (${totalMs}ms) for task #${i+1}`);
+        }
+      }
+      // Minimum 0.01 hours if the task was completed (to avoid sending 0 which appears blank in Taxes)
+      if (effectiveHoras === 0 && task.status === 'Finalizada') {
+        effectiveHoras = 0.01;
+        console.log(`[Hours] Task #${i+1} Finalizada with 0 hours — using minimum 0.01 to avoid blank in Taxes.`);
+      }
+      console.log(`Setting Horas Estimadas: ${effectiveHoras} (original: ${task.horasEstimadas})`);
+      const hoursVal3 = effectiveHoras.toFixed(2);
       const hoursFilled = await page.evaluate((idx, val) => {
         // There are multiple inputs with name="horas_estimadas" — one per task
         const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
@@ -2122,7 +2145,7 @@ async function syncWorkOrder(orderId) {
 
     // Extract Taxes OT number from green toast notifications
     console.log("Looking for Taxes Work Order Number from toast notifications...");
-    const taxesOrderNumber = await page.evaluate(() => {
+    let taxesOrderNumber = await page.evaluate(() => {
       const elements = Array.from(document.querySelectorAll('.toast, .b-toast, .alert, div, p, span'));
       for (const el of elements) {
         const text = el.textContent.trim();
@@ -2139,7 +2162,45 @@ async function syncWorkOrder(orderId) {
     if (taxesOrderNumber) {
       console.log(`Successfully captured Taxes Order Number: ${taxesOrderNumber}`);
     } else {
-      console.log("Warning: Could not capture Taxes Order Number from toast notifications.");
+      console.log("Warning: Could not capture Taxes Order Number from toast. Attempting fallback: extract from OT list...");
+      // FALLBACK: Navigate to OT list and find the most recently created OT for this interno
+      try {
+        await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
+        await page.waitForSelector('table, .table', { timeout: 10000 }).catch(() => {});
+        await delay(3000);
+        const fallbackOtNum = await page.evaluate((internoVal) => {
+          // Look in the OT list table for the most recent row matching this interno
+          const rows = Array.from(document.querySelectorAll('table tbody tr, .orders-table tr'));
+          for (const row of rows) {
+            const cells = Array.from(row.querySelectorAll('td'));
+            const cellTexts = cells.map(c => c.textContent.trim());
+            // Look for interno match and extract OT number from first or second column
+            const hasInterno = cellTexts.some(t => t === internoVal || t.includes(`Interno ${internoVal}`));
+            if (hasInterno) {
+              const otMatch = cellTexts.join(' ').match(/(\d{5,})/); // OT numbers are typically 5+ digits
+              if (otMatch) return otMatch[1];
+            }
+          }
+          // Also check page URL for OT id pattern
+          return null;
+        }, String(order.interno));
+        if (fallbackOtNum) {
+          taxesOrderNumber = fallbackOtNum;
+          console.log(`Fallback captured Taxes Order Number from OT list: ${taxesOrderNumber}`);
+        } else {
+          console.warn(`Could not capture OT number from list either. Will mark as error to prevent duplicate creation.`);
+        }
+      } catch (fallbackErr) {
+        console.warn(`Fallback OT number extraction failed: ${fallbackErr.message}`);
+      }
+    }
+
+    // CRITICAL: If we still don't have the OT number, mark as error.
+    // This prevents the worker from re-entering the create-new-OT path on next cycle,
+    // which would create a duplicate in Taxes. The reconcile retry (syncStatus=error + taxesOrderNumber present)
+    // only triggers when taxesOrderNumber is set, so we must NOT save success with null.
+    if (!taxesOrderNumber) {
+      throw new Error(`La OT fue enviada a Taxes pero no se pudo capturar el número asignado (el toast desapareció). Se reintentará en el próximo ciclo para evitar duplicados.`);
     }
 
     // Close any visible toast notifications by clicking close button inside them
