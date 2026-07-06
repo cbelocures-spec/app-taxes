@@ -1603,7 +1603,11 @@ async function syncWorkOrder(orderId) {
             return el.id;
           }, ci, finalDescription);
           if (descId) {
-            await page.click(`#${descId}`, { clickCount: 3 }).catch(() => {});
+            await page.click(`#${descId}`).catch(() => {});
+            await page.keyboard.down('Control');
+            await page.keyboard.press('A');
+            await page.keyboard.up('Control');
+            await page.keyboard.press('Backspace');
             await page.keyboard.type(finalDescription);
             await delay(2000);
           }
@@ -1632,7 +1636,11 @@ async function syncWorkOrder(orderId) {
             return el.id;
           }, ci, expectedHours);
           if (hoursId) {
-            await page.click(`#${hoursId}`, { clickCount: 3 }).catch(() => {});
+            await page.click(`#${hoursId}`).catch(() => {});
+            await page.keyboard.down('Control');
+            await page.keyboard.press('A');
+            await page.keyboard.up('Control');
+            await page.keyboard.press('Backspace');
             await page.keyboard.type(expectedHours);
             await delay(3500); // 3.5s delay to show typed hours in slow motion
           }
@@ -2600,7 +2608,11 @@ async function verifyWorkOrderWithPage(page, orderId) {
             }, expectedHoursStr);
 
             if (hoursId) {
-              await page.click(`#${hoursId}`, { clickCount: 3 }).catch(() => {});
+              await page.click(`#${hoursId}`).catch(() => {});
+              await page.keyboard.down('Control');
+              await page.keyboard.press('A');
+              await page.keyboard.up('Control');
+              await page.keyboard.press('Backspace');
               await page.keyboard.type(expectedHoursStr);
               await delay(500);
               // Dispatch input/change/blur again after typing to ensure state commit
