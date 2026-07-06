@@ -1680,6 +1680,58 @@ function addTaskField(taskData = null) {
     handleStatusChange();
   }
 
+  // Populate insumos checkboxes and inputs if taskData has insumos
+  if (taskData && taskData.insumos) {
+    const insumosStr = taskData.insumos;
+    const parts = insumosStr.split('|');
+    const insumoRows = cardElement.querySelectorAll('.insumo-row');
+    
+    parts.forEach(part => {
+      const trimmed = part.trim();
+      if (!trimmed) return;
+      
+      let insumoName = trimmed;
+      let insumoQty = "";
+      const colonIdx = trimmed.indexOf(':');
+      if (colonIdx !== -1) {
+        insumoName = trimmed.substring(0, colonIdx).trim();
+        insumoQty = trimmed.substring(colonIdx + 1).trim();
+      }
+      
+      // Find matching row
+      let foundRow = null;
+      let otherRow = null;
+      insumoRows.forEach(row => {
+        const checkbox = row.querySelector('.insumo-check');
+        if (checkbox) {
+          if (checkbox.value === insumoName) {
+            foundRow = row;
+          } else if (checkbox.value === 'Otros') {
+            otherRow = row;
+          }
+        }
+      });
+      
+      if (foundRow) {
+        const chk = foundRow.querySelector('.insumo-check');
+        const qtyInp = foundRow.querySelector('.insumo-qty-input');
+        if (chk) chk.checked = true;
+        if (qtyInp) {
+          qtyInp.value = insumoQty;
+          qtyInp.style.display = 'block';
+        }
+      } else if (otherRow) {
+        const chk = otherRow.querySelector('.insumo-check');
+        const qtyInp = otherRow.querySelector('.insumo-qty-input');
+        if (chk) chk.checked = true;
+        if (qtyInp) {
+          qtyInp.value = trimmed; 
+          qtyInp.style.display = 'block';
+        }
+      }
+    });
+  }
+
   updateTaskCountBadge();
 }
 
