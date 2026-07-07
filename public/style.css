@@ -2813,7 +2813,71 @@ body {
   .partetaller-grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }
+  
+  /* Prevent insumos grid from stretching on mobile */
+  .insumos-checkbox-grid {
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+    padding: 8px !important;
+  }
+  .insumo-row {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    padding: 6px 8px !important;
+  }
+  .insumo-qty-input {
+    width: 70px !important;
+    max-width: 70px !important;
+    font-size: 11px !important;
+    padding: 2px 4px !important;
+  }
+  .insumo-check-label {
+    font-size: 12px !important;
+  }
+  
+  /* Make view headers responsive on mobile */
+  .view-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    width: 100% !important;
+  }
+  .view-header > div {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+  .view-header > div button {
+    flex: 1 1 auto !important;
+    justify-content: center !important;
+  }
+
+  /* Make order cards responsive on mobile */
+  .order-card-header {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  .order-card-header > div:last-child {
+    align-self: flex-start !important;
+    align-items: flex-start !important;
+  }
+  .order-card-footer {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+  .order-card-footer .card-actions {
+    width: 100% !important;
+    justify-content: flex-end !important;
+  }
+  
+  /* Single-column dashboard grid on mobile screens */
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
+
 
 
 

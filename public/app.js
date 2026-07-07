@@ -930,7 +930,8 @@ async function fetchSettings() {
     document.getElementById('set-portal-url').value = data.portalUrl || "https://taxes.com.ar";
     document.getElementById('set-username').value = data.username || "";
     document.getElementById('set-password').value = data.password || "";
-    document.getElementById('set-google-script-url').value = data.googleScriptUrl || "";
+    const insumosUrlInput = document.getElementById('set-google-insumos-url');
+    if (insumosUrlInput) insumosUrlInput.value = data.googleScriptUrl || "";
     const activeTasksInput = document.getElementById('set-google-active-tasks-url');
     if (activeTasksInput) {
       activeTasksInput.value = data.googleActiveTasksUrl || "";
@@ -965,7 +966,7 @@ async function saveSettings(e) {
   const portalUrl = document.getElementById('set-portal-url').value;
   const username = document.getElementById('set-username').value;
   const password = document.getElementById('set-password').value;
-  const googleScriptUrl = document.getElementById('set-google-script-url').value;
+  const googleScriptUrl = document.getElementById('set-google-insumos-url')?.value || '';
   const googleActiveTasksUrl = document.getElementById('set-google-active-tasks-url')?.value || '';
   const preventivoScriptUrl = document.getElementById('set-preventivo-script-url')?.value || '';
   const parteTallerScriptUrl = document.getElementById('set-partetaller-script-url')?.value || '';
@@ -1001,23 +1002,24 @@ async function saveSettings(e) {
   }
 }
 
-async function testGoogleScriptConnection() {
-  const url = document.getElementById('set-google-script-url').value.trim();
+async function testGoogleInsumosConnection() {
+  const url = document.getElementById('set-google-insumos-url')?.value.trim();
   if (!url) {
     showToast("Por favor, ingresa una URL primero", "warning");
     return;
   }
 
-  const btn = document.getElementById('btn-test-google-script');
-  const originalText = btn.textContent;
-  btn.textContent = "...";
-  btn.disabled = true;
+  const btn = document.getElementById('btn-test-google-insumos');
+  const originalText = btn ? btn.textContent : 'Probar';
+  if (btn) { btn.textContent = "..."; btn.disabled = true; }
 
   try {
-    const res = await fetch('/api/settings/test-google-sheet', {
+    // Test the doGet with action=addInsumo test param
+    const testUrl = `${url}${url.includes('?') ? '&' : '?'}action=addInsumo&interno=TEST&insumo=TEST&cantidad=1&empleado=TEST&supervisor=TEST&numeroOrden=0`;
+    const res = await fetch(`/api/settings/test-google-sheet`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url })
+      body: JSON.stringify({ url: testUrl })
     });
 
     if (!res.ok) {
@@ -1027,16 +1029,15 @@ async function testGoogleScriptConnection() {
 
     const data = await res.json();
     if (data.status === 'success' || data.status === 'not_found') {
-      showToast("¡Conexión con Google Sheets exitosa!", "success");
+      showToast("¡Conexión con Google Sheets Insumos/Pañol exitosa!", "success");
     } else {
       showToast(`Error del script: ${data.message || 'Desconocido'}`, "danger");
     }
   } catch (error) {
     console.error(error);
-    showToast(`Falló la conexión: ${error.message}. Verifica haberlo publicado como 'Cualquiera' (Anyone).`, "danger");
+    showToast(`Falló la conexión: ${error.message}. Verificá que esté publicado como 'Cualquiera'.`, "danger");
   } finally {
-    btn.textContent = originalText;
-    btn.disabled = false;
+    if (btn) { btn.textContent = originalText; btn.disabled = false; }
   }
 }
 
@@ -3210,7 +3211,7 @@ function renderDashboard() {
       gridPaused.innerHTML = `<div class="empty-dashboard-state">No hay tareas en pausa.</div>`;
     } else {
       gridPaused.innerHTML = pausedTasks.map(t => {
-        let displayHours = t.horasEstimadas;
+        let displayHours = parseFloat(String(t.horasEstimadas || 0).replace(',', '.')) || 0;
         if (Array.isArray(t.timerHistory) && t.timerHistory.length > 0) {
           const totalSeconds = calculateTotalElapsedSeconds(t.timerHistory, null);
           displayHours = minutesToHmm(Math.round(totalSeconds / 60));
