@@ -2872,9 +2872,24 @@ body {
     justify-content: flex-end !important;
   }
   
-  /* Single-column dashboard grid on mobile screens */
+  /* Two-column dashboard grid on mobile screens */
   .dashboard-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .dashboard-card {
+    padding: 8px !important;
+  }
+
+  .dashboard-card-actions {
+    flex-direction: column !important;
+    gap: 4px !important;
+  }
+
+  .dashboard-card-actions button {
+    padding: 6px 4px !important;
+    font-size: 11px !important;
   }
 }
 
