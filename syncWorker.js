@@ -2342,6 +2342,7 @@ async function syncWorkOrder(orderId) {
       lastAutoSyncAttempt: new Date().toISOString()
     });
     return { success: false, message: error.message };
+  }
   } finally {
     if (browser) {
       try { await browser.close(); } catch (_) {}
@@ -3040,6 +3041,7 @@ async function verifyWorkOrder(orderId) {
     };
   } catch (error) {
     return { success: false, message: error.message };
+  }
   } finally {
     if (browser) {
       try { await browser.close(); } catch (_) {}
@@ -3253,7 +3255,6 @@ async function verifyGroupWithBrowser(group, settings) {
       }
     }
 
-    }
   } catch (err) {
     console.error(`[VerifyAll] Browser/login error for user ${group.username}:`, err.message);
     // Mark all orders in this group as error
