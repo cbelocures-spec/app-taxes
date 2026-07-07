@@ -43,6 +43,35 @@ let isWorkerRunning = false;
 let isScraping = false;
 const activeSyncs = new Set();
 
+// Browser execution lock (Mutex) to prevent multiple Puppeteer instances from running concurrently
+let isBrowserActive = false;
+const browserQueue = [];
+
+function acquireBrowserLock() {
+  return new Promise((resolve) => {
+    if (!isBrowserActive) {
+      isBrowserActive = true;
+      resolve();
+    } else {
+      browserQueue.push(resolve);
+    }
+  });
+}
+
+function releaseBrowserLock() {
+  if (browserQueue.length > 0) {
+    const nextResolve = browserQueue.shift();
+    nextResolve();
+  } else {
+    isBrowserActive = false;
+  }
+}
+
+function getIsScraping() {
+  return isScraping;
+}
+
+
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
 // Helper to navigate safely using 'load' instead of 'networkidle2' and catch timeout errors
@@ -756,6 +785,7 @@ async function scrapeCatalogs(triggerUsername = null) {
   console.log(`Starting automatic catalog extraction from Taxes.com.ar using user: ${username}...`);
   let browser = null;
 
+  await acquireBrowserLock();
   try {
     db.saveSettings({ catalogSyncStatus: "syncing", catalogSyncError: null });
     browser = await puppeteer.launch({
@@ -1123,15 +1153,17 @@ async function scrapeCatalogs(triggerUsername = null) {
     db.saveCatalogs(finalCatalogs);
     db.saveSettings({ catalogSyncStatus: "success", catalogSyncError: null });
     console.log(`Catalog scraping completed! Rodados: ${rodados.length}, Empleados: ${mergedEmpleados.length}, Centros: ${mergedCentros.length}`);
-    isScraping = false;
-    await browser.close();
     return { success: true, message: `Catálogos actualizados: ${rodados.length} rodados, ${mergedEmpleados.length} empleados, ${mergedCentros.length} centros de costo.` };
   } catch (error) {
     console.error("Error scraping catalogs:", error);
     db.saveSettings({ catalogSyncStatus: "error", catalogSyncError: error.message });
-    isScraping = false;
-    if (browser) await browser.close();
     return { success: false, message: `Error al extraer catálogos: ${error.message}` };
+  } finally {
+    isScraping = false;
+    if (browser) {
+      try { await browser.close(); } catch (_) {}
+    }
+    releaseBrowserLock();
   }
 }
 
@@ -1233,6 +1265,7 @@ async function syncWorkOrder(orderId) {
   db.updateWorkOrder(orderId, { syncStatus: "syncing", syncError: null });
 
   let browser = null;
+  await acquireBrowserLock();
 
   try {
     // Launch browser
@@ -1742,7 +1775,6 @@ async function syncWorkOrder(orderId) {
       console.log(`[Reconcile] Running verification for OT #${order.interno}...`);
       await verifyWorkOrderWithPage(page, orderId);
 
-      await browser.close();
       return { success: true, message: `Orden ${otNumClean} reconciliada correctamente.` };
     }
 
@@ -2288,7 +2320,6 @@ async function syncWorkOrder(orderId) {
     console.log(`Running post-sync verification for brand new OT #${order.interno}...`);
     await verifyWorkOrderWithPage(page, orderId);
 
-    browser.close().catch(() => {});
     return { success: true, message: `Orden ${order.interno} sincronizada correctamente.` };
 
   } catch (error) {
@@ -2310,11 +2341,13 @@ async function syncWorkOrder(orderId) {
       autoSyncRetryCount: (order.autoSyncRetryCount || 0) + 1,
       lastAutoSyncAttempt: new Date().toISOString()
     });
-    if (browser) browser.close().catch(() => {});
     return { success: false, message: error.message };
-  }
   } finally {
+    if (browser) {
+      try { await browser.close(); } catch (_) {}
+    }
     activeSyncs.delete(orderId);
+    releaseBrowserLock();
   }
 }
 
@@ -2960,6 +2993,7 @@ async function verifyWorkOrder(orderId) {
   }
 
   let browser = null;
+  await acquireBrowserLock();
   try {
     browser = await puppeteer.launch({
       headless: 'new',
@@ -2996,8 +3030,6 @@ async function verifyWorkOrder(orderId) {
     await autoLogin(page, username, password, settings.portalUrl);
     await verifyWorkOrderWithPage(page, orderId);
 
-    browser.close().catch(() => {});
-    
     // Get updated status
     const updated = db.getWorkOrderById(orderId);
     return { 
@@ -3007,11 +3039,13 @@ async function verifyWorkOrder(orderId) {
       count: updated.verifiedCount 
     };
   } catch (error) {
-    if (browser) browser.close().catch(() => {});
     return { success: false, message: error.message };
-  }
   } finally {
+    if (browser) {
+      try { await browser.close(); } catch (_) {}
+    }
     activeSyncs.delete(orderId);
+    releaseBrowserLock();
   }
 }
 
@@ -3149,6 +3183,7 @@ async function verifyMultipleOrders(orderIds) {
 
 async function verifyGroupWithBrowser(group, settings) {
   let browser = null;
+  await acquireBrowserLock();
   try {
     browser = await puppeteer.launch({
       headless: 'new',
@@ -3218,10 +3253,9 @@ async function verifyGroupWithBrowser(group, settings) {
       }
     }
 
-    await browser.close();
+    }
   } catch (err) {
     console.error(`[VerifyAll] Browser/login error for user ${group.username}:`, err.message);
-    if (browser) try { await browser.close(); } catch (_) {}
     // Mark all orders in this group as error
     for (const orderId of group.ids) {
       const order = db.getWorkOrderById(orderId);
@@ -3232,6 +3266,11 @@ async function verifyGroupWithBrowser(group, settings) {
         verifiedError: `Error de conexión: ${err.message}`
       });
     }
+  } finally {
+    if (browser) {
+      try { await browser.close(); } catch (_) {}
+    }
+    releaseBrowserLock();
   }
 }
 
@@ -3242,5 +3281,5 @@ module.exports = {
   verifyWorkOrder,
   verifyMultipleOrders,
   scrapeCatalogs,
-  isScraping
+  getIsScraping
 };

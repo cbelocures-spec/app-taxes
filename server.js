@@ -165,6 +165,46 @@ app.post('/api/login', (req, res) => {
   }
 });
 
+// Database Migration / Seed Endpoint
+app.post('/api/admin/upload-db', (req, res) => {
+  try {
+    const { secret, dbData } = req.body;
+    
+    // Simple authentication using a secret token
+    const adminSecret = process.env.ADMIN_SECRET || 'Paniol2015';
+    if (!secret || secret !== adminSecret) {
+      return res.status(401).json({ error: "No autorizado. Token inválido." });
+    }
+    
+    if (!dbData || typeof dbData !== 'object') {
+      return res.status(400).json({ error: "Datos de base de datos inválidos." });
+    }
+    
+    // Save settings, catalogs, workOrders, activeMechanics, users
+    if (dbData.settings) db.saveSettings(dbData.settings);
+    if (dbData.catalogs) db.saveCatalogs(dbData.catalogs);
+    
+    const data = db.read();
+    if (Array.isArray(dbData.workOrders)) {
+      data.workOrders = dbData.workOrders;
+    }
+    if (dbData.users) {
+      data.users = { ...data.users, ...dbData.users };
+    }
+    if (dbData.activeMechanics) {
+      data.activeMechanics = dbData.activeMechanics;
+    }
+    db.write(data);
+    
+    console.log(`[DB Migration] Database uploaded successfully. Orders: ${dbData.workOrders ? dbData.workOrders.length : 0}, Rodados: ${dbData.catalogs && dbData.catalogs.rodados ? dbData.catalogs.rodados.length : 0}`);
+    
+    res.json({ success: true, message: "Base de datos migrada con éxito." });
+  } catch (error) {
+    console.error("[DB Migration] Error uploading database:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Debug endpoint to retrieve last console.error logs
 app.get('/api/debug/logs', (req, res) => {
   res.json(lastConsoleErrors);
@@ -714,7 +754,7 @@ app.get('/api/settings', (req, res) => {
     );
 
     let catalogStatus = settings.catalogSyncStatus || "idle";
-    if (catalogStatus === "syncing" && !worker.isScraping) {
+    if (catalogStatus === "syncing" && !worker.getIsScraping()) {
       console.log("[Settings] Auto-correcting stuck catalogSyncStatus from 'syncing' to 'idle' because worker is not scraping.");
       catalogStatus = "idle";
       db.saveSettings({ catalogSyncStatus: "idle", catalogSyncError: null });
@@ -893,7 +933,7 @@ app.post('/api/catalogs/sync', async (req, res) => {
 // Get worker status
 app.get('/api/worker/status', (req, res) => {
   res.json({
-    isScraping: worker.isScraping
+    isScraping: worker.getIsScraping()
   });
 });
 
@@ -1701,15 +1741,17 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   console.log(`[HTTP] Escuchando en http://localhost:${PORT}`);
   console.log(`[HTTP] Red local:      http://${localIP}:${PORT}`);
 
-  // Start the Puppeteer background sync worker only if not on production (Railway)
-  if (process.env.NODE_ENV !== 'production') {
+  // Start the Puppeteer background sync worker if enabled (always locally, conditionally on production)
+  const enableWorker = process.env.NODE_ENV !== 'production' || process.env.ENABLE_BACKGROUND_WORKER === 'true';
+  if (enableWorker && process.env.DISABLE_BACKGROUND_WORKER !== 'true') {
     worker.startWorker();
   } else {
-    console.log('[Worker] Disabling Puppeteer background worker on production cloud server.');
+    console.log('[Worker] Puppeteer background worker is disabled.');
   }
 
 
   // Start Railway sync agent if running locally to bridge the Railway cloud database
+  // (Only runs locally, never in the cloud/production)
   if (process.env.NODE_ENV !== 'production') {
     try {
       const agent = require('./railway_sync_agent');
