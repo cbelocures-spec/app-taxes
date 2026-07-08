@@ -2342,6 +2342,7 @@ async function syncWorkOrder(orderId) {
       lastAutoSyncAttempt: new Date().toISOString()
     });
     return { success: false, message: error.message };
+  }
   } finally {
     if (browser) {
       try { await browser.close(); } catch (_) {}
