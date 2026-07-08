@@ -69,6 +69,7 @@ let activeMechanicsList = [];
 let selectedOrderIds = new Set();
 let selectedHistoryOrderIds = new Set();
 let isCurrentUserSupervisor = false;
+let editModalHasRenderingError = false;
 
 const MECANICA_EMPLOYEES = [
   "CALOMINO DARIO",
@@ -1214,7 +1215,12 @@ async function fetchCatalogs() {
       data.empleados = fallbackEmps.map(name => ({ value: name, label: name }));
     }
 
-    cachedCatalogs = data;
+    cachedCatalogs = {
+      rodados: data.rodados || [],
+      responsables: data.responsables || [],
+      empleados: data.empleados || [],
+      centrosCosto: data.centrosCosto || []
+    };
     
     // Populate form dropdowns
     populateSelect('form-rodado', data.rodados, "Seleccionar Rodado...");
@@ -1305,77 +1311,91 @@ function updateTaskCountBadge() {
 }
 
 function updateEmployeeDropdownForCard(card) {
-  const ccSelect = card.querySelector('.task-cc');
-  const empSelect = card.querySelector('.task-emp');
-  if (!ccSelect || !empSelect) return;
+  try {
+    const ccSelect = card.querySelector('.task-cc');
+    const empSelect = card.querySelector('.task-emp');
+    if (!ccSelect || !empSelect) return;
 
-  const selectedCc = ccSelect.value;
-  const currentValue = empSelect.value;
+    const selectedCc = ccSelect.value;
+    const currentValue = empSelect.value;
 
-  const currentUser = localStorage.getItem('currentUserUsername');
-  const userSector = getSectorByUsername(currentUser);
+    const currentUser = localStorage.getItem('currentUserUsername');
+    const userSector = getSectorByUsername(currentUser);
 
-  let filteredEmployees = cachedCatalogs.empleados;
+    let filteredEmployees = cachedCatalogs.empleados || [];
 
-  // Detect sector by label text of the selected CC option (robust, not hardcoded)
-  const selectedOption = ccSelect.options[ccSelect.selectedIndex];
-  const selectedLabel = selectedOption ? selectedOption.textContent.trim().toUpperCase() : '';
-  const isHerreriaCC = selectedLabel.includes('HERRER') || selectedCc === "HERRERIA" || selectedCc === "16" || userSector === 'Herrería';
-  const isMecanicaCC = selectedLabel.includes('MECAN') || selectedCc === "15" || selectedCc === "MECANICA";
+    // Detect sector by label text of the selected CC option (robust, not hardcoded)
+    const selectedOption = ccSelect.options && ccSelect.selectedIndex >= 0 ? ccSelect.options[ccSelect.selectedIndex] : null;
+    const selectedLabel = selectedOption ? String(selectedOption.textContent || '').trim().toUpperCase() : '';
+    const isHerreriaCC = selectedLabel.includes('HERRER') || selectedCc === "HERRERIA" || selectedCc === "16" || userSector === 'Herrería';
+    const isMecanicaCC = selectedLabel.includes('MECAN') || selectedCc === "15" || selectedCc === "MECANICA";
 
-  if (isHerreriaCC) {
-    // Herrería filter
-    const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
-    const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
-    
-    let matchedEmployees = cachedCatalogs.empleados.filter(emp => {
-      const empCleaned = cleanName(emp.label);
-      if (herreriaNamesCleaned.has(empCleaned)) return true;
-      for (const hName of herreriaNamesCleaned) {
-        if (empCleaned.includes(hName) || hName.includes(empCleaned)) {
-          return true;
+    const cleanName = (str) => {
+      if (typeof str !== 'string') return '';
+      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    };
+
+    if (isHerreriaCC) {
+      // Herrería filter
+      const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
+      
+      let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
+        if (!emp || !emp.label) return false;
+        const empCleaned = cleanName(emp.label);
+        if (herreriaNamesCleaned.has(empCleaned)) return true;
+        for (const hName of herreriaNamesCleaned) {
+          if (empCleaned.includes(hName) || hName.includes(empCleaned)) {
+            return true;
+          }
         }
-      }
-      return false;
-    });
+        return false;
+      });
 
-    // Add Federico, Luciano, Digno if not present
-    const customHerreriaNames = ["Federico", "Luciano", "Digno"];
-    customHerreriaNames.forEach(name => {
-      const exists = matchedEmployees.some(emp => emp.label.toLowerCase().trim() === name.toLowerCase());
-      if (!exists) {
-        matchedEmployees.push({ value: name, label: name });
-      }
-    });
-
-    filteredEmployees = matchedEmployees;
-
-  } else if (isMecanicaCC) { // MECANICA
-    const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
-    const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
-    filteredEmployees = cachedCatalogs.empleados.filter(emp => {
-      const empCleaned = cleanName(emp.label);
-      if (mecanicaNamesCleaned.has(empCleaned)) return true;
-      for (const mName of mecanicaNamesCleaned) {
-        if (empCleaned.includes(mName) || mName.includes(empCleaned)) {
-          return true;
+      // Add Federico, Luciano, Digno if not present
+      const customHerreriaNames = ["Federico", "Luciano", "Digno"];
+      customHerreriaNames.forEach(name => {
+        const exists = matchedEmployees.some(emp => emp && emp.label && emp.label.toLowerCase().trim() === name.toLowerCase());
+        if (!exists) {
+          matchedEmployees.push({ value: name, label: name });
         }
-      }
-      return false;
+      });
+
+      filteredEmployees = matchedEmployees;
+
+    } else if (isMecanicaCC) { // MECANICA
+      const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
+      filteredEmployees = (cachedCatalogs.empleados || []).filter(emp => {
+        if (!emp || !emp.label) return false;
+        const empCleaned = cleanName(emp.label);
+        if (mecanicaNamesCleaned.has(empCleaned)) return true;
+        for (const mName of mecanicaNamesCleaned) {
+          if (empCleaned.includes(mName) || mName.includes(empCleaned)) {
+            return true;
+          }
+        }
+        return false;
+      });
+    }
+
+    // Populate options
+    let empOptions = `<option value="">Seleccionar Empleado...</option>`;
+    filteredEmployees.forEach(opt => {
+      if (!opt) return;
+      const optVal = opt.value || "";
+      const optLabel = opt.label || opt.value || "";
+      const isSelected = optVal === currentValue;
+      empOptions += `<option value="${optVal}" ${isSelected ? "selected" : ""}>${optLabel}</option>`;
     });
-  }
+    empSelect.innerHTML = empOptions;
 
-  // Populate options
-  let empOptions = `<option value="">Seleccionar Empleado...</option>`;
-  filteredEmployees.forEach(opt => {
-    const isSelected = opt.value === currentValue;
-    empOptions += `<option value="${opt.value}" ${isSelected ? "selected" : ""}>${opt.label}</option>`;
-  });
-  empSelect.innerHTML = empOptions;
-
-  // Rebuild the searchable select UI dropdown options
-  if (empSelect.rebuildSearchable) {
-    empSelect.rebuildSearchable();
+    // Rebuild the searchable select UI dropdown options
+    if (empSelect.rebuildSearchable) {
+      empSelect.rebuildSearchable();
+    }
+  } catch (err) {
+    console.error("Error updating employee dropdown:", err, card);
+    editModalHasRenderingError = true;
+    showToast("Error al filtrar el listado de empleados. Por favor, recargue la página.", "danger");
   }
 }
 
@@ -1410,330 +1430,345 @@ function renderTaskTimerHistory(card) {
 }
 
 function addTaskField(taskData = null) {
-  const container = document.getElementById('modal-tasks-list');
-  const emptyState = document.getElementById('tasks-empty-state');
-  if (emptyState) emptyState.style.display = 'none';
+  try {
+    const container = document.getElementById('modal-tasks-list');
+    const emptyState = document.getElementById('tasks-empty-state');
+    if (emptyState) emptyState.style.display = 'none';
 
-  const taskIndex = container.querySelectorAll('.task-item-card').length;
-  // Use task ID from data if editing, else generate a unique card ID
-  const taskId = taskData && taskData.id ? taskData.id : `task-card-${Date.now()}-${taskIndex}`;
+    const taskIndex = container.querySelectorAll('.task-item-card').length;
+    // Use task ID from data if editing, else generate a unique card ID
+    const taskId = taskData && taskData.id ? taskData.id : `task-card-${Date.now()}-${taskIndex}`;
 
-  const currentUser = localStorage.getItem('currentUserUsername');
-  const userSector = getSectorByUsername(currentUser);
-  let defaultCcVal = "15"; // default to MECANICA
-  if (userSector === 'Herrería') {
-    const herrOpt = cachedCatalogs.centrosCosto.find(opt => opt.value === "16" || opt.value === "HERRERIA" || opt.label.toLowerCase().includes("herrer"));
-    if (herrOpt) {
-      defaultCcVal = herrOpt.value;
+    const currentUser = localStorage.getItem('currentUserUsername');
+    const userSector = getSectorByUsername(currentUser);
+    let defaultCcVal = "15"; // default to MECANICA
+    if (userSector === 'Herrería') {
+      const herrOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "16" || opt.value === "HERRERIA" || (opt.label && String(opt.label).toLowerCase().includes("herrer"))));
+      if (herrOpt) {
+        defaultCcVal = herrOpt.value;
+      }
     }
-  }
 
-  // Build select option strings
-  let ccOptions = `<option value="">Seleccionar Centro Costo...</option>`;
-  cachedCatalogs.centrosCosto.forEach(opt => {
-    const isSelected = taskData ? (opt.value === taskData.centroCosto) : (opt.value === defaultCcVal);
-    ccOptions += `<option value="${opt.value}" ${isSelected ? "selected" : ""}>${opt.label}</option>`;
-  });
+    // Build select option strings
+    let ccOptions = `<option value="">Seleccionar Centro Costo...</option>`;
+    (cachedCatalogs.centrosCosto || []).forEach(opt => {
+      if (!opt) return;
+      const isSelected = taskData ? (opt.value === taskData.centroCosto) : (opt.value === defaultCcVal);
+      ccOptions += `<option value="${opt.value}" ${isSelected ? "selected" : ""}>${opt.label || opt.value}</option>`;
+    });
 
-  const isNew = taskData === null;
-  const timerStarted = taskData && (taskData.timerStarted === true || taskData.timerStarted === 'true' || (Array.isArray(taskData.timerHistory) && taskData.timerHistory.length > 0)) ? 'true' : 'false';
-  const timerHistoryJson = taskData && taskData.timerHistory ? JSON.stringify(taskData.timerHistory) : '[]';
+    const isNew = taskData === null;
+    const timerStarted = taskData && (taskData.timerStarted === true || taskData.timerStarted === 'true' || (Array.isArray(taskData.timerHistory) && taskData.timerHistory.length > 0)) ? 'true' : 'false';
+    const timerHistoryJson = taskData && taskData.timerHistory ? JSON.stringify(taskData.timerHistory) : '[]';
 
-  let displayHours = taskData ? parseFloat(String(taskData.horasEstimadas).replace(',', '.')) || 0 : 0;
-  if (taskData && Array.isArray(taskData.timerHistory) && taskData.timerHistory.length > 0) {
-    const totalSeconds = calculateTotalElapsedSeconds(taskData.timerHistory, null);
-    displayHours = minutesToHmm(Math.round(totalSeconds / 60));
-  }
+    let displayHours = taskData ? parseFloat(String(taskData.horasEstimadas).replace(',', '.')) || 0 : 0;
+    if (taskData && Array.isArray(taskData.timerHistory) && taskData.timerHistory.length > 0) {
+      const totalSeconds = calculateTotalElapsedSeconds(taskData.timerHistory, null);
+      displayHours = minutesToHmm(Math.round(totalSeconds / 60));
+    }
 
-  const cardHtml = `
-    <div class="task-item-card ${isNew ? 'new-task' : ''}" id="${taskId}" data-timer-started="${timerStarted}" data-timer-history='${timerHistoryJson}'>
-      <div class="task-item-header">
-        <span class="task-item-title">Tarea #${taskIndex + 1}</span>
-        <button type="button" class="task-delete-btn" onclick="removeTaskField('${taskId}')">
-          <span class="material-icons">delete</span>
-        </button>
-      </div>
-
-      <div class="form-group">
-        <label>Centro de Costo *</label>
-        <select class="task-cc" required>
-          ${ccOptions}
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>Empleado Asignado *</label>
-        <select class="task-emp" required>
-          <option value="">Seleccionar Empleado...</option>
-        </select>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group col-6">
-          <label>Horas Estimadas</label>
-          <input type="number" step="0.01" min="0" value="${displayHours.toFixed(2)}" class="task-hours" oninput="updateHoursReadable(this)">
-          <small class="hours-readable" style="color:var(--primary);font-size:11px;margin-top:2px;display:block;">${displayHours > 0 ? formatDecimalHours(displayHours) : ''}</small>
-        </div>
-        <div class="form-group col-6">
-          <label>Estado Inicial</label>
-          <select class="task-status">
-            <option value="Pendiente" ${(taskData && taskData.status === 'Pendiente') ? 'selected' : ''}>Pendiente</option>
-            <option value="Finalizada" ${(taskData && taskData.status === 'Finalizada') ? 'selected' : ''}>Finalizada</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- TIMER CHRONOMETER WIDGET -->
-      <div class="timer-container-row">
-        <div class="timer-label">
-          <span class="material-icons" style="font-size:16px;">timer</span>
-          <span>Cronómetro</span>
-        </div>
-        <div class="timer-widget">
-          <span class="timer-time" id="timer-display-${taskId}">00:00:00</span>
-          <button type="button" class="btn btn-primary btn-xs btn-timer-toggle" id="timer-btn-${taskId}" onclick="toggleTaskTimer('${taskId}')">
-            <span class="material-icons" style="font-size:14px;">play_arrow</span>
-            <span class="btn-text">Iniciar</span>
+    const cardHtml = `
+      <div class="task-item-card ${isNew ? 'new-task' : ''}" id="${taskId}" data-timer-started="${timerStarted}" data-timer-history='${timerHistoryJson}'>
+        <div class="task-item-header">
+          <span class="task-item-title">Tarea #${taskIndex + 1}</span>
+          <button type="button" class="task-delete-btn" onclick="removeTaskField('${taskId}')">
+            <span class="material-icons">delete</span>
           </button>
         </div>
-      </div>
 
-      <div class="form-group" style="margin-top: 12px;">
-        <label>Descripción de Actividades</label>
-        <textarea placeholder="Describe las actividades a realizar..." rows="2" class="task-desc">${taskData ? taskData.descripcion : ''}</textarea>
-      </div>
+        <div class="form-group">
+          <label>Centro de Costo *</label>
+          <select class="task-cc" required>
+            ${ccOptions}
+          </select>
+        </div>
 
-      <div class="form-group task-insumos-section" style="margin-top: 10px;">
-        <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Insumos / Repuestos Utilizados</label>
-        <div class="insumos-checkbox-grid">
-          <div class="insumo-row">
-            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Aceite Motor" onchange="toggleInsumoRow(this)"> Aceite Motor</label>
-            <input type="text" placeholder="ej: 5L" class="insumo-qty-input" style="display: none;">
+        <div class="form-group">
+          <label>Empleado Asignado *</label>
+          <select class="task-emp" required>
+            <option value="">Seleccionar Empleado...</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Horas Estimadas</label>
+            <input type="number" step="0.01" min="0" value="${displayHours.toFixed(2)}" class="task-hours" oninput="updateHoursReadable(this)">
+            <small class="hours-readable" style="color:var(--primary);font-size:11px;margin-top:2px;display:block;">${displayHours > 0 ? formatDecimalHours(displayHours) : ''}</small>
           </div>
-          <div class="insumo-row">
-            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Refrigerante" onchange="toggleInsumoRow(this)"> Refrigerante</label>
-            <input type="text" placeholder="ej: 3L" class="insumo-qty-input" style="display: none;">
-          </div>
-          <div class="insumo-row">
-            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Diferencial" onchange="toggleInsumoRow(this)"> Grasa Diferencial</label>
-            <input type="text" placeholder="ej: 1Kg" class="insumo-qty-input" style="display: none;">
-          </div>
-          <div class="insumo-row">
-            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Caja" onchange="toggleInsumoRow(this)"> Grasa Caja</label>
-            <input type="text" placeholder="ej: 2L" class="insumo-qty-input" style="display: none;">
-          </div>
-          <div class="insumo-row">
-            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Equipo" onchange="toggleInsumoRow(this)"> Hco Equipo</label>
-            <input type="text" placeholder="ej: 10L" class="insumo-qty-input" style="display: none;">
-          </div>
-          <div class="insumo-row">
-            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Direccion" onchange="toggleInsumoRow(this)"> Hco Direccion</label>
-            <input type="text" placeholder="ej: 1L" class="insumo-qty-input" style="display: none;">
-          </div>
-          <div class="insumo-row">
-            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Engrase x KG" onchange="toggleInsumoRow(this)"> Grasa Engrase x KG</label>
-            <input type="text" placeholder="ej: 2Kg" class="insumo-qty-input" style="display: none;">
-          </div>
-          <div class="insumo-row">
-            <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Otros" onchange="toggleInsumoRow(this)"> Otros</label>
-            <input type="text" placeholder="ej: Filtro de aire" class="insumo-qty-input" style="display: none;">
+          <div class="form-group col-6">
+            <label>Estado Inicial</label>
+            <select class="task-status">
+              <option value="Pendiente" ${(taskData && taskData.status === 'Pendiente') ? 'selected' : ''}>Pendiente</option>
+              <option value="Finalizada" ${(taskData && taskData.status === 'Finalizada') ? 'selected' : ''}>Finalizada</option>
+            </select>
           </div>
         </div>
-        <button type="button" class="btn btn-secondary btn-xs btn-agregar-insumos" style="margin-top: 8px; display: flex; align-items: center; gap: 4px;" onclick="agregarCantidadesInsumos(this)">
-          <span class="material-icons" style="font-size: 14px;">add_circle_outline</span> Agregar cantidades a la tarea
-        </button>
-        <input type="hidden" class="task-insumos" value="${taskData && taskData.insumos ? taskData.insumos : ''}">
+
+        <!-- TIMER CHRONOMETER WIDGET -->
+        <div class="timer-container-row">
+          <div class="timer-label">
+            <span class="material-icons" style="font-size:16px;">timer</span>
+            <span>Cronómetro</span>
+          </div>
+          <div class="timer-widget">
+            <span class="timer-time" id="timer-display-${taskId}">00:00:00</span>
+            <button type="button" class="btn btn-primary btn-xs btn-timer-toggle" id="timer-btn-${taskId}" onclick="toggleTaskTimer('${taskId}')">
+              <span class="material-icons" style="font-size:14px;">play_arrow</span>
+              <span class="btn-text">Iniciar</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 12px;">
+          <label>Descripción de Actividades</label>
+          <textarea placeholder="Describe las actividades a realizar..." rows="2" class="task-desc">${taskData ? taskData.descripcion || '' : ''}</textarea>
+        </div>
+
+        <div class="form-group task-insumos-section" style="margin-top: 10px;">
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Insumos / Repuestos Utilizados</label>
+          <div class="insumos-checkbox-grid">
+            <div class="insumo-row">
+              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Aceite Motor" onchange="toggleInsumoRow(this)"> Aceite Motor</label>
+              <input type="text" placeholder="ej: 5L" class="insumo-qty-input" style="display: none;">
+            </div>
+            <div class="insumo-row">
+              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Refrigerante" onchange="toggleInsumoRow(this)"> Refrigerante</label>
+              <input type="text" placeholder="ej: 3L" class="insumo-qty-input" style="display: none;">
+            </div>
+            <div class="insumo-row">
+              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Diferencial" onchange="toggleInsumoRow(this)"> Grasa Diferencial</label>
+              <input type="text" placeholder="ej: 1Kg" class="insumo-qty-input" style="display: none;">
+            </div>
+            <div class="insumo-row">
+              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Caja" onchange="toggleInsumoRow(this)"> Grasa Caja</label>
+              <input type="text" placeholder="ej: 2L" class="insumo-qty-input" style="display: none;">
+            </div>
+            <div class="insumo-row">
+              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Equipo" onchange="toggleInsumoRow(this)"> Hco Equipo</label>
+              <input type="text" placeholder="ej: 10L" class="insumo-qty-input" style="display: none;">
+            </div>
+            <div class="insumo-row">
+              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Direccion" onchange="toggleInsumoRow(this)"> Hco Direccion</label>
+              <input type="text" placeholder="ej: 1L" class="insumo-qty-input" style="display: none;">
+            </div>
+            <div class="insumo-row">
+              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Engrase x KG" onchange="toggleInsumoRow(this)"> Grasa Engrase x KG</label>
+              <input type="text" placeholder="ej: 2Kg" class="insumo-qty-input" style="display: none;">
+            </div>
+            <div class="insumo-row">
+              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Otros" onchange="toggleInsumoRow(this)"> Otros</label>
+              <input type="text" placeholder="ej: Filtro de aire" class="insumo-qty-input" style="display: none;">
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-xs btn-agregar-insumos" style="margin-top: 8px; display: flex; align-items: center; gap: 4px;" onclick="agregarCantidadesInsumos(this)">
+            <span class="material-icons" style="font-size: 14px;">add_circle_outline</span> Agregar cantidades a la tarea
+          </button>
+          <input type="hidden" class="task-insumos" value="${taskData && taskData.insumos ? taskData.insumos : ''}">
+        </div>
+
+        <div class="timer-history-log" style="font-size: 11px; color: var(--text-muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+          ${renderTimerHistoryHtml(taskData ? taskData.timerHistory : [])}
+        </div>
       </div>
+    `;
 
-      <div class="timer-history-log" style="font-size: 11px; color: var(--text-muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
-        ${renderTimerHistoryHtml(taskData ? taskData.timerHistory : [])}
-      </div>
-    </div>
-  `;
-
-  // Append just before emptyState or at end
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = cardHtml;
-  const cardElement = tempDiv.firstElementChild;
-  if (taskData) {
-    container.appendChild(cardElement);
-  } else {
-    container.prepend(cardElement);
-  }
-
-  // Rebuild titles to ensure they match DOM order from top to bottom
-  container.querySelectorAll('.task-item-card').forEach((card, idx) => {
-    const titleEl = card.querySelector('.task-item-title');
-    if (titleEl) {
-      titleEl.textContent = `Tarea #${idx + 1}`;
+    // Append just before emptyState or at end
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = cardHtml;
+    const cardElement = tempDiv.firstElementChild;
+    if (taskData) {
+      container.appendChild(cardElement);
+    } else {
+      container.prepend(cardElement);
     }
-  });
 
-  // Set up the initial options inside the Employee dropdown (handles initial filtering if Mecanica)
-  const empSelect = cardElement.querySelector('.task-emp');
-  if (taskData) {
-    const ccSelect = cardElement.querySelector('.task-cc');
-    ccSelect.value = taskData.centroCosto;
-    
-    // We filter first and then assign the value
-    let filteredEmployees = cachedCatalogs.empleados;
-    const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
-
-    // Detect sector by looking up the label of the centroCosto in the catalog
-    const ccCatalogOpt = cachedCatalogs.centrosCosto.find(c => c.value === taskData.centroCosto);
-    const ccLabelUpper = ccCatalogOpt ? ccCatalogOpt.label.trim().toUpperCase() : String(taskData.centroCosto || '').toUpperCase();
-    const isHerreriaCC = ccLabelUpper.includes('HERRER');
-    const isMecanicaCC = ccLabelUpper.includes('MECAN') || taskData.centroCosto === '15';
-
-    if (isMecanicaCC) {
-      const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
-      filteredEmployees = cachedCatalogs.empleados.filter(emp => {
-        const empCleaned = cleanName(emp.label);
-        if (mecanicaNamesCleaned.has(empCleaned)) return true;
-        for (const mName of mecanicaNamesCleaned) {
-          if (empCleaned.includes(mName) || mName.includes(empCleaned)) {
-            return true;
-          }
-        }
-        return false;
-      });
-    } else if (isHerreriaCC) {
-      const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
-      let matchedEmployees = cachedCatalogs.empleados.filter(emp => {
-        const empCleaned = cleanName(emp.label);
-        if (herreriaNamesCleaned.has(empCleaned)) return true;
-        for (const hName of herreriaNamesCleaned) {
-          if (empCleaned.includes(hName) || hName.includes(empCleaned)) {
-            return true;
-          }
-        }
-        return false;
-      });
-      const customHerreriaNames = ["Federico", "Luciano", "Digno"];
-      customHerreriaNames.forEach(name => {
-        const exists = matchedEmployees.some(emp => emp.label.toLowerCase().trim() === name.toLowerCase());
-        if (!exists) {
-          matchedEmployees.push({ value: name, label: name });
-        }
-      });
-      filteredEmployees = matchedEmployees;
-    }
-    let empOptions = `<option value="">Seleccionar Empleado...</option>`;
-    filteredEmployees.forEach(opt => {
-      const isSelected = opt.value === taskData.empleado;
-      empOptions += `<option value="${opt.value}" ${isSelected ? "selected" : ""}>${opt.label}</option>`;
-    });
-    empSelect.innerHTML = empOptions;
-    empSelect.value = taskData.empleado;
-  } else {
-    // Fresh task: defaults to MECANICA (value "15") so filter immediately
-    updateEmployeeDropdownForCard(cardElement);
-  }
-
-  // Convert employee select to searchable select
-  convertSelectToSearchable(empSelect);
-
-  const statusSelect = cardElement.querySelector('.task-status');
-  const timerBtn = cardElement.querySelector('.btn-timer-toggle');
-  const isFinished = (taskData && taskData.status === 'Finalizada') || (statusSelect && statusSelect.value === 'Finalizada');
-
-  // Auto-resume timer if running in database taskData (and task is not finished)
-  if (taskData && taskData.timerStart && !isFinished) {
-    localStorage.setItem(`timer_start_${taskId}`, taskData.timerStart);
-  }
-
-  // Auto-resume timer if it is running in localStorage (and task is not finished)
-  const timerKey = `timer_start_${taskId}`;
-  if (isFinished) {
-    clearLocalStorageTimerKeys(taskId);
-    if (activeIntervalTimers[taskId]) {
-      clearInterval(activeIntervalTimers[taskId]);
-      delete activeIntervalTimers[taskId];
-    }
-  } else {
-    const runningStartTime = localStorage.getItem(timerKey);
-    if (runningStartTime) {
-      const startTime = parseInt(runningStartTime);
-      startTimerInterval(taskId, startTime);
-
-      // Update Button UI immediately to show running state
-      if (timerBtn) {
-        timerBtn.classList.add('running');
-        timerBtn.querySelector('.material-icons').textContent = 'stop';
-        timerBtn.querySelector('.btn-text').textContent = 'Detener';
-      }
-    }
-  }
-  
-  if (statusSelect && timerBtn) {
-    const handleStatusChange = () => {
-      const modal = document.getElementById('new-order-modal');
-      const isReadOnly = modal && modal.classList.contains('readonly-mode');
-
-      if (statusSelect.value === 'Finalizada') {
-        timerBtn.disabled = true;
-      } else {
-        timerBtn.disabled = isReadOnly;
-      }
-    };
-    statusSelect.addEventListener('change', handleStatusChange);
-    // Initial run
-    handleStatusChange();
-  }
-
-  // Populate insumos checkboxes and inputs if taskData has insumos
-  if (taskData && taskData.insumos) {
-    const insumosStr = taskData.insumos;
-    const parts = insumosStr.split('|');
-    const insumoRows = cardElement.querySelectorAll('.insumo-row');
-    
-    parts.forEach(part => {
-      const trimmed = part.trim();
-      if (!trimmed) return;
-      
-      let insumoName = trimmed;
-      let insumoQty = "";
-      const colonIdx = trimmed.indexOf(':');
-      if (colonIdx !== -1) {
-        insumoName = trimmed.substring(0, colonIdx).trim();
-        insumoQty = trimmed.substring(colonIdx + 1).trim();
-      }
-      
-      // Find matching row
-      let foundRow = null;
-      let otherRow = null;
-      insumoRows.forEach(row => {
-        const checkbox = row.querySelector('.insumo-check');
-        if (checkbox) {
-          if (checkbox.value === insumoName) {
-            foundRow = row;
-          } else if (checkbox.value === 'Otros') {
-            otherRow = row;
-          }
-        }
-      });
-      
-      if (foundRow) {
-        const chk = foundRow.querySelector('.insumo-check');
-        const qtyInp = foundRow.querySelector('.insumo-qty-input');
-        if (chk) chk.checked = true;
-        if (qtyInp) {
-          qtyInp.value = insumoQty;
-          qtyInp.style.display = 'block';
-        }
-      } else if (otherRow) {
-        const chk = otherRow.querySelector('.insumo-check');
-        const qtyInp = otherRow.querySelector('.insumo-qty-input');
-        if (chk) chk.checked = true;
-        if (qtyInp) {
-          qtyInp.value = trimmed; 
-          qtyInp.style.display = 'block';
-        }
+    // Rebuild titles to ensure they match DOM order from top to bottom
+    container.querySelectorAll('.task-item-card').forEach((card, idx) => {
+      const titleEl = card.querySelector('.task-item-title');
+      if (titleEl) {
+        titleEl.textContent = `Tarea #${idx + 1}`;
       }
     });
-  }
 
-  updateTaskCountBadge();
+    // Set up the initial options inside the Employee dropdown (handles initial filtering if Mecanica)
+    const empSelect = cardElement.querySelector('.task-emp');
+    if (taskData) {
+      const ccSelect = cardElement.querySelector('.task-cc');
+      ccSelect.value = taskData.centroCosto;
+      
+      // We filter first and then assign the value
+      let filteredEmployees = cachedCatalogs.empleados || [];
+      const cleanName = (str) => {
+        if (typeof str !== 'string') return '';
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+      };
+
+      // Detect sector by looking up the label of the centroCosto in the catalog
+      const ccCatalogOpt = (cachedCatalogs.centrosCosto || []).find(c => c && c.value === taskData.centroCosto);
+      const ccLabelUpper = ccCatalogOpt && ccCatalogOpt.label ? String(ccCatalogOpt.label).trim().toUpperCase() : String(taskData.centroCosto || '').toUpperCase();
+      const isHerreriaCC = ccLabelUpper.includes('HERRER');
+      const isMecanicaCC = ccLabelUpper.includes('MECAN') || taskData.centroCosto === '15';
+
+      if (isMecanicaCC) {
+        const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
+        filteredEmployees = (cachedCatalogs.empleados || []).filter(emp => {
+          if (!emp || !emp.label) return false;
+          const empCleaned = cleanName(emp.label);
+          if (mecanicaNamesCleaned.has(empCleaned)) return true;
+          for (const mName of mecanicaNamesCleaned) {
+            if (empCleaned.includes(mName) || mName.includes(empCleaned)) {
+              return true;
+            }
+          }
+          return false;
+        });
+      } else if (isHerreriaCC) {
+        const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
+        let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
+          if (!emp || !emp.label) return false;
+          const empCleaned = cleanName(emp.label);
+          if (herreriaNamesCleaned.has(empCleaned)) return true;
+          for (const hName of herreriaNamesCleaned) {
+            if (empCleaned.includes(hName) || hName.includes(empCleaned)) {
+              return true;
+            }
+          }
+          return false;
+        });
+        const customHerreriaNames = ["Federico", "Luciano", "Digno"];
+        customHerreriaNames.forEach(name => {
+          const exists = matchedEmployees.some(emp => emp && emp.label && emp.label.toLowerCase().trim() === name.toLowerCase());
+          if (!exists) {
+            matchedEmployees.push({ value: name, label: name });
+          }
+        });
+        filteredEmployees = matchedEmployees;
+      }
+      let empOptions = `<option value="">Seleccionar Empleado...</option>`;
+      filteredEmployees.forEach(opt => {
+        if (!opt) return;
+        const optVal = opt.value || "";
+        const optLabel = opt.label || opt.value || "";
+        const isSelected = optVal === taskData.empleado;
+        empOptions += `<option value="${optVal}" ${isSelected ? "selected" : ""}>${optLabel}</option>`;
+      });
+      empSelect.innerHTML = empOptions;
+      empSelect.value = taskData.empleado;
+    } else {
+      // Fresh task: defaults to MECANICA (value "15") so filter immediately
+      updateEmployeeDropdownForCard(cardElement);
+    }
+
+    // Convert employee select to searchable select
+    convertSelectToSearchable(empSelect);
+
+    const statusSelect = cardElement.querySelector('.task-status');
+    const timerBtn = cardElement.querySelector('.btn-timer-toggle');
+    const isFinished = (taskData && taskData.status === 'Finalizada') || (statusSelect && statusSelect.value === 'Finalizada');
+
+    // Auto-resume timer if running in database taskData (and task is not finished)
+    if (taskData && taskData.timerStart && !isFinished) {
+      localStorage.setItem(`timer_start_${taskId}`, taskData.timerStart);
+    }
+
+    // Auto-resume timer if it is running in localStorage (and task is not finished)
+    const timerKey = `timer_start_${taskId}`;
+    if (isFinished) {
+      clearLocalStorageTimerKeys(taskId);
+      if (activeIntervalTimers[taskId]) {
+        clearInterval(activeIntervalTimers[taskId]);
+        delete activeIntervalTimers[taskId];
+      }
+    } else {
+      const runningStartTime = localStorage.getItem(timerKey);
+      if (runningStartTime) {
+        const startTime = parseInt(runningStartTime);
+        startTimerInterval(taskId, startTime);
+
+        // Update Button UI immediately to show running state
+        if (timerBtn) {
+          timerBtn.classList.add('running');
+          timerBtn.querySelector('.material-icons').textContent = 'stop';
+          timerBtn.querySelector('.btn-text').textContent = 'Detener';
+        }
+      }
+    }
+    
+    if (statusSelect && timerBtn) {
+      const handleStatusChange = () => {
+        const modal = document.getElementById('new-order-modal');
+        const isReadOnly = modal && modal.classList.contains('readonly-mode');
+
+        if (statusSelect.value === 'Finalizada') {
+          timerBtn.disabled = true;
+        } else {
+          timerBtn.disabled = isReadOnly;
+        }
+      };
+      statusSelect.addEventListener('change', handleStatusChange);
+      // Initial run
+      handleStatusChange();
+    }
+
+    // Populate insumos checkboxes and inputs if taskData has insumos
+    if (taskData && taskData.insumos) {
+      const insumosStr = taskData.insumos;
+      const parts = insumosStr.split('|');
+      const insumoRows = cardElement.querySelectorAll('.insumo-row');
+      
+      parts.forEach(part => {
+        const trimmed = part.trim();
+        if (!trimmed) return;
+        
+        let insumoName = trimmed;
+        let insumoQty = "";
+        const colonIdx = trimmed.indexOf(':');
+        if (colonIdx !== -1) {
+          insumoName = trimmed.substring(0, colonIdx).trim();
+          insumoQty = trimmed.substring(colonIdx + 1).trim();
+        }
+        
+        // Find matching row
+        let foundRow = null;
+        let otherRow = null;
+        insumoRows.forEach(row => {
+          const checkbox = row.querySelector('.insumo-check');
+          if (checkbox) {
+            if (checkbox.value === insumoName) {
+              foundRow = row;
+            } else if (checkbox.value === 'Otros') {
+              otherRow = row;
+            }
+          }
+        });
+        
+        if (foundRow) {
+          const chk = foundRow.querySelector('.insumo-check');
+          const qtyInp = foundRow.querySelector('.insumo-qty-input');
+          if (chk) chk.checked = true;
+          if (qtyInp) {
+            qtyInp.value = insumoQty;
+            qtyInp.style.display = 'block';
+          }
+        } else if (otherRow) {
+          const chk = otherRow.querySelector('.insumo-check');
+          const qtyInp = otherRow.querySelector('.insumo-qty-input');
+          if (chk) chk.checked = true;
+          if (qtyInp) {
+            qtyInp.value = trimmed; 
+            qtyInp.style.display = 'block';
+          }
+        }
+      });
+    }
+
+    updateTaskCountBadge();
+  } catch (err) {
+    console.error("Error rendering task field:", err, taskData);
+    editModalHasRenderingError = true;
+    showToast("Error de renderizado al cargar una tarea. Por favor, recargue la página.", "danger");
+  }
 }
 
 function toggleInsumoRow(checkbox) {
@@ -2227,6 +2262,22 @@ async function submitWorkOrder() {
  
   if (!tasksValid) {
     return showToast("Completa el Centro de Costo y Operario de todas las tareas.", "danger");
+  }
+
+  // Block submission if there was a rendering error in the modal
+  if (window.editModalHasRenderingError) {
+    return showToast("No se puede guardar porque ocurrió un error al cargar las tareas. Por favor recargue la página.", "danger");
+  }
+
+  // Double check: if we are editing an order that originally had tasks, but now we collect 0 tasks
+  if (currentEditingOrderId) {
+    const originalOrder = activeOrders.find(o => o.id === currentEditingOrderId);
+    if (originalOrder && Array.isArray(originalOrder.tasks) && originalOrder.tasks.length > 0 && tasks.length === 0) {
+      const confirmDelete = confirm("ATENCIÓN: La orden original tenía tareas, pero ahora se guardará con 0 tareas (se borrarán permanentemente). ¿Está seguro de que desea continuar?");
+      if (!confirmDelete) {
+        return;
+      }
+    }
   }
  
   const payload = {
