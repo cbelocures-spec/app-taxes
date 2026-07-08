@@ -2,7 +2,7 @@ const https = require('https');
 const worker = require('./syncWorker');
 const db = require('./database');
 
-const HOST = 'app-taxes-production-ec67.up.railway.app';
+const HOST = 'app-taxes-production.up.railway.app';
 const USERNAME = 'paniol@contenedoreshugo.com.ar';
 const TARGET_ID = '1782944762767'; // OT 25548 (Interno 88)
 

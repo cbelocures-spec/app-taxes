@@ -1,6 +1,6 @@
 const https = require('https');
 
-const host = 'app-taxes-production-ec67.up.railway.app';
+const host = 'app-taxes-production.up.railway.app';
 const username = 'paniol@contenedoreshugo.com.ar';
 
 function get(path, callback) {

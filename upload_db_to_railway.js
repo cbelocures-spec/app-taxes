@@ -3,7 +3,7 @@ const path = require('path');
 const https = require('https');
 
 const localDbPath = path.resolve(__dirname, 'db.json');
-const HOST = 'app-taxes-production-ec67.up.railway.app';
+const HOST = 'app-taxes-production.up.railway.app';
 const PATH = '/api/admin/upload-db';
 const SECRET = process.env.ADMIN_SECRET || 'Paniol2015';
 
