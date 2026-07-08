@@ -1265,7 +1265,9 @@ async function syncWorkOrder(orderId) {
   db.updateWorkOrder(orderId, { syncStatus: "syncing", syncError: null });
 
   let browser = null;
+  let lockAcquired = false;
   await acquireBrowserLock();
+  lockAcquired = true;
 
   try {
     // Launch browser
@@ -2323,7 +2325,10 @@ async function syncWorkOrder(orderId) {
     return { success: true, message: `Orden ${order.interno} sincronizada correctamente.` };
 
   } catch (error) {
-    console.error(`Sync failed for OT #${order.interno}:`, error);
+    const errMsg = error && error.message ? error.message : String(error);
+    const errStack = error && error.stack ? error.stack : errMsg;
+    console.error(`Sync failed for OT #${order.interno}: ${errMsg}`);
+    console.error(`Stack: ${errStack}`);
     if (browser) {
       try {
         const pages = await browser.pages();
@@ -2337,18 +2342,18 @@ async function syncWorkOrder(orderId) {
     }
     db.updateWorkOrder(orderId, {
       syncStatus: "error",
-      syncError: error.message,
+      syncError: errMsg,
       autoSyncRetryCount: (order.autoSyncRetryCount || 0) + 1,
       lastAutoSyncAttempt: new Date().toISOString()
     });
-    return { success: false, message: error.message };
+    return { success: false, message: errMsg };
   }
   } finally {
     if (browser) {
       try { await browser.close(); } catch (_) {}
     }
     activeSyncs.delete(orderId);
-    releaseBrowserLock();
+    if (lockAcquired) releaseBrowserLock();
   }
 }
 
