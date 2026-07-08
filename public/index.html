@@ -94,10 +94,13 @@
     <section id="view-orders" class="app-view">
       <div class="view-header">
         <h2>Órdenes de Trabajo</h2>
-        <div style="display: flex; gap: 8px;">
-          <button class="btn btn-secondary btn-sm" onclick="cleanupSyncedOrders()" style="display: flex; align-items: center; gap: 4px;" title="Limpiar del Taller todas las órdenes ya subidas a Taxes que estén finalizadas">
-            <span class="material-icons" style="font-size: 16px;">delete_sweep</span> Limpiar
-          </button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <select class="btn btn-secondary btn-sm" id="cleanup-selector" onchange="if(this.value) { runCleanupOption(this.value); this.value=''; }" style="font-weight: 500; cursor: pointer; outline: none; height: 32px; display: inline-flex; align-items: center; padding: 0 8px; margin: 0;" title="Acciones de limpieza de órdenes">
+            <option value="" disabled selected>Limpiar Órdenes...</option>
+            <option value="controlled">Limpiar Sincronizadas y Controladas</option>
+            <option value="all-synced">Limpiar todas las Sincronizadas</option>
+            <option value="finished">Limpiar Finalizadas y Operativas</option>
+          </select>
           <button class="btn btn-secondary btn-sm" onclick="verifyAllOrders()" id="btn-verify-all" style="display: flex; align-items: center; gap: 4px;" title="Controlar todas las órdenes sincronizadas en Taxes">
             <span class="material-icons" style="font-size: 16px;">fact_check</span> Controlar Todas
           </button>

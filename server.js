@@ -536,9 +536,9 @@ app.delete('/api/orders/:id', (req, res) => {
 app.post('/api/orders/cleanup', (req, res) => {
   try {
     const requester = req.headers['x-user-username'] || null;
-    const { sector: reqSector } = req.body || {};
+    const { sector: reqSector, type = 'finished' } = req.body || {};
 
-    console.log(`[Cleanup Request] requester: ${requester}, reqSector: ${reqSector}`);
+    console.log(`[Cleanup Request] requester: ${requester}, reqSector: ${reqSector}, type: ${type}`);
 
     let sector = reqSector || getSectorByUsername(requester);
     if (sector === 'Admin') {
@@ -562,8 +562,22 @@ app.post('/api/orders/cleanup', (req, res) => {
       const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
       const isOutOfService = hasActiveOrPausedTimer || order.estadoUnidad === 'fuera_de_servicio';
 
-      if (allFinished && !isOutOfService) {
-        idsToDelete.push(order.id);
+      const isSynced = order.syncStatus === 'success';
+      const isVerified = order.verifiedStatus === 'success';
+
+      if (type === 'controlled') {
+        if (allFinished && isSynced && isVerified) {
+          idsToDelete.push(order.id);
+        }
+      } else if (type === 'all-synced') {
+        if (isSynced) {
+          idsToDelete.push(order.id);
+        }
+      } else {
+        // Default: finished and operative
+        if (allFinished && !isOutOfService) {
+          idsToDelete.push(order.id);
+        }
       }
     });
 

@@ -3,7 +3,7 @@
     "username": "paniol@contenedoreshugo.com.ar",
     "password": "Paniol2015",
     "portalUrl": "https://taxes.com.ar",
-    "googleScriptUrl": "",
+    "googleScriptUrl": "https://script.google.com/macros/s/AKfycbzWM4vId8R6Dx1VZNf9aBPwzZsuvCl_8dMd3T4B43hMUrFg-AOfdlZDBwouak4Dj5Zt/exec",
     "catalogSyncStatus": "error",
     "catalogSyncError": "Waiting for selector `select` failed: Waiting failed: 10000ms exceeded",
     "googleActiveTasksUrl": "https://script.google.com/macros/s/AKfycbxBIPF6-uoK2aFNfRCxDUS5AAFxLeToB7iMz3rdf_J4JjJBvsNbOv7aIdXBBnoxRZiC/exec",

@@ -2319,8 +2319,15 @@ async function deleteOrder(orderId) {
   }
 }
 
-async function cleanupSyncedOrders() {
-  if (confirm("¿Estás seguro de limpiar de la app todas las órdenes finalizadas que estén operativas? (No se borrarán del portal de Taxes)")) {
+async function cleanupSyncedOrders(type = 'finished') {
+  let confirmMsg = "¿Estás seguro de limpiar de la app todas las órdenes finalizadas que estén operativas? (No se borrarán del portal de Taxes)";
+  if (type === 'controlled') {
+    confirmMsg = "¿Estás seguro de limpiar de la app todas las órdenes ya sincronizadas y controladas? (No se borrarán del portal de Taxes)";
+  } else if (type === 'all-synced') {
+    confirmMsg = "¿Estás seguro de limpiar de la app todas las órdenes sincronizadas en Taxes (hayan sido controladas o no)? (No se borrarán del portal de Taxes)";
+  }
+
+  if (confirm(confirmMsg)) {
     try {
       const currentUsername = localStorage.getItem('currentUserUsername') || '';
       const res = await fetch('/api/orders/cleanup', {
@@ -2330,7 +2337,8 @@ async function cleanupSyncedOrders() {
           'x-user-username': currentUsername
         },
         body: JSON.stringify({
-          sector: currentSelectedSector
+          sector: currentSelectedSector,
+          type: type
         })
       });
       if (!res.ok) {
@@ -2349,7 +2357,7 @@ async function cleanupSyncedOrders() {
         showToast(`Se limpiaron ${data.count} órdenes de la app`, "success");
         fetchOrders();
       } else {
-        showToast("No hay órdenes finalizadas operativas para limpiar", "info");
+        showToast("No hay órdenes que coincidan con la condición para limpiar", "info");
       }
     } catch (error) {
       showToast("Error al limpiar órdenes: " + error.message, "danger");
@@ -2361,6 +2369,10 @@ async function cleanupSyncedOrders() {
       }
     }
   }
+}
+
+async function runCleanupOption(option) {
+  await cleanupSyncedOrders(option);
 }
 
 async function toggleOrderEstadoUnidad(event, orderId) {

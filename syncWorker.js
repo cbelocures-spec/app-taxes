@@ -1291,7 +1291,7 @@ async function syncWorkOrder(orderId) {
         '--disable-blink-features=AutomationControlled',
         '--lang=es-AR,es'
       ],
-      protocolTimeout: 300000
+      protocolTimeout: 90000
     });
 
     const page = await browser.newPage();
@@ -2327,7 +2327,7 @@ async function syncWorkOrder(orderId) {
   } catch (error) {
     const errMsg = error && error.message ? error.message : String(error);
     const errStack = error && error.stack ? error.stack : errMsg;
-    console.error(`Sync failed for OT #${order.interno}: ${errMsg}`);
+    console.error(`Sync failed for OT #${order?.interno ?? orderId}: ${errMsg}`);
     console.error(`Stack: ${errStack}`);
     if (browser) {
       try {
@@ -2348,6 +2348,18 @@ async function syncWorkOrder(orderId) {
     });
     return { success: false, message: errMsg };
   }
+  } catch (outerError) {
+    // Safety net: catches any error that escaped the inner catch (e.g. order is null, etc.)
+    const outerMsg = outerError && outerError.message ? outerError.message : String(outerError);
+    console.error(`[syncWorkOrder] Outer catch for order ${orderId}: ${outerMsg}`);
+    try {
+      db.updateWorkOrder(orderId, {
+        syncStatus: 'error',
+        syncError: outerMsg,
+        lastAutoSyncAttempt: new Date().toISOString()
+      });
+    } catch (_) {}
+    return { success: false, message: outerMsg };
   } finally {
     if (browser) {
       try { await browser.close(); } catch (_) {}
