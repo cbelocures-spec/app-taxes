@@ -69,9 +69,10 @@ async function checkAndSync() {
       }
 
 
-      // Find any order that needs sync (syncStatus is pending/error or verifiedStatus is error)
-      const pending = orders.filter(o => o.syncStatus === 'pending' || o.syncStatus === 'error' || o.verifiedStatus === 'error');
-
+      // Find any order that strictly needs sync (syncStatus is 'pending' only).
+      // Orders in 'error' are handled by syncWorker.js's own retry logic with
+      // proper throttling (autoSyncRetryCount + lastAutoSyncAttempt cooldown).
+      const pending = orders.filter(o => o.syncStatus === 'pending');
 
       if (pending.length === 0) {
         isAgentRunning = false;
