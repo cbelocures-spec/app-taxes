@@ -218,7 +218,7 @@ app.post('/api/admin/reset-order-status', (req, res) => {
       return res.status(400).json({ error: "orderId requerido." });
     }
     const newStatus = status || 'pending';
-    const order = db.getWorkOrder(orderId);
+    const order = db.getWorkOrderById(orderId);
     if (!order) {
       return res.status(404).json({ error: `Orden ${orderId} no encontrada.` });
     }
