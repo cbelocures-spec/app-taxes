@@ -205,7 +205,36 @@ app.post('/api/admin/upload-db', (req, res) => {
   }
 });
 
-// Debug endpoint to retrieve last console.error logs
+// Admin endpoint to reset a stuck order back to 'pending' so the worker retries it
+app.post('/api/admin/reset-order-status', (req, res) => {
+  try {
+    const { orderId, status } = req.body;
+    const adminToken = req.headers['x-admin-token'] || req.body.secret;
+    const adminSecret = process.env.ADMIN_SECRET || 'Paniol2015';
+    if (!adminToken || adminToken !== adminSecret) {
+      return res.status(401).json({ error: "No autorizado." });
+    }
+    if (!orderId) {
+      return res.status(400).json({ error: "orderId requerido." });
+    }
+    const newStatus = status || 'pending';
+    const order = db.getWorkOrder(orderId);
+    if (!order) {
+      return res.status(404).json({ error: `Orden ${orderId} no encontrada.` });
+    }
+    db.updateWorkOrder(orderId, {
+      syncStatus: newStatus,
+      syncError: null,
+      lastAutoSyncAttempt: null
+    });
+    console.log(`[Admin] Order ${orderId} (OT #${order.interno}) reset to '${newStatus}'`);
+    res.json({ success: true, message: `Orden ${order.interno} reseteada a '${newStatus}'.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 app.get('/api/debug/logs', (req, res) => {
   res.json(lastConsoleErrors);
 });
