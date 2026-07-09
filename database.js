@@ -433,6 +433,12 @@ class LocalDB {
       if (cleanUpdates.createdBy) {
         cleanUpdates.createdBy = normalizeEmail(cleanUpdates.createdBy);
       }
+      // SAFETY: strip undefined values so they never overwrite existing fields.
+      // This prevents partial updates (e.g. local-sync-result with no 'tasks')
+      // from wiping the tasks array by spreading { tasks: undefined }.
+      Object.keys(cleanUpdates).forEach(key => {
+        if (cleanUpdates[key] === undefined) delete cleanUpdates[key];
+      });
       db.workOrders[idx] = { ...db.workOrders[idx], ...cleanUpdates };
       this.write(db);
       return db.workOrders[idx];

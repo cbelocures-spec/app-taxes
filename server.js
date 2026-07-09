@@ -697,11 +697,17 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
       syncStatus: normalizeSyncStatus(syncStatus),
       syncError,
       syncDate,
-      tasks,
       verifiedStatus: normalizeVerifiedStatus(verifiedStatus),
       verifiedError,
       verifiedCount
     };
+
+    // CRITICAL: Only update 'tasks' if it was explicitly sent in the body.
+    // An intermediate call (e.g. setting status to 'syncing') must NOT overwrite
+    // the tasks array with undefined — that was the root cause of tasks disappearing.
+    if (req.body.hasOwnProperty('tasks') && Array.isArray(tasks) && tasks.length > 0) {
+      updates.tasks = tasks;
+    }
 
     if (taxesOrderNumber !== undefined && taxesOrderNumber !== null) {
       updates.taxesOrderNumber = taxesOrderNumber;
@@ -714,6 +720,7 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 
 // Force verification of a work order on Taxes
