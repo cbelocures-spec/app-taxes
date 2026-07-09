@@ -1259,46 +1259,48 @@ async function syncWorkOrder(orderId) {
   }
   activeSyncs.add(orderId);
 
+  let browser = null;
+  let lockAcquired = false;
+  let order = null;
+
   try {
-    const order = db.getWorkOrderById(orderId);
+    order = db.getWorkOrderById(orderId);
     if (!order) return { success: false, message: "Order not found" };
 
     const settings = db.getSettings();
   
-  // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
-  // fallback to order creator's credentials only if global settings are empty.
-  let username = settings.username;
-  let password = settings.password;
+    // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
+    // fallback to order creator's credentials only if global settings are empty.
+    let username = settings.username;
+    let password = settings.password;
 
-  if (!username || !password) {
-    if (order.createdBy) {
-      const user = db.getUser(order.createdBy);
-      if (user && user.password) {
-        username = user.username;
-        password = user.password;
+    if (!username || !password) {
+      if (order.createdBy) {
+        const user = db.getUser(order.createdBy);
+        if (user && user.password) {
+          username = user.username;
+          password = user.password;
+        }
       }
     }
-  }
 
-  if (!username || !password) {
-    db.updateWorkOrder(orderId, {
-      syncStatus: "error",
-      syncError: "Faltan configurar las credenciales del supervisor."
-    });
-    return { success: false, message: "Missing credentials" };
-  }
+    if (!username || !password) {
+      db.updateWorkOrder(orderId, {
+        syncStatus: "error",
+        syncError: "Faltan configurar las credenciales del supervisor."
+      });
+      return { success: false, message: "Missing credentials" };
+    }
 
-  console.log(`\n=== Starting Background Sync for OT #${order.interno} (ID: ${order.id}) using user: ${username} ===`);
-  db.updateWorkOrder(orderId, { syncStatus: "syncing", syncError: null });
+    console.log(`\n=== Starting Background Sync for OT #${order.interno} (ID: ${order.id}) using user: ${username} ===`);
+    db.updateWorkOrder(orderId, { syncStatus: "syncing", syncError: null });
 
-  let browser = null;
-  let lockAcquired = false;
-  await acquireBrowserLock();
-  lockAcquired = true;
+    await acquireBrowserLock();
+    lockAcquired = true;
 
-  try {
-    // Launch browser
-    browser = await puppeteer.launch({
+    try {
+      // Launch browser
+      browser = await puppeteer.launch({
       headless: 'new',
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       args: [
@@ -3003,7 +3005,6 @@ async function verifyWorkOrderWithPage(page, orderId) {
     throw err;
   }
 }
-
 // Standalone verify function for manual verification triggers
 async function verifyWorkOrder(orderId) {
   if (activeSyncs.has(orderId)) {
@@ -3012,89 +3013,93 @@ async function verifyWorkOrder(orderId) {
   }
   activeSyncs.add(orderId);
 
+  let browser = null;
+  let lockAcquired = false;
+  let order = null;
+
   try {
-    const order = db.getWorkOrderById(orderId);
+    order = db.getWorkOrderById(orderId);
     if (!order) return { success: false, message: "Order not found" };
 
     const settings = db.getSettings();
 
-  // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
-  // fallback to order creator's credentials only if global settings are empty.
-  let username = settings.username;
-  let password = settings.password;
+    // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
+    // fallback to order creator's credentials only if global settings are empty.
+    let username = settings.username;
+    let password = settings.password;
 
-  if (!username || !password) {
-    if (order.createdBy) {
-      const user = db.getUser(order.createdBy);
-      if (user && user.password) {
-        username = user.username;
-        password = user.password;
+    if (!username || !password) {
+      if (order.createdBy) {
+        const user = db.getUser(order.createdBy);
+        if (user && user.password) {
+          username = user.username;
+          password = user.password;
+        }
       }
     }
-  }
 
-  if (!username || !password) {
-    return { success: false, message: "Faltan credenciales del supervisor" };
-  }
+    if (!username || !password) {
+      return { success: false, message: "Faltan credenciales del supervisor" };
+    }
 
-  let browser = null;
-  await acquireBrowserLock();
-  try {
-    browser = await puppeteer.launch({
-      headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-extensions',
-        '--disable-default-apps',
-        '--disable-background-networking',
-        '--disable-sync',
-        '--disable-ipc-flooding-protection',
-        '--disable-renderer-backgrounding',
-        '--mute-audio',
-        '--disable-blink-features=AutomationControlled',
-        '--lang=es-AR,es'
-      ],
-      protocolTimeout: 300000
-    });
+    await acquireBrowserLock();
+    lockAcquired = true;
 
-    const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
-    await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
-    await page.emulateTimezone('America/Argentina/Buenos_Aires');
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    });
-    await page.setViewport({ width: 1280, height: 900 });
+    try {
+      browser = await puppeteer.launch({
+        headless: 'new',
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-extensions',
+          '--disable-default-apps',
+          '--disable-background-networking',
+          '--disable-sync',
+          '--disable-ipc-flooding-protection',
+          '--disable-renderer-backgrounding',
+          '--mute-audio',
+          '--disable-blink-features=AutomationControlled',
+          '--lang=es-AR,es'
+        ],
+        protocolTimeout: 300000
+      });
 
-    await autoLogin(page, username, password, settings.portalUrl);
-    await verifyWorkOrderWithPage(page, orderId);
+      const page = await browser.newPage();
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+      await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
+      await page.emulateTimezone('America/Argentina/Buenos_Aires');
+      await page.evaluateOnNewDocument(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      });
+      await page.setViewport({ width: 1280, height: 900 });
 
-    // Get updated status
-    const updated = db.getWorkOrderById(orderId);
-    return { 
-      success: updated.verifiedStatus === 'success', 
-      status: updated.verifiedStatus, 
-      error: updated.verifiedError, 
-      count: updated.verifiedCount 
-    };
-  } catch (error) {
-    return { success: false, message: error.message };
-  }
+      await autoLogin(page, username, password, settings.portalUrl);
+      await verifyWorkOrderWithPage(page, orderId);
+
+      // Get updated status
+      const updated = db.getWorkOrderById(orderId);
+      return { 
+        success: updated.verifiedStatus === 'success', 
+        status: updated.verifiedStatus, 
+        error: updated.verifiedError, 
+        count: updated.verifiedCount 
+      };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
   } finally {
     if (browser) {
       try { await browser.close(); } catch (_) {}
     }
     activeSyncs.delete(orderId);
-    releaseBrowserLock();
+    if (lockAcquired) releaseBrowserLock();
   }
 }
-
 // 3. BACKGROUND WORKER QUEUE LOOP
 async function startWorker() {
   if (isWorkerRunning) return;
