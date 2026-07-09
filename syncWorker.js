@@ -3101,6 +3101,65 @@ async function startWorker() {
     console.error("Error resetting stuck orders on startup:", err);
   }
 
+  // Auto-pause tasks whose timer was running since a PREVIOUS calendar day.
+  // This prevents runaway hour accumulation when the server restarts overnight.
+  try {
+    const todayStr = new Date().toISOString().slice(0, 10); // e.g. "2026-07-09"
+    const staleOrders = db.getWorkOrders();
+    let pausedCount = 0;
+    for (const o of staleOrders) {
+      if (!o.tasks || o.tasks.length === 0) continue;
+      let orderChanged = false;
+      const updatedTasks = o.tasks.map(task => {
+        if (task.timerStart && task.timerStart > 0) {
+          const startDay = new Date(task.timerStart).toISOString().slice(0, 10);
+          if (startDay !== todayStr) {
+            // Timer started on a different day — auto-pause it now
+            const pauseTimestamp = task.timerStart + Math.min(
+              Date.now() - task.timerStart,
+              24 * 60 * 60 * 1000  // cap at 24h to avoid absurd values
+            );
+            const history = Array.isArray(task.timerHistory) ? [...task.timerHistory] : [];
+            history.push({ type: 'Pausó', timestamp: pauseTimestamp, formatted: new Date(pauseTimestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) });
+
+            // Recalculate total elapsed from history only (without live timerStart)
+            let totalMs = 0;
+            const sorted = [...history].sort((a, b) => a.timestamp - b.timestamp);
+            let currentStart = null;
+            sorted.forEach(event => {
+              if (event.type === 'Inició' || event.type === 'Reanudó') {
+                currentStart = event.timestamp;
+              } else if (event.type === 'Pausó' || event.type === 'Fin') {
+                if (currentStart !== null) {
+                  totalMs += (event.timestamp - currentStart);
+                  currentStart = null;
+                }
+              }
+            });
+            const totalMinutes = Math.round(totalMs / (1000 * 60));
+            const h = Math.floor(totalMinutes / 60);
+            const m = totalMinutes % 60;
+            const hmmVal = parseFloat(`${h}.${String(m).padStart(2, '0')}`);
+
+            console.log(`[Startup] Auto-pausing task ${task.id} (started ${startDay}, today is ${todayStr}). Total: ${totalMinutes} min.`);
+            orderChanged = true;
+            return { ...task, timerStart: null, timerHistory: history, horasEstimadas: hmmVal };
+          }
+        }
+        return task;
+      });
+      if (orderChanged) {
+        db.updateWorkOrder(o.id, { tasks: updatedTasks });
+        pausedCount++;
+      }
+    }
+    if (pausedCount > 0) {
+      console.log(`[Startup] Auto-paused running timers in ${pausedCount} order(s) from previous day.`);
+    }
+  } catch (err) {
+    console.error("Error auto-pausing stale timers on startup:", err);
+  }
+
  // Auto-fix settings for tasks that failed verification (wrong hours/status in Taxes)
   const MAX_AUTO_VERIFY_RETRIES = 5;
   const AUTO_VERIFY_COOLDOWN_MS = 2 * 60 * 1000; // wait 2 min between auto retries per order

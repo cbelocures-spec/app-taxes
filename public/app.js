@@ -3293,7 +3293,21 @@ function renderDashboard() {
             <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
               ${renderTimerHistoryHtml(t.timerHistory)}
             </div>
-            <div class="dashboard-card-timer">${displayHours.toFixed(2)} hrs</div>
+            <div class="dashboard-card-timer" style="display:flex; align-items:center; gap:6px;">
+              <input
+                type="number"
+                id="dash-hours-input-${t.taskId}"
+                value="${displayHours.toFixed(2)}"
+                step="0.05"
+                min="0"
+                style="width:80px; font-size:16px; font-weight:700; text-align:center; border:1.5px solid var(--primary); border-radius:6px; padding:2px 4px; background:var(--card-bg); color:var(--text); outline:none;"
+                title="Podés escribir las horas manualmente (ej: 1.30 = 1h 30min)"
+              />
+              <span style="font-size:13px; color:var(--text-muted);">hrs</span>
+              <button type="button" onclick="saveDashboardTaskHours('${t.orderId}','${t.taskId}')" title="Guardar horas" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:13px;">
+                <span class="material-icons" style="font-size:15px;vertical-align:middle;">save</span>
+              </button>
+            </div>
             <div class="dashboard-card-actions">
               <button type="button" class="btn btn-primary btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
                 <span class="material-icons" style="font-size:14px;">play_arrow</span> Reanudar
@@ -3521,6 +3535,39 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
   } catch (error) {
     showToast(`Error al guardar el cronómetro: ${error.message}`, "danger");
     console.error(error);
+  }
+}
+
+async function saveDashboardTaskHours(orderId, taskId) {
+  const input = document.getElementById(`dash-hours-input-${taskId}`);
+  if (!input) return;
+  const rawVal = String(input.value).replace(',', '.');
+  const newHours = parseFloat(rawVal);
+  if (isNaN(newHours) || newHours < 0) {
+    showToast('Ingresá un valor válido (ej: 1.30 para 1h 30min)', 'warning');
+    return;
+  }
+
+  const order = activeOrders.find(o => o.id === orderId);
+  if (!order) return;
+  const task = (order.tasks || []).find(t => t.id === taskId);
+  if (!task) return;
+
+  // Update local state
+  task.horasEstimadas = newHours;
+
+  // Persist to server
+  try {
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const res = await fetch(`/api/orders/${orderId}/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-user-username': currentUsername },
+      body: JSON.stringify({ horasEstimadas: newHours })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    showToast(`Horas guardadas: ${newHours.toFixed(2)} hs`, 'success');
+  } catch (err) {
+    showToast('Error al guardar horas: ' + err.message, 'danger');
   }
 }
 

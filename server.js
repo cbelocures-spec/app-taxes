@@ -498,8 +498,36 @@ app.put('/api/orders/:id', (req, res) => {
   }
 });
 
+// Update a single task field (e.g. horasEstimadas) without touching timerState
+app.patch('/api/orders/:id/tasks/:taskId', (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const taskIdx = (order.tasks || []).findIndex(t => t.id === req.params.taskId);
+    if (taskIdx === -1) return res.status(404).json({ error: 'Task not found' });
+
+    // Only allow safe fields to be patched this way (not timerStart, timerHistory etc.)
+    const ALLOWED = ['horasEstimadas', 'descripcion', 'status', 'insumos'];
+    const updates = {};
+    for (const key of ALLOWED) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+
+    const updatedTasks = [...order.tasks];
+    updatedTasks[taskIdx] = { ...updatedTasks[taskIdx], ...updates };
+    db.updateWorkOrder(req.params.id, { tasks: updatedTasks });
+
+    console.log(`[PATCH task] Order ${req.params.id} / Task ${req.params.taskId} updated:`, updates);
+    res.json({ success: true, task: updatedTasks[taskIdx] });
+  } catch (err) {
+    console.error('[PATCH task] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Delete a work order (local only)
 app.delete('/api/orders/:id', (req, res) => {
+
   try {
     const existing = db.getWorkOrderById(req.params.id);
     if (!existing) {
@@ -616,9 +644,14 @@ app.post('/api/orders/retry/:id', async (req, res) => {
       return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
     }
 
-    const allCompleted = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t.status === "Finalizada");
-    if (!allCompleted) {
-      return res.status(400).json({ error: "No se puede subir a Taxes: la orden tiene tareas en proceso o incompletas." });
+    // Solo bloquear reintento si la orden ya fue creada en Taxes (tiene taxesOrderNumber)
+    // y se intenta resincronizar con tareas incompletas. Si nunca se subió a Taxes,
+    // debemos permitir subirla para que se cree la O.T.
+    if (order.taxesOrderNumber) {
+      const allCompleted = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t.status === "Finalizada");
+      if (!allCompleted) {
+        return res.status(400).json({ error: "No se puede subir a Taxes: la orden tiene tareas en proceso o incompletas." });
+      }
     }
 
     // Reset status to pending so worker picks it up immediately
