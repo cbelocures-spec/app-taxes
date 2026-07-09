@@ -48,13 +48,28 @@ let isBrowserActive = false;
 const browserQueue = [];
 
 function acquireBrowserLock() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (!isBrowserActive) {
       isBrowserActive = true;
       resolve();
-    } else {
-      browserQueue.push(resolve);
+      return;
     }
+
+    // 3 minutes timeout to prevent infinite queue hang
+    const timeout = setTimeout(() => {
+      const idx = browserQueue.indexOf(safeResolve);
+      if (idx !== -1) {
+        browserQueue.splice(idx, 1);
+      }
+      reject(new Error("Timeout esperando el bloqueo del navegador (Browser Lock)"));
+    }, 180000);
+
+    const safeResolve = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+
+    browserQueue.push(safeResolve);
   });
 }
 
@@ -64,6 +79,18 @@ function releaseBrowserLock() {
     nextResolve();
   } else {
     isBrowserActive = false;
+  }
+}
+
+function sanitizeBrowserLock() {
+  if (!isScraping && activeSyncs.size === 0 && isBrowserActive) {
+    console.log("[Sanity] Detectado lock de navegador huérfano (isBrowserActive = true pero no hay scraping ni syncs activos). Reseteando lock...");
+    isBrowserActive = false;
+    if (browserQueue.length > 0) {
+      const nextResolve = browserQueue.shift();
+      isBrowserActive = true;
+      nextResolve();
+    }
   }
 }
 
@@ -3166,7 +3193,18 @@ async function startWorker() {
 
   while (isWorkerRunning) {
     try {
+      // Sanitize lock & recover orphan syncing orders
+      sanitizeBrowserLock();
+
       const orders = db.getWorkOrders();
+
+      // Safety auto-recovery for orphan syncing orders
+      const stuckOrders = orders.filter(o => o.syncStatus === 'syncing' && !activeSyncs.has(o.id));
+      for (const o of stuckOrders) {
+        console.log(`[AutoFix] Detectada orden huérfana en 'syncing' (ID: ${o.id}, Interno: ${o.interno}). Reseteando a 'pending'...`);
+        db.updateWorkOrder(o.id, { syncStatus: 'pending', syncError: 'Sincronización huérfana detectada y reseteada.' });
+      }
+
       const pendingOrder = orders.find(o => o.syncStatus === 'pending');
 
       if (pendingOrder) {

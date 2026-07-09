@@ -372,6 +372,8 @@ function switchView(viewId) {
     if (container && container.querySelectorAll('.bulk-task-item-card').length === 0) {
       addBulkTaskField();
     }
+    // Always re-render vehicle selector to ensure it's populated (in case catalogs loaded after initial render)
+    renderBulkVehicleSelector();
   }
 
   if (viewId === 'preventivos') {
@@ -785,8 +787,9 @@ function editOrder(orderId) {
   container.innerHTML = "";
 
   // Populate tasks
-  if (order.tasks && order.tasks.length > 0) {
-    order.tasks.forEach(t => {
+  const validTasks = (order.tasks || []).filter(t => t !== null && t !== undefined);
+  if (validTasks.length > 0) {
+    validTasks.forEach(t => {
       addTaskField(t);
     });
   } else {
@@ -883,17 +886,19 @@ function viewOrder(orderId) {
   container.innerHTML = "";
 
   // Populate tasks (read-only, no timers)
-  if (order.tasks && order.tasks.length > 0) {
-    order.tasks.forEach(t => {
+  const validTasksView = (order.tasks || []).filter(t => t !== null && t !== undefined);
+  if (validTasksView.length > 0) {
+    validTasksView.forEach(t => {
       addTaskField(t);
     });
   } else {
     container.innerHTML = `
-      <div class="tasks-empty-state">
+      <div class="tasks-empty-state" id="tasks-empty-state">
         <span class="material-icons">assignment_late</span>
         <p>No hay tareas asignadas.</p>
       </div>
     `;
+    updateTaskCountBadge();
   }
   
   // Clear/Hide novelties side panel in read-only mode
@@ -2052,7 +2057,7 @@ function createOrderCardHtml(order) {
       <div class="order-card-footer">
         <div class="tasks-summary" onclick="toggleTaskEmployees(event, '${order.id}')" style="cursor:pointer;" title="Ver personal asignado">
           <span class="material-icons">format_list_bulleted</span>
-          <span>${(order.tasks || []).length} Tareas asignadas</span>
+          <span>${(order.tasks || []).filter(t => t !== null && t !== undefined).length} Tareas asignadas</span>
           <span class="material-icons" style="font-size:14px; margin-left:2px; color:var(--text-muted);">expand_more</span>
         </div>
         <div class="task-employees-detail" id="task-emp-${order.id}" style="display:none; width:100%; margin-top:6px; padding:6px 8px; background:var(--bg-secondary); border-radius:6px; font-size:12px;"></div>
@@ -2336,7 +2341,14 @@ async function submitWorkOrder() {
 // 9. SYNC ACTIONS (RETRY & DELETE)
 async function retrySync(orderId) {
   try {
-    const res = await fetch(`/api/orders/retry/${orderId}`, { method: 'POST' });
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const res = await fetch(`/api/orders/retry/${orderId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-username': currentUsername
+      }
+    });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || "Fallo al encolar reintento");
@@ -2360,7 +2372,13 @@ async function retryOrderFromModal() {
 async function deleteOrder(orderId) {
   if (confirm("¿Estás seguro de eliminar esta orden localmente? No se borrará del portal Taxes si ya fue sincronizada.")) {
     try {
-      const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+      const currentUsername = localStorage.getItem('currentUserUsername') || '';
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: 'DELETE',
+        headers: {
+          'x-user-username': currentUsername
+        }
+      });
       if (!res.ok) throw new Error("Failed to delete");
       
       showToast("Orden eliminada localmente", "success");
@@ -4161,12 +4179,13 @@ function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
       }
     });
 
-    filteredEmployees = matchedEmployees;
+    // Fallback to full list if filter returns too few results
+    filteredEmployees = matchedEmployees.length >= 3 ? matchedEmployees : cachedCatalogs.empleados;
 
   } else if (isMecanicaCC) { // MECANICA
     const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
     const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
-    filteredEmployees = cachedCatalogs.empleados.filter(emp => {
+    const mecFiltered = cachedCatalogs.empleados.filter(emp => {
       const empCleaned = cleanName(emp.label);
       if (mecanicaNamesCleaned.has(empCleaned)) return true;
       for (const mName of mecanicaNamesCleaned) {
@@ -4176,6 +4195,8 @@ function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
       }
       return false;
     });
+    // Fallback to full list if filter returns too few results (catalog names may not match)
+    filteredEmployees = mecFiltered.length >= 3 ? mecFiltered : cachedCatalogs.empleados;
   }
 
   // Populate options
@@ -4197,9 +4218,21 @@ async function submitBulkOrders() {
   const clasificacionEl = document.getElementById('bulk-clasificacion');
   const incidenteEl = document.getElementById('bulk-incidente');
 
+  // Diagnostic logging
+  console.log('[Bulk] submitBulkOrders iniciado');
+  console.log('[Bulk] Catálogo rodados:', cachedCatalogs.rodados.length, 'items');
+  
   const selectedChks = document.querySelectorAll('#bulk-vehicle-list input[type="checkbox"]:checked');
+  console.log('[Bulk] Vehículos seleccionados:', selectedChks.length);
+  console.log('[Bulk] Clasificación:', clasificacionEl?.value);
+  console.log('[Bulk] Hora inicio:', timeStartEl?.value, '| Hora fin:', timeEndEl?.value);
+  
   if (selectedChks.length === 0) {
     return showToast("Selecciona al menos un vehículo.", "danger");
+  }
+
+  if (!clasificacionEl.value) {
+    return showToast("Selecciona una Clasificación para las órdenes.", "danger");
   }
 
   const taskCards = document.querySelectorAll('#bulk-tasks-container .bulk-task-item-card');
@@ -4269,9 +4302,13 @@ async function submitBulkOrders() {
 
   for (let i = 0; i < selectedChks.length; i++) {
     const chk = selectedChks[i];
-    const rodadoId = chk.value;
-    const rodadoOpt = cachedCatalogs.rodados.find(r => r.value === rodadoId);
-    if (!rodadoOpt) continue;
+    const rodadoId = String(chk.value);
+    // Compare as strings to avoid type mismatch ("1" vs 1)
+    const rodadoOpt = cachedCatalogs.rodados.find(r => String(r.value) === rodadoId);
+    if (!rodadoOpt) {
+      console.warn(`[Bulk] No se encontró rodado con value="${rodadoId}" en catálogo.`);
+      continue;
+    }
 
     const interno = String(rodadoOpt.interno || '').trim();
     
@@ -4317,6 +4354,10 @@ async function submitBulkOrders() {
       incidente: incidenteEl.value.trim(),
       tasks: vehicleTasks
     });
+  }
+
+  if (ordersList.length === 0) {
+    return showToast("No se pudo preparar ninguna orden. Verifique que los vehículos estén en el catálogo.", "danger");
   }
 
   try {

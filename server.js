@@ -286,8 +286,8 @@ app.post('/api/orders', (req, res) => {
   try {
     const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset } = req.body;
     
-    if (!rodado || !responsable || !interno || !clasificacion) {
-      return res.status(400).json({ error: "Faltan campos obligatorios: rodado, responsable, interno, clasificacion son requeridos." });
+    if (!rodado || !responsable || !clasificacion) {
+      return res.status(400).json({ error: "Faltan campos obligatorios: rodado, responsable y clasificacion son requeridos." });
     }
 
     const createdBy = req.headers['x-user-username'] || null;
@@ -354,8 +354,8 @@ app.post('/api/orders/bulk', (req, res) => {
     for (const orderData of orders) {
       const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad } = orderData;
       
-      if (!rodado || !responsable || !interno || !clasificacion) {
-        return res.status(400).json({ error: `Campos obligatorios faltantes en orden para interno ${interno || 'desconocido'}.` });
+      if (!rodado || !responsable || !clasificacion) {
+        return res.status(400).json({ error: `Campos obligatorios faltantes en orden. Rodado, responsable y clasificacion son requeridos.` });
       }
 
       let finalClasificacion = clasificacion;
@@ -589,7 +589,7 @@ app.post('/api/orders/cleanup', (req, res) => {
       if (sector === 'Taller' && (cls === 'Herrería' || cls === 'Edilicio')) return;
 
       const tasks = order.tasks || [];
-      const allFinished = tasks.length > 0 && tasks.every(t => t.status === "Finalizada");
+      const allFinished = tasks.length === 0 || tasks.every(t => t.status === "Finalizada");
       
       // Force out of service if active/paused timers exist
       const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
