@@ -1462,7 +1462,9 @@ function addTaskField(taskData = null) {
     const timerHistoryJson = taskData && taskData.timerHistory ? JSON.stringify(taskData.timerHistory) : '[]';
 
     let displayHours = taskData ? parseFloat(String(taskData.horasEstimadas).replace(',', '.')) || 0 : 0;
-    if (taskData && Array.isArray(taskData.timerHistory) && taskData.timerHistory.length > 0) {
+    // Only fall back to timer-history calculation if there's no stored horasEstimadas value.
+    // If the user manually set horasEstimadas (> 0), always use that instead of recalculating.
+    if (displayHours === 0 && taskData && Array.isArray(taskData.timerHistory) && taskData.timerHistory.length > 0) {
       const totalSeconds = calculateTotalElapsedSeconds(taskData.timerHistory, null);
       displayHours = minutesToHmm(Math.round(totalSeconds / 60));
     }

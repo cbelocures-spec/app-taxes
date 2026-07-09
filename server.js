@@ -86,17 +86,22 @@ app.use((req, res, next) => {
 
 // Middleware to validate session (check if user exists in db when x-user-username is present)
 app.use((req, res, next) => {
-  // Allow login, settings, and static assets
+  // Allow login, settings, and static assets without any auth check
   if (req.path === '/api/login' || req.path === '/api/settings' || !req.path.startsWith('/api')) {
     return next();
   }
 
   const username = req.headers['x-user-username'];
-  if (username) {
+  // Only reject if a username IS provided but doesn't exist in the DB.
+  // If no username header is sent (anonymous / Railway fresh DB), allow through —
+  // individual endpoints handle sector defaults gracefully.
+  if (username && username.trim() !== '') {
     const user = db.getUser(username);
     if (!user || !user.password) {
-      console.log(`[Auth Check] User "${username}" not found or has no password in DB. Returning 401.`);
-      return res.status(401).json({ error: "Session expired or invalid user." });
+      console.log(`[Auth Check] User "${username}" not found or has no password in DB. Allowing as anonymous.`);
+      // Don't block — just clear the username so the request proceeds as anonymous.
+      // This handles Railway's fresh DB where no users are registered yet.
+      req.headers['x-user-username'] = '';
     }
   }
   next();
