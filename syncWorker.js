@@ -682,24 +682,25 @@ async function autoLogin(page, username, password, portalUrl) {
   console.log(`Navigating to ${portalUrl}/admin ...`);
   await safeGoto(page, `${portalUrl}/admin`, { timeout: 30000 });
 
-  // Wait for page to stabilize and check if we are on the login page (has password input)
-  let isOnLoginPage = false;
-  try {
-    await page.waitForSelector('input[type="password"]', { timeout: 6000 });
-    isOnLoginPage = true;
-  } catch (e) {
-    console.log("No password input found. Checking if already logged in...");
+  // Wait 1.5 seconds for Vue to finish initializing
+  await delay(1500);
+
+  // Check if we are on a login page by seeing if the URL contains '/login' or there is a password field
+  const currentUrlCheck = page.url().toLowerCase();
+  let isOnLoginPage = currentUrlCheck.includes('/login');
+  
+  if (!isOnLoginPage) {
+    const passwordInputExists = await page.$('input[type="password"]').catch(() => null);
+    if (passwordInputExists) {
+      isOnLoginPage = true;
+    }
   }
 
   if (!isOnLoginPage) {
-    // We are on a dashboard/admin page - check if the correct user is logged in
+    // We are on a dashboard/admin page - check who is logged in
     let loggedInEmail = '';
     try {
-      // Give the page 2 seconds to finish any post-login rendering/redirection
-      await delay(2000);
-      
-      loggedInEmail = await safeEvaluate(page, () => {
-        // Look for displayed email/username in nav or profile area
+      loggedInEmail = await page.evaluate(() => {
         const candidates = [
           document.querySelector('.user-profile-toggle'),
           document.querySelector('.user-profile-name'),
@@ -710,13 +711,12 @@ async function autoLogin(page, username, password, portalUrl) {
         for (const el of candidates) {
           if (el && el.textContent.trim()) return el.textContent.trim().toLowerCase();
         }
-        // Fallback: search body text for email pattern
         const bodyText = document.body.textContent;
         const emailMatch = bodyText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g);
         return emailMatch ? emailMatch[0].toLowerCase() : '';
-      });
+      }).catch(() => '');
     } catch (err) {
-      console.warn("[autoLogin] Failed to evaluate logged-in user email, assuming not logged in:", err.message);
+      console.log("Failed to inspect user profile in DOM, assuming re-login needed.");
     }
 
     const targetUser = username.toLowerCase().trim();
@@ -731,85 +731,75 @@ async function autoLogin(page, username, password, portalUrl) {
       return true;
     }
 
-    // Different user is logged in — need to logout first
-    console.log(`Different user logged in (${loggedInEmail}), need to logout and re-login as ${username}.`);
-    const logoutClicked = await safeEvaluate(page, () => {
-      const links = Array.from(document.querySelectorAll('a, button'));
-      const logout = links.find(el => {
-        const text = el.textContent.trim().toLowerCase();
-        return text.includes('salir') || text.includes('logout') || text.includes('cerrar sesión') || text.includes('cerrar session');
-      });
-      if (logout) { logout.click(); return true; }
-      return false;
-    });
-    if (logoutClicked) {
-      await page.waitForNavigation({ waitUntil: 'load', timeout: 10000 }).catch(() => {});
-      await delay(2000);
-    } else {
-      // Force navigate to logout URL
-      await safeGoto(page, `${portalUrl}/logout`, { timeout: 10000 }).catch(() => {});
-      await delay(2000);
-    }
-  }
-
-  console.log(`Not logged in (or logged out). Attempting login as ${username}...`);
-  
-  // Navigate to login page if not there already
-  const stillOnLogin = await safeEvaluate(page, () => {
-    const inputs = Array.from(document.querySelectorAll('input'));
-    return inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
-  });
-  if (!stillOnLogin) {
-    await safeGoto(page, `${portalUrl}/admin`, { timeout: 30000 });
+    // Different user is logged in (or we failed to read it) — logout directly by URL
+    console.log(`Need to login as ${username}. Performing clean logout via URL...`);
+    await safeGoto(page, `${portalUrl}/logout`, { timeout: 15000 }).catch(() => {});
     await delay(2000);
   }
 
-  // Wait for login fields
-  await page.waitForSelector('input', { timeout: 10000 }).catch(() => {});
-
-  // Fill credentials using generic selectors (common in login pages)
-  let usernameFilled = false;
-  let passwordFilled = false;
-
-  const inputs = await page.$$('input');
-  for (const input of inputs) {
-    const type = await safeEvaluate(page, el => el.type, input);
-    const name = await safeEvaluate(page, el => el.name || '', input);
-    
-    if ((type === 'text' || type === 'email' || name.includes('email') || name.includes('user')) && !usernameFilled) {
-      await input.focus();
-      await safeEvaluate(page, el => el.value = '', input);
-      await input.type(username);
-      usernameFilled = true;
-    } else if ((type === 'password' || name.includes('pass')) && !passwordFilled) {
-      await input.focus();
-      await safeEvaluate(page, el => el.value = '', input);
-      await input.type(password);
-      passwordFilled = true;
-    }
+  // Ensure we are on the login page now
+  const finalLoginUrl = page.url().toLowerCase();
+  if (!finalLoginUrl.includes('/login')) {
+    await safeGoto(page, `${portalUrl}/login`, { timeout: 20000 }).catch(() => {});
+    await delay(1500);
   }
 
-  if (!usernameFilled || !passwordFilled) {
-    // Try filling using labels
+  console.log(`Not logged in. Attempting login as ${username}...`);
+
+  // Target selectors for email and password
+  const emailSelector = 'input[type="email"], input[type="text"], input[name="email"], input[name="user"], input[name="username"]';
+  const passSelector = 'input[type="password"], input[name="password"], input[name="pass"]';
+
+  // Wait for inputs to be ready
+  await page.waitForSelector(passSelector, { timeout: 10000 }).catch(() => {});
+
+  // Fill Username
+  try {
+    await page.focus(emailSelector);
+    await page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (el) el.value = '';
+    }, emailSelector);
+    await page.type(emailSelector, username);
+  } catch (e) {
+    console.warn("Failed to fill username using standard selector, retrying with labels...");
     await fillInputByLabel(page, 'usuario', username);
     await fillInputByLabel(page, 'email', username);
+  }
+
+  // Fill Password
+  try {
+    await page.focus(passSelector);
+    await page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (el) el.value = '';
+    }, passSelector);
+    await page.type(passSelector, password);
+  } catch (e) {
+    console.warn("Failed to fill password using standard selector, retrying with labels...");
     await fillInputByLabel(page, 'contraseña', password);
     await fillInputByLabel(page, 'password', password);
   }
 
   // Click login button
   console.log("Clicking login button...");
-  const clicked = await clickByText(page, 'Iniciar Sesión', 'button') || 
-                  await clickByText(page, 'Ingresar', 'button') ||
-                  await clickByText(page, 'Login', 'button') ||
-                  await page.click('button[type="submit"]').then(() => true).catch(() => false);
+  let clicked = false;
+  try {
+    const submitSelector = 'button[type="submit"], input[type="submit"], button.btn-primary';
+    await page.click(submitSelector);
+    clicked = true;
+  } catch (e) {
+    clicked = await clickByText(page, 'Iniciar Sesión', 'button') || 
+              await clickByText(page, 'Ingresar', 'button') ||
+              await clickByText(page, 'Login', 'button');
+  }
 
   if (!clicked) {
-    // Trigger enter key
+    // Fallback: press Enter key
     await page.keyboard.press('Enter');
   }
 
-  // Wait for navigation or welcome dashboard (Taxes can be slow, wait up to 35 seconds)
+  // Wait for login redirection (Taxes can be slow, wait up to 35 seconds)
   console.log("Waiting for Taxes authentication process...");
   await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 35000 }).catch((e) => {
     console.log("Authentication navigation finished or hit timeout:", e.message);
@@ -822,7 +812,7 @@ async function autoLogin(page, username, password, portalUrl) {
   
   if (currentUrl.includes('/login')) {
     // We are still on the login page, so it failed. Let's find out why:
-    let errorMsg = "Credenciales inválidas o error al iniciar sesión en Taxes.com.ar";
+    let errorMsg = "Credenciales incorrectas o error de inicio de sesión en Taxes.com.ar";
     try {
       const hasErrorText = await page.evaluate(() => {
         const bodyText = document.body.textContent.toLowerCase();
