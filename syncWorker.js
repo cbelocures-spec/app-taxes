@@ -1750,6 +1750,7 @@ async function syncWorkOrder(orderId) {
       await verifyWorkOrderWithPage(page, orderId);
 
       await browser.close(); releaseBrowserLock();
+      try { db.purgeSyncedOrders(5); } catch(pe) { console.error('[Purge] Error:', pe.message); }
       return { success: true, message: `Orden ${otNumClean} reconciliada correctamente.` };
     }
 

@@ -535,9 +535,45 @@ app.patch('/api/orders/:id/tasks/:taskId', (req, res) => {
   }
 });
 
+// Get archived (history) orders
+app.get('/api/orders/archived', (req, res) => {
+  try {
+    const orders = db.getArchivedOrders();
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Soft-archive a work order (moves to history, stays in DB until permanently deleted)
+app.patch('/api/orders/:id/archive', (req, res) => {
+  try {
+    const requester = req.headers['x-user-username'] || null;
+    const sector = getSectorByUsername(requester);
+
+    // Only Pañol and Taller (Admin) can archive orders
+    if (sector !== 'Admin') {
+      return res.status(403).json({ error: "Solo Pañol y Taller están autorizados a archivar órdenes." });
+    }
+
+    const existing = db.getWorkOrderById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: "Orden no encontrada" });
+    }
+    // Only allow archiving orders that are fully synced
+    if (existing.syncStatus !== 'success') {
+      return res.status(400).json({ error: "Solo se pueden archivar órdenes sincronizadas correctamente." });
+    }
+    const success = db.archiveWorkOrder(req.params.id);
+    triggerActiveTasksGoogleSheetSync();
+    res.json({ success });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Delete a work order (local only)
 app.delete('/api/orders/:id', (req, res) => {
-
   try {
     const existing = db.getWorkOrderById(req.params.id);
     if (!existing) {
@@ -547,23 +583,13 @@ app.delete('/api/orders/:id', (req, res) => {
     const requester = req.headers['x-user-username'] || null;
     const sector = getSectorByUsername(requester);
 
-    // Check sector permission
-    const existingCls = existing.clasificacion;
-    if (sector === 'Herrería' && existingCls !== 'Herrería') {
-      return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
-    }
-    if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
-      return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
-    }
-    if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
-      return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
+    // Only Pañol and Taller (Admin) can permanently delete orders
+    if (sector !== 'Admin') {
+      return res.status(403).json({ error: "Solo Pañol y Taller están autorizados a eliminar órdenes." });
     }
 
     const success = db.deleteWorkOrder(req.params.id);
-    
-    // Trigger active tasks Google Sheets update
     triggerActiveTasksGoogleSheetSync();
-
     res.json({ success });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -383,6 +383,10 @@ function switchView(viewId) {
   if (viewId === 'partetaller') {
     fetchParteTallerEstado();
   }
+
+  if (viewId === 'historial') {
+    fetchArchivedOrders();
+  }
 }
 
 // 2. MODAL CONTROLLERS
@@ -1876,6 +1880,53 @@ async function fetchOrders() {
   }
 }
 
+// ---- HISTORIAL (ARCHIVED ORDERS) ----
+let archivedOrders = [];
+
+async function fetchArchivedOrders() {
+  try {
+    const res = await fetch(`/api/orders/archived?_=${Date.now()}`);
+    if (!res.ok) throw new Error("Error fetching archived orders");
+    archivedOrders = await res.json();
+    renderHistoryOrders();
+  } catch (error) {
+    console.error("Error loading archived orders:", error);
+  }
+}
+
+function renderHistoryOrders() {
+  const container = document.getElementById('history-orders-container');
+  const badge = document.getElementById('history-count-badge');
+  if (!container) return;
+
+  // Reset selection state
+  selectedHistoryOrderIds.clear();
+  updateHistoryBulkDeleteActionBar();
+
+  if (archivedOrders.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <span class="material-icons">inventory_2</span>
+        <p>No hay órdenes archivadas.</p>
+        <small style="color:var(--text-muted);">Cuando archives una orden sincronizada aparecerá aquí.</small>
+      </div>
+    `;
+    if (badge) badge.textContent = '';
+    return;
+  }
+
+  // Sort newest first
+  const sorted = [...archivedOrders].sort((a, b) => {
+    const da = new Date(a.archivedAt || a.syncDate || a.createdAt).getTime();
+    const db2 = new Date(b.archivedAt || b.syncDate || b.createdAt).getTime();
+    return db2 - da;
+  });
+
+  container.innerHTML = sorted.map(o => createHistoryCardHtml(o)).join('');
+  if (badge) badge.textContent = `${sorted.length} orden${sorted.length !== 1 ? 'es' : ''} en historial`;
+}
+
+
 function renderOrders() {
   const container = document.getElementById('orders-list-container');
   if (!container) return;
@@ -1918,11 +1969,12 @@ function renderOrders() {
 function createHistoryCardHtml(order) {
   const syncDate = order.syncDate ? new Date(order.syncDate).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha desconocida';
   const isChecked = selectedHistoryOrderIds.has(order.id) ? 'checked' : '';
+  const isAdmin = getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Admin';
   return `
     <div class="order-card">
       <div class="order-card-header">
         <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; margin-right: 8px;">
-          <input type="checkbox" class="history-order-select-checkbox" data-id="${order.id}" onchange="onHistoryOrderSelectionChange(event)" ${isChecked} style="margin: 0; width: 18px; height: 18px; cursor: pointer;">
+          ${isAdmin ? `<input type="checkbox" class="history-order-select-checkbox" data-id="${order.id}" onchange="onHistoryOrderSelectionChange(event)" ${isChecked} style="margin: 0; width: 18px; height: 18px; cursor: pointer;">` : ''}
           <div style="min-width: 0; flex: 1;">
             <div class="order-card-title">${order.rodado}</div>
             <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion}</strong></div>
@@ -1939,9 +1991,11 @@ function createHistoryCardHtml(order) {
           <button class="icon-btn primary" onclick="viewOrder('${order.id}')" title="Ver Orden">
             <span class="material-icons">visibility</span>
           </button>
-          <button class="icon-btn danger" onclick="deleteOrder('${order.id}')" title="Eliminar de la App (ya está en Taxes)">
-            <span class="material-icons">delete</span>
+          ${isAdmin ? `
+          <button class="icon-btn danger" onclick="deleteOrder('${order.id}')" title="Eliminar definitivamente de la App">
+            <span class="material-icons">delete_forever</span>
           </button>
+          ` : ''}
         </div>
       </div>
     </div>
@@ -2077,9 +2131,25 @@ function createOrderCardHtml(order) {
               <span class="material-icons">cloud_upload</span>
             </button>
           ` : ''}
-          <button class="icon-btn danger" onclick="deleteOrder('${order.id}')" title="Eliminar Localmente">
-            <span class="material-icons">delete</span>
-          </button>
+          ${(() => {
+            const isAdmin = getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Admin';
+            if (!isAdmin) return ''; // Herrería / Edilicio no pueden borrar ni archivar
+            if (order.syncStatus === 'success') {
+              // For synced orders: show Archive button (moves to history)
+              return `
+                <button class="icon-btn" onclick="archiveOrder('${order.id}')" title="Archivar (pasa al Historial)" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;">
+                  <span class="material-icons">archive</span>
+                </button>
+              `;
+            } else {
+              // For local/error orders: show Delete button
+              return `
+                <button class="icon-btn danger" onclick="deleteOrder('${order.id}')" title="Eliminar Localmente">
+                  <span class="material-icons">delete</span>
+                </button>
+              `;
+            }
+          })()}
         </div>
       </div>
     </div>
@@ -2373,18 +2443,19 @@ async function retryOrderFromModal() {
 }
 
 async function deleteOrder(orderId) {
-  if (confirm("¿Estás seguro de eliminar esta orden localmente? No se borrará del portal Taxes si ya fue sincronizada.")) {
+  if (confirm("¿Confirmar BORRADO DEFINITIVO? La orden se eliminará de la app permanentemente.\n(Ya está guardada en Taxes, no se borrará del portal.)")) {
     try {
       const currentUsername = localStorage.getItem('currentUserUsername') || '';
       const res = await fetch(`/api/orders/${orderId}`, {
         method: 'DELETE',
-        headers: {
-          'x-user-username': currentUsername
-        }
+        headers: { 'x-user-username': currentUsername }
       });
-      if (!res.ok) throw new Error("Failed to delete");
-      
-      showToast("Orden eliminada localmente", "success");
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "Error al eliminar orden", "danger");
+        return;
+      }
+      showToast("Orden eliminada definitivamente", "success");
       fetchOrders();
     } catch (error) {
       showToast("Error al eliminar orden", "danger");
@@ -2392,6 +2463,35 @@ async function deleteOrder(orderId) {
     }
   }
 }
+
+async function archiveOrder(orderId) {
+  if (confirm("¿Archivar esta orden?\nPasará al Historial y podrás borrarla definitivamente desde ahí.\n(Ya está guardada en Taxes.)")) {
+    try {
+      const currentUsername = localStorage.getItem('currentUserUsername') || '';
+      const res = await fetch(`/api/orders/${orderId}/archive`, {
+        method: 'PATCH',
+        headers: { 'x-user-username': currentUsername }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "Error al archivar orden", "danger");
+        return;
+      }
+      showToast("Orden archivada ✓ — la encontrás en Historial", "success");
+      fetchOrders();
+      // If historial view is currently open, refresh it too
+      const historialView = document.getElementById('view-historial');
+      if (historialView && historialView.classList.contains('active')) {
+        fetchArchivedOrders();
+      }
+    } catch (error) {
+      showToast("Error al archivar orden", "danger");
+      console.error(error);
+    }
+  }
+}
+
+
 
 async function cleanupSyncedOrders(type = 'finished') {
   let confirmMsg = "¿Estás seguro de limpiar de la app todas las órdenes finalizadas que estén operativas? (No se borrarán del portal de Taxes)";
@@ -5183,6 +5283,12 @@ function checkUserSession() {
       }
     }
     
+    // Show/hide nav Historial button — Admin only
+    const navHistorial = document.getElementById('nav-historial');
+    if (navHistorial) {
+      navHistorial.style.display = (sector === 'Admin') ? 'flex' : 'none';
+    }
+
     updateClassificationSelectOptions();
   }
 }
@@ -5421,34 +5527,47 @@ async function deleteSelectedHistoryOrders() {
   }
   
   const count = selectedHistoryOrderIds.size;
-  if (confirm(`¿Estás seguro de eliminar las ${count} órdenes seleccionadas localmente? No se borrarán del portal de Taxes.`)) {
+  if (confirm(`¿Borrar DEFINITIVAMENTE ${count} orden${count !== 1 ? 'es' : ''} del historial?\n(Ya están guardadas en Taxes, no se borrarán del portal.)`)) {
     showToast(`Eliminando ${count} órdenes...`, "warning");
     
     let successCount = 0;
+    let errorCount = 0;
     const idsToDelete = Array.from(selectedHistoryOrderIds);
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
     
     // Clear selection first
     selectedHistoryOrderIds.clear();
     updateHistoryBulkDeleteActionBar();
-    
-    // Uncheck all checkboxes
     document.querySelectorAll('.history-order-select-checkbox').forEach(chk => chk.checked = false);
+    const selectAllChk = document.getElementById('history-select-all-chk');
+    if (selectAllChk) selectAllChk.checked = false;
 
     for (const orderId of idsToDelete) {
       try {
-        const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+        const res = await fetch(`/api/orders/${orderId}`, {
+          method: 'DELETE',
+          headers: { 'x-user-username': currentUsername }
+        });
         if (res.ok) {
           successCount++;
+        } else {
+          errorCount++;
         }
       } catch (error) {
+        errorCount++;
         console.error(`Error deleting order ${orderId}:`, error);
       }
     }
     
-    showToast(`${successCount} de ${count} órdenes eliminadas localmente`, "success");
-    fetchOrders(); // Refresh lists
+    if (errorCount === 0) {
+      showToast(`${successCount} orden${successCount !== 1 ? 'es' : ''} eliminada${successCount !== 1 ? 's' : ''} definitivamente ✓`, "success");
+    } else {
+      showToast(`${successCount} eliminadas, ${errorCount} fallaron`, "warning");
+    }
+    fetchArchivedOrders(); // Refresh historial view
   }
 }
+
 
 // --- TIMER THRESHOLD & SUPERVISOR AUTHORIZATION LOGIC ---
 let currentAlertTaskId = null;

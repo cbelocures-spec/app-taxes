@@ -372,14 +372,34 @@ class LocalDB {
   }
 
   // --- Work Orders Methods ---
+  // Returns ACTIVE (non-archived) orders only — used by the sync worker and main UI
   getWorkOrders() {
     const db = this.read();
-    return db.workOrders || [];
+    return (db.workOrders || []).filter(o => !o.archived);
+  }
+
+  // Returns ARCHIVED orders only — used by the History/Historial section
+  getArchivedOrders() {
+    const db = this.read();
+    return (db.workOrders || []).filter(o => o.archived === true);
   }
 
   getWorkOrderById(id) {
-    const orders = this.getWorkOrders();
-    return orders.find(o => o.id === id);
+    // Search across all orders (active + archived)
+    const db = this.read();
+    return (db.workOrders || []).find(o => o.id === id);
+  }
+
+  // Soft-archive an order: marks it as archived so it leaves the active list
+  // but stays in the DB until the user permanently deletes it from History
+  archiveWorkOrder(id) {
+    const db = this.read();
+    const order = db.workOrders.find(o => o.id === id);
+    if (!order) return false;
+    order.archived = true;
+    order.archivedAt = new Date().toISOString();
+    this.write(db);
+    return true;
   }
 
   createWorkOrder(orderData) {
@@ -476,6 +496,34 @@ class LocalDB {
     db.workOrders = db.workOrders.filter(o => !ids.includes(o.id));
     this.write(db);
     return true;
+  }
+
+  purgeSyncedOrders(maxDaysOld = 5) {
+    const db = this.read();
+    const now = Date.now();
+    const thresholdMs = maxDaysOld * 24 * 60 * 60 * 1000;
+    const initialCount = db.workOrders.length;
+
+    db.workOrders = db.workOrders.filter(o => {
+      // Keep if not fully synchronized and verified
+      if (o.syncStatus !== 'success') return true;
+      if (o.verifiedStatus !== 'success') return true;
+
+      const syncTime = o.syncDate ? new Date(o.syncDate).getTime() : new Date(o.createdAt).getTime();
+      const ageMs = now - syncTime;
+
+      // Purge if older than threshold
+      if (ageMs > thresholdMs) {
+        console.log(`[Purge] Removing old synchronized order: OT ${o.interno} (Taxes: ${o.taxesOrderNumber}, Age: ${Math.round(ageMs/3600000)}h)`);
+        return false;
+      }
+      return true;
+    });
+
+    if (db.workOrders.length !== initialCount) {
+      this.write(db);
+      console.log(`[Purge] Database cleared. Orders reduced from ${initialCount} to ${db.workOrders.length}`);
+    }
   }
 
   // --- Odometer Overrides ---

@@ -705,6 +705,40 @@
       </div>
     </section>
 
+    <!-- VIEW 7: HISTORIAL (ÓRDENES ARCHIVADAS) - Solo Admin (Pañol/Taller) -->
+    <section id="view-historial" class="app-view">
+      <div class="view-header">
+        <span class="material-icons" style="color:#7c3aed;">archive</span>
+        <h2>Historial de Órdenes</h2>
+        <p style="font-size:13px;color:var(--text-muted);margin-top:4px;">Órdenes archivadas — ya sincronizadas en Taxes. Podés borrarlas definitivamente acá.</p>
+      </div>
+
+      <!-- Bulk delete bar for history -->
+      <div id="history-bulk-delete-bar" class="bulk-action-bar" style="display:none;background:linear-gradient(135deg,#7c3aed,#6d28d9);">
+        <span id="history-bulk-delete-count" style="color:#fff;font-weight:600;">0 seleccionadas</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-secondary" onclick="toggleSelectAllHistoryOrdersList(false)" style="background:rgba(255,255,255,0.2);color:#fff;border:none;">Deseleccionar todo</button>
+          <button class="btn-danger" onclick="deleteSelectedHistoryOrders()" style="background:#ef4444;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:600;"><span class="material-icons" style="font-size:16px;vertical-align:middle;">delete_forever</span> Borrar seleccionadas</button>
+        </div>
+      </div>
+
+      <!-- Select all / controls -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 4px;gap:8px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="history-select-all-chk" onchange="toggleSelectAllHistoryOrdersList(this.checked)" style="width:18px;height:18px;cursor:pointer;">
+          <label for="history-select-all-chk" style="font-size:13px;color:var(--text-muted);cursor:pointer;">Seleccionar todas</label>
+        </div>
+        <span id="history-count-badge" style="font-size:12px;color:var(--text-muted);"></span>
+      </div>
+
+      <div id="history-orders-container" style="padding:8px 16px;">
+        <div class="empty-state">
+          <span class="material-icons">inventory_2</span>
+          <p>No hay órdenes archivadas.</p>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- Bottom Navigation Bar -->
@@ -732,6 +766,11 @@
     <button class="nav-item" onclick="switchView('settings')" id="nav-settings">
       <span class="material-icons">settings</span>
       <span>Ajustes</span>
+    </button>
+    <!-- Historial: solo visible para Admin (Pañol/Taller) -->
+    <button class="nav-item" onclick="switchView('historial')" id="nav-historial" style="display:none;">
+      <span class="material-icons">archive</span>
+      <span>Historial</span>
     </button>
   </nav>
 

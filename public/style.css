@@ -2893,6 +2893,52 @@ body {
   }
 }
 
+/* HISTORIAL BULK ACTION BAR */
+.bulk-action-bar {
+  position: fixed;
+  bottom: 74px;
+  left: 50%;
+  transform: translateX(-50%) translateY(150px);
+  width: calc(100% - 32px);
+  max-width: 500px;
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  backdrop-filter: blur(8px);
+  color: white;
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 8px 25px rgba(109, 40, 217, 0.5);
+  z-index: 9999;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
 
+.bulk-action-bar.active {
+  transform: translateX(-50%) translateY(0);
+}
 
+/* View header for historial */
+#view-historial .view-header {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px 8px;
+  border-bottom: 1px solid var(--border-color);
+  gap: 4px;
+}
 
+#view-historial .view-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+#nav-historial.active {
+  color: #7c3aed;
+}
+#nav-historial.active .material-icons {
+  color: #7c3aed;
+}
