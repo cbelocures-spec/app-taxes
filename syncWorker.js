@@ -746,40 +746,28 @@ async function autoLogin(page, username, password, portalUrl) {
 
   console.log(`Not logged in. Attempting login as ${username}...`);
 
-  // Target selectors for email and password
-  const emailSelector = 'input[type="email"], input[type="text"], input[name="email"], input[name="user"], input[name="username"]';
-  const passSelector = 'input[type="password"], input[name="password"], input[name="pass"]';
+  // Target selectors for email and password on Taxes.com.ar login page
+  const emailSelector = 'input[name="loginUser"]';
+  const passSelector = 'input[name="password"]';
 
   // Wait for inputs to be ready
-  await page.waitForSelector(passSelector, { timeout: 10000 }).catch(() => {});
+  await page.waitForSelector(passSelector, { timeout: 15000 });
 
   // Fill Username
-  try {
-    await page.focus(emailSelector);
-    await page.evaluate((sel) => {
-      const el = document.querySelector(sel);
-      if (el) el.value = '';
-    }, emailSelector);
-    await page.type(emailSelector, username);
-  } catch (e) {
-    console.warn("Failed to fill username using standard selector, retrying with labels...");
-    await fillInputByLabel(page, 'usuario', username);
-    await fillInputByLabel(page, 'email', username);
-  }
+  await page.focus(emailSelector);
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (el) el.value = '';
+  }, emailSelector);
+  await page.type(emailSelector, username);
 
   // Fill Password
-  try {
-    await page.focus(passSelector);
-    await page.evaluate((sel) => {
-      const el = document.querySelector(sel);
-      if (el) el.value = '';
-    }, passSelector);
-    await page.type(passSelector, password);
-  } catch (e) {
-    console.warn("Failed to fill password using standard selector, retrying with labels...");
-    await fillInputByLabel(page, 'contraseña', password);
-    await fillInputByLabel(page, 'password', password);
-  }
+  await page.focus(passSelector);
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (el) el.value = '';
+  }, passSelector);
+  await page.type(passSelector, password);
 
   // Click login button
   console.log("Clicking login button...");
