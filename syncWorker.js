@@ -663,6 +663,17 @@ async function autoLogin(browser, username, password, portalUrl) {
   let page = await browser.newPage();
   await setupPage(page);
 
+  // Capture the page's own console/JS errors — a click that silently does
+  // nothing (no navigation, no visible error) is often caused by a client-side
+  // JS error we can't see in a screenshot or HTML snapshot.
+  page.on('console', msg => console.log(`[Taxes-Console-${msg.type()}] ${msg.text()}`));
+  page.on('pageerror', err => console.log(`[Taxes-PageError] ${err.message}`));
+  page.on('response', res => {
+    if (res.url().includes('/login') && res.request().method() === 'POST') {
+      console.log(`[Taxes-LoginRequest] POST ${res.url()} -> status ${res.status()}`);
+    }
+  });
+
   // Use domcontentloaded (not networkidle2) to tolerate internal redirects from Taxes
   try {
     await page.goto(`${portalUrl}/login`, { waitUntil: 'domcontentloaded', timeout: 25000 });
