@@ -2964,5 +2964,6 @@ module.exports = {
   verifyWorkOrder,
   verifyMultipleOrders,
   scrapeCatalogs,
-  isScraping
+  isScraping,
+  autoLogin
 };

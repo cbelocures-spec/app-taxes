@@ -261,7 +261,51 @@ app.get('/api/debug/chrome-test', (req, res) => {
   });
 });
 
-// Get all work orders (filtered by user sector)
+// Test login to Taxes.com.ar directly - for debugging auth issues
+app.post('/api/debug/test-login', async (req, res) => {
+  const puppeteer = require('puppeteer');
+  let browser;
+  try {
+    const settings = db.getSettings();
+    const portalUrl = (settings.portalUrl || 'https://taxes.com.ar').replace(/\/(admin|login|logout)\/?$/, '').replace(/\/$/, '');
+    const username = settings.username || '';
+    const password = settings.password || '';
+
+    if (!username || !password) {
+      return res.json({ success: false, error: 'No hay credenciales configuradas en Ajustes' });
+    }
+
+    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    const page = await browser.newPage();
+    await page.setDefaultNavigationTimeout(40000);
+
+    await page.goto(`${portalUrl}/login`, { waitUntil: 'networkidle2', timeout: 30000 });
+    const emailSelector = 'input[name="loginUser"]';
+    const passSelector = 'input[name="password"]';
+
+    await page.waitForSelector(passSelector, { timeout: 15000 });
+    await page.focus(emailSelector);
+    await page.evaluate((sel) => { const el = document.querySelector(sel); if (el) el.value = ''; }, emailSelector);
+    await page.type(emailSelector, username);
+    await page.focus(passSelector);
+    await page.evaluate((sel) => { const el = document.querySelector(sel); if (el) el.value = ''; }, passSelector);
+    await page.type(passSelector, password);
+
+    const btnSelector = 'button[type="submit"], input[type="submit"], button.login-btn, button';
+    await page.click(btnSelector);
+    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 35000 }).catch(() => {});
+
+    const finalUrl = page.url();
+    const loggedIn = !finalUrl.toLowerCase().includes('/login');
+    res.json({ success: loggedIn, finalUrl, username, portalUrl, message: loggedIn ? 'Login OK' : 'Sigue en /login - credenciales incorrectas o error de formulario' });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+});
+
+
 app.get('/api/orders', (req, res) => {
   try {
     const username = req.headers['x-user-username'] || null;
