@@ -842,6 +842,19 @@ async function autoLogin(browser, username, password, portalUrl) {
     } catch (e) {
       console.log("Could not evaluate error text on login page.");
     }
+    // Save a shared debug snapshot (screenshot + full HTML) any time autoLogin fails,
+    // regardless of which feature (sync, verify, catalogs) triggered it — so we can
+    // always inspect what the page actually looked like at the moment of failure.
+    try {
+      const path = require('path');
+      const fs = require('fs');
+      await page.screenshot({ path: path.join(__dirname, 'public', 'last_login_attempt.png'), fullPage: true });
+      const html = await page.content();
+      fs.writeFileSync(path.join(__dirname, 'public', 'last_login_attempt.html'), html);
+      console.warn(`[autoLogin] Debug snapshot saved: public/last_login_attempt.png and .html`);
+    } catch (se) {
+      console.warn('[autoLogin] Debug snapshot failed:', se.message);
+    }
     throw new Error(errorMsg);
   }
 
