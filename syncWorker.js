@@ -772,7 +772,26 @@ async function autoLogin(browser, username, password, portalUrl) {
     await delay(1200);
   }
 
-  // Submit form with Enter key - most reliable for Vue.js forms
+  // Submit: try clicking the real "INGRESAR" button first (more reliable for
+  // Vue.js forms whose submit logic is bound to a click handler on the button
+  // rather than to the form's native submit/keypress event), then fall back
+  // to pressing Enter as well just in case.
+  const ingresarBtnId = await page.evaluate(() => {
+    const buttons = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
+    const btn = buttons.find(b => b.textContent && b.textContent.trim().toUpperCase().includes('INGRESAR'));
+    if (!btn) return null;
+    const id = 'tmp-ingresar-btn-' + Date.now();
+    btn.id = id;
+    return id;
+  });
+  if (ingresarBtnId) {
+    console.log('[autoLogin] Clicking INGRESAR button (native click)...');
+    try { await page.click(`#${ingresarBtnId}`); }
+    catch (e) { console.log('[autoLogin] Native click on INGRESAR raised:', e.message); }
+  } else {
+    console.log('[autoLogin] INGRESAR button not found, falling back to Enter key only.');
+  }
+  await delay(500);
   await page.keyboard.press('Enter');
 
 
