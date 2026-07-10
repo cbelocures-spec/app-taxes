@@ -659,20 +659,41 @@ async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
 
 
 
+// Safe page.evaluate that retries on context/frame destruction due to rapid redirects
+async function safeEvaluate(page, fn, ...args) {
+  for (let i = 0; i < 3; i++) {
+    try {
+      return await page.evaluate(fn, ...args);
+    } catch (err) {
+      const msg = err.message || '';
+      if (msg.includes('Execution context was destroyed') || msg.includes('detached Frame') || msg.includes('Target closed')) {
+        console.warn(`[safeEvaluate] Context/Frame error, waiting 1s before retry ${i + 1}/3...`);
+        await delay(1000);
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error("Page evaluation failed due to persistent context/frame destruction.");
+}
+
 // Automate login to Taxes.com.ar
 async function autoLogin(page, username, password, portalUrl) {
   console.log(`Navigating to ${portalUrl}/admin ...`);
   await safeGoto(page, `${portalUrl}/admin`, { timeout: 30000 });
 
+  // Wait 2 seconds for any immediate redirects to finish
+  await delay(2000);
+
   // Check if we are on a login page (has password input visible)
-  const isOnLoginPage = await page.evaluate(() => {
+  const isOnLoginPage = await safeEvaluate(page, () => {
     const inputs = Array.from(document.querySelectorAll('input'));
     return inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
   });
 
   if (!isOnLoginPage) {
     // We are on a dashboard/admin page - check if the correct user is logged in
-    const loggedInEmail = await page.evaluate(() => {
+    const loggedInEmail = await safeEvaluate(page, () => {
       // Look for displayed email/username in nav or profile area
       const candidates = [
         document.querySelector('.user-profile-toggle'),
@@ -704,7 +725,7 @@ async function autoLogin(page, username, password, portalUrl) {
 
     // Different user is logged in — need to logout first
     console.log(`Different user logged in (${loggedInEmail}), need to logout and re-login as ${username}.`);
-    const logoutClicked = await page.evaluate(() => {
+    const logoutClicked = await safeEvaluate(page, () => {
       const links = Array.from(document.querySelectorAll('a, button'));
       const logout = links.find(el => {
         const text = el.textContent.trim().toLowerCase();
@@ -726,12 +747,13 @@ async function autoLogin(page, username, password, portalUrl) {
   console.log(`Not logged in (or logged out). Attempting login as ${username}...`);
   
   // Navigate to login page if not there already
-  const stillOnLogin = await page.evaluate(() => {
+  const stillOnLogin = await safeEvaluate(page, () => {
     const inputs = Array.from(document.querySelectorAll('input'));
     return inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
   });
   if (!stillOnLogin) {
     await safeGoto(page, `${portalUrl}/admin`, { timeout: 30000 });
+    await delay(2000);
   }
 
   // Wait for login fields
@@ -743,17 +765,17 @@ async function autoLogin(page, username, password, portalUrl) {
 
   const inputs = await page.$$('input');
   for (const input of inputs) {
-    const type = await page.evaluate(el => el.type, input);
-    const name = await page.evaluate(el => el.name || '', input);
+    const type = await safeEvaluate(page, el => el.type, input);
+    const name = await safeEvaluate(page, el => el.name || '', input);
     
     if ((type === 'text' || type === 'email' || name.includes('email') || name.includes('user')) && !usernameFilled) {
       await input.focus();
-      await page.evaluate(el => el.value = '', input);
+      await safeEvaluate(page, el => el.value = '', input);
       await input.type(username);
       usernameFilled = true;
     } else if ((type === 'password' || name.includes('pass')) && !passwordFilled) {
       await input.focus();
-      await page.evaluate(el => el.value = '', input);
+      await safeEvaluate(page, el => el.value = '', input);
       await input.type(password);
       passwordFilled = true;
     }
@@ -784,7 +806,7 @@ async function autoLogin(page, username, password, portalUrl) {
   await delay(3000); // Restored: needs enough time for dashboard to fully load
 
   // Check if login succeeded: we should NOT be on login page anymore
-  const stillOnLoginPage = await page.evaluate(() => {
+  const stillOnLoginPage = await safeEvaluate(page, () => {
     const inputs = Array.from(document.querySelectorAll('input'));
     const hasPasswordInput = inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
     // Check for SPECIFIC error phrases only (avoid false positives from dashboard menus)
