@@ -108,17 +108,8 @@ async function setupPage(page) {
   });
   await page.setViewport({ width: 1280, height: 800 });
 
-  // Intercept and block heavy media/images/fonts to save up to 70% RAM & bandwidth
-  await page.setRequestInterception(true);
-  page.on('request', (req) => {
-    const type = req.resourceType();
-    const url = req.url();
-    if (type === 'image' || type === 'font' || type === 'media' || url.endsWith('.png') || url.endsWith('.jpg') || url.endsWith('.woff') || url.endsWith('.woff2')) {
-      req.abort();
-    } else {
-      req.continue();
-    }
-  });
+  // Avoid using setRequestInterception(true) as it is known to cause race conditions
+  // and 'detached Frame' errors when handling rapid redirections in Puppeteer.
 }
 
 // Helper to navigate safely using 'load' instead of 'networkidle2' and catch timeout errors
