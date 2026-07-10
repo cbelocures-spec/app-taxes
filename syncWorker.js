@@ -716,37 +716,58 @@ async function autoLogin(browser, username, password, portalUrl) {
   const emailSelector = 'input[name="loginUser"]';
   const passSelector = 'input[name="password"]';
 
-  // Wait for inputs to be ready
-  await page.waitForSelector(passSelector, { timeout: 15000 });
+  // Poll for password input using evaluate (avoids detached frame from waitForSelector)
+  console.log('[autoLogin] Waiting for password input via polling...');
+  const inputReady = await (async () => {
+    for (let i = 0; i < 20; i++) {
+      try {
+        const found = await page.evaluate((sel) => !!document.querySelector(sel), passSelector);
+        if (found) return true;
+      } catch (e) { /* page might be navigating, keep polling */ }
+      await delay(500);
+    }
+    return false;
+  })();
 
+  if (!inputReady) {
+    throw new Error('[autoLogin] Password input not found after 10 seconds');
+  }
 
+  // Fill inputs using direct JS injection (most robust for Vue.js reactive forms)
+  await page.evaluate((esel, psel, uval, pval) => {
+    const email = document.querySelector(esel);
+    const pass = document.querySelector(psel);
+    if (email) {
+      email.value = '';
+      email.value = uval;
+      email.dispatchEvent(new Event('input', { bubbles: true }));
+      email.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (pass) {
+      pass.value = '';
+      pass.value = pval;
+      pass.dispatchEvent(new Event('input', { bubbles: true }));
+      pass.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }, emailSelector, passSelector, username, password);
 
-  // Fill Username
-  await page.focus(emailSelector);
-  await page.evaluate((sel) => {
-    const el = document.querySelector(sel);
-    if (el) el.value = '';
-  }, emailSelector);
-  await page.type(emailSelector, username);
-
-  // Fill Password
-  await page.focus(passSelector);
-  await page.evaluate((sel) => {
-    const el = document.querySelector(sel);
-    if (el) el.value = '';
-  }, passSelector);
-  await page.type(passSelector, password);
+  console.log('[autoLogin] Inputs filled. Submitting with Enter...');
 
   // Submit form with Enter key - most reliable for Vue.js forms
-  console.log("Submitting login form with Enter key...");
   await page.keyboard.press('Enter');
 
-  // Wait for login redirection (Taxes can be slow, wait up to 35 seconds)
-  console.log("Waiting for Taxes authentication process...");
-  await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 35000 }).catch((e) => {
-    console.log("Authentication navigation finished or hit timeout:", e.message);
-  });
-  await delay(4000); // Give dashboard time to settle
+
+  // Poll URL until we leave /login (up to 35 seconds) - avoids waitForNavigation frame issues
+  console.log('Waiting for Taxes authentication redirect...');
+  let redirected = false;
+  for (let i = 0; i < 70; i++) {
+    await delay(500);
+    try {
+      const url = page.url().toLowerCase();
+      if (!url.includes('/login')) { redirected = true; break; }
+    } catch (e) { /* page still navigating */ }
+  }
+  await delay(2000); // Give dashboard time to settle
 
   // Robust check: if the URL no longer contains "/login", the login was successful!
   const currentUrl = page.url().toLowerCase();
