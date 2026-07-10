@@ -2939,5 +2939,6 @@ module.exports = {
   verifyMultipleOrders,
   scrapeCatalogs,
   isScraping,
+  getIsScraping: () => isScraping,
   autoLogin
 };
