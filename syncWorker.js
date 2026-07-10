@@ -682,14 +682,14 @@ async function autoLogin(page, username, password, portalUrl) {
   console.log(`Navigating to ${portalUrl}/admin ...`);
   await safeGoto(page, `${portalUrl}/admin`, { timeout: 30000 });
 
-  // Wait 2 seconds for any immediate redirects to finish
-  await delay(2000);
-
-  // Check if we are on a login page (has password input visible)
-  const isOnLoginPage = await safeEvaluate(page, () => {
-    const inputs = Array.from(document.querySelectorAll('input'));
-    return inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
-  });
+  // Wait for page to stabilize and check if we are on the login page (has password input)
+  let isOnLoginPage = false;
+  try {
+    await page.waitForSelector('input[type="password"]', { timeout: 6000 });
+    isOnLoginPage = true;
+  } catch (e) {
+    console.log("No password input found. Checking if already logged in...");
+  }
 
   if (!isOnLoginPage) {
     // We are on a dashboard/admin page - check if the correct user is logged in
@@ -806,22 +806,26 @@ async function autoLogin(page, username, password, portalUrl) {
   await delay(3000); // Restored: needs enough time for dashboard to fully load
 
   // Check if login succeeded: we should NOT be on login page anymore
-  const stillOnLoginPage = await safeEvaluate(page, () => {
-    const inputs = Array.from(document.querySelectorAll('input'));
-    const hasPasswordInput = inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
-    // Check for SPECIFIC error phrases only (avoid false positives from dashboard menus)
-    const bodyText = document.body.textContent.toLowerCase();
-    const hasError = bodyText.includes('credenciales inv') ||
-                     bodyText.includes('credenciales incorrecta') ||
-                     bodyText.includes('usuario o contrase') ||
-                     bodyText.includes('contrase\u00f1a incorrecta') ||
-                     bodyText.includes('datos incorrectos') ||
-                     bodyText.includes('acceso denegado');
-    return hasPasswordInput || hasError;
-  });
+  const passwordInput = await page.$('input[type="password"]').catch(() => null);
+  let hasErrorText = false;
+  try {
+    hasErrorText = await page.evaluate(() => {
+      const bodyText = document.body.textContent.toLowerCase();
+      return bodyText.includes('credenciales inv') ||
+             bodyText.includes('credenciales incorrecta') ||
+             bodyText.includes('usuario o contrase') ||
+             bodyText.includes('contraseñaa incorrecta') ||
+             bodyText.includes('contraseña incorrecta') ||
+             bodyText.includes('datos incorrectos') ||
+             bodyText.includes('acceso denegado');
+    });
+  } catch (e) {
+    // If evaluation fails here, it's likely we navigated away, which implies login success!
+    console.log("Evaluation failed post-login (likely navigated away to dashboard).");
+  }
 
-  if (stillOnLoginPage) {
-    throw new Error("Credenciales inv\u00e1lidas o error al iniciar sesi\u00f3n en Taxes.com.ar");
+  if (passwordInput !== null || hasErrorText) {
+    throw new Error("Credenciales inválidas o error al iniciar sesión en Taxes.com.ar");
   }
 
   console.log(`Login successful as ${username}!`);
