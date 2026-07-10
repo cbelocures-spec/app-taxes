@@ -804,6 +804,21 @@ async function autoLogin(browser, username, password, portalUrl) {
   }
   await delay(500);
   await page.keyboard.press('Enter');
+  await delay(500);
+  // Extra safety net: directly trigger the form's native submit as well, in case
+  // neither the click nor Enter actually fired the submit handler (this bypasses
+  // whatever event wiring the click/keypress rely on and uses the browser's own
+  // form submission mechanism directly).
+  const nativeSubmitTried = await page.evaluate(() => {
+    const form = document.querySelector('form.login-form') || document.querySelector('form');
+    if (!form) return false;
+    try {
+      if (typeof form.requestSubmit === 'function') { form.requestSubmit(); }
+      else { form.submit(); }
+      return true;
+    } catch (e) { return false; }
+  });
+  console.log(`[autoLogin] Native form submit also triggered: ${nativeSubmitTried}`);
 
 
   // Poll URL until we leave /login (up to 35 seconds) - avoids waitForNavigation frame issues
