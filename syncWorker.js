@@ -1273,7 +1273,7 @@ async function syncWorkOrder(orderId) {
     try {
       page = await autoLogin(browser, username, password, settings.portalUrl);
     } catch (loginError) {
-      throw new Error(`Credenciales inválidas o el usuario ${username} no existe en Taxes.com.ar`);
+      throw new Error(`Error de login para ${username}: ${loginError.message}`);
     }
 
     page.on('requestfailed', r => {
