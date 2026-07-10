@@ -1221,6 +1221,10 @@ async function scrapeCatalogs(triggerUsername = null) {
           const path = require('path');
           await activePage.screenshot({ path: path.join(__dirname, 'public', 'last_catalog_error.png'), fullPage: true });
           console.warn(`[ScrapeCatalogs] Debug screenshot saved to public/last_catalog_error.png. Current URL: ${activePage.url()}`);
+          const fs = require('fs');
+          const html = await activePage.content();
+          fs.writeFileSync(path.join(__dirname, 'public', 'last_catalog_error.html'), html);
+          console.warn(`[ScrapeCatalogs] Debug HTML saved to public/last_catalog_error.html`);
         }
       } catch (se) { console.warn('[ScrapeCatalogs] Debug screenshot failed:', se.message); }
     }
