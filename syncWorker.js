@@ -741,7 +741,36 @@ async function autoLogin(browser, username, password, portalUrl) {
     }
   }, emailSelector, passSelector, username, password);
 
-  console.log('[autoLogin] Inputs filled. Submitting with Enter...');
+  console.log('[autoLogin] Inputs filled. Waiting a moment for the page to register the values before submitting...');
+  await delay(1200); // give Vue.js reactivity time to catch up with the injected values before we submit;
+                      // submitting too fast right after setting .value can intermittently send a stale/empty
+                      // form even though the fields visually show the right text.
+
+  // Verify the values actually "stuck" before submitting; if not, try filling again once.
+  const valuesStuck = await page.evaluate((esel, psel, uval, pval) => {
+    const email = document.querySelector(esel);
+    const pass = document.querySelector(psel);
+    return !!(email && pass && email.value === uval && pass.value === pval);
+  }, emailSelector, passSelector, username, password);
+
+  if (!valuesStuck) {
+    console.log('[autoLogin] Values did not stick on first fill — retrying fill once...');
+    await page.evaluate((esel, psel, uval, pval) => {
+      const email = document.querySelector(esel);
+      const pass = document.querySelector(psel);
+      if (email) {
+        email.value = uval;
+        email.dispatchEvent(new Event('input', { bubbles: true }));
+        email.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (pass) {
+        pass.value = pval;
+        pass.dispatchEvent(new Event('input', { bubbles: true }));
+        pass.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }, emailSelector, passSelector, username, password);
+    await delay(1200);
+  }
 
   // Submit form with Enter key - most reliable for Vue.js forms
   await page.keyboard.press('Enter');
