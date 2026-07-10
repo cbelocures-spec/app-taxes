@@ -769,23 +769,9 @@ async function autoLogin(page, username, password, portalUrl) {
   }, passSelector);
   await page.type(passSelector, password);
 
-  // Click login button
-  console.log("Clicking login button...");
-  let clicked = false;
-  try {
-    const submitSelector = 'button[type="submit"], input[type="submit"], button.btn-primary';
-    await page.click(submitSelector);
-    clicked = true;
-  } catch (e) {
-    clicked = await clickByText(page, 'Iniciar Sesión', 'button') || 
-              await clickByText(page, 'Ingresar', 'button') ||
-              await clickByText(page, 'Login', 'button');
-  }
-
-  if (!clicked) {
-    // Fallback: press Enter key
-    await page.keyboard.press('Enter');
-  }
+  // Submit form with Enter key - most reliable for Vue.js forms
+  console.log("Submitting login form with Enter key...");
+  await page.keyboard.press('Enter');
 
   // Wait for login redirection (Taxes can be slow, wait up to 35 seconds)
   console.log("Waiting for Taxes authentication process...");

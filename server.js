@@ -284,6 +284,21 @@ app.post('/api/debug/test-login', async (req, res) => {
     const passSelector = 'input[name="password"]';
 
     await page.waitForSelector(passSelector, { timeout: 15000 });
+
+    // Inspect what inputs exist before filling
+    const inputsInfo = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('input')).map(i => ({
+        name: i.name, type: i.type, id: i.id, placeholder: i.placeholder
+      }));
+    });
+
+    const buttonsInfo = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('button')).map(b => ({
+        type: b.type, text: b.textContent.trim().substring(0, 50), id: b.id, className: b.className
+      }));
+    });
+
+    // Fill inputs
     await page.focus(emailSelector);
     await page.evaluate((sel) => { const el = document.querySelector(sel); if (el) el.value = ''; }, emailSelector);
     await page.type(emailSelector, username);
@@ -291,13 +306,29 @@ app.post('/api/debug/test-login', async (req, res) => {
     await page.evaluate((sel) => { const el = document.querySelector(sel); if (el) el.value = ''; }, passSelector);
     await page.type(passSelector, password);
 
-    const btnSelector = 'button[type="submit"], input[type="submit"], button.login-btn, button';
-    await page.click(btnSelector);
+    // Verify values were set correctly
+    const filledValues = await page.evaluate((esel, psel) => {
+      const em = document.querySelector(esel);
+      const pa = document.querySelector(psel);
+      return { emailValue: em ? em.value : 'NOT FOUND', passLength: pa ? pa.value.length : 0 };
+    }, emailSelector, passSelector);
+
+    // Submit with Enter key (most reliable)
+    await page.keyboard.press('Enter');
     await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 35000 }).catch(() => {});
 
     const finalUrl = page.url();
     const loggedIn = !finalUrl.toLowerCase().includes('/login');
-    res.json({ success: loggedIn, finalUrl, username, portalUrl, message: loggedIn ? 'Login OK' : 'Sigue en /login - credenciales incorrectas o error de formulario' });
+    res.json({
+      success: loggedIn,
+      finalUrl,
+      username,
+      portalUrl,
+      filledValues,
+      inputsInfo,
+      buttonsInfo,
+      message: loggedIn ? 'Login OK' : 'Sigue en /login - ver buttonsInfo e inputsInfo para diagnostico'
+    });
   } catch (err) {
     res.json({ success: false, error: err.message });
   } finally {
