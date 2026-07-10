@@ -287,6 +287,16 @@ class LocalDB {
     if (cleanSettings.username) {
       cleanSettings.username = normalizeEmail(cleanSettings.username);
     }
+    if (cleanSettings.portalUrl) {
+      let url = String(cleanSettings.portalUrl).trim();
+      // Remove trailing slash
+      if (url.endsWith('/')) {
+        url = url.slice(0, -1);
+      }
+      // Remove subroutes like /admin, /login, /logout
+      url = url.replace(/\/admin$/, '').replace(/\/login$/, '').replace(/\/logout$/, '');
+      cleanSettings.portalUrl = url;
+    }
     db.settings = { ...db.settings, ...cleanSettings };
     this.write(db);
     return db.settings;
