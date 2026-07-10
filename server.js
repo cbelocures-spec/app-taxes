@@ -92,17 +92,20 @@ app.use((req, res, next) => {
   }
 
   const username = req.headers['x-user-username'];
-  // Only reject if a username IS provided but doesn't exist in the DB.
-  // If no username header is sent (anonymous / Railway fresh DB), allow through —
-  // individual endpoints handle sector defaults gracefully.
+  // Only reject if a username IS provided but doesn't exist in the DB AT ALL.
+  // If the user exists but has a masked/old password, keep the username so the
+  // endpoint can still identify WHO is making the request (sector, permissions, etc.)
+  // The syncWorker's resolveCredentials will handle the credential lookup.
   if (username && username.trim() !== '') {
     const user = db.getUser(username);
-    if (!user || !user.password) {
-      console.log(`[Auth Check] User "${username}" not found or has no password in DB. Allowing as anonymous.`);
+    if (!user) {
+      console.log(`[Auth Check] User "${username}" not found in DB. Allowing as anonymous.`);
       // Don't block — just clear the username so the request proceeds as anonymous.
       // This handles Railway's fresh DB where no users are registered yet.
       req.headers['x-user-username'] = '';
     }
+    // NOTE: If user exists but has masked/stale password, keep username intact.
+    // The worker will report a clear error if credentials can't be resolved.
   }
   next();
 });
@@ -119,7 +122,7 @@ function getSectorByUsername(username) {
   if (email === 'taller@contenedoreshugo.com.ar' || email === 'paniol@contenedoreshugo.com.ar') {
     return 'Admin';
   }
-  if (email === 'j.carmona@contenedoreshugo.com.ar' || email === 'jcarmona@contenedoreshugo.com.ar') {
+  if (email === 'jcarmona@contenedoreshugo.com.ar' || email === 'j.carmona@contenedoreshugo.com.ar') {
     return 'Herrería';
   }
   if (email === 'ftoledo@contenedoreshugo.com.ar' || email === 'f.toledo@contenedoreshugo.com.ar') {
@@ -139,9 +142,9 @@ app.post('/api/login', (req, res) => {
     // Save this user's credentials in per-user store (used by syncWorkOrder per order)
     const user = db.saveUser(username, password);
 
-    // Only update global settings (used for catalog sync fallback) if not already set,
-    // or if this is the same user updating their own credentials.
-    // This prevents user B's login from replacing user A's global settings.
+    // Always trigger catalog sync for ANY supervisor who logs in, using THEIR OWN credentials.
+    // Each supervisor (taller, paniol, sergio, brahim, jcarmona, ftoledo) has valid Taxes accounts.
+    // We only update global settings if there is no primary user yet, or if this IS the primary user.
     const currentSettings = db.getSettings();
     const isSameUser = currentSettings.username && 
                        currentSettings.username.toLowerCase().trim() === username.toLowerCase().trim();
@@ -150,12 +153,6 @@ app.post('/api/login', (req, res) => {
     if (noGlobalUser || isSameUser) {
       db.saveSettings({ username, password, catalogSyncStatus: 'idle', catalogSyncError: null });
       console.log(`[Login] Global settings updated for ${username}.`);
-      // Trigger catalog sync in background for this user
-      worker.scrapeCatalogs(username).then(result => {
-        console.log(`[Login] Catalog sync for ${username}:`, result.message);
-      }).catch(e => {
-        console.error(`[Login] Catalog sync error for ${username}:`, e.message);
-      });
     } else {
       // Secondary user logging in — clear stale errors but don't overwrite global settings
       if (currentSettings.catalogSyncError) {
@@ -163,6 +160,14 @@ app.post('/api/login', (req, res) => {
       }
       console.log(`[Login] Secondary user ${username} logged in (global settings kept for ${currentSettings.username}).`);
     }
+
+    // Trigger catalog sync in background using THIS user's own credentials regardless of role.
+    // This ensures each supervisor can sync catalogs independently without depending on paniol.
+    worker.scrapeCatalogs(username).then(result => {
+      console.log(`[Login] Catalog sync for ${username}:`, result.message);
+    }).catch(e => {
+      console.error(`[Login] Catalog sync error for ${username}:`, e.message);
+    });
 
     res.json({ success: true, username, sector: getSectorByUsername(username) });
   } catch (error) {
@@ -588,7 +593,7 @@ app.post('/api/orders/cleanup', (req, res) => {
       if (sector === 'Edilicio' && cls !== 'Edilicio') return;
       if (sector === 'Taller' && (cls === 'Herrería' || cls === 'Edilicio')) return;
 
-      const tasks = order.tasks || [];
+      const tasks = (order.tasks || []).filter(t => t !== null && t !== undefined);
       const allFinished = tasks.length === 0 || tasks.every(t => t.status === "Finalizada");
       
       // Force out of service if active/paused timers exist
@@ -599,6 +604,7 @@ app.post('/api/orders/cleanup', (req, res) => {
       const isVerified = order.verifiedStatus === 'success';
 
       if (type === 'controlled') {
+        // Controlled cleanup: synced+verified orders can always be deleted regardless of timer/OOS state
         if (allFinished && isSynced && isVerified) {
           idsToDelete.push(order.id);
         }
@@ -607,7 +613,7 @@ app.post('/api/orders/cleanup', (req, res) => {
           idsToDelete.push(order.id);
         }
       } else {
-        // Default: finished and operative
+        // Default: finished and operative (not blocked by OOS)
         if (allFinished && !isOutOfService) {
           idsToDelete.push(order.id);
         }
@@ -660,7 +666,8 @@ app.post('/api/orders/retry/:id', async (req, res) => {
     }
 
     // Reset status to pending so worker picks it up immediately
-    db.updateWorkOrder(order.id, { syncStatus: "pending", syncError: null });
+    // Also record who triggered the retry so the worker uses their credentials
+    db.updateWorkOrder(order.id, { syncStatus: "pending", syncError: null, syncTriggeredBy: requester || null });
     
     res.json({ success: true, message: "Sincronización encolada para reintento." });
   } catch (error) {
@@ -832,12 +839,22 @@ app.get('/api/settings', (req, res) => {
     const isMainSupervisor = requestingUser ? (
       requestingUser.toLowerCase().includes("paniol") || 
       requestingUser.toLowerCase().includes("belocures") || 
-      requestingUser.toLowerCase().includes("cesar")
+      requestingUser.toLowerCase().includes("cesar") ||
+      requestingUser.toLowerCase().includes("taller") ||
+      requestingUser.toLowerCase().includes("sergio") ||
+      requestingUser.toLowerCase().includes("brahim") ||
+      requestingUser.toLowerCase().includes("toledo") ||
+      requestingUser.toLowerCase().includes("carmona")
     ) : (
       settings.username && (
         settings.username.toLowerCase().includes("paniol") ||
         settings.username.toLowerCase().includes("belocures") ||
-        settings.username.toLowerCase().includes("cesar")
+        settings.username.toLowerCase().includes("cesar") ||
+        settings.username.toLowerCase().includes("taller") ||
+        settings.username.toLowerCase().includes("sergio") ||
+        settings.username.toLowerCase().includes("brahim") ||
+        settings.username.toLowerCase().includes("toledo") ||
+        settings.username.toLowerCase().includes("carmona")
       )
     );
 

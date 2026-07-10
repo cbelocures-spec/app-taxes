@@ -554,7 +554,8 @@ async function submitPreOrderCheck() {
   let existingOrder = activeOrders.find(o => {
     const isSameInterno = String(o.interno).trim() === String(interno);
     const isSameCls = String(o.clasificacion).trim().toLowerCase() === String(clasificacion).trim().toLowerCase();
-    const allCompleted = (o.tasks || []).length > 0 && (o.tasks || []).every(t => t.status === "Finalizada");
+    const validTasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
+    const allCompleted = validTasks.length > 0 && validTasks.every(t => t.status === "Finalizada");
     return isSameInterno && isSameCls && !allCompleted;
   });
 
@@ -562,10 +563,11 @@ async function submitPreOrderCheck() {
   if (!existingOrder) {
     existingOrder = activeOrders.find(o => {
       const isSameInterno = String(o.interno).trim() === String(interno);
-      const allCompleted = (o.tasks || []).length > 0 && (o.tasks || []).every(t => t.status === "Finalizada");
+      const validTasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
+      const allCompleted = validTasks.length > 0 && validTasks.every(t => t.status === "Finalizada");
       if (!isSameInterno || allCompleted) return false;
       
-      const tasks = o.tasks || [];
+      const tasks = validTasks;
       const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
       const isOutOfService = hasActiveOrPausedTimer || o.estadoUnidad === 'fuera_de_servicio';
       return isOutOfService;
@@ -2095,14 +2097,15 @@ function toggleTaskEmployees(event, orderId) {
   }
 
   const order = activeOrders.find(o => o.id === orderId);
-  if (!order || !order.tasks || order.tasks.length === 0) {
+  const validTasks = order && order.tasks ? order.tasks.filter(t => t !== null && t !== undefined) : [];
+  if (!order || validTasks.length === 0) {
     detailEl.innerHTML = '<span style="color:var(--text-muted);">Sin tareas asignadas</span>';
     detailEl.style.display = 'block';
     return;
   }
 
   let html = '';
-  order.tasks.forEach((t, idx) => {
+  validTasks.forEach((t, idx) => {
     const empOpt = (cachedCatalogs && cachedCatalogs.empleados)
       ? cachedCatalogs.empleados.find(e => e.value === t.empleado)
       : null;
@@ -3650,7 +3653,7 @@ async function markDashboardTaskFinished(orderId, taskId) {
   renderDashboard();
   showToast("Tarea finalizada", "success");
 
-  const allCompleted = order.tasks.every(t => t.status === "Finalizada");
+  const allCompleted = (order.tasks || []).filter(t => t !== null && t !== undefined).every(t => t.status === "Finalizada");
 
   // Then persist to server in background
   try {
@@ -4136,79 +4139,91 @@ function removeBulkTaskField(taskId) {
 }
 
 function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
-  const ccSelect = card.querySelector('.bulk-task-cc');
-  const empSelect = card.querySelector('.bulk-task-emp');
-  if (!ccSelect || !empSelect) return;
+  try {
+    const ccSelect = card.querySelector('.bulk-task-cc');
+    const empSelect = card.querySelector('.bulk-task-emp');
+    if (!ccSelect || !empSelect) return;
 
-  const selectedCc = ccSelect.value;
-  const currentValue = defaultValue || empSelect.value;
+    const selectedCc = ccSelect.value;
+    const currentValue = defaultValue || empSelect.value;
 
-  const currentUser = localStorage.getItem('currentUserUsername');
-  const userSector = getSectorByUsername(currentUser);
+    const currentUser = localStorage.getItem('currentUserUsername');
+    const userSector = getSectorByUsername(currentUser);
 
-  let filteredEmployees = cachedCatalogs.empleados;
+    let filteredEmployees = cachedCatalogs.empleados || [];
 
-  // Detect sector by label text of the selected CC option (robust, not hardcoded)
-  const selectedOption = ccSelect.options[ccSelect.selectedIndex];
-  const selectedLabel = selectedOption ? selectedOption.textContent.trim().toUpperCase() : '';
-  const isHerreriaCC = selectedLabel.includes('HERRER') || selectedCc === "HERRERIA" || selectedCc === "16" || userSector === 'Herrería';
-  const isMecanicaCC = selectedLabel.includes('MECAN') || selectedCc === "15" || selectedCc === "MECANICA";
+    // Detect sector by label text of the selected CC option (robust, not hardcoded)
+    const selectedOption = ccSelect.options[ccSelect.selectedIndex];
+    const selectedLabel = selectedOption ? selectedOption.textContent.trim().toUpperCase() : '';
+    const isHerreriaCC = selectedLabel.includes('HERRER') || selectedCc === "HERRERIA" || selectedCc === "16" || userSector === 'Herrería';
+    const isMecanicaCC = selectedLabel.includes('MECAN') || selectedCc === "15" || selectedCc === "MECANICA";
 
-  if (isHerreriaCC) {
-    // Herrería filter
-    const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
-    const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
-    
-    let matchedEmployees = cachedCatalogs.empleados.filter(emp => {
-      const empCleaned = cleanName(emp.label);
-      if (herreriaNamesCleaned.has(empCleaned)) return true;
-      for (const hName of herreriaNamesCleaned) {
-        if (empCleaned.includes(hName) || hName.includes(empCleaned)) {
-          return true;
+    const cleanName = (str) => {
+      if (typeof str !== 'string') return '';
+      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    };
+
+    if (isHerreriaCC) {
+      // Herrería filter
+      const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
+      
+      let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
+        if (!emp || !emp.label) return false;
+        const empCleaned = cleanName(emp.label);
+        if (herreriaNamesCleaned.has(empCleaned)) return true;
+        for (const hName of herreriaNamesCleaned) {
+          if (empCleaned.includes(hName) || hName.includes(empCleaned)) {
+            return true;
+          }
         }
-      }
-      return false;
-    });
+        return false;
+      });
 
-    // Add Federico, Luciano, Digno if not present
-    const customHerreriaNames = ["Federico", "Luciano", "Digno"];
-    customHerreriaNames.forEach(name => {
-      const exists = matchedEmployees.some(emp => emp.label.toLowerCase().trim() === name.toLowerCase());
-      if (!exists) {
-        matchedEmployees.push({ value: name, label: name });
-      }
-    });
-
-    // Fallback to full list if filter returns too few results
-    filteredEmployees = matchedEmployees.length >= 3 ? matchedEmployees : cachedCatalogs.empleados;
-
-  } else if (isMecanicaCC) { // MECANICA
-    const cleanName = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
-    const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
-    const mecFiltered = cachedCatalogs.empleados.filter(emp => {
-      const empCleaned = cleanName(emp.label);
-      if (mecanicaNamesCleaned.has(empCleaned)) return true;
-      for (const mName of mecanicaNamesCleaned) {
-        if (empCleaned.includes(mName) || mName.includes(empCleaned)) {
-          return true;
+      // Add Federico, Luciano, Digno if not present
+      const customHerreriaNames = ["Federico", "Luciano", "Digno"];
+      customHerreriaNames.forEach(name => {
+        const exists = matchedEmployees.some(emp => emp && emp.label && emp.label.toLowerCase().trim() === name.toLowerCase());
+        if (!exists) {
+          matchedEmployees.push({ value: name, label: name });
         }
-      }
-      return false;
+      });
+
+      // Fallback to full list if filter returns too few results
+      filteredEmployees = matchedEmployees.length >= 3 ? matchedEmployees : (cachedCatalogs.empleados || []);
+
+    } else if (isMecanicaCC) { // MECANICA
+      const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
+      const mecFiltered = (cachedCatalogs.empleados || []).filter(emp => {
+        if (!emp || !emp.label) return false;
+        const empCleaned = cleanName(emp.label);
+        if (mecanicaNamesCleaned.has(empCleaned)) return true;
+        for (const mName of mecanicaNamesCleaned) {
+          if (empCleaned.includes(mName) || mName.includes(empCleaned)) {
+            return true;
+          }
+        }
+        return false;
+      });
+      // Fallback to full list if filter returns too few results (catalog names may not match)
+      filteredEmployees = mecFiltered.length >= 3 ? mecFiltered : (cachedCatalogs.empleados || []);
+    }
+
+    // Populate options
+    let empOptions = `<option value="">Seleccionar Empleado...</option>`;
+    filteredEmployees.forEach(opt => {
+      if (!opt) return;
+      const optVal = opt.value || "";
+      const optLabel = opt.label || opt.value || "";
+      const isSelected = optVal === currentValue;
+      empOptions += `<option value="${optVal}" ${isSelected ? "selected" : ""}>${optLabel}</option>`;
     });
-    // Fallback to full list if filter returns too few results (catalog names may not match)
-    filteredEmployees = mecFiltered.length >= 3 ? mecFiltered : cachedCatalogs.empleados;
-  }
+    empSelect.innerHTML = empOptions;
 
-  // Populate options
-  let empOptions = `<option value="">Seleccionar Empleado...</option>`;
-  filteredEmployees.forEach(opt => {
-    const isSelected = opt.value === currentValue;
-    empOptions += `<option value="${opt.value}" ${isSelected ? "selected" : ""}>${opt.label}</option>`;
-  });
-  empSelect.innerHTML = empOptions;
-
-  if (empSelect.rebuildSearchable) {
-    empSelect.rebuildSearchable();
+    if (empSelect.rebuildSearchable) {
+      empSelect.rebuildSearchable();
+    }
+  } catch (err) {
+    console.error("Error updating bulk employee dropdown:", err);
   }
 }
 
@@ -7137,7 +7152,7 @@ function adjustPtStateLists(state) {
     const herreriaOrders = activeOrders.filter(o => {
       const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
       if (isClosed) return false;
-      const tasks = o.tasks || [];
+      const tasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
       return tasks.filter(taskMatchesSector).some(
         t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0))
       );
@@ -7201,7 +7216,7 @@ function adjustPtStateLists(state) {
   const activeRepairOrders = activeOrders.filter(o => {
     const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
     if (isClosed) return false;
-    const tasks = o.tasks || [];
+    const tasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
     return tasks.filter(taskMatchesSector).some(
       t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0))
     );

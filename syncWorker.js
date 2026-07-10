@@ -105,15 +105,26 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
 async function safeGoto(page, url, options = {}) {
   const defaultOptions = { waitUntil: 'load', timeout: 30000 };
   const mergedOptions = { ...defaultOptions, ...options };
-  try {
-    console.log(`[safeGoto] Navigating to ${url} ...`);
-    return await page.goto(url, mergedOptions);
-  } catch (err) {
-    if (err.message.includes('Timeout') || err.message.includes('timeout')) {
-      console.warn(`[safeGoto] Navigation timeout hit for ${url}. Attempting to continue...`);
-      return null;
+  let attempts = 0;
+  while (attempts < 2) {
+    try {
+      attempts++;
+      console.log(`[safeGoto] Navigating to ${url} (attempt ${attempts}) ...`);
+      return await page.goto(url, mergedOptions);
+    } catch (err) {
+      const isTimeout = err.message.includes('Timeout') || err.message.includes('timeout');
+      const isDetached = err.message.includes('detached') || err.message.includes('Navigation failed') || err.message.includes('destroyed');
+      if (isTimeout) {
+        console.warn(`[safeGoto] Navigation timeout hit for ${url}. Attempting to continue...`);
+        return null;
+      }
+      if (isDetached && attempts < 2) {
+        console.warn(`[safeGoto] Navigation failed (${err.message}). Retrying in 2s...`);
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
+      throw err;
     }
-    throw err;
   }
 }
 
@@ -170,286 +181,240 @@ async function fillInputByLabel(page, labelText, value) {
   return false;
 }
 
-// Puppeteer helper to fill custom searchable selects
-async function fillSearchableSelect(page, labelText, searchValue) {
-  console.log(`Searching for searchable select for: "${labelText}" with target value: "${searchValue}"`);
-  try {
-    // Find the correct searchable-input by looking at the label
-    const inputInfo = await page.evaluate((label) => {
-      const clean = (str) => {
-        if (!str) return '';
-        return str.normalize("NFD")
-                  .replace(/[\u0300-\u036f]/g, "")
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]/g, "");
-      };
-      
-      const cleanTarget = clean(label);
-      const allLabels = Array.from(document.querySelectorAll('label'));
-      for (const lbl of allLabels) {
-        const cleanLabelText = clean(lbl.textContent);
-        if (cleanLabelText.includes(cleanTarget) || cleanTarget.includes(cleanLabelText)) {
-          // Find the parent container
-          const parent = lbl.closest('.form-group') || 
-                         lbl.closest('.taxes-form-group') || 
-                         lbl.closest('.col') || 
-                         lbl.closest('.row') ||
-                         lbl.parentElement;
-          if (parent) {
-            // Look for the searchable-input inside this container
-            const searchInput = parent.querySelector('.searchable-input, input[type="text"]');
-            // Look for any hidden input in the same container
-            const hiddenInput = parent.querySelector('input[type="hidden"], input[name$="_id"], input[name="rodado_id"], input[name="syj_empleado_id"]');
-            
-            if (searchInput && hiddenInput) {
-              // Give them temporary IDs for reliable selection
-              const searchId = 'tmp_search_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-              const hiddenId = 'tmp_hidden_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-              searchInput.setAttribute('id', searchId);
-              hiddenInput.setAttribute('id', hiddenId);
-              return { searchId, hiddenId, found: true };
-            }
-          }
+// =========================================================================
+// fillSearchableSelect: fills a searchable-select (Rodado / Responsable)
+// in the OT creation form.
+//
+// Strategy:
+//  1. Find the .searchable-input whose wrapping label contains `fieldLabel`.
+//  2. Click it, type a normalised search term, wait for dropdown.
+//  3. Click the best-matching option.
+//  4. If the dropdown never shows / nothing matched → DIRECT INJECTION
+//     using the hidden input + the local catalog for the ID.
+// =========================================================================
+async function fillSearchableSelect(page, fieldLabel, targetValue) {
+  if (!targetValue) {
+    console.warn(`[fillSearchableSelect] No value provided for field "${fieldLabel}". Skipping.`);
+    return false;
+  }
+
+  const clean = (s) => {
+    if (!s) return '';
+    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  };
+
+  // -----------------------------------------------------------------
+  // STEP 1: Locate the correct searchable-input for this field.
+  // The Taxes portal uses a custom <searchable-select> component that
+  // renders a .searchable-input (visible text) + a hidden input.
+  // We look for a .form-group / .col whose text label contains fieldLabel.
+  // -----------------------------------------------------------------
+  const selectorInfo = await page.evaluate((lbl) => {
+    const normalise = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const cleanLbl = normalise(lbl);
+
+    // Collect all searchable-input elements that are visible
+    const allSearchInputs = Array.from(document.querySelectorAll('.searchable-input'));
+    for (const si of allSearchInputs) {
+      // Walk up to find a container that has a label
+      let container = si.closest('.form-group') || si.closest('[class*="col"]') || si.parentElement;
+      for (let depth = 0; depth < 5 && container; depth++) {
+        const labels = Array.from(container.querySelectorAll('label, .label, span.col-form-label'));
+        const hasLabel = labels.some(l => normalise(l.textContent).includes(cleanLbl));
+        if (hasLabel) {
+          // Also find associated hidden input
+          const wrapper = si.closest('.searchable-select-wrapper') || si.parentElement;
+          const hiddenInput = wrapper ? wrapper.querySelector('input[type="hidden"]') : null;
+          const searchId = 'tmp_ss_search_' + cleanLbl + '_' + Date.now();
+          const hiddenId = 'tmp_ss_hidden_' + cleanLbl + '_' + Date.now();
+          si.setAttribute('id', searchId);
+          if (hiddenInput) hiddenInput.setAttribute('id', hiddenId);
+          return { searchId, hiddenId: hiddenInput ? hiddenId : null, found: true };
         }
-      }
-      return { found: false };
-    }, labelText);
-
-    if (!inputInfo.found) {
-      console.log(`Could not find searchable select input for: "${labelText}"`);
-      return false;
-    }
-
-    const searchSelector = `#${inputInfo.searchId}`;
-    const hiddenSelector = `#${inputInfo.hiddenId}`;
-
-    // Generate list of queries to try in sequence
-    const queriesToTry = [];
-    let rodadoInfo = null;
-
-    if (labelText.toLowerCase().includes('rodado')) {
-      try {
-        const catalogs = db.getCatalogs();
-        const rodados = catalogs.rodados || [];
-        const internoMatch = searchValue.match(/Interno\s+(\S+)/i);
-        const searchInterno = internoMatch ? internoMatch[1].toLowerCase().trim() : '';
-        const matching = rodados.find(r => 
-          r.label === searchValue || 
-          r.value === searchValue || 
-          (r.interno && searchInterno && r.interno.toLowerCase().trim() === searchInterno)
-        );
-        if (matching) {
-          rodadoInfo = {
-            patente: matching.patente || '',
-            interno: matching.interno || '',
-            modelo: matching.modelo || ''
-          };
-          if (rodadoInfo.patente) {
-            queriesToTry.push(rodadoInfo.patente.trim());
-          }
-          if (rodadoInfo.interno) {
-            queriesToTry.push(rodadoInfo.interno.trim());
-            queriesToTry.push(`Interno ${rodadoInfo.interno.trim()}`);
-          }
-          if (rodadoInfo.modelo) {
-            queriesToTry.push(rodadoInfo.modelo.trim());
-          }
-        }
-      } catch (catErr) {
-        console.error("Error retrieving matching rodado from local catalogs:", catErr);
+        container = container.parentElement;
       }
     }
+    return { found: false };
+  }, fieldLabel);
 
-    if (queriesToTry.length === 0) {
-      // If it contains "Interno X", we try to search by the interno number FIRST as it is highly precise!
-      const internoMatch = searchValue.match(/Interno\s+(\d+)/i);
-      if (internoMatch) {
-        queriesToTry.push(internoMatch[1]); // Try "4" first
-        queriesToTry.push(`Interno ${internoMatch[1]}`); // Try "Interno 4" second
-      }
+  if (!selectorInfo.found) {
+    console.warn(`[fillSearchableSelect] Could not find .searchable-input for "${fieldLabel}". Attempting direct injection only.`);
+  }
 
-      queriesToTry.push(searchValue);
-      if (searchValue.includes(' - ')) {
-        const parts = searchValue.split(' - ');
-        const brand = parts[0].trim();
-        const rest = parts[1].split('.')[0].trim(); // e.g. "F100" or "SAVEIRO 1.6L"
-        queriesToTry.push(`${brand} ${rest}`);
-        queriesToTry.push(rest);
-        queriesToTry.push(brand);
-      }
-      if (searchValue.includes(' ')) {
-        const words = searchValue.split(/\s+/);
-        queriesToTry.push(words[0]); // Last name (e.g. "BELOCURES")
-        if (words[1]) {
-          queriesToTry.push(words[1]); // First name (e.g. "CESAR")
-        }
-      }
-    }
+  const searchSelector = selectorInfo.found ? `#${selectorInfo.searchId}` : null;
+  const hiddenSelector = selectorInfo.hiddenId ? `#${selectorInfo.hiddenId}` : null;
 
-    // Try queries one by one
+  // -----------------------------------------------------------------
+  // STEP 2: Build search queries to try (full value + individual words)
+  // -----------------------------------------------------------------
+  const queriesToTry = [];
+  // Extract the "Interno" number if present — that's the most unique token
+  const internoMatch = targetValue.match(/[Ii]nterno\s*(\d+)/);
+  if (internoMatch) queriesToTry.push(internoMatch[1]); // e.g. "68"
+  // Add first significant word (brand / surname)
+  const firstWord = targetValue.split(/[\s,]+/).find(w => w.length >= 3);
+  if (firstWord) queriesToTry.push(firstWord);
+  // Add full value as final fallback
+  queriesToTry.push(targetValue);
+
+  if (searchSelector) {
     for (const query of queriesToTry) {
-      console.log(`Attempting search query for "${labelText}": "${query}"...`);
-      
-      // Check if dropdown is visible, if not click it to open
-      const isDropdownOpen = await page.evaluate(() => {
-        const dropdownContainers = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"]'));
-        return dropdownContainers.some(container => container.offsetHeight > 0);
-      });
+      console.log(`[fillSearchableSelect] "${fieldLabel}": trying query "${query}"...`);
 
-      if (!isDropdownOpen) {
-        console.log(`   Dropdown was closed, clicking input to open...`);
-        await page.click(searchSelector);
-        await delay(500);
-      }
+      // Open dropdown if closed
+      try { await page.click(searchSelector); } catch (_) {}
+      await delay(400);
 
-      // Focus and clear existing text reliably via evaluate and keyboard
-      await page.evaluate((sel) => {
-        const el = document.querySelector(sel);
-        if (el) {
-          el.value = '';
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      }, searchSelector);
+      // Clear and type query
       await page.focus(searchSelector);
-      await delay(300);
+      await page.keyboard.down('Control');
+      await page.keyboard.press('A');
+      await page.keyboard.up('Control');
+      await page.keyboard.press('Backspace');
+      await delay(200);
+      await page.type(searchSelector, query, { delay: 40 });
+      await delay(1800); // Wait for Vue to filter the dropdown
 
-      // Type the query
-      await page.type(searchSelector, query, { delay: 50 });
-      await delay(2000); // Wait for dropdown to appear and filter
+      // Try to click the best matching option
+      const result = await page.evaluate((targetVal) => {
+        const clean = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const targetClean = clean(targetVal);
 
-      // Click the first visible option in the dropdown that matches
-      const optionClicked = await page.evaluate((targetVal, rodadoInfo) => {
-        // Find visible options inside portal dropdown containers (ID starts with "searchable-select-dropdown-")
-        const dropdownContainers = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"]'));
-        
+        // Collect all visible dropdown option divs
+        const dropdowns = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"], .searchable-select-dropdown, .searchable-dropdown'));
         let visibleOptions = [];
-        dropdownContainers.forEach(container => {
-          const isVisible = container.offsetHeight > 0;
-          if (isVisible) {
-            // Find leaf divs that contain text and do not have child divs
-            const divs = Array.from(container.querySelectorAll('div'));
+        dropdowns.forEach(dd => {
+          if (dd.offsetHeight > 0) {
+            const divs = Array.from(dd.querySelectorAll('div'));
             const leafDivs = divs.filter(d => d.querySelectorAll('div').length === 0 && d.textContent.trim().length > 0);
             visibleOptions.push(...leafDivs);
           }
         });
 
-        // Normalize helper to ignore accents, punctuation, and spaces
-        const clean = (str) => {
-          if (!str) return '';
-          return str.normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "")
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]/g, "");
-        };
-
-        const targetClean = clean(targetVal);
-
-        // Filter out header/status rows containing "opciones" or "cargando"
-        const filteredOptions = visibleOptions.filter(el => {
-          const text = el.textContent.trim().toLowerCase();
-          return text.length > 0 && !text.includes('opciones') && !text.includes('cargando') && !text.includes('no hay');
+        // Filter out noise (loading/empty messages)
+        const options = visibleOptions.filter(el => {
+          const t = el.textContent.trim().toLowerCase();
+          return t.length > 0 && !t.includes('cargando') && !t.includes('no hay') && !t.includes('no se encontr') && !t.includes('opciones');
         });
 
-        if (filteredOptions.length === 0) return { success: false };
+        if (options.length === 0) return { success: false, reason: 'no_options' };
 
-        let matched = null;
+        // Best match: prioritise options whose cleaned text includes the cleaned target
+        let matched = options.find(el => {
+          const tc = clean(el.textContent);
+          return tc.includes(targetClean) || targetClean.includes(tc);
+        });
+        if (!matched) matched = options[0]; // fall back to first visible option
 
-        // A. Match by patent (highest priority for vehicles)
-        if (rodadoInfo && rodadoInfo.patente) {
-          const cleanPatent = clean(rodadoInfo.patente);
-          if (cleanPatent) {
-            matched = filteredOptions.find(el => clean(el.textContent).includes(cleanPatent));
+        matched.click();
+        return { success: true, text: matched.textContent.trim() };
+      }, targetValue);
+
+      if (result.success) {
+        console.log(`[fillSearchableSelect] "${fieldLabel}": selected "${result.text}"`);
+        await delay(800);
+
+        // Confirm hidden input was set
+        if (hiddenSelector) {
+          const hv = await page.evaluate((sel) => {
+            const el = document.querySelector(sel);
+            return el ? el.value : '';
+          }, hiddenSelector);
+          if (hv && hv !== '') {
+            console.log(`[fillSearchableSelect] "${fieldLabel}": hidden input value = "${hv}" ✓`);
+            return true;
           }
+          console.warn(`[fillSearchableSelect] "${fieldLabel}": hidden input still empty after selection — will try direct injection.`);
+        } else {
+          return true; // No hidden input to verify, trust the click
         }
+      }
+    }
+  }
 
-        // B. Match by interno (extract and compare exact internal number)
-        if (!matched && rodadoInfo && rodadoInfo.interno) {
-          const cleanInterno = clean(rodadoInfo.interno);
-          if (cleanInterno) {
-            matched = filteredOptions.find(el => {
-              const text = el.textContent.toLowerCase();
-              const match = text.match(/interno\s+(\S+)/);
-              if (match) {
-                return clean(match[1]) === cleanInterno;
-              }
-              // Fallback to substring only if "interno" word is not present in the option text
-              if (!text.includes('interno')) {
-                return clean(text).includes(cleanInterno);
-              }
-              return false;
-            });
-          }
+  // -----------------------------------------------------------------
+  // STEP 3: DIRECT INJECTION FALLBACK
+  // Look up the value/id from our local catalog and set it directly.
+  // -----------------------------------------------------------------
+  console.log(`[fillSearchableSelect] "${fieldLabel}": dropdown approach failed. Trying DIRECT INJECTION...`);
+  const isRodado = fieldLabel.toLowerCase().includes('rodado') || fieldLabel.toLowerCase().includes('veh');
+  const catalogKey = isRodado ? 'rodados' : 'responsables';
+  const catalog = db.getCatalogs()[catalogKey] || [];
+
+  const cleanVal = clean(targetValue);
+  const catalogObj = catalog.find(item => {
+    const lc = clean(item.label);
+    return lc.includes(cleanVal) || cleanVal.includes(lc);
+  });
+
+  if (!catalogObj) {
+    // For Rodado: try matching by interno number only
+    if (isRodado) {
+      const internoNum = (targetValue.match(/[Ii]nterno\s*(\d+)/) || [])[1];
+      if (internoNum) {
+        const byInterno = catalog.find(item => item.label.includes(`Interno ${internoNum}`) || item.interno === internoNum || item.value === internoNum);
+        if (byInterno) {
+          console.log(`[fillSearchableSelect] Rodado matched by Interno number "${internoNum}": ${JSON.stringify(byInterno)}`);
+          return await injectSearchableSelectValue(page, searchSelector, hiddenSelector, byInterno.value, byInterno.label);
         }
+      }
+    }
+    console.warn(`[fillSearchableSelect] "${fieldLabel}": value "${targetValue}" not found in local catalog "${catalogKey}" (${catalog.length} items).`);
+    return false;
+  }
 
-        // C. Try exact or full match containing targetVal
-        if (!matched) {
-          matched = filteredOptions.find(el => {
-            const textClean = clean(el.textContent);
-            return textClean.includes(targetClean) || targetClean.includes(textClean);
-          });
-        }
+  console.log(`[fillSearchableSelect] "${fieldLabel}": catalog match → ID=${catalogObj.value}, label="${catalogObj.label}"`);
+  return await injectSearchableSelectValue(page, searchSelector, hiddenSelector, catalogObj.value, catalogObj.label);
+}
 
-        // D. Try partial match: if targetVal contains brand and interno, check both
-        if (!matched && targetVal.includes(' - ')) {
-          const parts = targetVal.split(' - ');
-          const brand = clean(parts[0]);
-          const numMatch = targetVal.match(/Interno\s+(\d+)/i);
-          const internoNum = numMatch ? numMatch[1] : '';
+// Helper: directly set a searchable-select value without using the dropdown UI
+async function injectSearchableSelectValue(page, searchSelector, hiddenSelector, valueId, valueLabel) {
+  const injected = await page.evaluate((searchSel, hiddenSel, val, label) => {
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
 
-          matched = filteredOptions.find(el => {
-            const textClean = clean(el.textContent);
-            const hasBrand = textClean.includes(brand);
-            const hasInterno = internoNum ? textClean.includes(internoNum) : true;
-            return hasBrand && hasInterno;
-          });
-        }
-
-        // E. Fallback: click the very first visible option in the dropdown
-        if (!matched && filteredOptions.length > 0) {
-          matched = filteredOptions[0];
-        }
-
-        if (matched) {
-          matched.click();
-          return { success: true, text: matched.textContent.trim() };
-        }
-
-        return { success: false };
-      }, searchValue, rodadoInfo);
-
-      if (optionClicked.success) {
-        console.log(`   ✓ Selected option for "${labelText}": "${optionClicked.text}"`);
-        
-        // Wait for Vue reactivity to update the hidden input
-        await delay(1000);
-        
-        // Verify the hidden input got a value
-        const hiddenValue = await page.evaluate((sel) => {
-          const el = document.querySelector(sel);
-          return el ? el.value : '(not found)';
-        }, hiddenSelector);
-        console.log(`   ✓ Hidden input value for "${labelText}": "${hiddenValue}"`);
-        
-        if (hiddenValue !== '' && hiddenValue !== '(not found)') {
-          return true;
+    // Set hidden (submitted) value
+    if (hiddenSel) {
+      const hiddenEl = document.querySelector(hiddenSel);
+      if (hiddenEl) {
+        nativeSetter.call(hiddenEl, val);
+        hiddenEl.dispatchEvent(new Event('input', { bubbles: true }));
+        hiddenEl.dispatchEvent(new Event('change', { bubbles: true }));
+        // Try Vue reactivity
+        const wrapper = hiddenEl.closest('.searchable-select-wrapper');
+        if (wrapper && wrapper.__vue__) {
+          try { wrapper.__vue__.$emit('input', val); wrapper.__vue__.$emit('change', val); } catch(_) {}
         }
       }
     }
 
-    console.log(`Failed to select option for "${labelText}" after all search query attempts.`);
-    return false;
-  } catch (error) {
-    console.error(`Error filling searchable select for "${labelText}":`, error);
-    return false;
+    // Set visible text
+    if (searchSel) {
+      const searchEl = document.querySelector(searchSel);
+      if (searchEl) {
+        nativeSetter.call(searchEl, label);
+        searchEl.dispatchEvent(new Event('input', { bubbles: true }));
+        searchEl.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+
+    return true;
+  }, searchSelector, hiddenSelector, valueId, valueLabel);
+
+  if (injected) {
+    console.log(`[injectSearchableSelectValue] Injected value="${valueId}" label="${valueLabel}" ✓`);
+    await delay(500);
+    return true;
   }
+  return false;
 }
 
-// Puppeteer helper to fill custom searchable selects inside task cards
+// =========================================================================
+// fillTaskEmployeeSearchableSelect: fills the per-task employee dropdown
+// inside the OT creation/edit form. Uses index `index` (0-based) to
+// target the correct .searchable-select-wrapper for task card #index.
+// =========================================================================
 async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
-  console.log(`Filling Employee for Task #${index} with: "${employeeName}"`);
   try {
-    // Resolve searchable input and hidden input dynamically
     const inputInfo = await page.evaluate((idx) => {
       const hiddenInput = document.querySelector(`input[name="syj_empleado_id_tarea_${idx}"], input[name$="empleado_id_tarea_${idx}"], input[name*="empleado_id_tarea_${idx}"]`);
       if (hiddenInput) {
@@ -684,22 +649,29 @@ async function autoLogin(page, username, password, portalUrl) {
 
     // Different user is logged in — need to logout first
     console.log(`Different user logged in (${loggedInEmail}), need to logout and re-login as ${username}.`);
-    const logoutClicked = await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll('a, button'));
-      const logout = links.find(el => {
-        const text = el.textContent.trim().toLowerCase();
-        return text.includes('salir') || text.includes('logout') || text.includes('cerrar sesión') || text.includes('cerrar session');
+    try {
+      const client = await page.target().createCDPSession();
+      await client.send('Network.clearBrowserCookies');
+      console.log("[Login] Cleared browser cookies for logout.");
+    } catch (e) {
+      console.warn("[Login] Failed to clear cookies via CDP, falling back to standard logout click:", e.message);
+      const logoutClicked = await page.evaluate(() => {
+        const links = Array.from(document.querySelectorAll('a, button'));
+        const logout = links.find(el => {
+          const text = el.textContent.trim().toLowerCase();
+          return text.includes('salir') || text.includes('logout') || text.includes('cerrar sesión') || text.includes('cerrar session');
+        });
+        if (logout) { logout.click(); return true; }
+        return false;
       });
-      if (logout) { logout.click(); return true; }
-      return false;
-    });
-    if (logoutClicked) {
-      await page.waitForNavigation({ waitUntil: 'load', timeout: 10000 }).catch(() => {});
-      await delay(2000);
-    } else {
-      // Force navigate to logout URL
-      await safeGoto(page, `${portalUrl}/logout`, { timeout: 10000 }).catch(() => {});
-      await delay(2000);
+      if (logoutClicked) {
+        await page.waitForNavigation({ waitUntil: 'load', timeout: 10000 }).catch(() => {});
+        await delay(2000);
+      } else {
+        // Force navigate to logout URL
+        await safeGoto(page, `${portalUrl}/logout`, { timeout: 10000 }).catch(() => {});
+        await delay(2000);
+      }
     }
   }
 
@@ -759,15 +731,15 @@ async function autoLogin(page, username, password, portalUrl) {
     await page.keyboard.press('Enter');
   }
 
-  // Wait for navigation or welcome dashboard
-  await page.waitForNavigation({ waitUntil: 'load', timeout: 15000 }).catch(() => {});
-  await delay(3000); // Restored: needs enough time for dashboard to fully load
+  // Wait for navigation or dashboard load (SPA-compatible)
+  await page.waitForNavigation({ waitUntil: 'load', timeout: 20000 }).catch(() => {});
+  await delay(3000);
 
-  // Check if login succeeded: we should NOT be on login page anymore
-  const stillOnLoginPage = await page.evaluate(() => {
-    const inputs = Array.from(document.querySelectorAll('input'));
-    const hasPasswordInput = inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
-    // Check for SPECIFIC error phrases only (avoid false positives from dashboard menus)
+  const currentUrl = page.url();
+  console.log(`[Login] Post-login URL: ${currentUrl}`);
+
+  // Check for explicit error text from Taxes first
+  const loginResult = await page.evaluate(() => {
     const bodyText = document.body.textContent.toLowerCase();
     const hasError = bodyText.includes('credenciales inv') ||
                      bodyText.includes('credenciales incorrecta') ||
@@ -775,15 +747,131 @@ async function autoLogin(page, username, password, portalUrl) {
                      bodyText.includes('contrase\u00f1a incorrecta') ||
                      bodyText.includes('datos incorrectos') ||
                      bodyText.includes('acceso denegado');
-    return hasPasswordInput || hasError;
+    // Look for dashboard indicators
+    const hasDashboard = !!document.querySelector('.sidebar, .nav-sidebar, [class*="dashboard"], [class*="admin"], .main-content');
+    const hasPasswordInput = Array.from(document.querySelectorAll('input')).some(el => el.type === 'password' && el.offsetWidth > 0);
+    return { hasError, hasDashboard, hasPasswordInput, bodyLength: document.body.textContent.length };
   });
 
-  if (stillOnLoginPage) {
-    throw new Error("Credenciales inv\u00e1lidas o error al iniciar sesi\u00f3n en Taxes.com.ar");
+  console.log(`[Login] Result check: error=${loginResult.hasError}, dashboard=${loginResult.hasDashboard}, passwordVisible=${loginResult.hasPasswordInput}, bodyLen=${loginResult.bodyLength}`);
+
+  // Success if: no error AND (URL changed from login OR dashboard found OR no password input)
+  const urlChangedFromLogin = !currentUrl.includes('/login') && !currentUrl.includes('/auth');
+  const loginSucceeded = !loginResult.hasError && (loginResult.hasDashboard || urlChangedFromLogin);
+
+  if (!loginSucceeded) {
+    const reason = loginResult.hasError ? 'El portal reportó credenciales incorrectas' :
+                   loginResult.hasPasswordInput ? 'El login no completó (sigue en página de login)' :
+                   `URL inesperada post-login: ${currentUrl}`;
+    throw new Error(reason);
   }
 
-  console.log(`Login successful as ${username}!`);
+  console.log(`Login successful as ${username}! URL: ${currentUrl}`);
   return true;
+}
+
+// Helper to resolve Taxes.com.ar credentials, bypassing any bullet mask "••••••••••••"
+// TODAS las cuentas del sistema existen en Taxes.com.ar:
+//   taller@, paniol@, ftoledo@, jcarmona@, a.brahim@, sergios@
+// El único filtro aplicado es si la contraseña guardada está enmascarada.
+// Cuentas que NO tienen acceso directo a Taxes.com.ar y necesitan usar
+// las credenciales de otro supervisor para realizar operaciones.
+// Estas cuentas son "internas" del sistema (supervisores de sector sin cuenta Taxes propia).
+// Cuentas que NO tienen acceso al portal Taxes (cuentas solo internas de la app).
+// paniol@contenedoreshugo.com.ar SÍ tiene acceso a Taxes — NO va aquí.
+// Cuentas de la aplicación interna que NO tienen acceso directo al portal Taxes.
+// El sistema usará automáticamente las credenciales de otro supervisor válido para sincronizar.
+const NON_TAXES_ACCOUNTS = [
+  'paniol@contenedoreshugo.com.ar'
+];
+
+function isNonTaxesAccount(email) {
+  if (!email) return false;
+  return NON_TAXES_ACCOUNTS.includes(email.toLowerCase().trim());
+}
+
+function resolveCredentials(targetUsername = null, orderCreator = null) {
+  const settings = db.getSettings();
+  let username = settings.username;
+  let password = settings.password;
+
+  // Helper: obtiene credenciales de un usuario en DB.
+  // Retorna null si la contraseña está enmascarada o si es cuenta no-Taxes.
+  const getCredentialsFromDB = (email) => {
+    if (!email) return null;
+    if (isNonTaxesAccount(email)) {
+      console.log(`[resolveCredentials] Omitiendo cuenta no-Taxes (sin acceso directo a portal): ${email}`);
+      return null;
+    }
+    const user = db.getUser(email);
+    if (user && user.password && user.password !== "••••••••••••") {
+      return { username: user.username, password: user.password };
+    }
+    return null;
+  };
+
+  // Helper: busca cualquier cuenta válida en DB (fallback universal)
+  const findAnyValidAccount = () => {
+    const allUsers = db.getAllUsers ? db.getAllUsers() : [];
+    for (const u of allUsers) {
+      if (u.password && u.password !== "••••••••••••" && !isNonTaxesAccount(u.username)) {
+        console.log(`[resolveCredentials] Usando cuenta válida encontrada en DB: ${u.username}`);
+        return { username: u.username, password: u.password };
+      }
+    }
+    return null;
+  };
+
+  let resolved = null;
+
+  // 1. Si se especificó un usuario que disparó la sync manualmente:
+  //    - Si es una cuenta Taxes válida → usar sus credenciales
+  //    - Si es paniol u otra cuenta sin acceso Taxes → ignorar y buscar alternativa
+  if (targetUsername) {
+    if (!isNonTaxesAccount(targetUsername)) {
+      resolved = getCredentialsFromDB(targetUsername);
+      if (resolved) {
+        console.log(`[resolveCredentials] Usando credenciales del supervisor solicitante: ${resolved.username}`);
+        return resolved;
+      }
+      // El supervisor que disparó la sync no tiene credenciales cacheadas.
+      // Continúa buscando otra cuenta disponible en lugar de abortar.
+      console.warn(`[resolveCredentials] "${targetUsername}" disparó la sync pero no tiene credenciales cacheadas. Buscando alternativa...`);
+    } else {
+      console.log(`[resolveCredentials] "${targetUsername}" es cuenta no-Taxes (ej: paniol). Buscando credenciales de otro supervisor...`);
+    }
+  }
+
+  // 2. Intentar con el usuario configurado en Settings globales
+  if (!resolved && username && !isNonTaxesAccount(username)) {
+    resolved = getCredentialsFromDB(username);
+    if (resolved) console.log(`[resolveCredentials] Usando cuenta de Settings globales: ${resolved.username}`);
+  }
+
+  // 3. Intentar con el creador de la orden (independiente de quién la dispara)
+  if (!resolved && orderCreator && !isNonTaxesAccount(orderCreator)) {
+    resolved = getCredentialsFromDB(orderCreator);
+    if (resolved) console.log(`[resolveCredentials] Usando credenciales del creador de la orden: ${resolved.username}`);
+  }
+
+  // 4. Intentar con la contraseña directa de Settings (si no está enmascarada)
+  if (!resolved && username && password && password !== "••••••••••••" && !isNonTaxesAccount(username)) {
+    resolved = { username, password };
+    console.log(`[resolveCredentials] Usando contraseña directa de Settings: ${username}`);
+  }
+
+  // 5. Fallback final: escanear todos los usuarios en DB para encontrar cualquier cuenta válida
+  if (!resolved) {
+    resolved = findAnyValidAccount();
+  }
+
+  if (resolved) {
+    return resolved;
+  }
+
+  // Sin opciones — advertencia crítica
+  console.warn(`[resolveCredentials] ADVERTENCIA CRÍTICA: no se encontró ninguna cuenta Taxes válida. Verificar credenciales en Configuración.`);
+  return { username, password: (password === "••••••••••••" ? "" : password) };
 }
 
 // 1. SCRAPE CATALOGS FUNCTION
@@ -792,16 +880,7 @@ async function scrapeCatalogs(triggerUsername = null) {
   isScraping = true;
   
   const settings = db.getSettings();
-  let username = settings.username;
-  let password = settings.password;
-
-  if (triggerUsername) {
-    const user = db.getUser(triggerUsername);
-    if (user && user.password) {
-      username = user.username;
-      password = user.password;
-    }
-  }
+  const { username, password } = resolveCredentials(triggerUsername);
 
   if (!username || !password) {
     isScraping = false;
@@ -1253,7 +1332,7 @@ function resolveAndMapEmployee(task) {
 }
 
 // 2. SYNCHRONIZE SINGLE WORK ORDER
-async function syncWorkOrder(orderId) {
+async function syncWorkOrder(orderId, triggerUsername = null) {
   if (activeSyncs.has(orderId)) {
     console.log(`[Worker] syncWorkOrder already running for order ID: ${orderId}. Skipping parallel execution.`);
     return { success: false, message: "Already syncing" };
@@ -1269,21 +1348,8 @@ async function syncWorkOrder(orderId) {
     if (!order) return { success: false, message: "Order not found" };
 
     const settings = db.getSettings();
-  
-    // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
-    // fallback to order creator's credentials only if global settings are empty.
-    let username = settings.username;
-    let password = settings.password;
-
-    if (!username || !password) {
-      if (order.createdBy) {
-        const user = db.getUser(order.createdBy);
-        if (user && user.password) {
-          username = user.username;
-          password = user.password;
-        }
-      }
-    }
+    // Use the supervisor who triggered the sync first; fall back to order creator
+    const { username, password } = resolveCredentials(triggerUsername || order.syncTriggeredBy || null, order.createdBy);
 
     if (!username || !password) {
       db.updateWorkOrder(orderId, {
@@ -1348,7 +1414,14 @@ async function syncWorkOrder(orderId) {
     try {
       await autoLogin(page, username, password, settings.portalUrl);
     } catch (loginError) {
-      throw new Error(`Credenciales inválidas o el usuario ${username} no existe en Taxes.com.ar`);
+      const realMsg = loginError?.message || String(loginError);
+      console.error(`[Login] FAILED for ${username}: ${realMsg}`);
+      // Capture screenshot for debugging
+      try {
+        const debugShot = await page.screenshot({ encoding: 'base64' }).catch(() => null);
+        if (debugShot) db.updateWorkOrder(orderId, { lastLoginDebugScreenshot: debugShot.substring(0, 50) + '...' });
+      } catch(_) {}
+      throw new Error(`Error de login para ${username}: ${realMsg}`);
     }
 
     // 2. EXISTING OT — RECONCILIATION VIA OT EDIT FORM (pencil)
@@ -3008,7 +3081,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
   }
 }
 // Standalone verify function for manual verification triggers
-async function verifyWorkOrder(orderId) {
+async function verifyWorkOrder(orderId, triggerUsername = null) {
   if (activeSyncs.has(orderId)) {
     console.log(`[Worker] verifyWorkOrder already running for order ID: ${orderId}. Skipping parallel execution.`);
     return { success: false, message: "Already syncing" };
@@ -3024,21 +3097,8 @@ async function verifyWorkOrder(orderId) {
     if (!order) return { success: false, message: "Order not found" };
 
     const settings = db.getSettings();
-
-    // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
-    // fallback to order creator's credentials only if global settings are empty.
-    let username = settings.username;
-    let password = settings.password;
-
-    if (!username || !password) {
-      if (order.createdBy) {
-        const user = db.getUser(order.createdBy);
-        if (user && user.password) {
-          username = user.username;
-          password = user.password;
-        }
-      }
-    }
+    // Use the supervisor who triggered the sync first; fall back to order creator
+    const { username, password } = resolveCredentials(triggerUsername || order.syncTriggeredBy || null, order.createdBy);
 
     if (!username || !password) {
       return { success: false, message: "Faltan credenciales del supervisor" };
@@ -3231,8 +3291,8 @@ async function startWorker() {
       const pendingOrder = orders.find(o => o.syncStatus === 'pending');
 
       if (pendingOrder) {
-        console.log(`Found pending Work Order ID: ${pendingOrder.id}. Launching sync...`);
-        await syncWorkOrder(pendingOrder.id);
+        console.log(`Found pending Work Order ID: ${pendingOrder.id}. Launching sync... (triggered by: ${pendingOrder.syncTriggeredBy || 'auto'})`);
+        await syncWorkOrder(pendingOrder.id, pendingOrder.syncTriggeredBy || null);
       } else {
         // No new orders to sync — look for orders that need an automatic retry:
         // either their tasks failed the control check (verifiedStatus: 'error'),
@@ -3256,7 +3316,7 @@ async function startWorker() {
           console.log(`[AutoFix] Found order needing retry (ID: ${brokenOrder.id}, syncStatus=${brokenOrder.syncStatus}, verifiedStatus=${brokenOrder.verifiedStatus}). Retrying full reconciliation...`);
           // Use the full sync/reconcile function (not just verify) so it can also
           // create tasks that are completely missing on Taxes, not just fix field mismatches.
-          await syncWorkOrder(brokenOrder.id);
+          await syncWorkOrder(brokenOrder.id, brokenOrder.syncTriggeredBy || null);
         }
       }
     } catch (e) {
@@ -3289,17 +3349,7 @@ async function verifyMultipleOrders(orderIds) {
     const order = db.getWorkOrderById(id);
     if (!order || !order.taxesOrderNumber) continue;
 
-    let username = settings.username;
-    let password = settings.password;
-    if (!username || !password) {
-      if (order.createdBy) {
-        const user = db.getUser(order.createdBy);
-        if (user && user.password) {
-          username = user.username;
-          password = user.password;
-        }
-      }
-    }
+    const { username, password } = resolveCredentials(null, order.createdBy);
     if (!username || !password) continue;
 
     if (!groups.has(username)) {
