@@ -2,7 +2,7 @@ const https = require('https');
 const worker = require('./syncWorker');
 const db = require('./database');
 
-const HOST = 'app-taxes-production.up.railway.app';
+const HOST = 'app-taxes-production-ec67.up.railway.app';
 const USERNAME = 'paniol@contenedoreshugo.com.ar';
 const POLL_INTERVAL_MS = 20000; // 20 seconds
 

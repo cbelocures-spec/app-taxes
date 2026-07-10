@@ -274,10 +274,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Poll for orders sync status in real time
-  setInterval(fetchOrders, 3000);
-  setInterval(checkWorkerStatus, 3000);
-  setInterval(fetchSettingsPolling, 3000);
+  // Poll for orders sync status in real time (1.5s so changes between supervisors appear fast)
+  setInterval(fetchOrders, 1500);
+  setInterval(checkWorkerStatus, 5000);
+  setInterval(fetchSettingsPolling, 5000);
 
   // Fetch novelties from Google Sheet on startup
   fetchNovelties();
