@@ -795,10 +795,18 @@ body {
   height: var(--nav-height);
   background-color: var(--card-bg);
   border-top: 1px solid var(--border-color);
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
   z-index: 100;
   box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+}
+
+.bottom-nav::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 .nav-item {
@@ -808,10 +816,14 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
   cursor: pointer;
   color: var(--text-muted);
   transition: color 0.2s;
+  flex: 1 0 64px; /* min 64px each, grows to fill space */
+  min-width: 64px;
+  padding: 4px 0;
+  height: 100%;
 }
 
 .nav-item.active {
@@ -835,12 +847,13 @@ body {
 }
 
 .nav-item .material-icons {
-  font-size: 24px;
+  font-size: 22px;
 }
 
 .nav-item span {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 /* FULLSCREEN MODAL */
@@ -2487,10 +2500,8 @@ body {
    PREVENTIVOS & PARTE TALLER SPECIFIC STYLES
    ========================================== */
 
-/* Overrides for bottom-nav with 6 items */
-.bottom-nav {
-  grid-template-columns: repeat(6, 1fr) !important;
-}
+/* bottom-nav now uses flexbox with overflow-x: auto — no grid override needed */
+
 
 #nav-preventivos.active {
   color: #9c27b0 !important; /* Purple for preventivos */
