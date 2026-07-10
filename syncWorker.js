@@ -741,10 +741,10 @@ async function autoLogin(browser, username, password, portalUrl) {
     }
   }, emailSelector, passSelector, username, password);
 
-  console.log('[autoLogin] Inputs filled. Waiting a moment for the page to register the values before submitting...');
-  await delay(1200); // give Vue.js reactivity time to catch up with the injected values before we submit;
-                      // submitting too fast right after setting .value can intermittently send a stale/empty
-                      // form even though the fields visually show the right text.
+  console.log('[autoLogin] Inputs filled. Verifying values stuck before submitting...');
+  await delay(150); // minimal pause just for the DOM to process the dispatched events —
+                     // the login form has a short-lived security token, so we submit as
+                     // soon as possible instead of waiting around.
 
   // Verify the values actually "stuck" before submitting; if not, try filling again once.
   const valuesStuck = await page.evaluate((esel, psel, uval, pval) => {
@@ -769,7 +769,7 @@ async function autoLogin(browser, username, password, portalUrl) {
         pass.dispatchEvent(new Event('change', { bubbles: true }));
       }
     }, emailSelector, passSelector, username, password);
-    await delay(1200);
+    await delay(150);
   }
 
   // Submit: try clicking the real "INGRESAR" button first (more reliable for
