@@ -91,17 +91,21 @@ app.use((req, res, next) => {
     return next();
   }
 
-  let username = req.headers['x-user-username'];
+  const username = req.headers['x-user-username'];
+  // Only reject if a username IS provided but doesn't exist in the DB AT ALL.
+  // If the user exists but has a masked/old password, keep the username so the
+  // endpoint can still identify WHO is making the request (sector, permissions, etc.)
+  // The syncWorker's resolveCredentials will handle the credential lookup.
   if (username && username.trim() !== '') {
-    // If proxy/CDN appended multiple usernames, take only the first one
-    username = username.split(',')[0].trim();
-    req.headers['x-user-username'] = username;
-
     const user = db.getUser(username);
     if (!user) {
       console.log(`[Auth Check] User "${username}" not found in DB. Allowing as anonymous.`);
+      // Don't block — just clear the username so the request proceeds as anonymous.
+      // This handles Railway's fresh DB where no users are registered yet.
       req.headers['x-user-username'] = '';
     }
+    // NOTE: If user exists but has masked/stale password, keep username intact.
+    // The worker will report a clear error if credentials can't be resolved.
   }
   next();
 });
@@ -257,110 +261,7 @@ app.get('/api/debug/chrome-test', (req, res) => {
   });
 });
 
-app.get('/api/debug/show-settings-safe', (req, res) => {
-  try {
-    const settings = db.getSettings();
-    const users = db.read().users || {};
-    const safeUsers = {};
-    for (const key of Object.keys(users)) {
-      const u = users[key];
-      safeUsers[key] = {
-        username: u.username,
-        passLength: u.password ? u.password.length : 0,
-        passFirstChar: u.password ? u.password.charAt(0) : ''
-      };
-    }
-    res.json({
-      settings: {
-        username: settings.username,
-        passLength: settings.password ? settings.password.length : 0,
-        passFirstChar: settings.password ? settings.password.charAt(0) : '',
-        portalUrl: settings.portalUrl
-      },
-      users: safeUsers
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-
-// Test login to Taxes.com.ar directly - for debugging auth issues
-app.post('/api/debug/test-login', async (req, res) => {
-  const puppeteer = require('puppeteer');
-  let browser;
-  try {
-    const settings = db.getSettings();
-    const portalUrl = (settings.portalUrl || 'https://taxes.com.ar').replace(/\/(admin|login|logout)\/?$/, '').replace(/\/$/, '');
-    const username = settings.username || '';
-    const password = settings.password || '';
-
-    if (!username || !password) {
-      return res.json({ success: false, error: 'No hay credenciales configuradas en Ajustes' });
-    }
-
-    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-    const page = await browser.newPage();
-    await page.setDefaultNavigationTimeout(40000);
-
-    await page.goto(`${portalUrl}/login`, { waitUntil: 'networkidle2', timeout: 30000 });
-    const emailSelector = 'input[name="loginUser"]';
-    const passSelector = 'input[name="password"]';
-
-    await page.waitForSelector(passSelector, { timeout: 15000 });
-
-    // Inspect what inputs exist before filling
-    const inputsInfo = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('input')).map(i => ({
-        name: i.name, type: i.type, id: i.id, placeholder: i.placeholder
-      }));
-    });
-
-    const buttonsInfo = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('button')).map(b => ({
-        type: b.type, text: b.textContent.trim().substring(0, 50), id: b.id, className: b.className
-      }));
-    });
-
-    // Fill inputs
-    await page.focus(emailSelector);
-    await page.evaluate((sel) => { const el = document.querySelector(sel); if (el) el.value = ''; }, emailSelector);
-    await page.type(emailSelector, username);
-    await page.focus(passSelector);
-    await page.evaluate((sel) => { const el = document.querySelector(sel); if (el) el.value = ''; }, passSelector);
-    await page.type(passSelector, password);
-
-    // Verify values were set correctly
-    const filledValues = await page.evaluate((esel, psel) => {
-      const em = document.querySelector(esel);
-      const pa = document.querySelector(psel);
-      return { emailValue: em ? em.value : 'NOT FOUND', passLength: pa ? pa.value.length : 0 };
-    }, emailSelector, passSelector);
-
-    // Submit with Enter key (most reliable)
-    await page.keyboard.press('Enter');
-    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 35000 }).catch(() => {});
-
-    const finalUrl = page.url();
-    const loggedIn = !finalUrl.toLowerCase().includes('/login');
-    res.json({
-      success: loggedIn,
-      finalUrl,
-      username,
-      portalUrl,
-      filledValues,
-      inputsInfo,
-      buttonsInfo,
-      message: loggedIn ? 'Login OK' : 'Sigue en /login - ver buttonsInfo e inputsInfo para diagnostico'
-    });
-  } catch (err) {
-    res.json({ success: false, error: err.message });
-  } finally {
-    if (browser) await browser.close().catch(() => {});
-  }
-});
-
-
+// Get all work orders (filtered by user sector)
 app.get('/api/orders', (req, res) => {
   try {
     const username = req.headers['x-user-username'] || null;
@@ -634,45 +535,9 @@ app.patch('/api/orders/:id/tasks/:taskId', (req, res) => {
   }
 });
 
-// Get archived (history) orders
-app.get('/api/orders/archived', (req, res) => {
-  try {
-    const orders = db.getArchivedOrders();
-    res.json(orders);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Soft-archive a work order (moves to history, stays in DB until permanently deleted)
-app.patch('/api/orders/:id/archive', (req, res) => {
-  try {
-    const requester = req.headers['x-user-username'] || null;
-    const sector = getSectorByUsername(requester);
-
-    // Only Pañol and Taller (Admin) can archive orders
-    if (sector !== 'Admin') {
-      return res.status(403).json({ error: "Solo Pañol y Taller están autorizados a archivar órdenes." });
-    }
-
-    const existing = db.getWorkOrderById(req.params.id);
-    if (!existing) {
-      return res.status(404).json({ error: "Orden no encontrada" });
-    }
-    // Only allow archiving orders that are fully synced
-    if (existing.syncStatus !== 'success') {
-      return res.status(400).json({ error: "Solo se pueden archivar órdenes sincronizadas correctamente." });
-    }
-    const success = db.archiveWorkOrder(req.params.id);
-    triggerActiveTasksGoogleSheetSync();
-    res.json({ success });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Delete a work order (local only)
 app.delete('/api/orders/:id', (req, res) => {
+
   try {
     const existing = db.getWorkOrderById(req.params.id);
     if (!existing) {
@@ -682,13 +547,23 @@ app.delete('/api/orders/:id', (req, res) => {
     const requester = req.headers['x-user-username'] || null;
     const sector = getSectorByUsername(requester);
 
-    // Only Pañol and Taller (Admin) can permanently delete orders
-    if (sector !== 'Admin') {
-      return res.status(403).json({ error: "Solo Pañol y Taller están autorizados a eliminar órdenes." });
+    // Check sector permission
+    const existingCls = existing.clasificacion;
+    if (sector === 'Herrería' && existingCls !== 'Herrería') {
+      return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
+    }
+    if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
+      return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
+    }
+    if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
+      return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
     }
 
     const success = db.deleteWorkOrder(req.params.id);
+    
+    // Trigger active tasks Google Sheets update
     triggerActiveTasksGoogleSheetSync();
+
     res.json({ success });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1037,6 +912,11 @@ app.post('/api/settings', (req, res) => {
       updates.username = username !== undefined ? username : current.username;
       if (password && password !== "••••••••••••") {
         updates.password = password;
+        // Also keep this exact username's personal credential record (db.users) in sync,
+        // regardless of which app account is doing the saving — otherwise features that
+        // look up credentials per-username (like the catalog sync button) can end up using
+        // a stale password even after it was just corrected here in Ajustes.
+        db.saveUser(updates.username, password);
       }
     }
 
@@ -1162,13 +1042,9 @@ app.post('/api/catalogs/sync', async (req, res) => {
 
 // Get worker status
 app.get('/api/worker/status', (req, res) => {
-  try {
-    res.json({
-      isScraping: worker.getIsScraping ? worker.getIsScraping() : false
-    });
-  } catch (e) {
-    res.json({ isScraping: false, error: e.message });
-  }
+  res.json({
+    isScraping: worker.getIsScraping()
+  });
 });
 
 // Get active mechanics list
@@ -1881,36 +1757,6 @@ async function triggerActiveTasksGoogleSheetSync() {
     console.error("[Google Sheets Active Tasks] Sync failed:", error.message);
   }
 }
-
-// =============================================
-// ADMIN: Upload full DB from local to Railway
-// =============================================
-app.post('/api/admin/upload-db', (req, res) => {
-  try {
-    const ADMIN_SECRET = process.env.ADMIN_SECRET || 'Paniol2015';
-    const { secret, dbData } = req.body;
-    if (secret !== ADMIN_SECRET) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-    if (!dbData || typeof dbData !== 'object') {
-      return res.status(400).json({ error: 'Invalid dbData payload' });
-    }
-    // Write the entire database replacing what's there
-    const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'db.json');
-    const content = JSON.stringify(dbData, null, 2);
-    fs.writeFileSync(DB_PATH, content, 'utf8');
-    const stats = {
-      orders: dbData.workOrders ? dbData.workOrders.length : 0,
-      users: dbData.users ? Object.keys(dbData.users).length : 0,
-      rodados: dbData.catalogs && dbData.catalogs.rodados ? dbData.catalogs.rodados.length : 0,
-    };
-    console.log(`[AdminUpload] Database replaced via upload-db. Orders: ${stats.orders}, Users: ${stats.users}`);
-    res.json({ success: true, stats });
-  } catch (e) {
-    console.error('[AdminUpload] Error:', e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
 
 // Fallback: serve frontend index.html for SPA routes
 app.get('*', (req, res) => {
