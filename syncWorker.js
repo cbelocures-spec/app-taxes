@@ -1165,6 +1165,17 @@ async function scrapeCatalogs(triggerUsername = null) {
   } catch (error) {
     console.error("Error scraping catalogs:", error);
     db.saveSettings({ catalogSyncStatus: "error", catalogSyncError: error.message });
+    if (browser) {
+      try {
+        const pages = await browser.pages();
+        const activePage = pages[pages.length - 1];
+        if (activePage) {
+          const path = require('path');
+          await activePage.screenshot({ path: path.join(__dirname, 'public', 'last_catalog_error.png'), fullPage: true });
+          console.warn(`[ScrapeCatalogs] Debug screenshot saved to public/last_catalog_error.png. Current URL: ${activePage.url()}`);
+        }
+      } catch (se) { console.warn('[ScrapeCatalogs] Debug screenshot failed:', se.message); }
+    }
     isScraping = false; releaseBrowserLock();
     if (browser) await browser.close();
     return { success: false, message: `Error al extraer catálogos: ${error.message}` };
