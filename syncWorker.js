@@ -737,12 +737,14 @@ async function autoLogin(page, username, password, portalUrl) {
     await delay(2000);
   }
 
-  // Ensure we are on the login page now
-  const finalLoginUrl = page.url().toLowerCase();
-  if (!finalLoginUrl.includes('/login')) {
-    await safeGoto(page, `${portalUrl}/login`, { timeout: 20000 }).catch(() => {});
-    await delay(1500);
+  // Ensure we are on the login page - navigate directly and wait for full load
+  console.log('Navigating to login page and waiting for it to fully load...');
+  try {
+    await page.goto(`${portalUrl}/login`, { waitUntil: 'networkidle2', timeout: 20000 });
+  } catch (e) {
+    console.log('Login page navigation timeout (ok):', e.message);
   }
+  await delay(1500); // Give Vue.js time to hydrate the DOM
 
   console.log(`Not logged in. Attempting login as ${username}...`);
 
@@ -750,8 +752,16 @@ async function autoLogin(page, username, password, portalUrl) {
   const emailSelector = 'input[name="loginUser"]';
   const passSelector = 'input[name="password"]';
 
-  // Wait for inputs to be ready
-  await page.waitForSelector(passSelector, { timeout: 15000 });
+  // Wait for inputs to be ready - retry once if frame was detached
+  try {
+    await page.waitForSelector(passSelector, { timeout: 15000 });
+  } catch (e) {
+    console.log('waitForSelector failed, retrying navigation to /login:', e.message);
+    await page.goto(`${portalUrl}/login`, { waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
+    await delay(2000);
+    await page.waitForSelector(passSelector, { timeout: 15000 });
+  }
+
 
   // Fill Username
   await page.focus(emailSelector);
