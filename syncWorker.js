@@ -825,6 +825,7 @@ async function scrapeCatalogs(triggerUsername = null) {
         '--disable-gpu',
         '--no-first-run',
         '--no-zygote',
+        '--single-process',
         '--disable-extensions',
         '--disable-default-apps',
         '--disable-background-networking',
@@ -1293,7 +1294,7 @@ async function syncWorkOrder(orderId) {
     }
 
     console.log(`\n=== Starting Background Sync for OT #${order.interno} (ID: ${order.id}) using user: ${username} ===`);
-    db.updateWorkOrder(orderId, { syncStatus: "syncing", syncError: null });
+    db.updateWorkOrder(orderId, { syncStatus: "syncing", syncError: null, syncStartedAt: new Date().toISOString() });
 
     await acquireBrowserLock();
     lockAcquired = true;
@@ -1310,6 +1311,7 @@ async function syncWorkOrder(orderId) {
         '--disable-gpu',
         '--no-first-run',
         '--no-zygote',
+        '--single-process',
         '--disable-extensions',
         '--disable-default-apps',
         '--disable-background-networking',
@@ -3056,6 +3058,7 @@ async function verifyWorkOrder(orderId) {
           '--disable-gpu',
           '--no-first-run',
           '--no-zygote',
+          '--single-process',
           '--disable-extensions',
           '--disable-default-apps',
           '--disable-background-networking',
@@ -3203,11 +3206,26 @@ async function startWorker() {
 
       const orders = db.getWorkOrders();
 
-      // Safety auto-recovery for orphan syncing orders
+      // Safety auto-recovery for orphan syncing orders (not tracked in activeSyncs)
       const stuckOrders = orders.filter(o => o.syncStatus === 'syncing' && !activeSyncs.has(o.id));
       for (const o of stuckOrders) {
         console.log(`[AutoFix] Detectada orden huérfana en 'syncing' (ID: ${o.id}, Interno: ${o.interno}). Reseteando a 'pending'...`);
-        db.updateWorkOrder(o.id, { syncStatus: 'pending', syncError: 'Sincronización huérfana detectada y reseteada.' });
+        db.updateWorkOrder(o.id, { syncStatus: 'pending', syncError: 'Sincronización huérfana detectada y reseteada.', syncStartedAt: null });
+      }
+
+      // Watchdog: reset orders stuck in 'syncing' for more than 15 minutes (even if in activeSyncs)
+      // This handles silent Puppeteer hangs where the browser freezes without throwing an error.
+      const SYNC_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+      const timedOutOrders = orders.filter(o => {
+        if (o.syncStatus !== 'syncing') return false;
+        if (!o.syncStartedAt) return false;
+        return (Date.now() - new Date(o.syncStartedAt).getTime()) > SYNC_TIMEOUT_MS;
+      });
+      for (const o of timedOutOrders) {
+        const elapsedMin = Math.round((Date.now() - new Date(o.syncStartedAt).getTime()) / 60000);
+        console.warn(`[Watchdog] Orden ID ${o.id} (OT #${o.interno}) lleva ${elapsedMin} minutos en 'syncing'. Forzando reset a 'pending'...`);
+        activeSyncs.delete(o.id); // Remove from active set so it can be retried
+        db.updateWorkOrder(o.id, { syncStatus: 'pending', syncError: `Timeout de sincronización (${elapsedMin} min). Se reintentará.`, syncStartedAt: null });
       }
 
       const pendingOrder = orders.find(o => o.syncStatus === 'pending');
@@ -3260,7 +3278,7 @@ function stopWorker() {
  * and reusing the same browser session for each credential group.
  * Up to MAX_PARALLEL_BROWSERS groups run simultaneously.
  */
-const MAX_PARALLEL_BROWSERS = 2;
+const MAX_PARALLEL_BROWSERS = 1;
 
 async function verifyMultipleOrders(orderIds) {
   const settings = db.getSettings();
@@ -3316,6 +3334,7 @@ async function verifyGroupWithBrowser(group, settings) {
         '--disable-gpu',
         '--no-first-run',
         '--no-zygote',
+        '--single-process',
         '--disable-extensions',
         '--disable-default-apps',
         '--disable-background-networking',
