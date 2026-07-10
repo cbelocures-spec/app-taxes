@@ -693,23 +693,31 @@ async function autoLogin(page, username, password, portalUrl) {
 
   if (!isOnLoginPage) {
     // We are on a dashboard/admin page - check if the correct user is logged in
-    const loggedInEmail = await safeEvaluate(page, () => {
-      // Look for displayed email/username in nav or profile area
-      const candidates = [
-        document.querySelector('.user-profile-toggle'),
-        document.querySelector('.user-profile-name'),
-        document.querySelector('.profile-user'),
-        document.querySelector('.nav-item .nav-link span'),
-        document.querySelector('.dropdown-toggle'),
-      ];
-      for (const el of candidates) {
-        if (el && el.textContent.trim()) return el.textContent.trim().toLowerCase();
-      }
-      // Fallback: search body text for email pattern
-      const bodyText = document.body.textContent;
-      const emailMatch = bodyText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g);
-      return emailMatch ? emailMatch[0].toLowerCase() : '';
-    });
+    let loggedInEmail = '';
+    try {
+      // Give the page 2 seconds to finish any post-login rendering/redirection
+      await delay(2000);
+      
+      loggedInEmail = await safeEvaluate(page, () => {
+        // Look for displayed email/username in nav or profile area
+        const candidates = [
+          document.querySelector('.user-profile-toggle'),
+          document.querySelector('.user-profile-name'),
+          document.querySelector('.profile-user'),
+          document.querySelector('.nav-item .nav-link span'),
+          document.querySelector('.dropdown-toggle'),
+        ];
+        for (const el of candidates) {
+          if (el && el.textContent.trim()) return el.textContent.trim().toLowerCase();
+        }
+        // Fallback: search body text for email pattern
+        const bodyText = document.body.textContent;
+        const emailMatch = bodyText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g);
+        return emailMatch ? emailMatch[0].toLowerCase() : '';
+      });
+    } catch (err) {
+      console.warn("[autoLogin] Failed to evaluate logged-in user email, assuming not logged in:", err.message);
+    }
 
     const targetUser = username.toLowerCase().trim();
     const alreadyCorrectUser = loggedInEmail && (
