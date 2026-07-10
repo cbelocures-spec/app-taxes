@@ -718,8 +718,9 @@ async function autoLogin(browser, username, password, portalUrl) {
 
   // Poll for password input using evaluate (avoids detached frame from waitForSelector)
   console.log('[autoLogin] Waiting for password input via polling...');
+  await delay(2000); // Initial wait for Vue.js to render the form
   const inputReady = await (async () => {
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 40; i++) { // 40 × 500ms = 20 seconds max
       try {
         const found = await page.evaluate((sel) => !!document.querySelector(sel), passSelector);
         if (found) return true;
@@ -730,7 +731,7 @@ async function autoLogin(browser, username, password, portalUrl) {
   })();
 
   if (!inputReady) {
-    throw new Error('[autoLogin] Password input not found after 10 seconds');
+    throw new Error('[autoLogin] Password input not found after 20 seconds');
   }
 
   // Fill inputs using direct JS injection (most robust for Vue.js reactive forms)
