@@ -41,63 +41,32 @@ function initMockCatalogs() {
 // Background Worker state
 let isWorkerRunning = false;
 let isScraping = false;
-const activeSyncs = new Set();
 
-// Browser execution lock (Mutex) to prevent multiple Puppeteer instances from running concurrently
-let isBrowserActive = false;
-const browserQueue = [];
-
-function acquireBrowserLock() {
-  return new Promise((resolve, reject) => {
-    if (!isBrowserActive) {
-      isBrowserActive = true;
-      resolve();
-      return;
+// Global lock so only ONE Puppeteer browser runs at a time across the whole app.
+// Running two Chromium instances at once on a resource-limited server (like a
+// small Railway container) can cause one of them to crash/close mid-operation
+// ("Target closed" / "detached Frame" errors), so every entry point that launches
+// a browser must acquire this lock first and release it when done.
+let browserBusy = false;
+async function acquireBrowserLock(context) {
+  let waited = false;
+  let waitedMs = 0;
+  const MAX_WAIT_MS = 6 * 60 * 1000; // safety valve: never wait more than 6 minutes
+  while (browserBusy) {
+    if (!waited) { console.log(`[Lock] Browser is busy, ${context} is waiting for it to free up...`); waited = true; }
+    if (waitedMs >= MAX_WAIT_MS) {
+      console.warn(`[Lock] ${context} waited over 6 minutes for the browser lock — forcing it free (possible stuck process).`);
+      break;
     }
-
-    // 3 minutes timeout to prevent infinite queue hang
-    const timeout = setTimeout(() => {
-      const idx = browserQueue.indexOf(safeResolve);
-      if (idx !== -1) {
-        browserQueue.splice(idx, 1);
-      }
-      reject(new Error("Timeout esperando el bloqueo del navegador (Browser Lock)"));
-    }, 180000);
-
-    const safeResolve = () => {
-      clearTimeout(timeout);
-      resolve();
-    };
-
-    browserQueue.push(safeResolve);
-  });
+    await delay(3000);
+    waitedMs += 3000;
+  }
+  if (waited) console.log(`[Lock] Browser is free, ${context} proceeding.`);
+  browserBusy = true;
 }
-
 function releaseBrowserLock() {
-  if (browserQueue.length > 0) {
-    const nextResolve = browserQueue.shift();
-    nextResolve();
-  } else {
-    isBrowserActive = false;
-  }
+  browserBusy = false;
 }
-
-function sanitizeBrowserLock() {
-  if (!isScraping && activeSyncs.size === 0 && isBrowserActive) {
-    console.log("[Sanity] Detectado lock de navegador huérfano (isBrowserActive = true pero no hay scraping ni syncs activos). Reseteando lock...");
-    isBrowserActive = false;
-    if (browserQueue.length > 0) {
-      const nextResolve = browserQueue.shift();
-      isBrowserActive = true;
-      nextResolve();
-    }
-  }
-}
-
-function getIsScraping() {
-  return isScraping;
-}
-
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
@@ -105,26 +74,15 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
 async function safeGoto(page, url, options = {}) {
   const defaultOptions = { waitUntil: 'load', timeout: 30000 };
   const mergedOptions = { ...defaultOptions, ...options };
-  let attempts = 0;
-  while (attempts < 2) {
-    try {
-      attempts++;
-      console.log(`[safeGoto] Navigating to ${url} (attempt ${attempts}) ...`);
-      return await page.goto(url, mergedOptions);
-    } catch (err) {
-      const isTimeout = err.message.includes('Timeout') || err.message.includes('timeout');
-      const isDetached = err.message.includes('detached') || err.message.includes('Navigation failed') || err.message.includes('destroyed');
-      if (isTimeout) {
-        console.warn(`[safeGoto] Navigation timeout hit for ${url}. Attempting to continue...`);
-        return null;
-      }
-      if (isDetached && attempts < 2) {
-        console.warn(`[safeGoto] Navigation failed (${err.message}). Retrying in 2s...`);
-        await new Promise(r => setTimeout(r, 2000));
-        continue;
-      }
-      throw err;
+  try {
+    console.log(`[safeGoto] Navigating to ${url} ...`);
+    return await page.goto(url, mergedOptions);
+  } catch (err) {
+    if (err.message.includes('Timeout') || err.message.includes('timeout')) {
+      console.warn(`[safeGoto] Navigation timeout hit for ${url}. Attempting to continue...`);
+      return null;
     }
+    throw err;
   }
 }
 
@@ -181,240 +139,286 @@ async function fillInputByLabel(page, labelText, value) {
   return false;
 }
 
-// =========================================================================
-// fillSearchableSelect: fills a searchable-select (Rodado / Responsable)
-// in the OT creation form.
-//
-// Strategy:
-//  1. Find the .searchable-input whose wrapping label contains `fieldLabel`.
-//  2. Click it, type a normalised search term, wait for dropdown.
-//  3. Click the best-matching option.
-//  4. If the dropdown never shows / nothing matched → DIRECT INJECTION
-//     using the hidden input + the local catalog for the ID.
-// =========================================================================
-async function fillSearchableSelect(page, fieldLabel, targetValue) {
-  if (!targetValue) {
-    console.warn(`[fillSearchableSelect] No value provided for field "${fieldLabel}". Skipping.`);
-    return false;
-  }
-
-  const clean = (s) => {
-    if (!s) return '';
-    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  };
-
-  // -----------------------------------------------------------------
-  // STEP 1: Locate the correct searchable-input for this field.
-  // The Taxes portal uses a custom <searchable-select> component that
-  // renders a .searchable-input (visible text) + a hidden input.
-  // We look for a .form-group / .col whose text label contains fieldLabel.
-  // -----------------------------------------------------------------
-  const selectorInfo = await page.evaluate((lbl) => {
-    const normalise = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-    const cleanLbl = normalise(lbl);
-
-    // Collect all searchable-input elements that are visible
-    const allSearchInputs = Array.from(document.querySelectorAll('.searchable-input'));
-    for (const si of allSearchInputs) {
-      // Walk up to find a container that has a label
-      let container = si.closest('.form-group') || si.closest('[class*="col"]') || si.parentElement;
-      for (let depth = 0; depth < 5 && container; depth++) {
-        const labels = Array.from(container.querySelectorAll('label, .label, span.col-form-label'));
-        const hasLabel = labels.some(l => normalise(l.textContent).includes(cleanLbl));
-        if (hasLabel) {
-          // Also find associated hidden input
-          const wrapper = si.closest('.searchable-select-wrapper') || si.parentElement;
-          const hiddenInput = wrapper ? wrapper.querySelector('input[type="hidden"]') : null;
-          const searchId = 'tmp_ss_search_' + cleanLbl + '_' + Date.now();
-          const hiddenId = 'tmp_ss_hidden_' + cleanLbl + '_' + Date.now();
-          si.setAttribute('id', searchId);
-          if (hiddenInput) hiddenInput.setAttribute('id', hiddenId);
-          return { searchId, hiddenId: hiddenInput ? hiddenId : null, found: true };
+// Puppeteer helper to fill custom searchable selects
+async function fillSearchableSelect(page, labelText, searchValue) {
+  console.log(`Searching for searchable select for: "${labelText}" with target value: "${searchValue}"`);
+  try {
+    // Find the correct searchable-input by looking at the label
+    const inputInfo = await page.evaluate((label) => {
+      const clean = (str) => {
+        if (!str) return '';
+        return str.normalize("NFD")
+                  .replace(/[\u0300-\u036f]/g, "")
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]/g, "");
+      };
+      
+      const cleanTarget = clean(label);
+      const allLabels = Array.from(document.querySelectorAll('label'));
+      for (const lbl of allLabels) {
+        const cleanLabelText = clean(lbl.textContent);
+        if (cleanLabelText.includes(cleanTarget) || cleanTarget.includes(cleanLabelText)) {
+          // Find the parent container
+          const parent = lbl.closest('.form-group') || 
+                         lbl.closest('.taxes-form-group') || 
+                         lbl.closest('.col') || 
+                         lbl.closest('.row') ||
+                         lbl.parentElement;
+          if (parent) {
+            // Look for the searchable-input inside this container
+            const searchInput = parent.querySelector('.searchable-input, input[type="text"]');
+            // Look for any hidden input in the same container
+            const hiddenInput = parent.querySelector('input[type="hidden"], input[name$="_id"], input[name="rodado_id"], input[name="syj_empleado_id"]');
+            
+            if (searchInput && hiddenInput) {
+              // Give them temporary IDs for reliable selection
+              const searchId = 'tmp_search_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+              const hiddenId = 'tmp_hidden_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+              searchInput.setAttribute('id', searchId);
+              hiddenInput.setAttribute('id', hiddenId);
+              return { searchId, hiddenId, found: true };
+            }
+          }
         }
-        container = container.parentElement;
+      }
+      return { found: false };
+    }, labelText);
+
+    if (!inputInfo.found) {
+      console.log(`Could not find searchable select input for: "${labelText}"`);
+      return false;
+    }
+
+    const searchSelector = `#${inputInfo.searchId}`;
+    const hiddenSelector = `#${inputInfo.hiddenId}`;
+
+    // Generate list of queries to try in sequence
+    const queriesToTry = [];
+    let rodadoInfo = null;
+
+    if (labelText.toLowerCase().includes('rodado')) {
+      try {
+        const catalogs = db.getCatalogs();
+        const rodados = catalogs.rodados || [];
+        const internoMatch = searchValue.match(/Interno\s+(\S+)/i);
+        const searchInterno = internoMatch ? internoMatch[1].toLowerCase().trim() : '';
+        const matching = rodados.find(r => 
+          r.label === searchValue || 
+          r.value === searchValue || 
+          (r.interno && searchInterno && r.interno.toLowerCase().trim() === searchInterno)
+        );
+        if (matching) {
+          rodadoInfo = {
+            patente: matching.patente || '',
+            interno: matching.interno || '',
+            modelo: matching.modelo || ''
+          };
+          if (rodadoInfo.patente) {
+            queriesToTry.push(rodadoInfo.patente.trim());
+          }
+          if (rodadoInfo.interno) {
+            queriesToTry.push(rodadoInfo.interno.trim());
+            queriesToTry.push(`Interno ${rodadoInfo.interno.trim()}`);
+          }
+          if (rodadoInfo.modelo) {
+            queriesToTry.push(rodadoInfo.modelo.trim());
+          }
+        }
+      } catch (catErr) {
+        console.error("Error retrieving matching rodado from local catalogs:", catErr);
       }
     }
-    return { found: false };
-  }, fieldLabel);
 
-  if (!selectorInfo.found) {
-    console.warn(`[fillSearchableSelect] Could not find .searchable-input for "${fieldLabel}". Attempting direct injection only.`);
-  }
+    if (queriesToTry.length === 0) {
+      // If it contains "Interno X", we try to search by the interno number FIRST as it is highly precise!
+      const internoMatch = searchValue.match(/Interno\s+(\d+)/i);
+      if (internoMatch) {
+        queriesToTry.push(internoMatch[1]); // Try "4" first
+        queriesToTry.push(`Interno ${internoMatch[1]}`); // Try "Interno 4" second
+      }
 
-  const searchSelector = selectorInfo.found ? `#${selectorInfo.searchId}` : null;
-  const hiddenSelector = selectorInfo.hiddenId ? `#${selectorInfo.hiddenId}` : null;
+      queriesToTry.push(searchValue);
+      if (searchValue.includes(' - ')) {
+        const parts = searchValue.split(' - ');
+        const brand = parts[0].trim();
+        const rest = parts[1].split('.')[0].trim(); // e.g. "F100" or "SAVEIRO 1.6L"
+        queriesToTry.push(`${brand} ${rest}`);
+        queriesToTry.push(rest);
+        queriesToTry.push(brand);
+      }
+      if (searchValue.includes(' ')) {
+        const words = searchValue.split(/\s+/);
+        queriesToTry.push(words[0]); // Last name (e.g. "BELOCURES")
+        if (words[1]) {
+          queriesToTry.push(words[1]); // First name (e.g. "CESAR")
+        }
+      }
+    }
 
-  // -----------------------------------------------------------------
-  // STEP 2: Build search queries to try (full value + individual words)
-  // -----------------------------------------------------------------
-  const queriesToTry = [];
-  // Extract the "Interno" number if present — that's the most unique token
-  const internoMatch = targetValue.match(/[Ii]nterno\s*(\d+)/);
-  if (internoMatch) queriesToTry.push(internoMatch[1]); // e.g. "68"
-  // Add first significant word (brand / surname)
-  const firstWord = targetValue.split(/[\s,]+/).find(w => w.length >= 3);
-  if (firstWord) queriesToTry.push(firstWord);
-  // Add full value as final fallback
-  queriesToTry.push(targetValue);
-
-  if (searchSelector) {
+    // Try queries one by one
     for (const query of queriesToTry) {
-      console.log(`[fillSearchableSelect] "${fieldLabel}": trying query "${query}"...`);
+      console.log(`Attempting search query for "${labelText}": "${query}"...`);
+      
+      // Check if dropdown is visible, if not click it to open
+      const isDropdownOpen = await page.evaluate(() => {
+        const dropdownContainers = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"]'));
+        return dropdownContainers.some(container => container.offsetHeight > 0);
+      });
 
-      // Open dropdown if closed
-      try { await page.click(searchSelector); } catch (_) {}
-      await delay(400);
+      if (!isDropdownOpen) {
+        console.log(`   Dropdown was closed, clicking input to open...`);
+        await page.click(searchSelector);
+        await delay(500);
+      }
 
-      // Clear and type query
+      // Focus and clear existing text reliably via evaluate and keyboard
+      await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        if (el) {
+          el.value = '';
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }, searchSelector);
       await page.focus(searchSelector);
-      await page.keyboard.down('Control');
-      await page.keyboard.press('A');
-      await page.keyboard.up('Control');
-      await page.keyboard.press('Backspace');
-      await delay(200);
-      await page.type(searchSelector, query, { delay: 40 });
-      await delay(1800); // Wait for Vue to filter the dropdown
+      await delay(300);
 
-      // Try to click the best matching option
-      const result = await page.evaluate((targetVal) => {
-        const clean = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const targetClean = clean(targetVal);
+      // Type the query
+      await page.type(searchSelector, query, { delay: 50 });
+      await delay(2000); // Wait for dropdown to appear and filter
 
-        // Collect all visible dropdown option divs
-        const dropdowns = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"], .searchable-select-dropdown, .searchable-dropdown'));
+      // Click the first visible option in the dropdown that matches
+      const optionClicked = await page.evaluate((targetVal, rodadoInfo) => {
+        // Find visible options inside portal dropdown containers (ID starts with "searchable-select-dropdown-")
+        const dropdownContainers = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"]'));
+        
         let visibleOptions = [];
-        dropdowns.forEach(dd => {
-          if (dd.offsetHeight > 0) {
-            const divs = Array.from(dd.querySelectorAll('div'));
+        dropdownContainers.forEach(container => {
+          const isVisible = container.offsetHeight > 0;
+          if (isVisible) {
+            // Find leaf divs that contain text and do not have child divs
+            const divs = Array.from(container.querySelectorAll('div'));
             const leafDivs = divs.filter(d => d.querySelectorAll('div').length === 0 && d.textContent.trim().length > 0);
             visibleOptions.push(...leafDivs);
           }
         });
 
-        // Filter out noise (loading/empty messages)
-        const options = visibleOptions.filter(el => {
-          const t = el.textContent.trim().toLowerCase();
-          return t.length > 0 && !t.includes('cargando') && !t.includes('no hay') && !t.includes('no se encontr') && !t.includes('opciones');
+        // Normalize helper to ignore accents, punctuation, and spaces
+        const clean = (str) => {
+          if (!str) return '';
+          return str.normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]/g, "");
+        };
+
+        const targetClean = clean(targetVal);
+
+        // Filter out header/status rows containing "opciones" or "cargando"
+        const filteredOptions = visibleOptions.filter(el => {
+          const text = el.textContent.trim().toLowerCase();
+          return text.length > 0 && !text.includes('opciones') && !text.includes('cargando') && !text.includes('no hay');
         });
 
-        if (options.length === 0) return { success: false, reason: 'no_options' };
+        if (filteredOptions.length === 0) return { success: false };
 
-        // Best match: prioritise options whose cleaned text includes the cleaned target
-        let matched = options.find(el => {
-          const tc = clean(el.textContent);
-          return tc.includes(targetClean) || targetClean.includes(tc);
-        });
-        if (!matched) matched = options[0]; // fall back to first visible option
+        let matched = null;
 
-        matched.click();
-        return { success: true, text: matched.textContent.trim() };
-      }, targetValue);
-
-      if (result.success) {
-        console.log(`[fillSearchableSelect] "${fieldLabel}": selected "${result.text}"`);
-        await delay(800);
-
-        // Confirm hidden input was set
-        if (hiddenSelector) {
-          const hv = await page.evaluate((sel) => {
-            const el = document.querySelector(sel);
-            return el ? el.value : '';
-          }, hiddenSelector);
-          if (hv && hv !== '') {
-            console.log(`[fillSearchableSelect] "${fieldLabel}": hidden input value = "${hv}" ✓`);
-            return true;
+        // A. Match by patent (highest priority for vehicles)
+        if (rodadoInfo && rodadoInfo.patente) {
+          const cleanPatent = clean(rodadoInfo.patente);
+          if (cleanPatent) {
+            matched = filteredOptions.find(el => clean(el.textContent).includes(cleanPatent));
           }
-          console.warn(`[fillSearchableSelect] "${fieldLabel}": hidden input still empty after selection — will try direct injection.`);
-        } else {
-          return true; // No hidden input to verify, trust the click
+        }
+
+        // B. Match by interno (extract and compare exact internal number)
+        if (!matched && rodadoInfo && rodadoInfo.interno) {
+          const cleanInterno = clean(rodadoInfo.interno);
+          if (cleanInterno) {
+            matched = filteredOptions.find(el => {
+              const text = el.textContent.toLowerCase();
+              const match = text.match(/interno\s+(\S+)/);
+              if (match) {
+                return clean(match[1]) === cleanInterno;
+              }
+              // Fallback to substring only if "interno" word is not present in the option text
+              if (!text.includes('interno')) {
+                return clean(text).includes(cleanInterno);
+              }
+              return false;
+            });
+          }
+        }
+
+        // C. Try exact or full match containing targetVal
+        if (!matched) {
+          matched = filteredOptions.find(el => {
+            const textClean = clean(el.textContent);
+            return textClean.includes(targetClean) || targetClean.includes(textClean);
+          });
+        }
+
+        // D. Try partial match: if targetVal contains brand and interno, check both
+        if (!matched && targetVal.includes(' - ')) {
+          const parts = targetVal.split(' - ');
+          const brand = clean(parts[0]);
+          const numMatch = targetVal.match(/Interno\s+(\d+)/i);
+          const internoNum = numMatch ? numMatch[1] : '';
+
+          matched = filteredOptions.find(el => {
+            const textClean = clean(el.textContent);
+            const hasBrand = textClean.includes(brand);
+            const hasInterno = internoNum ? textClean.includes(internoNum) : true;
+            return hasBrand && hasInterno;
+          });
+        }
+
+        // E. Fallback: click the very first visible option in the dropdown
+        if (!matched && filteredOptions.length > 0) {
+          matched = filteredOptions[0];
+        }
+
+        if (matched) {
+          matched.click();
+          return { success: true, text: matched.textContent.trim() };
+        }
+
+        return { success: false };
+      }, searchValue, rodadoInfo);
+
+      if (optionClicked.success) {
+        console.log(`   ✓ Selected option for "${labelText}": "${optionClicked.text}"`);
+        
+        // Wait for Vue reactivity to update the hidden input
+        await delay(1000);
+        
+        // Verify the hidden input got a value
+        const hiddenValue = await page.evaluate((sel) => {
+          const el = document.querySelector(sel);
+          return el ? el.value : '(not found)';
+        }, hiddenSelector);
+        console.log(`   ✓ Hidden input value for "${labelText}": "${hiddenValue}"`);
+        
+        if (hiddenValue !== '' && hiddenValue !== '(not found)') {
+          return true;
         }
       }
     }
-  }
 
-  // -----------------------------------------------------------------
-  // STEP 3: DIRECT INJECTION FALLBACK
-  // Look up the value/id from our local catalog and set it directly.
-  // -----------------------------------------------------------------
-  console.log(`[fillSearchableSelect] "${fieldLabel}": dropdown approach failed. Trying DIRECT INJECTION...`);
-  const isRodado = fieldLabel.toLowerCase().includes('rodado') || fieldLabel.toLowerCase().includes('veh');
-  const catalogKey = isRodado ? 'rodados' : 'responsables';
-  const catalog = db.getCatalogs()[catalogKey] || [];
-
-  const cleanVal = clean(targetValue);
-  const catalogObj = catalog.find(item => {
-    const lc = clean(item.label);
-    return lc.includes(cleanVal) || cleanVal.includes(lc);
-  });
-
-  if (!catalogObj) {
-    // For Rodado: try matching by interno number only
-    if (isRodado) {
-      const internoNum = (targetValue.match(/[Ii]nterno\s*(\d+)/) || [])[1];
-      if (internoNum) {
-        const byInterno = catalog.find(item => item.label.includes(`Interno ${internoNum}`) || item.interno === internoNum || item.value === internoNum);
-        if (byInterno) {
-          console.log(`[fillSearchableSelect] Rodado matched by Interno number "${internoNum}": ${JSON.stringify(byInterno)}`);
-          return await injectSearchableSelectValue(page, searchSelector, hiddenSelector, byInterno.value, byInterno.label);
-        }
-      }
-    }
-    console.warn(`[fillSearchableSelect] "${fieldLabel}": value "${targetValue}" not found in local catalog "${catalogKey}" (${catalog.length} items).`);
+    console.log(`Failed to select option for "${labelText}" after all search query attempts.`);
+    return false;
+  } catch (error) {
+    console.error(`Error filling searchable select for "${labelText}":`, error);
     return false;
   }
-
-  console.log(`[fillSearchableSelect] "${fieldLabel}": catalog match → ID=${catalogObj.value}, label="${catalogObj.label}"`);
-  return await injectSearchableSelectValue(page, searchSelector, hiddenSelector, catalogObj.value, catalogObj.label);
 }
 
-// Helper: directly set a searchable-select value without using the dropdown UI
-async function injectSearchableSelectValue(page, searchSelector, hiddenSelector, valueId, valueLabel) {
-  const injected = await page.evaluate((searchSel, hiddenSel, val, label) => {
-    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-
-    // Set hidden (submitted) value
-    if (hiddenSel) {
-      const hiddenEl = document.querySelector(hiddenSel);
-      if (hiddenEl) {
-        nativeSetter.call(hiddenEl, val);
-        hiddenEl.dispatchEvent(new Event('input', { bubbles: true }));
-        hiddenEl.dispatchEvent(new Event('change', { bubbles: true }));
-        // Try Vue reactivity
-        const wrapper = hiddenEl.closest('.searchable-select-wrapper');
-        if (wrapper && wrapper.__vue__) {
-          try { wrapper.__vue__.$emit('input', val); wrapper.__vue__.$emit('change', val); } catch(_) {}
-        }
-      }
-    }
-
-    // Set visible text
-    if (searchSel) {
-      const searchEl = document.querySelector(searchSel);
-      if (searchEl) {
-        nativeSetter.call(searchEl, label);
-        searchEl.dispatchEvent(new Event('input', { bubbles: true }));
-        searchEl.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    }
-
-    return true;
-  }, searchSelector, hiddenSelector, valueId, valueLabel);
-
-  if (injected) {
-    console.log(`[injectSearchableSelectValue] Injected value="${valueId}" label="${valueLabel}" ✓`);
-    await delay(500);
-    return true;
-  }
-  return false;
-}
-
-// =========================================================================
-// fillTaskEmployeeSearchableSelect: fills the per-task employee dropdown
-// inside the OT creation/edit form. Uses index `index` (0-based) to
-// target the correct .searchable-select-wrapper for task card #index.
-// =========================================================================
+// Puppeteer helper to fill custom searchable selects inside task cards
 async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
+  console.log(`Filling Employee for Task #${index} with: "${employeeName}"`);
   try {
+    // Resolve searchable input and hidden input dynamically
     const inputInfo = await page.evaluate((idx) => {
       const hiddenInput = document.querySelector(`input[name="syj_empleado_id_tarea_${idx}"], input[name$="empleado_id_tarea_${idx}"], input[name*="empleado_id_tarea_${idx}"]`);
       if (hiddenInput) {
@@ -649,29 +653,22 @@ async function autoLogin(page, username, password, portalUrl) {
 
     // Different user is logged in — need to logout first
     console.log(`Different user logged in (${loggedInEmail}), need to logout and re-login as ${username}.`);
-    try {
-      const client = await page.target().createCDPSession();
-      await client.send('Network.clearBrowserCookies');
-      console.log("[Login] Cleared browser cookies for logout.");
-    } catch (e) {
-      console.warn("[Login] Failed to clear cookies via CDP, falling back to standard logout click:", e.message);
-      const logoutClicked = await page.evaluate(() => {
-        const links = Array.from(document.querySelectorAll('a, button'));
-        const logout = links.find(el => {
-          const text = el.textContent.trim().toLowerCase();
-          return text.includes('salir') || text.includes('logout') || text.includes('cerrar sesión') || text.includes('cerrar session');
-        });
-        if (logout) { logout.click(); return true; }
-        return false;
+    const logoutClicked = await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll('a, button'));
+      const logout = links.find(el => {
+        const text = el.textContent.trim().toLowerCase();
+        return text.includes('salir') || text.includes('logout') || text.includes('cerrar sesión') || text.includes('cerrar session');
       });
-      if (logoutClicked) {
-        await page.waitForNavigation({ waitUntil: 'load', timeout: 10000 }).catch(() => {});
-        await delay(2000);
-      } else {
-        // Force navigate to logout URL
-        await safeGoto(page, `${portalUrl}/logout`, { timeout: 10000 }).catch(() => {});
-        await delay(2000);
-      }
+      if (logout) { logout.click(); return true; }
+      return false;
+    });
+    if (logoutClicked) {
+      await page.waitForNavigation({ waitUntil: 'load', timeout: 10000 }).catch(() => {});
+      await delay(2000);
+    } else {
+      // Force navigate to logout URL
+      await safeGoto(page, `${portalUrl}/logout`, { timeout: 10000 }).catch(() => {});
+      await delay(2000);
     }
   }
 
@@ -731,15 +728,15 @@ async function autoLogin(page, username, password, portalUrl) {
     await page.keyboard.press('Enter');
   }
 
-  // Wait for navigation or dashboard load (SPA-compatible)
-  await page.waitForNavigation({ waitUntil: 'load', timeout: 20000 }).catch(() => {});
-  await delay(3000);
+  // Wait for navigation or welcome dashboard
+  await page.waitForNavigation({ waitUntil: 'load', timeout: 15000 }).catch(() => {});
+  await delay(3000); // Restored: needs enough time for dashboard to fully load
 
-  const currentUrl = page.url();
-  console.log(`[Login] Post-login URL: ${currentUrl}`);
-
-  // Check for explicit error text from Taxes first
-  const loginResult = await page.evaluate(() => {
+  // Check if login succeeded: we should NOT be on login page anymore
+  const stillOnLoginPage = await page.evaluate(() => {
+    const inputs = Array.from(document.querySelectorAll('input'));
+    const hasPasswordInput = inputs.some(el => el.type === 'password' && el.offsetWidth > 0);
+    // Check for SPECIFIC error phrases only (avoid false positives from dashboard menus)
     const bodyText = document.body.textContent.toLowerCase();
     const hasError = bodyText.includes('credenciales inv') ||
                      bodyText.includes('credenciales incorrecta') ||
@@ -747,143 +744,37 @@ async function autoLogin(page, username, password, portalUrl) {
                      bodyText.includes('contrase\u00f1a incorrecta') ||
                      bodyText.includes('datos incorrectos') ||
                      bodyText.includes('acceso denegado');
-    // Look for dashboard indicators
-    const hasDashboard = !!document.querySelector('.sidebar, .nav-sidebar, [class*="dashboard"], [class*="admin"], .main-content');
-    const hasPasswordInput = Array.from(document.querySelectorAll('input')).some(el => el.type === 'password' && el.offsetWidth > 0);
-    return { hasError, hasDashboard, hasPasswordInput, bodyLength: document.body.textContent.length };
+    return hasPasswordInput || hasError;
   });
 
-  console.log(`[Login] Result check: error=${loginResult.hasError}, dashboard=${loginResult.hasDashboard}, passwordVisible=${loginResult.hasPasswordInput}, bodyLen=${loginResult.bodyLength}`);
-
-  // Success if: no error AND (URL changed from login OR dashboard found OR no password input)
-  const urlChangedFromLogin = !currentUrl.includes('/login') && !currentUrl.includes('/auth');
-  const loginSucceeded = !loginResult.hasError && (loginResult.hasDashboard || urlChangedFromLogin);
-
-  if (!loginSucceeded) {
-    const reason = loginResult.hasError ? 'El portal reportó credenciales incorrectas' :
-                   loginResult.hasPasswordInput ? 'El login no completó (sigue en página de login)' :
-                   `URL inesperada post-login: ${currentUrl}`;
-    throw new Error(reason);
+  if (stillOnLoginPage) {
+    throw new Error("Credenciales inv\u00e1lidas o error al iniciar sesi\u00f3n en Taxes.com.ar");
   }
 
-  console.log(`Login successful as ${username}! URL: ${currentUrl}`);
+  console.log(`Login successful as ${username}!`);
   return true;
-}
-
-// Helper to resolve Taxes.com.ar credentials, bypassing any bullet mask "••••••••••••"
-// TODAS las cuentas del sistema existen en Taxes.com.ar:
-//   taller@, paniol@, ftoledo@, jcarmona@, a.brahim@, sergios@
-// El único filtro aplicado es si la contraseña guardada está enmascarada.
-// Cuentas que NO tienen acceso directo a Taxes.com.ar y necesitan usar
-// las credenciales de otro supervisor para realizar operaciones.
-// Estas cuentas son "internas" del sistema (supervisores de sector sin cuenta Taxes propia).
-// Cuentas que NO tienen acceso al portal Taxes (cuentas solo internas de la app).
-// paniol@contenedoreshugo.com.ar SÍ tiene acceso a Taxes — NO va aquí.
-// Cuentas de la aplicación interna que NO tienen acceso directo al portal Taxes.
-// El sistema usará automáticamente las credenciales de otro supervisor válido para sincronizar.
-const NON_TAXES_ACCOUNTS = [
-  'paniol@contenedoreshugo.com.ar'
-];
-
-function isNonTaxesAccount(email) {
-  if (!email) return false;
-  return NON_TAXES_ACCOUNTS.includes(email.toLowerCase().trim());
-}
-
-function resolveCredentials(targetUsername = null, orderCreator = null) {
-  const settings = db.getSettings();
-  let username = settings.username;
-  let password = settings.password;
-
-  // Helper: obtiene credenciales de un usuario en DB.
-  // Retorna null si la contraseña está enmascarada o si es cuenta no-Taxes.
-  const getCredentialsFromDB = (email) => {
-    if (!email) return null;
-    if (isNonTaxesAccount(email)) {
-      console.log(`[resolveCredentials] Omitiendo cuenta no-Taxes (sin acceso directo a portal): ${email}`);
-      return null;
-    }
-    const user = db.getUser(email);
-    if (user && user.password && user.password !== "••••••••••••") {
-      return { username: user.username, password: user.password };
-    }
-    return null;
-  };
-
-  // Helper: busca cualquier cuenta válida en DB (fallback universal)
-  const findAnyValidAccount = () => {
-    const allUsers = db.getAllUsers ? db.getAllUsers() : [];
-    for (const u of allUsers) {
-      if (u.password && u.password !== "••••••••••••" && !isNonTaxesAccount(u.username)) {
-        console.log(`[resolveCredentials] Usando cuenta válida encontrada en DB: ${u.username}`);
-        return { username: u.username, password: u.password };
-      }
-    }
-    return null;
-  };
-
-  let resolved = null;
-
-  // 1. Si se especificó un usuario que disparó la sync manualmente:
-  //    - Si es una cuenta Taxes válida → usar sus credenciales
-  //    - Si es paniol u otra cuenta sin acceso Taxes → ignorar y buscar alternativa
-  if (targetUsername) {
-    if (!isNonTaxesAccount(targetUsername)) {
-      resolved = getCredentialsFromDB(targetUsername);
-      if (resolved) {
-        console.log(`[resolveCredentials] Usando credenciales del supervisor solicitante: ${resolved.username}`);
-        return resolved;
-      }
-      // El supervisor que disparó la sync no tiene credenciales cacheadas.
-      // Continúa buscando otra cuenta disponible en lugar de abortar.
-      console.warn(`[resolveCredentials] "${targetUsername}" disparó la sync pero no tiene credenciales cacheadas. Buscando alternativa...`);
-    } else {
-      console.log(`[resolveCredentials] "${targetUsername}" es cuenta no-Taxes (ej: paniol). Buscando credenciales de otro supervisor...`);
-    }
-  }
-
-  // 2. Intentar con el usuario configurado en Settings globales
-  if (!resolved && username && !isNonTaxesAccount(username)) {
-    resolved = getCredentialsFromDB(username);
-    if (resolved) console.log(`[resolveCredentials] Usando cuenta de Settings globales: ${resolved.username}`);
-  }
-
-  // 3. Intentar con el creador de la orden (independiente de quién la dispara)
-  if (!resolved && orderCreator && !isNonTaxesAccount(orderCreator)) {
-    resolved = getCredentialsFromDB(orderCreator);
-    if (resolved) console.log(`[resolveCredentials] Usando credenciales del creador de la orden: ${resolved.username}`);
-  }
-
-  // 4. Intentar con la contraseña directa de Settings (si no está enmascarada)
-  if (!resolved && username && password && password !== "••••••••••••" && !isNonTaxesAccount(username)) {
-    resolved = { username, password };
-    console.log(`[resolveCredentials] Usando contraseña directa de Settings: ${username}`);
-  }
-
-  // 5. Fallback final: escanear todos los usuarios en DB para encontrar cualquier cuenta válida
-  if (!resolved) {
-    resolved = findAnyValidAccount();
-  }
-
-  if (resolved) {
-    return resolved;
-  }
-
-  // Sin opciones — advertencia crítica
-  console.warn(`[resolveCredentials] ADVERTENCIA CRÍTICA: no se encontró ninguna cuenta Taxes válida. Verificar credenciales en Configuración.`);
-  return { username, password: (password === "••••••••••••" ? "" : password) };
 }
 
 // 1. SCRAPE CATALOGS FUNCTION
 async function scrapeCatalogs(triggerUsername = null) {
   if (isScraping) return { success: false, message: "Catalog scraping is already running." };
   isScraping = true;
-  
+  await acquireBrowserLock('scrapeCatalogs');
+
   const settings = db.getSettings();
-  const { username, password } = resolveCredentials(triggerUsername);
+  let username = settings.username;
+  let password = settings.password;
+
+  if (triggerUsername) {
+    const user = db.getUser(triggerUsername);
+    if (user && user.password) {
+      username = user.username;
+      password = user.password;
+    }
+  }
 
   if (!username || !password) {
-    isScraping = false;
+    isScraping = false; releaseBrowserLock();
     db.saveSettings({ catalogSyncStatus: "error", catalogSyncError: "Faltan configurar las credenciales de Taxes." });
     return { success: false, message: "Faltan configurar las credenciales de Taxes." };
   }
@@ -891,30 +782,12 @@ async function scrapeCatalogs(triggerUsername = null) {
   console.log(`Starting automatic catalog extraction from Taxes.com.ar using user: ${username}...`);
   let browser = null;
 
-  await acquireBrowserLock();
   try {
     db.saveSettings({ catalogSyncStatus: "syncing", catalogSyncError: null });
     browser = await puppeteer.launch({
-      headless: 'new',
+      headless: process.env.PUPPETEER_EXECUTABLE_PATH ? true : (process.env.NODE_ENV === 'production'),
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-extensions',
-        '--disable-default-apps',
-        '--disable-background-networking',
-        '--disable-sync',
-        '--disable-ipc-flooding-protection',
-        '--disable-renderer-backgrounding',
-        '--mute-audio',
-        '--disable-blink-features=AutomationControlled',
-        '--lang=es-AR,es'
-      ],
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote', '--disable-blink-features=AutomationControlled', '--lang=es-AR,es'],
       protocolTimeout: 300000
     });
 
@@ -1260,17 +1133,15 @@ async function scrapeCatalogs(triggerUsername = null) {
     db.saveCatalogs(finalCatalogs);
     db.saveSettings({ catalogSyncStatus: "success", catalogSyncError: null });
     console.log(`Catalog scraping completed! Rodados: ${rodados.length}, Empleados: ${mergedEmpleados.length}, Centros: ${mergedCentros.length}`);
+    isScraping = false; releaseBrowserLock();
+    await browser.close();
     return { success: true, message: `Catálogos actualizados: ${rodados.length} rodados, ${mergedEmpleados.length} empleados, ${mergedCentros.length} centros de costo.` };
   } catch (error) {
     console.error("Error scraping catalogs:", error);
     db.saveSettings({ catalogSyncStatus: "error", catalogSyncError: error.message });
+    isScraping = false; releaseBrowserLock();
+    if (browser) await browser.close();
     return { success: false, message: `Error al extraer catálogos: ${error.message}` };
-  } finally {
-    isScraping = false;
-    if (browser) {
-      try { await browser.close(); } catch (_) {}
-    }
-    releaseBrowserLock();
   }
 }
 
@@ -1332,63 +1203,48 @@ function resolveAndMapEmployee(task) {
 }
 
 // 2. SYNCHRONIZE SINGLE WORK ORDER
-async function syncWorkOrder(orderId, triggerUsername = null) {
-  if (activeSyncs.has(orderId)) {
-    console.log(`[Worker] syncWorkOrder already running for order ID: ${orderId}. Skipping parallel execution.`);
-    return { success: false, message: "Already syncing" };
+async function syncWorkOrder(orderId) {
+  const order = db.getWorkOrderById(orderId);
+  if (!order) return { success: false, message: "Order not found" };
+
+  const settings = db.getSettings();
+  
+  // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
+  // fallback to order creator's credentials only if global settings are empty.
+  let username = settings.username;
+  let password = settings.password;
+
+  if (!username || !password) {
+    if (order.createdBy) {
+      const user = db.getUser(order.createdBy);
+      if (user && user.password) {
+        username = user.username;
+        password = user.password;
+      }
+    }
   }
-  activeSyncs.add(orderId);
+
+  if (!username || !password) {
+    db.updateWorkOrder(orderId, {
+      syncStatus: "error",
+      syncError: "Faltan configurar las credenciales del supervisor."
+    });
+    return { success: false, message: "Missing credentials" };
+  }
+
+  await acquireBrowserLock(`syncWorkOrder(${orderId})`);
+  console.log(`\n=== Starting Background Sync for OT #${order.interno} (ID: ${order.id}) using user: ${username} ===`);
+  db.updateWorkOrder(orderId, { syncStatus: "syncing", syncError: null });
 
   let browser = null;
-  let lockAcquired = false;
-  let order = null;
 
   try {
-    order = db.getWorkOrderById(orderId);
-    if (!order) return { success: false, message: "Order not found" };
-
-    const settings = db.getSettings();
-    // Use the supervisor who triggered the sync first; fall back to order creator
-    const { username, password } = resolveCredentials(triggerUsername || order.syncTriggeredBy || null, order.createdBy);
-
-    if (!username || !password) {
-      db.updateWorkOrder(orderId, {
-        syncStatus: "error",
-        syncError: "Faltan configurar las credenciales del supervisor."
-      });
-      return { success: false, message: "Missing credentials" };
-    }
-
-    console.log(`\n=== Starting Background Sync for OT #${order.interno} (ID: ${order.id}) using user: ${username} ===`);
-    db.updateWorkOrder(orderId, { syncStatus: "syncing", syncError: null, syncStartedAt: new Date().toISOString() });
-
-    await acquireBrowserLock();
-    lockAcquired = true;
-
-    try {
-      // Launch browser
-      browser = await puppeteer.launch({
-      headless: 'new',
+    // Launch browser
+    browser = await puppeteer.launch({
+      headless: process.env.PUPPETEER_EXECUTABLE_PATH ? true : (process.env.NODE_ENV === 'production'),
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-extensions',
-        '--disable-default-apps',
-        '--disable-background-networking',
-        '--disable-sync',
-        '--disable-ipc-flooding-protection',
-        '--disable-renderer-backgrounding',
-        '--mute-audio',
-        '--disable-blink-features=AutomationControlled',
-        '--lang=es-AR,es'
-      ],
-      protocolTimeout: 90000
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote', '--disable-blink-features=AutomationControlled', '--lang=es-AR,es'],
+      protocolTimeout: 300000
     });
 
     const page = await browser.newPage();
@@ -1414,14 +1270,7 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
     try {
       await autoLogin(page, username, password, settings.portalUrl);
     } catch (loginError) {
-      const realMsg = loginError?.message || String(loginError);
-      console.error(`[Login] FAILED for ${username}: ${realMsg}`);
-      // Capture screenshot for debugging
-      try {
-        const debugShot = await page.screenshot({ encoding: 'base64' }).catch(() => null);
-        if (debugShot) db.updateWorkOrder(orderId, { lastLoginDebugScreenshot: debugShot.substring(0, 50) + '...' });
-      } catch(_) {}
-      throw new Error(`Error de login para ${username}: ${realMsg}`);
+      throw new Error(`Credenciales inválidas o el usuario ${username} no existe en Taxes.com.ar`);
     }
 
     // 2. EXISTING OT — RECONCILIATION VIA OT EDIT FORM (pencil)
@@ -1560,20 +1409,29 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
       };
 
       let pencilClicked = false;
+      console.log(`[Reconcile] Locating pencil/edit button for OT ${otNumClean}...`);
       const pencilBtnId = await findAndTagPencil();
+      console.log(`[Reconcile] Pencil button located: ${pencilBtnId ? pencilBtnId : 'NOT FOUND'}`);
       if (pencilBtnId) {
         try {
-          await page.click(`#${pencilBtnId}`);
+          console.log(`[Reconcile] Clicking pencil button #${pencilBtnId} (native click)...`);
+          await Promise.race([
+            page.click(`#${pencilBtnId}`),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('native click timeout after 10s')), 10000))
+          ]);
+          console.log(`[Reconcile] Pencil click call returned normally.`);
           pencilClicked = true;
         } catch (clickErr) {
           // A "Node is detached" / navigation-related error here usually means
           // the click succeeded and the page already navigated away — treat as success
           // and let the waitForSelector below confirm it for real.
-          console.warn(`[Reconcile] Native click on pencil button raised: ${clickErr.message} (likely navigated away, treating as success)`);
+          console.warn(`[Reconcile] Native click on pencil button raised/timed out: ${clickErr.message} (likely navigated away, treating as success)`);
           pencilClicked = true;
         }
         // Confirm the edit form actually loaded before trusting the click.
+        console.log(`[Reconcile] Waiting for edit form to confirm navigation...`);
         pencilClicked = await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 10000 }).then(() => true).catch(() => pencilClicked);
+        console.log(`[Reconcile] Edit form loaded: ${pencilClicked}`);
       }
 
 
@@ -1720,21 +1578,13 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
             const trashBtns = Array.from(document.querySelectorAll('button.btn-danger, a.btn-danger, [class*="danger"]'))
               .filter(b => b.querySelector('.fa-trash, .fa-times, .fa-remove') || b.textContent.trim() === '' || b.title?.toLowerCase().includes('elim'));
             const btn = trashBtns[idx];
-            if (btn) {
-              if (typeof btn.click === 'function') btn.click();
-              else btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-              return true;
-            }
+            if (btn) { btn.click(); return true; }
             // Fallback: any red button in the task card container (each card has one at top-right)
             const cards = Array.from(document.querySelectorAll('[class*="card"], [class*="task"], .col-12')).filter(c => c.querySelector('input[name="horas_estimadas"]'));
             const card = cards[idx];
             if (card) {
               const redBtn = card.querySelector('button.btn-danger, a.btn-danger, button[style*="red"]');
-              if (redBtn) {
-                if (typeof redBtn.click === 'function') redBtn.click();
-                else redBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-                return true;
-              }
+              if (redBtn) { redBtn.click(); return true; }
             }
             return false;
           }, cardIdx);
@@ -1754,7 +1604,7 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
         if (!appTask) continue;
 
         // Fill Employee if empty
-        const { employeeLabel, finalDescription } = resolveAndMapEmployee(appTask);
+        const { employeeLabel } = resolveAndMapEmployee(appTask);
         if (formCards[ci].employee === '') {
           console.log(`[Reconcile] Card #${ci} has no employee. Selecting: "${employeeLabel}"...`);
           const empFilled = await fillTaskEmployeeSearchableSelect(page, ci, employeeLabel);
@@ -1763,12 +1613,14 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
         }
 
         // Fill/Fix Description if empty or doesn't match what the app has
+        const { finalDescription } = resolveAndMapEmployee(appTask);
         const descMismatch = formCards[ci].description === '' ||
-          cleanStr(formCards[ci].description) !== cleanStr(finalDescription);
+          (!cleanStr(formCards[ci].description).includes(cleanStr(finalDescription)) &&
+           !cleanStr(finalDescription).includes(cleanStr(formCards[ci].description)));
         if (descMismatch) {
           console.log(`[Reconcile] Card #${ci} description mismatch (Taxes: "${formCards[ci].description}"). Writing: "${finalDescription}"...`);
           const descId = await page.evaluate((idx, val) => {
-            const textareas = Array.from(document.querySelectorAll('textarea[id^="descripcion_"], textarea[placeholder*="Describe las actividades"]'));
+            const textareas = Array.from(document.querySelectorAll('textarea'));
             const el = textareas[idx];
             if (!el) return null;
             el.focus();
@@ -1780,11 +1632,7 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
             return el.id;
           }, ci, finalDescription);
           if (descId) {
-            await page.click(`#${descId}`).catch(() => {});
-            await page.keyboard.down('Control');
-            await page.keyboard.press('A');
-            await page.keyboard.up('Control');
-            await page.keyboard.press('Backspace');
+            await page.click(`#${descId}`, { clickCount: 3 }).catch(() => {});
             await page.keyboard.type(finalDescription);
             await delay(2000);
           }
@@ -1800,7 +1648,7 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
         if (!hoursOk) {
           console.log(`[Reconcile] Fixing hours for card #${ci}...`);
           const hoursId = await page.evaluate((idx, val) => {
-            const inputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
+            const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
             const el = inputs[idx];
             if (!el) return null;
             try { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, val); }
@@ -1813,11 +1661,7 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
             return el.id;
           }, ci, expectedHours);
           if (hoursId) {
-            await page.click(`#${hoursId}`).catch(() => {});
-            await page.keyboard.down('Control');
-            await page.keyboard.press('A');
-            await page.keyboard.up('Control');
-            await page.keyboard.press('Backspace');
+            await page.click(`#${hoursId}`, { clickCount: 3 }).catch(() => {});
             await page.keyboard.type(expectedHours);
             await delay(3500); // 3.5s delay to show typed hours in slow motion
           }
@@ -1850,13 +1694,7 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
       console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
       await delay(4000);
       const guardarBtnId = await page.evaluate(() => {
-        let btn = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn')).find(b => {
-          const text = (b.textContent || b.value || '').toLowerCase().trim();
-          return text.includes('guardar') || text.includes('crear') || text.includes('aceptar');
-        });
-        if (!btn) {
-          btn = document.querySelector('button.btn-success, input.btn-success, button.btn-primary, input.btn-primary');
-        }
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
         if (!btn) return null;
         const id = 'tmp-guardar-btn-' + Date.now();
         btn.id = id;
@@ -1881,6 +1719,7 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
       console.log(`[Reconcile] Running verification for OT #${order.interno}...`);
       await verifyWorkOrderWithPage(page, orderId);
 
+      await browser.close(); releaseBrowserLock();
       return { success: true, message: `Orden ${otNumClean} reconciliada correctamente.` };
     }
 
@@ -2159,34 +1998,11 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
       }
 
       // 3. Fill Hours — input[name="horas_estimadas"], type="number", index i
-      // Calculate actual worked hours from timer history if horasEstimadas is 0
-      let effectiveHoras = parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0;
-      if (effectiveHoras === 0 && task.timerHistory && Array.isArray(task.timerHistory) && task.timerHistory.length >= 2) {
-        // Sum up all (Inicio → Fin) pairs in the timer history
-        let totalMs = 0;
-        const history = task.timerHistory;
-        for (let hi = 0; hi < history.length - 1; hi++) {
-          if ((history[hi].type === 'Inició' || history[hi].type === 'Inicio' || history[hi].type === 'Inici\u00f3') &&
-              (history[hi+1].type === 'Fin' || history[hi+1].type === 'FIN')) {
-            totalMs += (history[hi+1].timestamp - history[hi].timestamp);
-            hi++; // skip the Fin entry
-          }
-        }
-        if (totalMs > 0) {
-          effectiveHoras = Math.round((totalMs / 3600000) * 100) / 100; // hours rounded to 2 decimals
-          console.log(`[Hours] Using timer-derived hours: ${effectiveHoras}h (${totalMs}ms) for task #${i+1}`);
-        }
-      }
-      // Minimum 0.01 hours if the task was completed (to avoid sending 0 which appears blank in Taxes)
-      if (effectiveHoras === 0 && task.status === 'Finalizada') {
-        effectiveHoras = 0.01;
-        console.log(`[Hours] Task #${i+1} Finalizada with 0 hours — using minimum 0.01 to avoid blank in Taxes.`);
-      }
-      console.log(`Setting Horas Estimadas: ${effectiveHoras} (original: ${task.horasEstimadas})`);
-      const hoursVal3 = effectiveHoras.toFixed(2);
+      console.log(`Setting Horas Estimadas: ${task.horasEstimadas}`);
+      const hoursVal3 = (parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
       const hoursFilled = await page.evaluate((idx, val) => {
-        // There are multiple inputs with name="horas_estimadas" or id^="horas_" — one per task
-        const inputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
+        // There are multiple inputs with name="horas_estimadas" — one per task
+        const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
         const el = inputs[idx];
         if (!el) return false;
         try {
@@ -2201,7 +2017,7 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
       }, i, hoursVal3).catch(() => false);
       // Also type via keyboard — assign ID first, then triple-click + type
       const hoursId3 = await page.evaluate((idx) => {
-        const inputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
+        const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
         const el = inputs[idx];
         if (!el) return null;
         if (!el.id) el.id = `temp-horas-${idx}`;
@@ -2335,7 +2151,7 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
 
     // Extract Taxes OT number from green toast notifications
     console.log("Looking for Taxes Work Order Number from toast notifications...");
-    let taxesOrderNumber = await page.evaluate(() => {
+    const taxesOrderNumber = await page.evaluate(() => {
       const elements = Array.from(document.querySelectorAll('.toast, .b-toast, .alert, div, p, span'));
       for (const el of elements) {
         const text = el.textContent.trim();
@@ -2352,45 +2168,7 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
     if (taxesOrderNumber) {
       console.log(`Successfully captured Taxes Order Number: ${taxesOrderNumber}`);
     } else {
-      console.log("Warning: Could not capture Taxes Order Number from toast. Attempting fallback: extract from OT list...");
-      // FALLBACK: Navigate to OT list and find the most recently created OT for this interno
-      try {
-        await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
-        await page.waitForSelector('table, .table', { timeout: 10000 }).catch(() => {});
-        await delay(3000);
-        const fallbackOtNum = await page.evaluate((internoVal) => {
-          // Look in the OT list table for the most recent row matching this interno
-          const rows = Array.from(document.querySelectorAll('table tbody tr, .orders-table tr'));
-          for (const row of rows) {
-            const cells = Array.from(row.querySelectorAll('td'));
-            const cellTexts = cells.map(c => c.textContent.trim());
-            // Look for interno match and extract OT number from first or second column
-            const hasInterno = cellTexts.some(t => t === internoVal || t.includes(`Interno ${internoVal}`));
-            if (hasInterno) {
-              const otMatch = cellTexts.join(' ').match(/(\d{5,})/); // OT numbers are typically 5+ digits
-              if (otMatch) return otMatch[1];
-            }
-          }
-          // Also check page URL for OT id pattern
-          return null;
-        }, String(order.interno));
-        if (fallbackOtNum) {
-          taxesOrderNumber = fallbackOtNum;
-          console.log(`Fallback captured Taxes Order Number from OT list: ${taxesOrderNumber}`);
-        } else {
-          console.warn(`Could not capture OT number from list either. Will mark as error to prevent duplicate creation.`);
-        }
-      } catch (fallbackErr) {
-        console.warn(`Fallback OT number extraction failed: ${fallbackErr.message}`);
-      }
-    }
-
-    // CRITICAL: If we still don't have the OT number, mark as error.
-    // This prevents the worker from re-entering the create-new-OT path on next cycle,
-    // which would create a duplicate in Taxes. The reconcile retry (syncStatus=error + taxesOrderNumber present)
-    // only triggers when taxesOrderNumber is set, so we must NOT save success with null.
-    if (!taxesOrderNumber) {
-      throw new Error(`La OT fue enviada a Taxes pero no se pudo capturar el número asignado (el toast desapareció). Se reintentará en el próximo ciclo para evitar duplicados.`);
+      console.log("Warning: Could not capture Taxes Order Number from toast notifications.");
     }
 
     // Close any visible toast notifications by clicking close button inside them
@@ -2426,13 +2204,11 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
     console.log(`Running post-sync verification for brand new OT #${order.interno}...`);
     await verifyWorkOrderWithPage(page, orderId);
 
+    await browser.close(); releaseBrowserLock();
     return { success: true, message: `Orden ${order.interno} sincronizada correctamente.` };
 
   } catch (error) {
-    const errMsg = error && error.message ? error.message : String(error);
-    const errStack = error && error.stack ? error.stack : errMsg;
-    console.error(`Sync failed for OT #${order?.interno ?? orderId}: ${errMsg}`);
-    console.error(`Stack: ${errStack}`);
+    console.error(`Sync failed for OT #${order.interno}:`, error);
     if (browser) {
       try {
         const pages = await browser.pages();
@@ -2446,48 +2222,17 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
     }
     db.updateWorkOrder(orderId, {
       syncStatus: "error",
-      syncError: errMsg,
+      syncError: error.message,
       autoSyncRetryCount: (order.autoSyncRetryCount || 0) + 1,
       lastAutoSyncAttempt: new Date().toISOString()
     });
-    return { success: false, message: errMsg };
-  }
-  } catch (outerError) {
-    // Safety net: catches any error that escaped the inner catch (e.g. order is null, etc.)
-    const outerMsg = outerError && outerError.message ? outerError.message : String(outerError);
-    console.error(`[syncWorkOrder] Outer catch for order ${orderId}: ${outerMsg}`);
-    try {
-      db.updateWorkOrder(orderId, {
-        syncStatus: 'error',
-        syncError: outerMsg,
-        lastAutoSyncAttempt: new Date().toISOString()
-      });
-    } catch (_) {}
-    return { success: false, message: outerMsg };
-  } finally {
-    if (browser) {
-      try { await browser.close(); } catch (_) {}
-    }
-    activeSyncs.delete(orderId);
-    if (lockAcquired) releaseBrowserLock();
+    if (browser) await browser.close(); releaseBrowserLock();
+    return { success: false, message: error.message };
   }
 }
 
+// 2b. AGENT VERIFICATION SYSTEM FOR OT TASKS
 async function verifyWorkOrderWithPage(page, orderId) {
-  // Register auto-accepting dialog handler to prevent browser hangs on confirm/alert popups
-  page.on('dialog', async d => {
-    console.log(`[BrowserDialog] Auto-accepting dialog: [${d.type()}] "${d.message()}"`);
-    await d.accept().catch(() => {});
-  });
-
-  page.on('console', msg => {
-    const txt = msg.text();
-    const type = msg.type();
-    if (type === 'error' || txt.toLowerCase().includes('error') || txt.toLowerCase().includes('fail') || txt.toLowerCase().includes('exception')) {
-      console.log(`[BrowserConsole] [${type.toUpperCase()}] ${txt}`);
-    }
-  });
-
   const order = db.getWorkOrderById(orderId);
   if (!order || !order.taxesOrderNumber) {
     console.log(`[Verify] Cannot verify: order not found or missing Taxes OT number.`);
@@ -2495,183 +2240,37 @@ async function verifyWorkOrderWithPage(page, orderId) {
   }
   const settings = db.getSettings();
   const otNumClean = String(order.taxesOrderNumber).replace(/^#/, '').trim();
-  console.log(`[Verify] Starting direct tasks-list verification for OT #${order.interno} (Taxes: ${otNumClean})...`);
+  console.log(`[Verify] Starting tasks-list verification for OT #${order.interno} (Taxes: ${otNumClean})...`);
 
   try {
-    // Helper: Navigate internally via sidebar to avoid white-page SPA loading bugs
-    const goToTareasPage = async () => {
-      console.log(`[Verify] Navigating to Tareas page via sidebar (Taller -> Tareas OT)...`);
-      const sidebarSuccess = await page.evaluate(() => {
-        const findAndClick = (text) => {
-          const els = Array.from(document.querySelectorAll('a'));
-          const el = els.find(e => {
-            const txt = e.textContent.trim().toLowerCase();
-            return txt === text.toLowerCase() || txt.includes(text.toLowerCase());
-          });
-          if (el) {
-            el.click();
-            return true;
-          }
-          return false;
-        };
-
-        const clickedTaller = findAndClick('Taller');
-        if (!clickedTaller) return false;
-
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            const clickedTareas = findAndClick('Tareas OT') || findAndClick('Tareas');
-            resolve(clickedTareas);
-          }, 800);
-        });
-      }).catch(() => false);
-
-      if (sidebarSuccess) {
-        await delay(3500); // Wait for router view to render
-      } else {
-        console.log(`[Verify] Sidebar navigation failed. Using direct safeGoto fallback...`);
-        await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-      }
-    };
-
-    // Helper: Find OT number search input dynamically by matching its label
-    const findSearchInput = async () => {
-      return await page.evaluate(() => {
-        const labels = Array.from(document.querySelectorAll('label'));
-        // Be specific: only match labels that clearly refer to the OT search field
-        // Avoid generic "ot" substring which can match "Costo", "Moto", etc.
-        const otLabel = labels.find(l => {
-          const txt = l.textContent.toLowerCase().trim();
-          return txt.includes('buscar por numero') || 
-                 txt.includes('titulo de ot') || 
-                 txt === 'ot' ||
-                 (txt.startsWith('buscar') && txt.includes('ot'));
-        });
-        if (!otLabel) return null;
-        const container = otLabel.closest('.field-compact, .form-group') || otLabel.parentElement?.parentElement;
-        if (!container) return null;
-        const inp = container.querySelector('input');
-        if (inp) {
-          if (!inp.id) inp.id = 'temp-ot-search-input';
-          return '#' + inp.id;
-        }
-        return null;
+    // 1. Navigate to tasks list
+    await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+    const searchInpSelector = 'input[placeholder*="Buscar por Numero"], input[placeholder*="OT"], input[placeholder*="Título"]';
+    await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async () => {
+      console.warn(`[Verify] Search input selector timeout. Page loaded blank? Reloading and retrying...`);
+      await page.reload({ waitUntil: 'load', timeout: 30000 });
+      await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async (err) => {
+        // Save debug info so we can see what page/state the browser actually ended up on.
+        try {
+          const path = require('path');
+          await page.screenshot({ path: path.join(__dirname, 'public', 'last_verify_error.png'), fullPage: true });
+          console.warn(`[Verify] Debug screenshot saved to public/last_verify_error.png. Current URL: ${page.url()}, Title: ${await page.title()}`);
+        } catch (se) { console.warn('[Verify] Debug screenshot failed:', se.message); }
+        throw err;
       });
-    };
+    });
+    await delay(1500);
 
-    // Helper: Find Employee filter input dynamically by matching its label
-    const findEmployeeFilterInput = async () => {
-      return await page.evaluate(() => {
-        const labels = Array.from(document.querySelectorAll('label'));
-        const empLabel = labels.find(l => l.textContent.trim().toLowerCase() === 'empleado');
-        if (!empLabel) return null;
-        const container = empLabel.closest('.field-compact, .form-group') || empLabel.parentElement?.parentElement;
-        if (!container) return null;
-        const inp = container.querySelector('input');
-        if (inp) {
-          if (!inp.id) inp.id = 'temp-emp-filter-input';
-          return '#' + inp.id;
-        }
-        return null;
-      });
-    };
-
-    // Helper to clear employee tag filter
-    const clearEmployeeFilter = async () => {
-      await page.evaluate(() => {
-        const labels = Array.from(document.querySelectorAll('label, span, div'));
-        const empLabelEl = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
-        if (empLabelEl) {
-          const container = empLabelEl.closest('.form-group, .col, [class*="col"], .field-compact') || empLabelEl.parentElement;
-          if (container) {
-            const removeBtn = container.querySelector('.multiselect__tag-icon, .multiselect__remove, [class*="remove"], [class*="clear"], .clear-button');
-            if (removeBtn) removeBtn.click();
-          }
-        }
-      });
-      await delay(500);
-    };
-
-    // Helper to select employee in filter using searchable-select-dropdown global elements
-    const selectEmployeeInFilter = async (empLabel) => {
-      console.log(`[Verify] Selecting employee "${empLabel}" in filter...`);
-      const empInputSelector = await findEmployeeFilterInput();
-      if (!empInputSelector) {
-        console.warn(`[Verify] Could not find Empleado filter input.`);
-        return false;
-      }
-
-      // Clear the input first, then type the apellido to search
-      await page.click(empInputSelector, { clickCount: 3 });
-      await page.keyboard.press('Backspace');
-      await delay(300);
-
-      // Parse apellido and primer nombre for precise matching
-      const parts = empLabel.split(',');
-      const apellido = parts[0].trim();              // e.g. "Sosa", "Cuba Orosco", "Vera"
-      const primerNombre = parts[1] ? parts[1].trim().split(' ')[0] : ''; // e.g. "Alejandro", "Kevín", "Domingo"
-
-      await page.keyboard.type(apellido, { delay: 80 });
-      await delay(2500); // Wait for dropdown to populate
-
-      // Select from global searchable-select-dropdown elements
-      const clicked = await page.evaluate((targetVal, apel, pNombre) => {
-        const dropdownContainers = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"]'));
-        let visibleOptions = [];
-        dropdownContainers.forEach(container => {
-          if (container.offsetHeight > 0 || container.style.display !== 'none') {
-            const divs = Array.from(container.querySelectorAll('div'));
-            const leafDivs = divs.filter(d => d.querySelectorAll('div').length === 0 && d.textContent.trim().length > 0);
-            visibleOptions.push(...leafDivs);
-          }
-        });
-        if (visibleOptions.length === 0) {
-          dropdownContainers.forEach(container => {
-            const items = Array.from(container.querySelectorAll('li, [class*="item"], [class*="option"]'));
-            if (items.length > 0) visibleOptions.push(...items);
-          });
-        }
-        console.log('[Verify] Dropdown options found:', visibleOptions.map(d => d.textContent.trim()));
-
-        const apelLower = apel.toLowerCase();
-        const pNomLower = pNombre.toLowerCase();
-        const targetLower = targetVal.toLowerCase();
-
-        // Priority 1: exact full name match
-        let match = visibleOptions.find(d => d.textContent.trim().toLowerCase() === targetLower);
-        // Priority 2: contains both apellido and primer nombre
-        if (!match && pNomLower) {
-          match = visibleOptions.find(d => {
-            const t = d.textContent.trim().toLowerCase();
-            return t.includes(apelLower) && t.includes(pNomLower);
-          });
-        }
-        // Priority 3: contains apellido
-        if (!match) {
-          match = visibleOptions.find(d => d.textContent.trim().toLowerCase().includes(apelLower));
-        }
-
-        if (match) {
-          console.log('[Verify] Matched option:', match.textContent.trim());
-          match.click();
-          return true;
-        }
-        // No match found
-        console.log('[Verify] No dropdown match for employee:', targetVal);
-        return false;
-      }, empLabel, apellido, primerNombre);
-
-      if (!clicked) {
-        console.log(`[Verify] Employee not found in dropdown. Pressing Escape to close...`);
-        await page.keyboard.press('Escape');
-        await delay(300);
-        // Clear the input so filter doesn't apply broken employee name
-        await page.click(empInputSelector, { clickCount: 3 });
-        await page.keyboard.press('Backspace');
-      }
-      await delay(800);
-      return clicked;
-    };
+    // 2. Search for OT number
+    console.log(`[Verify] Searching for OT ${otNumClean} in tasks page...`);
+    await page.click(searchInpSelector, { clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type(otNumClean, { delay: 80 });
+    await delay(500);
+    await page.keyboard.press('Tab');
+    await delay(200);
+    await page.keyboard.press('Enter');
+    await delay(4500); // Wait for results to load
 
     // Helper to read table tasks
     const readTableTasks = async () => {
@@ -2697,6 +2296,67 @@ async function verifyWorkOrderWithPage(page, orderId) {
       });
     };
 
+    let tableTasks = await readTableTasks();
+    console.log(`[Verify] Found ${tableTasks.length} tasks in Taxes table:`, JSON.stringify(tableTasks));
+
+    // Helper: use the page's own "Empleado" filter (in addition to the OT number
+    // already typed) to narrow results down to the exact task server-side —
+    // far more reliable than comparing description text on our end.
+    const filterByEmployee = async (employeeName) => {
+      try {
+        const empFieldId = await page.evaluate(() => {
+          const labels = Array.from(document.querySelectorAll('label'));
+          const empLabel = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
+          let container = empLabel ? (empLabel.closest('.form-group') || empLabel.parentElement) : null;
+          if (!container) return null;
+          const input = container.querySelector('input[type="text"], input.searchable-input, input:not([type])');
+          if (!input) return null;
+          const id = 'tmp-emp-filter-' + Date.now();
+          input.id = id;
+          return id;
+        });
+        if (!empFieldId) {
+          console.warn('[Verify] Could not locate the "Empleado" filter field on the tasks page.');
+          return false;
+        }
+        await page.click(`#${empFieldId}`, { clickCount: 3 }).catch(() => {});
+        await page.keyboard.press('Backspace').catch(() => {});
+        await page.keyboard.type(employeeName, { delay: 60 });
+        await delay(1200);
+        // If a dropdown suggestion appears, pick the first option
+        await page.evaluate(() => {
+          const opts = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"] li, .multiselect__option, .dropdown-item, ul[role="listbox"] li'));
+          if (opts.length > 0) opts[0].click();
+        }).catch(() => {});
+        await delay(500);
+        const clicked = await page.evaluate(() => {
+          const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase().includes('BUSCAR'));
+          if (btn) { btn.click(); return true; }
+          return false;
+        });
+        if (clicked) await delay(3500);
+        return clicked;
+      } catch (e) {
+        console.warn('[Verify] Employee-narrowed search failed:', e.message);
+        return false;
+      }
+    };
+
+    const clearEmployeeFilterAndResearch = async () => {
+      await page.evaluate(() => {
+        const labels = Array.from(document.querySelectorAll('label'));
+        const empLabel = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
+        const container = empLabel ? (empLabel.closest('.form-group') || empLabel.parentElement) : null;
+        const input = container ? container.querySelector('input') : null;
+        if (input) { input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); }
+      }).catch(() => {});
+      await page.evaluate(() => {
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase().includes('BUSCAR'));
+        if (btn) btn.click();
+      }).catch(() => {});
+      await delay(3000);
+    };
+
     const errors = [];
     let madeChanges = false;
     const clean = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -2708,95 +2368,65 @@ async function verifyWorkOrderWithPage(page, orderId) {
       const expectedHoursStr = expectedHours.toFixed(2);
       const expectedHoursComma = expectedHoursStr.replace('.', ',');
 
-      console.log(`[Verify] Filtering tasks page by OT "${otNumClean}" and Employee "${employeeLabel}"...`);
-
-      // 1. Go to tasks list
-      await goToTareasPage();
-      
-      // 2. Locate OT search input dynamically
-      let searchInpSelector = null;
-      for (let i = 0; i < 5; i++) {
-        searchInpSelector = await findSearchInput();
-        if (searchInpSelector) break;
-        await delay(2000);
-      }
-
-      if (!searchInpSelector) {
-        console.warn(`[Verify] Selector timeout. Reloading and retrying...`);
-        await page.reload({ waitUntil: 'load', timeout: 30000 });
-        searchInpSelector = await findSearchInput();
-      }
-
-      if (!searchInpSelector) {
-        throw new Error('No se pudo localizar la caja de búsqueda por número de OT.');
-      }
-
-      // 3. Fill OT number field — use nativeSetter + Vue events to ensure Vue state updates
-      console.log(`[Verify] Filling OT search field with "${otNumClean}"...`);
-      const otFilled = await page.evaluate((selector, value) => {
-        const el = document.querySelector(selector);
-        if (!el) return false;
-        try {
-          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-          nativeSetter.call(el, value);
-        } catch (e) { el.value = value; }
-        el.focus();
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-        el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-        return el.value;
-      }, searchInpSelector, otNumClean);
-      console.log(`[Verify] OT field filled: "${otFilled}"`);
-      await delay(600);
-
-      // 4. Clear employee tag and select current task's employee
-      await clearEmployeeFilter();
-      await selectEmployeeInFilter(employeeLabel);
-
-      // 5. Click BUSCAR button
-      console.log(`[Verify] Clicking BUSCAR...`);
-      await page.evaluate(() => {
-        const btns = Array.from(document.querySelectorAll('button, a'));
-        const buscarBtn = btns.find(b => b.textContent.trim().toUpperCase() === 'BUSCAR');
-        if (buscarBtn) buscarBtn.click();
-      });
-      await delay(4500); // Wait for filtered results
-
-      // 6. Read table rows
-      let tableTasks = await readTableTasks();
-      console.log(`[Verify] Filtered tasks count: ${tableTasks.length}`, JSON.stringify(tableTasks));
-
+      // Find matching row
       let matchedRow = null;
       if (tableTasks.length > 0) {
-        if (tableTasks.length === 1) {
-          matchedRow = tableTasks[0];
-        } else {
-          // If multiple tasks for same employee, match by description
-          for (const row of tableTasks) {
-            const descOk = clean(row.description).includes(clean(t.descripcion)) || clean(t.descripcion).includes(clean(row.description)) ||
-                           clean(row.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(row.description));
-            if (descOk) {
-              matchedRow = row;
-              break;
+        for (const row of tableTasks) {
+          const empOk = clean(row.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(row.employee));
+          const descOk = clean(row.description).includes(clean(t.descripcion)) || clean(t.descripcion).includes(clean(row.description)) ||
+                         clean(row.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(row.description));
+          if (empOk && descOk) {
+            matchedRow = row;
+            break;
+          }
+        }
+        // Fallback: if description was garbled/truncated on Taxes (typing issue on creation),
+        // match by employee alone when unambiguous (only one task and one candidate row).
+        if (!matchedRow && order.tasks.length === 1) {
+          const empCandidates = tableTasks.filter(row =>
+            clean(row.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(row.employee))
+          );
+          if (empCandidates.length === 1) {
+            console.log(`[Verify] Task #${idx+1}: description didn't match but employee matched uniquely. Using loose match.`);
+            matchedRow = empCandidates[0];
+          }
+        }
+      }
+
+      let usedNarrowedSearch = false;
+      if (!matchedRow) {
+        console.log(`[Verify] Task #${idx+1}: no match by description. Narrowing search on Taxes by employee "${employeeLabel}"...`);
+        const narrowed = await filterByEmployee(employeeLabel);
+        if (narrowed) {
+          usedNarrowedSearch = true;
+          const narrowedTasks = await readTableTasks();
+          if (narrowedTasks.length >= 1) {
+            matchedRow = narrowedTasks.find(row =>
+              clean(row.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(row.employee))
+            ) || (narrowedTasks.length === 1 ? narrowedTasks[0] : null);
+            if (matchedRow) {
+              console.log(`[Verify] Task #${idx+1}: found via employee-narrowed search.`);
+              tableTasks = narrowedTasks; // keep this view active — matchedRow.rowIndex refers to it
             }
           }
         }
       }
 
       if (!matchedRow) {
-        console.warn(`[Verify] Task #${idx+1} (${employeeLabel}) NOT found in filtered search results.`);
+        if (usedNarrowedSearch) await clearEmployeeFilterAndResearch().then(() => readTableTasks()).then(t => { tableTasks = t; });
+        console.warn(`[Verify] Task #${idx+1} (${employeeLabel}) NOT found in tasks list table.`);
         errors.push(`Tarea #${idx + 1} (${employeeLabel}): No encontrada en el listado de tareas`);
       } else {
         const actualHours = parseFloat(String(matchedRow.hours).replace(',', '.')) || 0;
         const hoursOk = Math.abs(expectedHours - actualHours) <= 0.05;
         const expectedRealizada = t.status === 'Finalizada' ? 'SI' : 'NO';
         const realizadaOk = matchedRow.realizada.toUpperCase() === expectedRealizada;
-        const descOk = clean(matchedRow.description) === clean(finalDescription);
+        const descOkFinal = clean(matchedRow.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(matchedRow.description));
 
-        console.log(`[Verify] Task #${idx+1}: hours expected=${expectedHoursStr} actual=${actualHours} OK=${hoursOk} | realizada expected=${expectedRealizada} actual=${matchedRow.realizada} OK=${realizadaOk} | description OK=${descOk}`);
+        console.log(`[Verify] Task #${idx+1}: hours expected=${expectedHoursStr} actual=${actualHours} OK=${hoursOk} | realizada expected=${expectedRealizada} actual=${matchedRow.realizada} OK=${realizadaOk} | description OK=${descOkFinal}`);
 
-        if (!hoursOk || !realizadaOk || !descOk) {
-          console.log(`[Verify] Mismatch found for Task #${idx+1}. Opening single task edit form...`);
+        if (!hoursOk || !realizadaOk || !descOkFinal) {
+          console.log(`[Verify] Mismatch found for Task #${idx+1}. Clicking eye edit button...`);
           const eyeBtnId = await page.evaluate((rowIdx) => {
             const rows = Array.from(document.querySelectorAll('table tbody tr'));
             const row = rows[rowIdx];
@@ -2806,196 +2436,70 @@ async function verifyWorkOrderWithPage(page, orderId) {
             btn.id = id;
             return id;
           }, matchedRow.rowIndex);
-          
           if (eyeBtnId) {
-            await page.click(`#${eyeBtnId}`).catch(e => console.warn(`[Verify] Click eye error: ${e.message}`));
+            try { await page.click(`#${eyeBtnId}`); }
+            catch (e) { console.warn(`[Verify] Native click on eye button raised: ${e.message} (likely navigated away)`); }
           }
           
-          await delay(5000); // Wait for task edit form to load
+          await delay(5000); // Wait for task edit page/modal to load
 
           // Update description if mismatch
-          if (!descOk) {
+          if (!descOkFinal) {
             console.log(`[Verify] Setting description to "${finalDescription}"...`);
             const descId = await page.evaluate((val) => {
-              // 1. Try finding textarea by label text containing "descri" or "actividad"
-              const labels = Array.from(document.querySelectorAll('label'));
-              const descLabel = labels.find(l => {
-                const text = l.textContent.toLowerCase();
-                return text.includes('descri') || text.includes('actividad') || text.includes('detalle');
-              });
-              if (descLabel) {
-                if (descLabel.htmlFor) {
-                  const el = document.getElementById(descLabel.htmlFor);
-                  if (el) {
-                    try {
-                      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-                      nativeSetter.call(el, val);
-                    } catch(e) { el.value = val; }
-                    el.focus();
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                    return el.id || (el.id = 'temp-fix-desc-single');
-                  }
-                }
-                const parent = descLabel.closest('.form-group') || descLabel.parentElement;
-                const el = parent?.querySelector('textarea, input');
-                if (el) {
-                  try {
-                    const nativeSetter = Object.getOwnPropertyDescriptor((el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement : window.HTMLInputElement).prototype, 'value').set;
-                    nativeSetter.call(el, val);
-                  } catch(e) { el.value = val; }
-                  el.focus();
-                  el.dispatchEvent(new Event('input', { bubbles: true }));
-                  el.dispatchEvent(new Event('change', { bubbles: true }));
-                  return el.id || (el.id = 'temp-fix-desc-single');
-                }
-              }
-
-              // 2. Fallback to searching all textareas, or name/id/placeholder attributes
-              const ta = document.querySelector('textarea');
-              if (ta) {
-                try {
-                  const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-                  nativeSetter.call(ta, val);
-                } catch(e) { ta.value = val; }
-                ta.focus();
-                ta.dispatchEvent(new Event('input', { bubbles: true }));
-                ta.dispatchEvent(new Event('change', { bubbles: true }));
-                return ta.id || (ta.id = 'temp-fix-desc-single');
-              }
-
-              const inputs = Array.from(document.querySelectorAll('input'));
-              const el = inputs.find(i => {
-                const name = (i.name || '').toLowerCase();
-                const id = (i.id || '').toLowerCase();
-                const placeholder = (i.placeholder || '').toLowerCase();
-                return name.includes('descri') || id.includes('descri') || placeholder.includes('descri');
-              });
-              if (el) {
-                try {
-                  const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                  nativeSetter.call(el, val);
-                } catch(e) { el.value = val; }
-                el.focus();
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-                return el.id || (el.id = 'temp-fix-desc-single');
-              }
-              return null;
+              const el = document.querySelector('textarea[name="descripcion"]') || document.querySelector('textarea');
+              if (!el) return null;
+              try { Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(el, val); }
+              catch(e) { el.value = val; }
+              el.focus();
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              if (!el.id) el.id = 'temp-fix-desc-single';
+              return el.id;
             }, finalDescription);
-
             if (descId) {
-              await page.click(`#${descId}`).catch(() => {});
-              await page.keyboard.down('Control');
-              await page.keyboard.press('A');
-              await page.keyboard.up('Control');
-              await page.keyboard.press('Backspace');
+              await page.click(`#${descId}`, { clickCount: 3 }).catch(() => {});
               await page.keyboard.type(finalDescription);
-              await delay(500);
-              await page.evaluate((id) => {
-                const el = document.getElementById(id);
-                if (el) {
-                  el.dispatchEvent(new Event('input', { bubbles: true }));
-                  el.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-              }, descId);
               await delay(1500);
               madeChanges = true;
-            } else {
-              console.warn(`[Verify] Could not find description input field for Task #${idx+1}`);
-              errors.push(`Tarea #${idx+1}: No se encontró el campo de descripción en el formulario de edición`);
             }
           }
 
           // Update hours if mismatch
           if (!hoursOk) {
-            console.log(`[Verify] Setting hours to ${expectedHoursStr}...`);
+            console.log(`[Verify] Setting hours to ${expectedHoursComma}...`);
             const hoursId = await page.evaluate((val) => {
-              // 1. Try finding input by label text containing "horas"
-              const labels = Array.from(document.querySelectorAll('label'));
-              const hoursLabel = labels.find(l => l.textContent.toLowerCase().includes('horas'));
-              if (hoursLabel) {
-                if (hoursLabel.htmlFor) {
-                  const el = document.getElementById(hoursLabel.htmlFor);
-                  if (el) {
-                    try {
-                      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                      nativeSetter.call(el, val);
-                    } catch(e) { el.value = val; }
-                    el.focus();
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                    el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-                    return el.id || (el.id = 'temp-fix-hours-single');
-                  }
-                }
-                const parent = hoursLabel.closest('.form-group') || hoursLabel.parentElement;
-                const el = parent?.querySelector('input');
-                if (el) {
-                  try {
-                    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                    nativeSetter.call(el, val);
-                  } catch(e) { el.value = val; }
-                  el.focus();
-                  el.dispatchEvent(new Event('input', { bubbles: true }));
-                  el.dispatchEvent(new Event('change', { bubbles: true }));
-                  el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-                  return el.id || (el.id = 'temp-fix-hours-single');
-                }
-              }
-
-              // 2. Fallback to searching name/id/placeholder attributes
               const inputs = Array.from(document.querySelectorAll('input'));
               const el = inputs.find(i => {
                 const name = (i.name || '').toLowerCase();
-                const id = (i.id || '').toLowerCase();
                 const placeholder = (i.placeholder || '').toLowerCase();
-                return name.includes('hora') || id.includes('hora') || placeholder.includes('hora');
+                const label = i.closest('.form-group')?.textContent.toLowerCase() || '';
+                return name.includes('horas') || placeholder.includes('horas') || label.includes('horas');
               });
-              if (el) {
-                try {
-                  const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                  nativeSetter.call(el, val);
-                } catch(e) { el.value = val; }
-                el.focus();
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-                el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-                return el.id || (el.id = 'temp-fix-hours-single');
-              }
-              return null;
-            }, expectedHoursStr);
+              if (!el) return null;
+              try { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, val); }
+              catch(e) { el.value = val; }
+              el.focus();
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+              if (!el.id) el.id = 'temp-fix-hours-single';
+              return el.id;
+            }, expectedHoursComma);
 
             if (hoursId) {
-              await page.click(`#${hoursId}`).catch(() => {});
-              await page.keyboard.down('Control');
-              await page.keyboard.press('A');
-              await page.keyboard.up('Control');
-              await page.keyboard.press('Backspace');
-              await page.keyboard.type(expectedHoursStr);
-              await delay(500);
-              // Dispatch input/change/blur again after typing to ensure state commit
-              await page.evaluate((id) => {
-                const el = document.getElementById(id);
-                if (el) {
-                  el.dispatchEvent(new Event('input', { bubbles: true }));
-                  el.dispatchEvent(new Event('change', { bubbles: true }));
-                  el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-                }
-              }, hoursId);
+              await page.click(`#${hoursId}`, { clickCount: 3 }).catch(() => {});
+              await page.keyboard.type(expectedHoursComma);
               await delay(1500);
               madeChanges = true;
-            } else {
-              console.warn(`[Verify] Could not find hours input field for Task #${idx+1}`);
-              errors.push(`Tarea #${idx+1}: No se encontró el campo de horas en el formulario de edición`);
             }
           }
 
           // Update status if mismatch
           if (!realizadaOk) {
             console.log(`[Verify] Setting status to ${t.status}...`);
-            const statusUpdated = await page.evaluate((targetStatus) => {
-              // 1. Try status select dropdown first
+            await page.evaluate((targetStatus) => {
+              // 1. Try to find a select dropdown first
               const selects = Array.from(document.querySelectorAll('select'));
               const statusSelect = selects.find(s => {
                 const options = Array.from(s.options).map(o => o.text.toLowerCase());
@@ -3009,7 +2513,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
                   return true;
                 }
               }
-              // 2. Try switch toggle next to 'Realizada' text
+              // 2. Try to find switch toggle next to 'Realizada' text
               if (targetStatus === 'Finalizada') {
                 const labels = Array.from(document.querySelectorAll('label, span, div, .custom-control-label'));
                 const realLabel = labels.find(l => l.textContent.trim().toLowerCase() === 'realizada');
@@ -3025,35 +2529,43 @@ async function verifyWorkOrderWithPage(page, orderId) {
               return false;
             }, t.status);
             await delay(1500);
-            if (statusUpdated) {
-              madeChanges = true;
-            } else {
-              console.warn(`[Verify] Could not toggle status for Task #${idx+1}`);
-              errors.push(`Tarea #${idx+1}: No se pudo cambiar el estado a '${t.status}'`);
-            }
+            madeChanges = true;
           }
 
           // Click GUARDAR
-          console.log(`[Verify] Clicking GUARDAR...`);
-          const saved = await page.evaluate(() => {
-            let btn = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn')).find(b => {
-              const text = (b.textContent || b.value || '').toLowerCase().trim();
-              return text.includes('guardar');
-            });
-            if (!btn) {
-              btn = document.querySelector('button.btn-success, input.btn-success');
-            }
-            if (btn) { btn.click(); return true; }
-            return false;
+          console.log(`[Verify] Saving task edit...`);
+          const guardarBtnId2 = await page.evaluate(() => {
+            const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
+            if (!btn) return null;
+            const id = 'tmp-guardar-verify-btn-' + Date.now();
+            btn.id = id;
+            return id;
           });
-          
-          if (saved) {
+          if (guardarBtnId2) {
+            try { await page.click(`#${guardarBtnId2}`); }
+            catch (e) { console.warn(`[Verify] Native click on GUARDAR raised: ${e.message} (likely navigated away)`); }
             await delay(4500);
             console.log(`[Verify] Task edit saved successfully!`);
-          } else {
-            console.warn(`[Verify] Could not find or click GUARDAR button for Task #${idx+1}`);
-            errors.push(`Tarea #${idx+1}: No se encontró el botón GUARDAR`);
           }
+
+          // Return to tasks list page and search again to verify remaining tasks
+          await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+          await page.waitForSelector(searchInpSelector, { timeout: 15000 });
+          await page.click(searchInpSelector, { clickCount: 3 });
+          await page.keyboard.press('Backspace');
+          await page.keyboard.type(otNumClean, { delay: 80 });
+          await delay(500);
+          await page.keyboard.press('Tab');
+          await delay(200);
+          await page.keyboard.press('Enter');
+          await delay(4500);
+
+          tableTasks = await readTableTasks();
+        } else if (usedNarrowedSearch) {
+          // Task was fine as-is — still need to reset the employee filter
+          // before the next task in this loop searches again.
+          await clearEmployeeFilterAndResearch();
+          tableTasks = await readTableTasks();
         }
       }
     }
@@ -3080,89 +2592,70 @@ async function verifyWorkOrderWithPage(page, orderId) {
     throw err;
   }
 }
+
 // Standalone verify function for manual verification triggers
-async function verifyWorkOrder(orderId, triggerUsername = null) {
-  if (activeSyncs.has(orderId)) {
-    console.log(`[Worker] verifyWorkOrder already running for order ID: ${orderId}. Skipping parallel execution.`);
-    return { success: false, message: "Already syncing" };
+async function verifyWorkOrder(orderId) {
+  const order = db.getWorkOrderById(orderId);
+  if (!order) return { success: false, message: "Order not found" };
+  const settings = db.getSettings();
+
+  // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
+  // fallback to order creator's credentials only if global settings are empty.
+  let username = settings.username;
+  let password = settings.password;
+
+  if (!username || !password) {
+    if (order.createdBy) {
+      const user = db.getUser(order.createdBy);
+      if (user && user.password) {
+        username = user.username;
+        password = user.password;
+      }
+    }
   }
-  activeSyncs.add(orderId);
 
+  if (!username || !password) {
+    return { success: false, message: "Faltan credenciales del supervisor" };
+  }
+
+  await acquireBrowserLock(`verifyWorkOrder(${orderId})`);
   let browser = null;
-  let lockAcquired = false;
-  let order = null;
-
   try {
-    order = db.getWorkOrderById(orderId);
-    if (!order) return { success: false, message: "Order not found" };
+    browser = await puppeteer.launch({
+      headless: process.env.PUPPETEER_EXECUTABLE_PATH ? true : (process.env.NODE_ENV === 'production'),
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote', '--disable-blink-features=AutomationControlled', '--lang=es-AR,es'],
+      protocolTimeout: 300000
+    });
 
-    const settings = db.getSettings();
-    // Use the supervisor who triggered the sync first; fall back to order creator
-    const { username, password } = resolveCredentials(triggerUsername || order.syncTriggeredBy || null, order.createdBy);
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+    await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
+    await page.emulateTimezone('America/Argentina/Buenos_Aires');
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    });
+    await page.setViewport({ width: 1280, height: 900 });
 
-    if (!username || !password) {
-      return { success: false, message: "Faltan credenciales del supervisor" };
-    }
+    await autoLogin(page, username, password, settings.portalUrl);
+    await verifyWorkOrderWithPage(page, orderId);
 
-    await acquireBrowserLock();
-    lockAcquired = true;
-
-    try {
-      browser = await puppeteer.launch({
-        headless: 'new',
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-          '--disable-extensions',
-          '--disable-default-apps',
-          '--disable-background-networking',
-          '--disable-sync',
-          '--disable-ipc-flooding-protection',
-          '--disable-renderer-backgrounding',
-          '--mute-audio',
-          '--disable-blink-features=AutomationControlled',
-          '--lang=es-AR,es'
-        ],
-        protocolTimeout: 300000
-      });
-
-      const page = await browser.newPage();
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
-      await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
-      await page.emulateTimezone('America/Argentina/Buenos_Aires');
-      await page.evaluateOnNewDocument(() => {
-        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-      });
-      await page.setViewport({ width: 1280, height: 900 });
-
-      await autoLogin(page, username, password, settings.portalUrl);
-      await verifyWorkOrderWithPage(page, orderId);
-
-      // Get updated status
-      const updated = db.getWorkOrderById(orderId);
-      return { 
-        success: updated.verifiedStatus === 'success', 
-        status: updated.verifiedStatus, 
-        error: updated.verifiedError, 
-        count: updated.verifiedCount 
-      };
-    } catch (error) {
-      return { success: false, message: error.message };
-    }
-  } finally {
-    if (browser) {
-      try { await browser.close(); } catch (_) {}
-    }
-    activeSyncs.delete(orderId);
-    if (lockAcquired) releaseBrowserLock();
+    await browser.close();
+    
+    // Get updated status
+    const updated = db.getWorkOrderById(orderId);
+    return { 
+      success: updated.verifiedStatus === 'success', 
+      status: updated.verifiedStatus, 
+      error: updated.verifiedError, 
+      count: updated.verifiedCount 
+    };
+  } catch (error) {
+    if (browser) await browser.close();
+    return { success: false, message: error.message };
   }
 }
+
 // 3. BACKGROUND WORKER QUEUE LOOP
 async function startWorker() {
   if (isWorkerRunning) return;
@@ -3196,103 +2689,18 @@ async function startWorker() {
     console.error("Error resetting stuck orders on startup:", err);
   }
 
-  // Auto-pause tasks whose timer was running since a PREVIOUS calendar day.
-  // This prevents runaway hour accumulation when the server restarts overnight.
-  try {
-    const todayStr = new Date().toISOString().slice(0, 10); // e.g. "2026-07-09"
-    const staleOrders = db.getWorkOrders();
-    let pausedCount = 0;
-    for (const o of staleOrders) {
-      if (!o.tasks || o.tasks.length === 0) continue;
-      let orderChanged = false;
-      const updatedTasks = o.tasks.map(task => {
-        if (task.timerStart && task.timerStart > 0) {
-          const startDay = new Date(task.timerStart).toISOString().slice(0, 10);
-          if (startDay !== todayStr) {
-            // Timer started on a different day — auto-pause it now
-            const pauseTimestamp = task.timerStart + Math.min(
-              Date.now() - task.timerStart,
-              24 * 60 * 60 * 1000  // cap at 24h to avoid absurd values
-            );
-            const history = Array.isArray(task.timerHistory) ? [...task.timerHistory] : [];
-            history.push({ type: 'Pausó', timestamp: pauseTimestamp, formatted: new Date(pauseTimestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) });
-
-            // Recalculate total elapsed from history only (without live timerStart)
-            let totalMs = 0;
-            const sorted = [...history].sort((a, b) => a.timestamp - b.timestamp);
-            let currentStart = null;
-            sorted.forEach(event => {
-              if (event.type === 'Inició' || event.type === 'Reanudó') {
-                currentStart = event.timestamp;
-              } else if (event.type === 'Pausó' || event.type === 'Fin') {
-                if (currentStart !== null) {
-                  totalMs += (event.timestamp - currentStart);
-                  currentStart = null;
-                }
-              }
-            });
-            const totalMinutes = Math.round(totalMs / (1000 * 60));
-            const h = Math.floor(totalMinutes / 60);
-            const m = totalMinutes % 60;
-            const hmmVal = parseFloat(`${h}.${String(m).padStart(2, '0')}`);
-
-            console.log(`[Startup] Auto-pausing task ${task.id} (started ${startDay}, today is ${todayStr}). Total: ${totalMinutes} min.`);
-            orderChanged = true;
-            return { ...task, timerStart: null, timerHistory: history, horasEstimadas: hmmVal };
-          }
-        }
-        return task;
-      });
-      if (orderChanged) {
-        db.updateWorkOrder(o.id, { tasks: updatedTasks });
-        pausedCount++;
-      }
-    }
-    if (pausedCount > 0) {
-      console.log(`[Startup] Auto-paused running timers in ${pausedCount} order(s) from previous day.`);
-    }
-  } catch (err) {
-    console.error("Error auto-pausing stale timers on startup:", err);
-  }
-
  // Auto-fix settings for tasks that failed verification (wrong hours/status in Taxes)
   const MAX_AUTO_VERIFY_RETRIES = 5;
   const AUTO_VERIFY_COOLDOWN_MS = 2 * 60 * 1000; // wait 2 min between auto retries per order
 
   while (isWorkerRunning) {
     try {
-      // Sanitize lock & recover orphan syncing orders
-      sanitizeBrowserLock();
-
       const orders = db.getWorkOrders();
-
-      // Safety auto-recovery for orphan syncing orders (not tracked in activeSyncs)
-      const stuckOrders = orders.filter(o => o.syncStatus === 'syncing' && !activeSyncs.has(o.id));
-      for (const o of stuckOrders) {
-        console.log(`[AutoFix] Detectada orden huérfana en 'syncing' (ID: ${o.id}, Interno: ${o.interno}). Reseteando a 'pending'...`);
-        db.updateWorkOrder(o.id, { syncStatus: 'pending', syncError: 'Sincronización huérfana detectada y reseteada.', syncStartedAt: null });
-      }
-
-      // Watchdog: reset orders stuck in 'syncing' for more than 15 minutes (even if in activeSyncs)
-      // This handles silent Puppeteer hangs where the browser freezes without throwing an error.
-      const SYNC_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
-      const timedOutOrders = orders.filter(o => {
-        if (o.syncStatus !== 'syncing') return false;
-        if (!o.syncStartedAt) return false;
-        return (Date.now() - new Date(o.syncStartedAt).getTime()) > SYNC_TIMEOUT_MS;
-      });
-      for (const o of timedOutOrders) {
-        const elapsedMin = Math.round((Date.now() - new Date(o.syncStartedAt).getTime()) / 60000);
-        console.warn(`[Watchdog] Orden ID ${o.id} (OT #${o.interno}) lleva ${elapsedMin} minutos en 'syncing'. Forzando reset a 'pending'...`);
-        activeSyncs.delete(o.id); // Remove from active set so it can be retried
-        db.updateWorkOrder(o.id, { syncStatus: 'pending', syncError: `Timeout de sincronización (${elapsedMin} min). Se reintentará.`, syncStartedAt: null });
-      }
-
       const pendingOrder = orders.find(o => o.syncStatus === 'pending');
 
       if (pendingOrder) {
-        console.log(`Found pending Work Order ID: ${pendingOrder.id}. Launching sync... (triggered by: ${pendingOrder.syncTriggeredBy || 'auto'})`);
-        await syncWorkOrder(pendingOrder.id, pendingOrder.syncTriggeredBy || null);
+        console.log(`Found pending Work Order ID: ${pendingOrder.id}. Launching sync...`);
+        await syncWorkOrder(pendingOrder.id);
       } else {
         // No new orders to sync — look for orders that need an automatic retry:
         // either their tasks failed the control check (verifiedStatus: 'error'),
@@ -3316,7 +2724,7 @@ async function startWorker() {
           console.log(`[AutoFix] Found order needing retry (ID: ${brokenOrder.id}, syncStatus=${brokenOrder.syncStatus}, verifiedStatus=${brokenOrder.verifiedStatus}). Retrying full reconciliation...`);
           // Use the full sync/reconcile function (not just verify) so it can also
           // create tasks that are completely missing on Taxes, not just fix field mismatches.
-          await syncWorkOrder(brokenOrder.id, brokenOrder.syncTriggeredBy || null);
+          await syncWorkOrder(brokenOrder.id);
         }
       }
     } catch (e) {
@@ -3338,7 +2746,7 @@ function stopWorker() {
  * and reusing the same browser session for each credential group.
  * Up to MAX_PARALLEL_BROWSERS groups run simultaneously.
  */
-const MAX_PARALLEL_BROWSERS = 1;
+const MAX_PARALLEL_BROWSERS = 2;
 
 async function verifyMultipleOrders(orderIds) {
   const settings = db.getSettings();
@@ -3349,7 +2757,17 @@ async function verifyMultipleOrders(orderIds) {
     const order = db.getWorkOrderById(id);
     if (!order || !order.taxesOrderNumber) continue;
 
-    const { username, password } = resolveCredentials(null, order.createdBy);
+    let username = settings.username;
+    let password = settings.password;
+    if (!username || !password) {
+      if (order.createdBy) {
+        const user = db.getUser(order.createdBy);
+        if (user && user.password) {
+          username = user.username;
+          password = user.password;
+        }
+      }
+    }
     if (!username || !password) continue;
 
     if (!groups.has(username)) {
@@ -3371,30 +2789,13 @@ async function verifyMultipleOrders(orderIds) {
 }
 
 async function verifyGroupWithBrowser(group, settings) {
+  await acquireBrowserLock(`verifyGroupWithBrowser(${group.username})`);
   let browser = null;
-  await acquireBrowserLock();
   try {
     browser = await puppeteer.launch({
-      headless: 'new',
+      headless: process.env.PUPPETEER_EXECUTABLE_PATH ? true : (process.env.NODE_ENV === 'production'),
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-extensions',
-        '--disable-default-apps',
-        '--disable-background-networking',
-        '--disable-sync',
-        '--disable-ipc-flooding-protection',
-        '--disable-renderer-backgrounding',
-        '--mute-audio',
-        '--disable-blink-features=AutomationControlled',
-        '--lang=es-AR,es'
-      ],
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote', '--disable-blink-features=AutomationControlled', '--lang=es-AR,es'],
       protocolTimeout: 300000
     });
 
@@ -3443,8 +2844,11 @@ async function verifyGroupWithBrowser(group, settings) {
       }
     }
 
+    await browser.close(); releaseBrowserLock();
   } catch (err) {
     console.error(`[VerifyAll] Browser/login error for user ${group.username}:`, err.message);
+    if (browser) try { await browser.close(); } catch (_) {}
+    releaseBrowserLock();
     // Mark all orders in this group as error
     for (const orderId of group.ids) {
       const order = db.getWorkOrderById(orderId);
@@ -3455,11 +2859,6 @@ async function verifyGroupWithBrowser(group, settings) {
         verifiedError: `Error de conexión: ${err.message}`
       });
     }
-  } finally {
-    if (browser) {
-      try { await browser.close(); } catch (_) {}
-    }
-    releaseBrowserLock();
   }
 }
 
@@ -3470,5 +2869,5 @@ module.exports = {
   verifyWorkOrder,
   verifyMultipleOrders,
   scrapeCatalogs,
-  getIsScraping
+  isScraping
 };
