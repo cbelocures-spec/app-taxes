@@ -718,20 +718,31 @@ async function autoLogin(browser, username, password, portalUrl) {
 
   // Poll for password input using evaluate (avoids detached frame from waitForSelector)
   console.log('[autoLogin] Waiting for password input via polling...');
-  await delay(2000); // Initial wait for Vue.js to render the form
+  await delay(5000); // Wait longer for Vue.js + any redirects to settle
   const inputReady = await (async () => {
     for (let i = 0; i < 40; i++) { // 40 × 500ms = 20 seconds max
       try {
         const found = await page.evaluate((sel) => !!document.querySelector(sel), passSelector);
-        if (found) return true;
-      } catch (e) { /* page might be navigating, keep polling */ }
+        if (found) { console.log(`[autoLogin] Password input found after ${i * 500 + 5000}ms`); return true; }
+      } catch (e) {
+        if (i % 4 === 0) console.log(`[autoLogin] Polling attempt ${i}: ${e.message.substring(0, 80)}`);
+      }
       await delay(500);
     }
+    // If still not found, try navigating again to /login
+    console.log('[autoLogin] Input not found after 25s - retrying goto /login...');
+    try { await page.goto(`${portalUrl}/login`, { waitUntil: 'domcontentloaded', timeout: 20000 }); } catch (_) {}
+    await delay(3000);
+    try {
+      const found = await page.evaluate((sel) => !!document.querySelector(sel), passSelector);
+      if (found) { console.log('[autoLogin] Password input found after retry goto'); return true; }
+    } catch (e) { console.log('[autoLogin] Retry evaluate failed:', e.message.substring(0, 80)); }
     return false;
   })();
 
   if (!inputReady) {
-    throw new Error('[autoLogin] Password input not found after 20 seconds');
+    const currentPageUrl = page.url();
+    throw new Error(`[autoLogin] Password input not found. Current URL: ${currentPageUrl}`);
   }
 
   // Fill inputs using direct JS injection (most robust for Vue.js reactive forms)
