@@ -70,6 +70,57 @@ function releaseBrowserLock() {
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
+async function launchBrowser() {
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.PUPPETEER_EXECUTABLE_PATH;
+  const launchOptions = {
+    headless: isProduction ? true : false,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process', // Reduces Chromium memory by spawning a single process in Docker
+      '--disable-extensions',
+      '--disable-default-apps',
+      '--disable-background-networking',
+      '--disable-sync',
+      '--disable-translate',
+      '--metrics-recording-only',
+      '--mute-audio',
+      '--disable-blink-features=AutomationControlled',
+      '--lang=es-AR,es'
+    ],
+    protocolTimeout: 360000 // Prevent devtools disconnect (6 minutes timeout)
+  };
+  return await puppeteer.launch(launchOptions);
+}
+
+async function setupPage(page) {
+  // Anti-bot detection avoidance
+  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+  await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
+  await page.emulateTimezone('America/Argentina/Buenos_Aires');
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  });
+  await page.setViewport({ width: 1280, height: 800 });
+
+  // Intercept and block heavy media/images/fonts to save up to 70% RAM & bandwidth
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    const type = req.resourceType();
+    const url = req.url();
+    if (type === 'image' || type === 'font' || type === 'media' || url.endsWith('.png') || url.endsWith('.jpg') || url.endsWith('.woff') || url.endsWith('.woff2')) {
+      req.abort();
+    } else {
+      req.continue();
+    }
+  });
+}
+
 // Helper to navigate safely using 'load' instead of 'networkidle2' and catch timeout errors
 async function safeGoto(page, url, options = {}) {
   const defaultOptions = { waitUntil: 'load', timeout: 30000 };
@@ -784,21 +835,9 @@ async function scrapeCatalogs(triggerUsername = null) {
 
   try {
     db.saveSettings({ catalogSyncStatus: "syncing", catalogSyncError: null });
-    browser = await puppeteer.launch({
-      headless: process.env.PUPPETEER_EXECUTABLE_PATH ? true : (process.env.NODE_ENV === 'production'),
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote', '--disable-blink-features=AutomationControlled', '--lang=es-AR,es'],
-      protocolTimeout: 300000
-    });
-
+    browser = await launchBrowser();
     const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
-    await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
-    await page.emulateTimezone('America/Argentina/Buenos_Aires');
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    });
-    await page.setViewport({ width: 1280, height: 800 });
+    await setupPage(page);
 
     // Login
     await autoLogin(page, username, password, settings.portalUrl);
@@ -1240,17 +1279,9 @@ async function syncWorkOrder(orderId) {
 
   try {
     // Launch browser
-    browser = await puppeteer.launch({
-      headless: process.env.PUPPETEER_EXECUTABLE_PATH ? true : (process.env.NODE_ENV === 'production'),
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote', '--disable-blink-features=AutomationControlled', '--lang=es-AR,es'],
-      protocolTimeout: 300000
-    });
-
+    browser = await launchBrowser();
     const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
-    await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
-    await page.emulateTimezone('America/Argentina/Buenos_Aires');
+    await setupPage(page);
 
     page.on('requestfailed', r => {
       console.log(`[Browser-Network-Err] Request failed: ${r.url()} - ${r.failure()?.errorText || ''}`);
@@ -1260,11 +1291,6 @@ async function syncWorkOrder(orderId) {
         console.log(`[Browser-Network-Err] Response error: ${r.url()} - Status: ${r.status()}`);
       }
     });
-
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    });
-    await page.setViewport({ width: 1280, height: 900 });
 
     // 1. LOGIN
     try {
@@ -2285,20 +2311,54 @@ async function verifyWorkOrderWithPage(page, orderId) {
   try {
     // 1. Navigate to tasks list
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
-    const searchInpSelector = 'input[placeholder*="Buscar por Numero"], input[placeholder*="OT"], input[placeholder*="Título"]';
-    await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async () => {
-      console.warn(`[Verify] Search input selector timeout. Page loaded blank? Reloading and retrying...`);
-      await page.reload({ waitUntil: 'load', timeout: 30000 });
-      await page.waitForSelector(searchInpSelector, { timeout: 15000 }).catch(async (err) => {
-        // Save debug info so we can see what page/state the browser actually ended up on.
-        try {
-          const path = require('path');
-          await page.screenshot({ path: path.join(__dirname, 'public', 'last_verify_error.png'), fullPage: true });
-          console.warn(`[Verify] Debug screenshot saved to public/last_verify_error.png. Current URL: ${page.url()}, Title: ${await page.title()}`);
-        } catch (se) { console.warn('[Verify] Debug screenshot failed:', se.message); }
-        throw err;
+
+    // 1b. Robust selector resolution for the OT search input
+    // Since Taxes removed placeholders on their search inputs, we locate the second input of the form-group or the one labeled for OT/Numero.
+    const getSearchInputId = async () => {
+      return await page.evaluate(() => {
+        const labels = Array.from(document.querySelectorAll('label, div, span'));
+        const targetLabel = labels.find(l => l.textContent.includes('Buscar por Numero') || l.textContent.includes('Titulo de OT'));
+        if (targetLabel) {
+          if (targetLabel.getAttribute('for')) {
+            return '#' + targetLabel.getAttribute('for');
+          }
+          const parent = targetLabel.parentElement;
+          if (parent) {
+            const input = parent.querySelector('input');
+            if (input) {
+              if (!input.id) input.id = 'tmp-search-ot-input';
+              return '#' + input.id;
+            }
+          }
+        }
+        // Fallback: second text input
+        const inputs = Array.from(document.querySelectorAll('input.input-compact.form-control'));
+        if (inputs[1]) {
+          if (!inputs[1].id) inputs[1].id = 'tmp-search-ot-input-fallback';
+          return '#' + inputs[1].id;
+        }
+        return null;
       });
-    });
+    };
+
+    let searchInpSelector = await getSearchInputId();
+    if (!searchInpSelector) {
+      // Reload and retry
+      console.warn(`[Verify] Search input not resolved. Reloading and retrying...`);
+      await page.reload({ waitUntil: 'load', timeout: 30000 });
+      searchInpSelector = await getSearchInputId();
+    }
+
+    if (!searchInpSelector) {
+      try {
+        const path = require('path');
+        await page.screenshot({ path: path.join(__dirname, 'public', 'last_verify_error.png'), fullPage: true });
+        console.warn(`[Verify] Debug screenshot saved to public/last_verify_error.png. URL: ${page.url()}`);
+      } catch (se) {}
+      throw new Error(`No se pudo localizar el selector del input de búsqueda de OT en la página.`);
+    }
+
+    await page.waitForSelector(searchInpSelector, { timeout: 15000 });
     await delay(1500);
 
     // 2. Search for OT number
@@ -2306,7 +2366,6 @@ async function verifyWorkOrderWithPage(page, orderId) {
     await page.click(searchInpSelector, { clickCount: 3 });
     await page.keyboard.press('Backspace');
     await page.keyboard.type(otNumClean, { delay: 80 });
-    await delay(500);
     await page.keyboard.press('Tab');
     await delay(200);
     await page.keyboard.press('Enter');
@@ -2661,21 +2720,9 @@ async function verifyWorkOrder(orderId) {
   await acquireBrowserLock(`verifyWorkOrder(${orderId})`);
   let browser = null;
   try {
-    browser = await puppeteer.launch({
-      headless: process.env.PUPPETEER_EXECUTABLE_PATH ? true : (process.env.NODE_ENV === 'production'),
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote', '--disable-blink-features=AutomationControlled', '--lang=es-AR,es'],
-      protocolTimeout: 300000
-    });
-
+    browser = await launchBrowser();
     const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
-    await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
-    await page.emulateTimezone('America/Argentina/Buenos_Aires');
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    });
-    await page.setViewport({ width: 1280, height: 900 });
+    await setupPage(page);
 
     await autoLogin(page, username, password, settings.portalUrl);
     await verifyWorkOrderWithPage(page, orderId);
@@ -2832,21 +2879,9 @@ async function verifyGroupWithBrowser(group, settings) {
   await acquireBrowserLock(`verifyGroupWithBrowser(${group.username})`);
   let browser = null;
   try {
-    browser = await puppeteer.launch({
-      headless: process.env.PUPPETEER_EXECUTABLE_PATH ? true : (process.env.NODE_ENV === 'production'),
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote', '--disable-blink-features=AutomationControlled', '--lang=es-AR,es'],
-      protocolTimeout: 300000
-    });
-
+    browser = await launchBrowser();
     const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
-    await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
-    await page.emulateTimezone('America/Argentina/Buenos_Aires');
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    });
-    await page.setViewport({ width: 1280, height: 900 });
+    await setupPage(page);
 
     // Login once for the whole group
     await autoLogin(page, group.username, group.password, settings.portalUrl);
