@@ -1757,6 +1757,36 @@ async function triggerActiveTasksGoogleSheetSync() {
   }
 }
 
+// =============================================
+// ADMIN: Upload full DB from local to Railway
+// =============================================
+app.post('/api/admin/upload-db', (req, res) => {
+  try {
+    const ADMIN_SECRET = process.env.ADMIN_SECRET || 'Paniol2015';
+    const { secret, dbData } = req.body;
+    if (secret !== ADMIN_SECRET) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    if (!dbData || typeof dbData !== 'object') {
+      return res.status(400).json({ error: 'Invalid dbData payload' });
+    }
+    // Write the entire database replacing what's there
+    const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'db.json');
+    const content = JSON.stringify(dbData, null, 2);
+    fs.writeFileSync(DB_PATH, content, 'utf8');
+    const stats = {
+      orders: dbData.workOrders ? dbData.workOrders.length : 0,
+      users: dbData.users ? Object.keys(dbData.users).length : 0,
+      rodados: dbData.catalogs && dbData.catalogs.rodados ? dbData.catalogs.rodados.length : 0,
+    };
+    console.log(`[AdminUpload] Database replaced via upload-db. Orders: ${stats.orders}, Users: ${stats.users}`);
+    res.json({ success: true, stats });
+  } catch (e) {
+    console.error('[AdminUpload] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Fallback: serve frontend index.html for SPA routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

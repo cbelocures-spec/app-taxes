@@ -43,6 +43,12 @@ conn.on('ready', async () => {
     await uploadFile('database.js', '/home/cbelocures/gestion/database.js');
     await uploadFile('syncWorker.js', '/home/cbelocures/gestion/syncWorker.js');
     await uploadFile('public/app.js', '/home/cbelocures/gestion/public/app.js');
+
+    // Configure local server to redirect ALL traffic to Railway (single source of truth)
+    console.log('Configuring local server to redirect to Railway...');
+    await runCmd(`echo 'CesarHernan3550' | sudo -S sed -i '/^Environment=REDIRECT_TO/d' /etc/systemd/system/app-taxes.service`);
+    await runCmd(`echo 'CesarHernan3550' | sudo -S sed -i '/^\\[Service\\]/a Environment=REDIRECT_TO=https://app-taxes-production-ec67.up.railway.app' /etc/systemd/system/app-taxes.service`);
+    await runCmd(`echo 'CesarHernan3550' | sudo -S systemctl daemon-reload`);
     await runCmd('echo CesarHernan3550 | sudo -S systemctl restart app-taxes.service');
     await new Promise(r => setTimeout(r, 3000));
     await runCmd('systemctl status app-taxes.service --no-pager -l');
