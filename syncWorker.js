@@ -679,23 +679,35 @@ async function safeEvaluate(page, fn, ...args) {
 
 // Automate login to Taxes.com.ar
 async function autoLogin(browser, username, password, portalUrl) {
-  // Always create a FRESH page to avoid detached frame issues from /admin redirects
-  console.log(`[autoLogin] Creating fresh page and navigating directly to ${portalUrl}/login ...`);
-  const page = await browser.newPage();
+  // Always create a FRESH page to avoid detached frame issues
+  console.log(`[autoLogin] Creating fresh page and navigating to ${portalUrl}/login ...`);
+  
+  let page = await browser.newPage();
   await setupPage(page);
 
+  // Use domcontentloaded (not networkidle2) to tolerate internal redirects from Taxes
   try {
-    await page.goto(`${portalUrl}/login`, { waitUntil: 'networkidle2', timeout: 25000 });
+    await page.goto(`${portalUrl}/login`, { waitUntil: 'domcontentloaded', timeout: 25000 });
   } catch (e) {
-    console.log('[autoLogin] Login page load timeout (ok):', e.message);
+    console.log('[autoLogin] goto /login threw error, creating another fresh page:', e.message);
+    // If frame was detached during goto, create yet another fresh page and try again
+    try { await page.close(); } catch (_) {}
+    page = await browser.newPage();
+    await setupPage(page);
+    try {
+      await page.goto(`${portalUrl}/login`, { waitUntil: 'domcontentloaded', timeout: 25000 });
+    } catch (e2) {
+      console.log('[autoLogin] Second goto also failed (ok):', e2.message);
+    }
   }
-  await delay(1500); // Give Vue.js time to hydrate the DOM
+
+  await delay(2000); // Give Vue.js time to hydrate the DOM
 
   // Check if we landed on /login or got redirected to /admin (already logged in)
   const urlAfterLoad = page.url().toLowerCase();
   if (!urlAfterLoad.includes('/login')) {
     console.log(`[autoLogin] Already logged in, URL is: ${urlAfterLoad}`);
-    return page; // Return page for reuse
+    return page;
   }
 
   console.log(`[autoLogin] Not logged in. Attempting login as ${username}...`);
@@ -706,6 +718,7 @@ async function autoLogin(browser, username, password, portalUrl) {
 
   // Wait for inputs to be ready
   await page.waitForSelector(passSelector, { timeout: 15000 });
+
 
 
   // Fill Username
