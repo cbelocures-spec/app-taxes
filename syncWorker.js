@@ -73,27 +73,14 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
 async function launchBrowser() {
   const isProduction = process.env.NODE_ENV === 'production' || process.env.PUPPETEER_EXECUTABLE_PATH;
   const launchOptions = {
-    headless: isProduction ? true : false,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    headless: true, // Always headless on server
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process', // Reduces Chromium memory by spawning a single process in Docker
-      '--disable-extensions',
-      '--disable-default-apps',
-      '--disable-background-networking',
-      '--disable-sync',
-      '--disable-translate',
-      '--metrics-recording-only',
-      '--mute-audio',
-      '--disable-blink-features=AutomationControlled',
-      '--lang=es-AR,es'
-    ],
-    protocolTimeout: 360000 // Prevent devtools disconnect (6 minutes timeout)
+      '--disable-gpu'
+    ]
   };
   return await puppeteer.launch(launchOptions);
 }
