@@ -869,9 +869,10 @@ function resolveCredentials(targetUsername = null, orderCreator = null) {
     return resolved;
   }
 
-  // Sin opciones — advertencia crítica
-  console.warn(`[resolveCredentials] ADVERTENCIA CRÍTICA: no se encontró ninguna cuenta Taxes válida. Verificar credenciales en Configuración.`);
-  return { username, password: (password === "••••••••••••" ? "" : password) };
+  // Sin opciones — advertencia crítica. NO devolver paniol ni cuentas enmascaradas.
+  // Retornar null/null para que el caller aborte limpiamente sin intentar un login inválido.
+  console.warn(`[resolveCredentials] ADVERTENCIA CRÍTICA: no se encontró ninguna cuenta Taxes válida. Sync abortado. El usuario debe iniciar sesión primero.`);
+  return { username: null, password: null };
 }
 
 // 1. SCRAPE CATALOGS FUNCTION
@@ -1790,7 +1791,11 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
           }
         }
 
-        const expectedHours = (parseFloat(String(appTask.horasEstimadas || '0').replace(',', '.')) || 0).toFixed(2);
+        // Convert H.MM format (e.g. 1.30 = 1h30min) to decimal hours (e.g. 1.5) for Taxes portal
+        const rawHmm = parseFloat(String(appTask.horasEstimadas || '0').replace(',', '.')) || 0;
+        const hmmHours = Math.floor(rawHmm);
+        const hmmMins = Math.round((rawHmm - hmmHours) * 100);
+        const expectedHours = (hmmHours + hmmMins / 60).toFixed(2);
         const actualHours = parseFloat(formCards[ci].hours.replace(',', '.')) || 0;
         const hoursOk = Math.abs(parseFloat(expectedHours) - actualHours) <= 0.05;
         const realizadaNeeded = appTask.status === 'Finalizada' && !formCards[ci].realizada;
@@ -2160,21 +2165,34 @@ async function syncWorkOrder(orderId, triggerUsername = null) {
 
       // 3. Fill Hours — input[name="horas_estimadas"], type="number", index i
       // Calculate actual worked hours from timer history if horasEstimadas is 0
-      let effectiveHoras = parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0;
-      if (effectiveHoras === 0 && task.timerHistory && Array.isArray(task.timerHistory) && task.timerHistory.length >= 2) {
-        // Sum up all (Inicio → Fin) pairs in the timer history
+      // IMPORTANT: horasEstimadas is stored in H.MM format (e.g., 1.30 = 1h30min).
+      // Must convert to decimal hours (e.g., 1.5) before sending to Taxes.
+      function hmmToDecimalHours(hmmVal) {
+        const raw = parseFloat(String(hmmVal || '0').replace(',', '.')) || 0;
+        const hours = Math.floor(raw);
+        const minutesFrac = Math.round((raw - hours) * 100); // H.MM → extract MM part
+        return parseFloat((hours + minutesFrac / 60).toFixed(2));
+      }
+
+      let effectiveHoras = hmmToDecimalHours(task.horasEstimadas);
+      if (effectiveHoras === 0 && task.timerHistory && Array.isArray(task.timerHistory) && task.timerHistory.length >= 1) {
+        // Sum up all (Inició/Reanudó → Pausó/Fin) pairs in the timer history
         let totalMs = 0;
-        const history = task.timerHistory;
-        for (let hi = 0; hi < history.length - 1; hi++) {
-          if ((history[hi].type === 'Inició' || history[hi].type === 'Inicio' || history[hi].type === 'Inici\u00f3') &&
-              (history[hi+1].type === 'Fin' || history[hi+1].type === 'FIN')) {
-            totalMs += (history[hi+1].timestamp - history[hi].timestamp);
-            hi++; // skip the Fin entry
+        const sorted = [...task.timerHistory].sort((a, b) => a.timestamp - b.timestamp);
+        let currentStart = null;
+        sorted.forEach(event => {
+          if (event.type === 'Inició' || event.type === 'Reanudó' || event.type === 'Inicio') {
+            currentStart = event.timestamp;
+          } else if (event.type === 'Pausó' || event.type === 'Fin' || event.type === 'FIN') {
+            if (currentStart !== null) {
+              totalMs += (event.timestamp - currentStart);
+              currentStart = null;
+            }
           }
-        }
+        });
         if (totalMs > 0) {
-          effectiveHoras = Math.round((totalMs / 3600000) * 100) / 100; // hours rounded to 2 decimals
-          console.log(`[Hours] Using timer-derived hours: ${effectiveHoras}h (${totalMs}ms) for task #${i+1}`);
+          effectiveHoras = Math.round((totalMs / 3600000) * 100) / 100; // real decimal hours
+          console.log(`[Hours] Using timer-derived decimal hours: ${effectiveHoras}h (${totalMs}ms) for task #${i+1}`);
         }
       }
       // Minimum 0.01 hours if the task was completed (to avoid sending 0 which appears blank in Taxes)

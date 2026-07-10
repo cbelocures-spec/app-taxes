@@ -1037,9 +1037,13 @@ app.post('/api/catalogs/sync', async (req, res) => {
 
 // Get worker status
 app.get('/api/worker/status', (req, res) => {
-  res.json({
-    isScraping: worker.getIsScraping()
-  });
+  try {
+    res.json({
+      isScraping: worker.getIsScraping ? worker.getIsScraping() : false
+    });
+  } catch (e) {
+    res.json({ isScraping: false, error: e.message });
+  }
 });
 
 // Get active mechanics list
