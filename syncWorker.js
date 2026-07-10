@@ -678,89 +678,34 @@ async function safeEvaluate(page, fn, ...args) {
 }
 
 // Automate login to Taxes.com.ar
-async function autoLogin(page, username, password, portalUrl) {
-  console.log(`Navigating to ${portalUrl}/admin ...`);
-  await safeGoto(page, `${portalUrl}/admin`, { timeout: 30000 });
+async function autoLogin(browser, username, password, portalUrl) {
+  // Always create a FRESH page to avoid detached frame issues from /admin redirects
+  console.log(`[autoLogin] Creating fresh page and navigating directly to ${portalUrl}/login ...`);
+  const page = await browser.newPage();
+  await setupPage(page);
 
-  // Wait 1.5 seconds for Vue to finish initializing
-  await delay(1500);
-
-  // Check if we are on a login page by seeing if the URL contains '/login' or there is a password field
-  const currentUrlCheck = page.url().toLowerCase();
-  let isOnLoginPage = currentUrlCheck.includes('/login');
-  
-  if (!isOnLoginPage) {
-    const passwordInputExists = await page.$('input[type="password"]').catch(() => null);
-    if (passwordInputExists) {
-      isOnLoginPage = true;
-    }
-  }
-
-  if (!isOnLoginPage) {
-    // We are on a dashboard/admin page - check who is logged in
-    let loggedInEmail = '';
-    try {
-      loggedInEmail = await page.evaluate(() => {
-        const candidates = [
-          document.querySelector('.user-profile-toggle'),
-          document.querySelector('.user-profile-name'),
-          document.querySelector('.profile-user'),
-          document.querySelector('.nav-item .nav-link span'),
-          document.querySelector('.dropdown-toggle'),
-        ];
-        for (const el of candidates) {
-          if (el && el.textContent.trim()) return el.textContent.trim().toLowerCase();
-        }
-        const bodyText = document.body.textContent;
-        const emailMatch = bodyText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g);
-        return emailMatch ? emailMatch[0].toLowerCase() : '';
-      }).catch(() => '');
-    } catch (err) {
-      console.log("Failed to inspect user profile in DOM, assuming re-login needed.");
-    }
-
-    const targetUser = username.toLowerCase().trim();
-    const alreadyCorrectUser = loggedInEmail && (
-      loggedInEmail.includes(targetUser.split('@')[0]) ||
-      targetUser.includes(loggedInEmail.split('@')[0]) ||
-      loggedInEmail === targetUser
-    );
-
-    if (alreadyCorrectUser) {
-      console.log(`Already logged in as correct user (${loggedInEmail}). Skipping login.`);
-      return true;
-    }
-
-    // Different user is logged in (or we failed to read it) — logout directly by URL
-    console.log(`Need to login as ${username}. Performing clean logout via URL...`);
-    await safeGoto(page, `${portalUrl}/logout`, { timeout: 15000 }).catch(() => {});
-    await delay(2000);
-  }
-
-  // Ensure we are on the login page - navigate directly and wait for full load
-  console.log('Navigating to login page and waiting for it to fully load...');
   try {
-    await page.goto(`${portalUrl}/login`, { waitUntil: 'networkidle2', timeout: 20000 });
+    await page.goto(`${portalUrl}/login`, { waitUntil: 'networkidle2', timeout: 25000 });
   } catch (e) {
-    console.log('Login page navigation timeout (ok):', e.message);
+    console.log('[autoLogin] Login page load timeout (ok):', e.message);
   }
   await delay(1500); // Give Vue.js time to hydrate the DOM
 
-  console.log(`Not logged in. Attempting login as ${username}...`);
+  // Check if we landed on /login or got redirected to /admin (already logged in)
+  const urlAfterLoad = page.url().toLowerCase();
+  if (!urlAfterLoad.includes('/login')) {
+    console.log(`[autoLogin] Already logged in, URL is: ${urlAfterLoad}`);
+    return page; // Return page for reuse
+  }
+
+  console.log(`[autoLogin] Not logged in. Attempting login as ${username}...`);
 
   // Target selectors for email and password on Taxes.com.ar login page
   const emailSelector = 'input[name="loginUser"]';
   const passSelector = 'input[name="password"]';
 
-  // Wait for inputs to be ready - retry once if frame was detached
-  try {
-    await page.waitForSelector(passSelector, { timeout: 15000 });
-  } catch (e) {
-    console.log('waitForSelector failed, retrying navigation to /login:', e.message);
-    await page.goto(`${portalUrl}/login`, { waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
-    await delay(2000);
-    await page.waitForSelector(passSelector, { timeout: 15000 });
-  }
+  // Wait for inputs to be ready
+  await page.waitForSelector(passSelector, { timeout: 15000 });
 
 
   // Fill Username
@@ -818,7 +763,7 @@ async function autoLogin(page, username, password, portalUrl) {
   }
 
   console.log(`Login successful as ${username}!`);
-  return true;
+  return page; // Return authenticated page for reuse
 }
 
 // 1. SCRAPE CATALOGS FUNCTION
@@ -855,7 +800,9 @@ async function scrapeCatalogs(triggerUsername = null) {
     await setupPage(page);
 
     // Login
-    await autoLogin(page, username, password, settings.portalUrl);
+    const loginPage = await autoLogin(browser, username, password, settings.portalUrl);
+    // Close the login page and open a fresh one for catalog scraping
+    await loginPage.close().catch(() => {});
 
     // ============================================================
     // STEP A: SCRAPE ALL RODADOS FROM FLOTA > FLOTA (limit 999)
@@ -1295,8 +1242,14 @@ async function syncWorkOrder(orderId) {
   try {
     // Launch browser
     browser = await launchBrowser();
-    const page = await browser.newPage();
-    await setupPage(page);
+
+    // 1. LOGIN - autoLogin creates a fresh page directly on /login
+    let page;
+    try {
+      page = await autoLogin(browser, username, password, settings.portalUrl);
+    } catch (loginError) {
+      throw new Error(`Credenciales inválidas o el usuario ${username} no existe en Taxes.com.ar`);
+    }
 
     page.on('requestfailed', r => {
       console.log(`[Browser-Network-Err] Request failed: ${r.url()} - ${r.failure()?.errorText || ''}`);
@@ -1307,12 +1260,6 @@ async function syncWorkOrder(orderId) {
       }
     });
 
-    // 1. LOGIN
-    try {
-      await autoLogin(page, username, password, settings.portalUrl);
-    } catch (loginError) {
-      throw new Error(`Credenciales inválidas o el usuario ${username} no existe en Taxes.com.ar`);
-    }
 
     // 2. EXISTING OT — RECONCILIATION VIA OT EDIT FORM (pencil)
     // Uses the OT edit form directly: reads task cards, deletes duplicates with red trash,
@@ -2737,10 +2684,7 @@ async function verifyWorkOrder(orderId) {
   let browser = null;
   try {
     browser = await launchBrowser();
-    const page = await browser.newPage();
-    await setupPage(page);
-
-    await autoLogin(page, username, password, settings.portalUrl);
+    const page = await autoLogin(browser, username, password, settings.portalUrl);
     await verifyWorkOrderWithPage(page, orderId);
 
     await browser.close();
@@ -2896,11 +2840,9 @@ async function verifyGroupWithBrowser(group, settings) {
   let browser = null;
   try {
     browser = await launchBrowser();
-    const page = await browser.newPage();
-    await setupPage(page);
 
-    // Login once for the whole group
-    await autoLogin(page, group.username, group.password, settings.portalUrl);
+    // Login once for the whole group - autoLogin creates a fresh page
+    const page = await autoLogin(browser, group.username, group.password, settings.portalUrl);
     console.log(`[VerifyAll] Logged in as ${group.username}. Verifying ${group.ids.length} order(s)...`);
 
     // Verify each order in this group sequentially, with auto-retry on timeout
