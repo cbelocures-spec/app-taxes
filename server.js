@@ -91,21 +91,17 @@ app.use((req, res, next) => {
     return next();
   }
 
-  const username = req.headers['x-user-username'];
-  // Only reject if a username IS provided but doesn't exist in the DB AT ALL.
-  // If the user exists but has a masked/old password, keep the username so the
-  // endpoint can still identify WHO is making the request (sector, permissions, etc.)
-  // The syncWorker's resolveCredentials will handle the credential lookup.
+  let username = req.headers['x-user-username'];
   if (username && username.trim() !== '') {
+    // If proxy/CDN appended multiple usernames, take only the first one
+    username = username.split(',')[0].trim();
+    req.headers['x-user-username'] = username;
+
     const user = db.getUser(username);
     if (!user) {
       console.log(`[Auth Check] User "${username}" not found in DB. Allowing as anonymous.`);
-      // Don't block — just clear the username so the request proceeds as anonymous.
-      // This handles Railway's fresh DB where no users are registered yet.
       req.headers['x-user-username'] = '';
     }
-    // NOTE: If user exists but has masked/stale password, keep username intact.
-    // The worker will report a clear error if credentials can't be resolved.
   }
   next();
 });
@@ -260,6 +256,34 @@ app.get('/api/debug/chrome-test', (req, res) => {
     });
   });
 });
+
+app.get('/api/debug/show-settings-safe', (req, res) => {
+  try {
+    const settings = db.getSettings();
+    const users = db.read().users || {};
+    const safeUsers = {};
+    for (const key of Object.keys(users)) {
+      const u = users[key];
+      safeUsers[key] = {
+        username: u.username,
+        passLength: u.password ? u.password.length : 0,
+        passFirstChar: u.password ? u.password.charAt(0) : ''
+      };
+    }
+    res.json({
+      settings: {
+        username: settings.username,
+        passLength: settings.password ? settings.password.length : 0,
+        passFirstChar: settings.password ? settings.password.charAt(0) : '',
+        portalUrl: settings.portalUrl
+      },
+      users: safeUsers
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // Test login to Taxes.com.ar directly - for debugging auth issues
 app.post('/api/debug/test-login', async (req, res) => {

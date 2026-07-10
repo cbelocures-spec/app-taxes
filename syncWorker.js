@@ -801,7 +801,8 @@ async function scrapeCatalogs(triggerUsername = null) {
   let password = settings.password;
 
   if (triggerUsername) {
-    const user = db.getUser(triggerUsername);
+    const cleanTriggerUsername = triggerUsername.split(',')[0].trim();
+    const user = db.getUser(cleanTriggerUsername);
     if (user && user.password) {
       username = user.username;
       password = user.password;
