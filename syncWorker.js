@@ -2492,9 +2492,14 @@ async function verifyWorkOrderWithPage(page, orderId) {
     }, searchInpSelector);
     await delay(200);
     await page.keyboard.type(otNumClean, { delay: 80 });
-    await page.keyboard.press('Tab');
-    await delay(200);
-    await page.keyboard.press('Enter');
+    await delay(500);
+    const clickedBuscar = await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
+      const btn = buttons.find(b => b.textContent.trim().toUpperCase().includes('BUSCAR') || (b.value || '').toUpperCase().includes('BUSCAR'));
+      if (btn) { btn.click(); return true; }
+      return false;
+    });
+    console.log(`[Verify] Clicked BUSCAR button via JS: ${clickedBuscar}`);
     await delay(4500); // Wait for results to load
 
     // Helper to read table tasks
@@ -2530,15 +2535,27 @@ async function verifyWorkOrderWithPage(page, orderId) {
     const filterByEmployee = async (employeeName) => {
       try {
         const empFieldId = await page.evaluate(() => {
-          const labels = Array.from(document.querySelectorAll('label'));
-          const empLabel = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
+          // Try locating input by placeholder first
+          const directInput = document.querySelector('input[placeholder*="Empleado" i], input[placeholder*="Operario" i], input[placeholder*="Responsable" i], input[placeholder*="Personal" i]');
+          if (directInput) {
+            if (!directInput.id) directInput.id = 'tmp-emp-filter-' + Date.now();
+            return '#' + directInput.id;
+          }
+          // Fallback to labels search
+          const labels = Array.from(document.querySelectorAll('label, div, span'));
+          const empLabel = labels.find(l => {
+            const txt = l.textContent.trim().toLowerCase();
+            return txt.includes('empleado') || txt.includes('operario') || txt.includes('responsable') || txt.includes('personal');
+          });
           let container = empLabel ? (empLabel.closest('.form-group') || empLabel.parentElement) : null;
-          if (!container) return null;
-          const input = container.querySelector('input[type="text"], input.searchable-input, input:not([type])');
-          if (!input) return null;
-          const id = 'tmp-emp-filter-' + Date.now();
-          input.id = id;
-          return id;
+          if (container) {
+            const input = container.querySelector('input[type="text"], input.searchable-input, input:not([type])');
+            if (input) {
+              if (!input.id) input.id = 'tmp-emp-filter-' + Date.now();
+              return '#' + input.id;
+            }
+          }
+          return null;
         });
         if (!empFieldId) {
           console.warn('[Verify] Could not locate the "Empleado" filter field on the tasks page.');
@@ -2569,8 +2586,18 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     const clearEmployeeFilterAndResearch = async () => {
       await page.evaluate(() => {
-        const labels = Array.from(document.querySelectorAll('label'));
-        const empLabel = labels.find(l => l.textContent.trim().toLowerCase().startsWith('empleado'));
+        const directInput = document.querySelector('input[placeholder*="Empleado" i], input[placeholder*="Operario" i], input[placeholder*="Responsable" i], input[placeholder*="Personal" i]');
+        if (directInput) {
+          directInput.value = '';
+          directInput.dispatchEvent(new Event('input', { bubbles: true }));
+          directInput.dispatchEvent(new Event('change', { bubbles: true }));
+          return;
+        }
+        const labels = Array.from(document.querySelectorAll('label, div, span'));
+        const empLabel = labels.find(l => {
+          const txt = l.textContent.trim().toLowerCase();
+          return txt.includes('empleado') || txt.includes('operario') || txt.includes('responsable') || txt.includes('personal');
+        });
         const container = empLabel ? (empLabel.closest('.form-group') || empLabel.parentElement) : null;
         const input = container ? container.querySelector('input') : null;
         if (input) { input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); }
@@ -2865,9 +2892,13 @@ async function verifyWorkOrderWithPage(page, orderId) {
           await delay(200);
           await page.keyboard.type(otNumClean, { delay: 80 });
           await delay(500);
-          await page.keyboard.press('Tab');
-          await delay(200);
-          await page.keyboard.press('Enter');
+          const clickedBuscarRetry = await page.evaluate(() => {
+            const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
+            const btn = buttons.find(b => b.textContent.trim().toUpperCase().includes('BUSCAR') || (b.value || '').toUpperCase().includes('BUSCAR'));
+            if (btn) { btn.click(); return true; }
+            return false;
+          });
+          console.log(`[Verify] Clicked BUSCAR button via JS (retry): ${clickedBuscarRetry}`);
           await delay(4500);
 
           tableTasks = await readTableTasks();
