@@ -1349,31 +1349,18 @@ async function syncWorkOrder(orderId) {
 
   const settings = db.getSettings();
   
-  // Prioritize the order creator's OWN Taxes credentials first (each person may
-  // have their own separate Taxes.com.ar account), falling back to the global
-  // settings (admin/pañol) only if the creator has no personal credentials saved.
-  let username = null;
-  let password = null;
-
-  if (order.createdBy) {
-    const user = db.getUser(order.createdBy);
-    if (user && user.password) {
-      username = user.username;
-      password = user.password;
-    }
-  }
-
-  if (!username || !password) {
-    username = settings.username;
-    password = settings.password;
-  }
+  // SIEMPRE usar credenciales globales de Ajustes (paniol@).
+  // Cualquier supervisor puede sincronizar cualquier OT con las credenciales centrales.
+  // Las credenciales del creador de la OT se ignoran.
+  const username = settings.username;
+  const password = settings.password;
 
   if (!username || !password) {
     db.updateWorkOrder(orderId, {
       syncStatus: "error",
-      syncError: "Faltan configurar las credenciales del supervisor."
+      syncError: "Faltan las credenciales en Ajustes. Configurá el usuario y contraseña de Taxes."
     });
-    return { success: false, message: "Missing credentials" };
+    return { success: false, message: "Missing credentials in settings" };
   }
 
   await acquireBrowserLock(`syncWorkOrder(${orderId})`);
@@ -2804,27 +2791,12 @@ async function verifyWorkOrder(orderId) {
   if (!order) return { success: false, message: "Order not found" };
   const settings = db.getSettings();
 
-  // Prioritize the order creator's OWN Taxes credentials first (each person may
-  // have their own separate Taxes.com.ar account), falling back to the global
-  // settings (admin/pañol) only if the creator has no personal credentials saved.
-  let username = null;
-  let password = null;
-
-  if (order.createdBy) {
-    const user = db.getUser(order.createdBy);
-    if (user && user.password) {
-      username = user.username;
-      password = user.password;
-    }
-  }
+  // SIEMPRE usar credenciales globales de Ajustes
+  const username = settings.username;
+  const password = settings.password;
 
   if (!username || !password) {
-    username = settings.username;
-    password = settings.password;
-  }
-
-  if (!username || !password) {
-    return { success: false, message: "Faltan credenciales del supervisor" };
+    return { success: false, message: "Faltan las credenciales en Ajustes. Configurá el usuario y contraseña de Taxes." };
   }
 
   await acquireBrowserLock(`verifyWorkOrder(${orderId})`);
@@ -2945,31 +2917,23 @@ const MAX_PARALLEL_BROWSERS = 2;
 async function verifyMultipleOrders(orderIds) {
   const settings = db.getSettings();
 
-  // Group order IDs by their credential key (username)
-  const groups = new Map(); // key: username → { username, password, ids: [] }
+  // SIEMPRE usar credenciales globales de Ajustes para todas las OTs
+  const globalUsername = settings.username;
+  const globalPassword = settings.password;
+  if (!globalUsername || !globalPassword) {
+    console.log('[VerifyAll] Faltan credenciales en Ajustes. No se puede verificar.');
+    return;
+  }
+
+  // Todas las OTs usan las mismas credenciales globales
+  const groups = new Map();
   for (const id of orderIds) {
     const order = db.getWorkOrderById(id);
     if (!order || !order.taxesOrderNumber) continue;
-
-    let username = null;
-    let password = null;
-    if (order.createdBy) {
-      const user = db.getUser(order.createdBy);
-      if (user && user.password) {
-        username = user.username;
-        password = user.password;
-      }
+    if (!groups.has(globalUsername)) {
+      groups.set(globalUsername, { username: globalUsername, password: globalPassword, ids: [] });
     }
-    if (!username || !password) {
-      username = settings.username;
-      password = settings.password;
-    }
-    if (!username || !password) continue;
-
-    if (!groups.has(username)) {
-      groups.set(username, { username, password, ids: [] });
-    }
-    groups.get(username).ids.push(id);
+    groups.get(globalUsername).ids.push(id);
   }
 
   const groupList = Array.from(groups.values());
