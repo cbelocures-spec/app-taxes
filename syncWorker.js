@@ -2126,7 +2126,13 @@ async function syncWorkOrder(orderId) {
       const hoursResult = await page.evaluate((idx, val) => {
         // There are multiple inputs with name="horas_estimadas" — one per task
         const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
-        const el = inputs[idx];
+        let el = inputs[idx];
+        if (!el) {
+          // Fallback: use the exact, manually-verified CSS selector path for the
+          // Horas Estimadas input inside a given task card (indexed by position).
+          el = document.querySelector(`div.card-body:nth-child(${idx + 1}) input[type="number"][name="horas_estimadas"]`) ||
+               document.querySelector(`#app > div > main > div > div:nth-child(2) > div > div > div > div > div.card-body:nth-child(${idx + 1}) > div > p > div:nth-child(2) > div:nth-child(1) > input`);
+        }
         if (!el) return { found: false };
 
         const numericVal = parseFloat(val);
@@ -2696,13 +2702,20 @@ async function verifyWorkOrderWithPage(page, orderId) {
             console.log(`[Verify] Setting hours to ${expectedHoursComma} (${expectedHoursDot})...`);
 
             const hoursSetResult = await page.evaluate((val) => {
-              const inputs = Array.from(document.querySelectorAll('input'));
-              const el = inputs.find(i => {
-                const name = (i.name || '').toLowerCase();
-                const placeholder = (i.placeholder || '').toLowerCase();
-                const label = i.closest('.form-group')?.textContent.toLowerCase() || '';
-                return name.includes('horas') || placeholder.includes('horas') || label.includes('horas');
-              });
+              // Manually-verified, stable CSS path to the Horas Estimadas input
+              // in the Taxes task edit form. Prefer this exact selector; fall
+              // back to a name-based lookup only if the DOM structure changed.
+              const exactSelector = '#app > div > main > div > div:nth-child(2) > div > div > div > div > div.card-body > div > p > div:nth-child(2) > div:nth-child(1) > input';
+              let el = document.querySelector(exactSelector);
+              if (!el) {
+                const inputs = Array.from(document.querySelectorAll('input'));
+                el = inputs.find(i => {
+                  const name = (i.name || '').toLowerCase();
+                  const placeholder = (i.placeholder || '').toLowerCase();
+                  const label = i.closest('.form-group')?.textContent.toLowerCase() || '';
+                  return name.includes('horas') || placeholder.includes('horas') || label.includes('horas');
+                });
+              }
               if (!el) return { found: false };
 
               const numericVal = parseFloat(val);
