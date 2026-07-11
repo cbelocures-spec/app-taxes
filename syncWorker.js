@@ -659,6 +659,18 @@ async function safeEvaluate(page, fn, ...args) {
 async function autoLogin(browser, username, password, portalUrl) {
   // Always create a FRESH page to avoid detached frame issues
   console.log(`[autoLogin] Creating fresh page and navigating to ${portalUrl}/login ...`);
+
+  // Diagnostic only (never logs the actual password value): helps catch invisible
+  // issues like stray whitespace, newlines, or non-standard characters that can
+  // sneak in from copy/paste or mobile keyboards without being visible on screen.
+  const describeStr = (label, s) => {
+    if (s === undefined || s === null) { console.log(`[autoLogin-Diag] ${label}: MISSING (undefined/null)`); return; }
+    const hasLeadingOrTrailingSpace = s !== s.trim();
+    const hasNonAscii = /[^\x20-\x7E]/.test(s);
+    console.log(`[autoLogin-Diag] ${label}: length=${s.length}, trimmedLength=${s.trim().length}, hasLeadingOrTrailingSpace=${hasLeadingOrTrailingSpace}, hasNonAsciiChars=${hasNonAscii}`);
+  };
+  describeStr('username', username);
+  describeStr('password', password);
   
   let page = await browser.newPage();
   await setupPage(page);
