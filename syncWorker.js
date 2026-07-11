@@ -2120,35 +2120,97 @@ async function syncWorkOrder(orderId) {
         console.log(`[Hours] Task #${i+1} Finalizada with 0 hours — using minimum 0.01 to avoid blank in Taxes.`);
       }
 
-      console.log(`Setting Horas Estimadas: ${effectiveHoras} (original H.MM: ${task.horasEstimadas})`);
       const hoursVal3 = effectiveHoras.toFixed(2);
-      const hoursFilled = await page.evaluate((idx, val) => {
+      console.log(`[Hours] Target Horas Estimadas for task #${i+1}: "${hoursVal3}"`);
+
+      const hoursResult = await page.evaluate((idx, val) => {
         // There are multiple inputs with name="horas_estimadas" — one per task
         const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
         const el = inputs[idx];
-        if (!el) return false;
-        try {
-          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-          nativeSetter.call(el, val);
-        } catch(e) { el.value = val; }
+        if (!el) return { found: false };
+
+        const numericVal = parseFloat(val);
+
+        // Use the native HTMLInputElement value setter so Vue's proxied
+        // `value` accessor on the element doesn't swallow the assignment.
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+
         el.focus();
+
+        try {
+          nativeInputValueSetter.call(el, val);
+        } catch (e) {
+          el.value = val;
+        }
+
+        // For number inputs, also force valueAsNumber so Vue's v-model
+        // (which reads/writes the number type under the hood) picks up
+        // the numeric change even if the string setter above didn't "stick".
+        try {
+          if (el.type === 'number' && !Number.isNaN(numericVal)) {
+            const nativeValueAsNumberSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'valueAsNumber').set;
+            nativeValueAsNumberSetter.call(el, numericVal);
+          }
+        } catch (e) {
+          // ignore — fallback to string value already set above
+        }
+
+        // Fire events in the order the browser normally would, so Vue's
+        // v-model listeners (input) and any blur-based validation both fire.
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
         el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-        return true;
-      }, i, hoursVal3).catch(() => false);
-      // Also type via keyboard — assign ID first, then triple-click + type
-      const hoursId3 = await page.evaluate((idx) => {
+        el.blur();
+
+        return {
+          found: true,
+          valueAfter: el.value,
+          valueAsNumberAfter: el.valueAsNumber
+        };
+      }, i, hoursVal3).catch((e) => ({ found: false, error: e.message }));
+
+      console.log(`[Hours] Input element found: ${hoursResult.found}`);
+      if (hoursResult.found) {
+        console.log(`[Hours] Value after setting: "${hoursResult.valueAfter}" (valueAsNumber: ${hoursResult.valueAsNumberAfter})`);
+      } else {
+        console.log(`[Hours] Could not locate input[name="horas_estimadas"] at index ${i}. Error: ${hoursResult.error || 'N/A'}`);
+      }
+
+      await delay(300);
+
+      // Verification step — re-read the input to confirm the value stuck
+      // after Vue has had a chance to react to the dispatched events.
+      const hoursVerify = await page.evaluate((idx) => {
         const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
         const el = inputs[idx];
-        if (!el) return null;
-        if (!el.id) el.id = `temp-horas-${idx}`;
-        return el.id;
-      }, i);
-      if (hoursId3) {
-        await page.click(`#${hoursId3}`, { clickCount: 3 }).catch(() => {});
-        await page.keyboard.type(hoursVal3);
+        if (!el) return { found: false };
+        return {
+          found: true,
+          value: el.value,
+          valueAsNumber: el.valueAsNumber
+        };
+      }, i).catch(() => ({ found: false }));
+
+      const hoursFilled = hoursResult.found && hoursVerify.found && parseFloat(hoursVerify.value) === parseFloat(hoursVal3);
+      console.log(`[Hours] Verification — value retained: "${hoursVerify.value}" (valueAsNumber: ${hoursVerify.valueAsNumber}), expected: "${hoursVal3}", success: ${hoursFilled}`);
+
+      if (!hoursFilled) {
+        // Fallback: type via keyboard — assign ID first, then triple-click + type
+        console.log(`[Hours] Value did not stick via direct set — falling back to keyboard input for task #${i+1}.`);
+        const hoursId3 = await page.evaluate((idx) => {
+          const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
+          const el = inputs[idx];
+          if (!el) return null;
+          if (!el.id) el.id = `temp-horas-${idx}`;
+          return el.id;
+        }, i);
+        if (hoursId3) {
+          await page.click(`#${hoursId3}`, { clickCount: 3 }).catch(() => {});
+          await page.keyboard.type(hoursVal3);
+          await page.keyboard.press('Tab');
+        }
       }
+
       console.log(`Horas filled: ${hoursFilled}, value: ${hoursVal3}, inputs found: via querySelectorAll`);
 
       // 4. Fill Description
