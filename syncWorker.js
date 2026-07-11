@@ -75,6 +75,7 @@ async function launchBrowser() {
   const launchOptions = {
     headless: true, // Always headless on server
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
+    protocolTimeout: 30000, // Allow up to 30s for slow CDP/Runtime responses (e.g. Taxes listing DOM queries)
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
