@@ -746,57 +746,23 @@ async function autoLogin(browser, username, password, portalUrl) {
     throw new Error(`[autoLogin] Password input not found. Current URL: ${currentPageUrl}`);
   }
 
-  // Fill inputs using direct JS injection (most robust for Vue.js reactive forms)
-  await page.evaluate((esel, psel, uval, pval) => {
-    const email = document.querySelector(esel);
-    const pass = document.querySelector(psel);
-    if (email) {
-      email.value = '';
-      email.value = uval;
-      email.dispatchEvent(new Event('input', { bubbles: true }));
-      email.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    if (pass) {
-      pass.value = '';
-      pass.value = pval;
-      pass.dispatchEvent(new Event('input', { bubbles: true }));
-      pass.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-  }, emailSelector, passSelector, username, password);
+  // Use real keyboard simulation (page.type) so Vue.js v-model detects the input.
+  // Direct .value assignment via evaluate() is NOT detected by Vue's reactivity system.
+  console.log('[autoLogin] Filling form with real keyboard simulation...');
 
-  console.log('[autoLogin] Inputs filled. Verifying values stuck before submitting...');
-  await delay(150); // minimal pause just for the DOM to process the dispatched events —
-                     // the login form has a short-lived security token, so we submit as
-                     // soon as possible instead of waiting around.
+  // Clear and type email
+  await page.evaluate((sel) => { const el = document.querySelector(sel); if (el) { el.value = ''; el.focus(); } }, emailSelector);
+  await page.click(emailSelector, { clickCount: 3 }); // select all
+  await page.type(emailSelector, username, { delay: 30 });
 
-  // Verify the values actually "stuck" before submitting; if not, try filling again once.
-  const valuesStuck = await page.evaluate((esel, psel, uval, pval) => {
-    const email = document.querySelector(esel);
-    const pass = document.querySelector(psel);
-    return !!(email && pass && email.value === uval && pass.value === pval);
-  }, emailSelector, passSelector, username, password);
+  // Clear and type password
+  await page.evaluate((sel) => { const el = document.querySelector(sel); if (el) { el.value = ''; el.focus(); } }, passSelector);
+  await page.click(passSelector, { clickCount: 3 }); // select all
+  await page.type(passSelector, password, { delay: 30 });
 
-  if (!valuesStuck) {
-    console.log('[autoLogin] Values did not stick on first fill — retrying fill once...');
-    await page.evaluate((esel, psel, uval, pval) => {
-      const email = document.querySelector(esel);
-      const pass = document.querySelector(psel);
-      if (email) {
-        email.value = uval;
-        email.dispatchEvent(new Event('input', { bubbles: true }));
-        email.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      if (pass) {
-        pass.value = pval;
-        pass.dispatchEvent(new Event('input', { bubbles: true }));
-        pass.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    }, emailSelector, passSelector, username, password);
-    await delay(150);
-  }
+  await delay(300);
 
   // Extract and inject CSRF token (Taxes.com.ar is Laravel-based and requires _token)
-  // Even though it's in the HTML, we confirm it's in the form before submitting.
   const csrfToken = await page.evaluate(() => {
     const meta = document.querySelector('meta[name="csrf-token"]');
     return meta ? meta.getAttribute('content') : null;
@@ -819,26 +785,8 @@ async function autoLogin(browser, username, password, portalUrl) {
     console.log('[autoLogin] No CSRF meta tag found - proceeding without explicit token.');
   }
 
-  // Submit: try clicking the real "INGRESAR" button first (more reliable for
-  // Vue.js forms whose submit logic is bound to a click handler on the button
-  // rather than to the form's native submit/keypress event), then fall back
-  // to pressing Enter as well just in case.
-  const ingresarBtnId = await page.evaluate(() => {
-    const buttons = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
-    const btn = buttons.find(b => b.textContent && b.textContent.trim().toUpperCase().includes('INGRESAR'));
-    if (!btn) return null;
-    const id = 'tmp-ingresar-btn-' + Date.now();
-    btn.id = id;
-    return id;
-  });
-  if (ingresarBtnId) {
-    console.log('[autoLogin] Clicking INGRESAR button (native click)...');
-    try { await page.click(`#${ingresarBtnId}`); }
-    catch (e) { console.log('[autoLogin] Native click on INGRESAR raised:', e.message); }
-  } else {
-    console.log('[autoLogin] INGRESAR button not found, falling back to Enter key only.');
-  }
-  await delay(500);
+  // Submit with Enter key (most reliable for this form)
+  console.log('[autoLogin] Submitting form with Enter key...');
   await page.keyboard.press('Enter');
   await delay(500);
   // Extra safety net: directly trigger the form's native submit as well, in case
