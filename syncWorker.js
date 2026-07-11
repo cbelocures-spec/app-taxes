@@ -1725,7 +1725,7 @@ async function syncWorkOrder(orderId) {
         const hmmMins = Math.round((rawHmm - hmmHours) * 100);
         const expectedHours = (hmmHours + hmmMins / 60).toFixed(2);
         const actualHours = parseFloat(formCards[ci].hours.replace(',', '.')) || 0;
-        const hoursOk = Math.abs(parseFloat(expectedHours) - actualHours) <= 0.05;
+        const hoursOk = (actualHours === 0 && parseFloat(expectedHours) > 0) ? false : (Math.abs(parseFloat(expectedHours) - actualHours) <= 0.05);
         const realizadaNeeded = appTask.status === 'Finalizada' && !formCards[ci].realizada;
 
         console.log(`[Reconcile] Card #${ci}: hours exp=${expectedHours} actual=${actualHours} ok=${hoursOk} | realizada needed=${realizadaNeeded}`);
@@ -2670,7 +2670,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
         errors.push(`Tarea #${idx + 1} (${employeeLabel}): No encontrada en el listado de tareas`);
       } else {
         const actualHours = parseFloat(String(matchedRow.hours).replace(',', '.')) || 0;
-        const hoursOk = Math.abs(expectedHours - actualHours) <= 0.05;
+        const hoursOk = (actualHours === 0 && expectedHours > 0) ? false : (Math.abs(expectedHours - actualHours) <= 0.05);
         const expectedRealizada = t.status === 'Finalizada' ? 'SI' : 'NO';
         const realizadaOk = matchedRow.realizada.toUpperCase() === expectedRealizada;
         const descOkFinal = clean(matchedRow.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(matchedRow.description));
