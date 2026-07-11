@@ -2907,6 +2907,55 @@ async function verifyWorkOrderWithPage(page, orderId) {
           // before the next task in this loop searches again.
           await clearEmployeeFilterAndResearch();
           tableTasks = await readTableTasks();
+    }
+
+    // Double-check verification after all edits are done to ensure they actually persisted in Taxes.
+    if (madeChanges && errors.length === 0) {
+      console.log(`[Verify] Re-reading tasks table to verify that edits actually persisted in Taxes...`);
+      tableTasks = await readTableTasks();
+      for (let idx = 0; idx < order.tasks.length; idx++) {
+        const t = order.tasks[idx];
+        const { employeeLabel, finalDescription } = resolveAndMapEmployee(t);
+        const expectedHours = parseFloat(String(t.horasEstimadas || '0').replace(',', '.')) || 0;
+        const expectedHoursStr = expectedHours.toFixed(2);
+        
+        let matchedRow = null;
+        if (tableTasks.length > 0) {
+          for (const row of tableTasks) {
+            const empOk = clean(row.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(row.employee));
+            const descOk = clean(row.description).includes(clean(t.descripcion)) || clean(t.descripcion).includes(clean(row.description)) ||
+                           clean(row.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(row.description));
+            if (empOk && descOk) {
+              matchedRow = row;
+              break;
+            }
+          }
+          if (!matchedRow && order.tasks.length === 1) {
+            const empCandidates = tableTasks.filter(row =>
+              clean(row.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(row.employee))
+            );
+            if (empCandidates.length === 1) matchedRow = empCandidates[0];
+          }
+        }
+
+        if (!matchedRow) {
+          errors.push(`Tarea #${idx + 1} (${employeeLabel}): No se encontró la tarea tras guardar cambios.`);
+        } else {
+          const actualHours = parseFloat(String(matchedRow.hours).replace(',', '.')) || 0;
+          const hoursOk = (actualHours === 0 && expectedHours > 0) ? false : (Math.abs(expectedHours - actualHours) <= 0.05);
+          const expectedRealizada = t.status === 'Finalizada' ? 'SI' : 'NO';
+          const realizadaOk = matchedRow.realizada.toUpperCase() === expectedRealizada;
+          const descOkFinal = clean(matchedRow.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(matchedRow.description));
+          
+          if (!hoursOk) {
+            errors.push(`Tarea #${idx + 1} (${employeeLabel}): Horas no coincidieron tras guardar (esperadas: ${expectedHoursStr}, en Taxes: ${actualHours}).`);
+          }
+          if (!realizadaOk) {
+            errors.push(`Tarea #${idx + 1} (${employeeLabel}): Estado no coincidió tras guardar (esperado: ${expectedRealizada}, en Taxes: ${matchedRow.realizada}).`);
+          }
+          if (!descOkFinal) {
+            errors.push(`Tarea #${idx + 1} (${employeeLabel}): Descripción no coincidió tras guardar.`);
+          }
         }
       }
     }
