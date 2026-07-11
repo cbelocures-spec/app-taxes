@@ -1337,19 +1337,23 @@ async function syncWorkOrder(orderId) {
 
   const settings = db.getSettings();
   
-  // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
-  // fallback to order creator's credentials only if global settings are empty.
-  let username = settings.username;
-  let password = settings.password;
+  // Prioritize the order creator's OWN Taxes credentials first (each person may
+  // have their own separate Taxes.com.ar account), falling back to the global
+  // settings (admin/pañol) only if the creator has no personal credentials saved.
+  let username = null;
+  let password = null;
+
+  if (order.createdBy) {
+    const user = db.getUser(order.createdBy);
+    if (user && user.password) {
+      username = user.username;
+      password = user.password;
+    }
+  }
 
   if (!username || !password) {
-    if (order.createdBy) {
-      const user = db.getUser(order.createdBy);
-      if (user && user.password) {
-        username = user.username;
-        password = user.password;
-      }
-    }
+    username = settings.username;
+    password = settings.password;
   }
 
   if (!username || !password) {
@@ -2788,19 +2792,23 @@ async function verifyWorkOrder(orderId) {
   if (!order) return { success: false, message: "Order not found" };
   const settings = db.getSettings();
 
-  // Prioritize global settings credentials (admin/pañol) to ensure full permission coverage,
-  // fallback to order creator's credentials only if global settings are empty.
-  let username = settings.username;
-  let password = settings.password;
+  // Prioritize the order creator's OWN Taxes credentials first (each person may
+  // have their own separate Taxes.com.ar account), falling back to the global
+  // settings (admin/pañol) only if the creator has no personal credentials saved.
+  let username = null;
+  let password = null;
+
+  if (order.createdBy) {
+    const user = db.getUser(order.createdBy);
+    if (user && user.password) {
+      username = user.username;
+      password = user.password;
+    }
+  }
 
   if (!username || !password) {
-    if (order.createdBy) {
-      const user = db.getUser(order.createdBy);
-      if (user && user.password) {
-        username = user.username;
-        password = user.password;
-      }
-    }
+    username = settings.username;
+    password = settings.password;
   }
 
   if (!username || !password) {
@@ -2931,16 +2939,18 @@ async function verifyMultipleOrders(orderIds) {
     const order = db.getWorkOrderById(id);
     if (!order || !order.taxesOrderNumber) continue;
 
-    let username = settings.username;
-    let password = settings.password;
-    if (!username || !password) {
-      if (order.createdBy) {
-        const user = db.getUser(order.createdBy);
-        if (user && user.password) {
-          username = user.username;
-          password = user.password;
-        }
+    let username = null;
+    let password = null;
+    if (order.createdBy) {
+      const user = db.getUser(order.createdBy);
+      if (user && user.password) {
+        username = user.username;
+        password = user.password;
       }
+    }
+    if (!username || !password) {
+      username = settings.username;
+      password = settings.password;
     }
     if (!username || !password) continue;
 
