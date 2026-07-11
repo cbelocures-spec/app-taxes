@@ -795,6 +795,30 @@ async function autoLogin(browser, username, password, portalUrl) {
     await delay(150);
   }
 
+  // Extract and inject CSRF token (Taxes.com.ar is Laravel-based and requires _token)
+  // Even though it's in the HTML, we confirm it's in the form before submitting.
+  const csrfToken = await page.evaluate(() => {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : null;
+  });
+  if (csrfToken) {
+    console.log(`[autoLogin] CSRF token found (length=${csrfToken.length}), injecting into form...`);
+    await page.evaluate((token) => {
+      const form = document.querySelector('form.login-form') || document.querySelector('form');
+      if (!form) return;
+      let tokenInput = form.querySelector('input[name="_token"]');
+      if (!tokenInput) {
+        tokenInput = document.createElement('input');
+        tokenInput.type = 'hidden';
+        tokenInput.name = '_token';
+        form.appendChild(tokenInput);
+      }
+      tokenInput.value = token;
+    }, csrfToken);
+  } else {
+    console.log('[autoLogin] No CSRF meta tag found - proceeding without explicit token.');
+  }
+
   // Submit: try clicking the real "INGRESAR" button first (more reliable for
   // Vue.js forms whose submit logic is bound to a click handler on the button
   // rather than to the form's native submit/keypress event), then fall back
@@ -831,6 +855,7 @@ async function autoLogin(browser, username, password, portalUrl) {
     } catch (e) { return false; }
   });
   console.log(`[autoLogin] Native form submit also triggered: ${nativeSubmitTried}`);
+
 
 
   // Poll URL until we leave /login (up to 35 seconds) - avoids waitForNavigation frame issues
