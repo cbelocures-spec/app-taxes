@@ -2696,13 +2696,25 @@ async function verifyWorkOrderWithPage(page, orderId) {
             console.log(`[Verify] Setting hours to ${expectedHoursComma} (${expectedHoursDot})...`);
 
             const hoursSetResult = await page.evaluate((val) => {
-              const inputs = Array.from(document.querySelectorAll('input'));
-              const el = inputs.find(i => {
-                const name = (i.name || '').toLowerCase();
-                const placeholder = (i.placeholder || '').toLowerCase();
-                const label = i.closest('.form-group')?.textContent.toLowerCase() || '';
-                return name.includes('horas') || placeholder.includes('horas') || label.includes('horas');
-              });
+              // 1. Try the exact CSS path discovered in the Taxes DOM for the hours input.
+              let el = document.querySelector('div.card-body > div > p > div:nth-child(2) > div:nth-child(1) > input');
+
+              // 2. Fallback to the known input name used by the Taxes edit form.
+              if (!el) {
+                el = document.querySelector('input[name="horas_estimadas"]');
+              }
+
+              // 3. Last resort — fuzzy match by name/placeholder/label containing "horas".
+              if (!el) {
+                const inputs = Array.from(document.querySelectorAll('input'));
+                el = inputs.find(i => {
+                  const name = (i.name || '').toLowerCase();
+                  const placeholder = (i.placeholder || '').toLowerCase();
+                  const label = i.closest('.form-group')?.textContent.toLowerCase() || '';
+                  return name.includes('horas') || placeholder.includes('horas') || label.includes('horas');
+                });
+              }
+
               if (!el) return { found: false };
 
               const numericVal = parseFloat(val);
