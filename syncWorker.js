@@ -1731,24 +1731,29 @@ async function syncWorkOrder(orderId) {
         console.log(`[Reconcile] Card #${ci}: hours exp=${expectedHours} actual=${actualHours} ok=${hoursOk} | realizada needed=${realizadaNeeded}`);
 
         if (!hoursOk) {
-          console.log(`[Reconcile] Fixing hours for card #${ci}...`);
-          const hoursId = await page.evaluate((idx, val) => {
+          console.log(`[Reconcile] Fixing hours for card #${ci} to "${expectedHours}"...`);
+          const hoursId = await page.evaluate((idx) => {
             const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
             const el = inputs[idx];
             if (!el) return null;
-            try { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, val); }
-            catch(e) { el.value = val; }
-            el.focus();
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-            el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-            if (!el.id) el.id = `rc-hours-${idx}`;
+            if (!el.id) el.id = `rc-hours-${idx}-${Date.now()}`;
             return el.id;
-          }, ci, expectedHours);
+          }, ci);
           if (hoursId) {
-            await page.click(`#${hoursId}`, { clickCount: 3 }).catch(() => {});
-            await page.keyboard.type(expectedHours);
-            await delay(3500); // 3.5s delay to show typed hours in slow motion
+            const sel = `#${hoursId}`;
+            await page.focus(sel).catch(() => {});
+            await page.click(sel, { clickCount: 3 }).catch(() => {});
+            await page.keyboard.press('Backspace').catch(() => {});
+            await page.type(sel, expectedHours, { delay: 50 });
+            await page.evaluate((s) => {
+              const el = document.querySelector(s);
+              if (el) {
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+              }
+            }, sel);
+            await delay(1000);
           }
           appTask.needsHoursUpdate = false;
         }
@@ -2123,92 +2128,45 @@ async function syncWorkOrder(orderId) {
       const hoursVal3 = effectiveHoras.toFixed(2);
       console.log(`[Hours] Target Horas Estimadas for task #${i+1}: "${hoursVal3}"`);
 
-      const hoursResult = await page.evaluate((idx, val) => {
-        // There are multiple inputs with name="horas_estimadas" — one per task
+      // Resolve input ID
+      const hoursInputId = await page.evaluate((idx) => {
         const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
         const el = inputs[idx];
-        if (!el) return { found: false };
+        if (!el) return null;
+        if (!el.id) el.id = `temp-horas-${idx}-${Date.now()}`;
+        return el.id;
+      }, i);
 
-        const numericVal = parseFloat(val);
-
-        // Use the native HTMLInputElement value setter so Vue's proxied
-        // `value` accessor on the element doesn't swallow the assignment.
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-
-        el.focus();
-
-        try {
-          nativeInputValueSetter.call(el, val);
-        } catch (e) {
-          el.value = val;
-        }
-
-        // For number inputs, also force valueAsNumber so Vue's v-model
-        // (which reads/writes the number type under the hood) picks up
-        // the numeric change even if the string setter above didn't "stick".
-        try {
-          if (el.type === 'number' && !Number.isNaN(numericVal)) {
-            const nativeValueAsNumberSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'valueAsNumber').set;
-            nativeValueAsNumberSetter.call(el, numericVal);
+      let hoursFilled = false;
+      if (hoursInputId) {
+        console.log(`[Hours] Found hours input at index ${i}. Focusing and typing value "${hoursVal3}"...`);
+        const sel = `#${hoursInputId}`;
+        await page.focus(sel).catch(() => {});
+        await page.click(sel, { clickCount: 3 }).catch(() => {});
+        await page.keyboard.press('Backspace').catch(() => {});
+        await page.type(sel, hoursVal3, { delay: 50 });
+        await page.evaluate((s) => {
+          const el = document.querySelector(s);
+          if (el) {
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
           }
-        } catch (e) {
-          // ignore — fallback to string value already set above
-        }
+        }, sel);
 
-        // Fire events in the order the browser normally would, so Vue's
-        // v-model listeners (input) and any blur-based validation both fire.
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-        el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-        el.blur();
+        await delay(300);
 
-        return {
-          found: true,
-          valueAfter: el.value,
-          valueAsNumberAfter: el.valueAsNumber
-        };
-      }, i, hoursVal3).catch((e) => ({ found: false, error: e.message }));
+        // Verification step — re-read the input to confirm the value stuck
+        const hoursVerify = await page.evaluate((s) => {
+          const el = document.querySelector(s);
+          if (!el) return { found: false };
+          return { found: true, value: el.value };
+        }, sel).catch(() => ({ found: false }));
 
-      console.log(`[Hours] Input element found: ${hoursResult.found}`);
-      if (hoursResult.found) {
-        console.log(`[Hours] Value after setting: "${hoursResult.valueAfter}" (valueAsNumber: ${hoursResult.valueAsNumberAfter})`);
+        hoursFilled = hoursVerify.found && parseFloat(hoursVerify.value) === parseFloat(hoursVal3);
+        console.log(`[Hours] Verification — value retained: "${hoursVerify.value}", expected: "${hoursVal3}", success: ${hoursFilled}`);
       } else {
-        console.log(`[Hours] Could not locate input[name="horas_estimadas"] at index ${i}. Error: ${hoursResult.error || 'N/A'}`);
-      }
-
-      await delay(300);
-
-      // Verification step — re-read the input to confirm the value stuck
-      // after Vue has had a chance to react to the dispatched events.
-      const hoursVerify = await page.evaluate((idx) => {
-        const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
-        const el = inputs[idx];
-        if (!el) return { found: false };
-        return {
-          found: true,
-          value: el.value,
-          valueAsNumber: el.valueAsNumber
-        };
-      }, i).catch(() => ({ found: false }));
-
-      const hoursFilled = hoursResult.found && hoursVerify.found && parseFloat(hoursVerify.value) === parseFloat(hoursVal3);
-      console.log(`[Hours] Verification — value retained: "${hoursVerify.value}" (valueAsNumber: ${hoursVerify.valueAsNumber}), expected: "${hoursVal3}", success: ${hoursFilled}`);
-
-      if (!hoursFilled) {
-        // Fallback: type via keyboard — assign ID first, then triple-click + type
-        console.log(`[Hours] Value did not stick via direct set — falling back to keyboard input for task #${i+1}.`);
-        const hoursId3 = await page.evaluate((idx) => {
-          const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
-          const el = inputs[idx];
-          if (!el) return null;
-          if (!el.id) el.id = `temp-horas-${idx}`;
-          return el.id;
-        }, i);
-        if (hoursId3) {
-          await page.click(`#${hoursId3}`, { clickCount: 3 }).catch(() => {});
-          await page.keyboard.type(hoursVal3);
-          await page.keyboard.press('Tab');
-        }
+        console.warn(`[Hours] Could not locate input[name="horas_estimadas"] at index ${i}`);
       }
 
       console.log(`Horas filled: ${hoursFilled}, value: ${hoursVal3}, inputs found: via querySelectorAll`);
@@ -2720,18 +2678,14 @@ async function verifyWorkOrderWithPage(page, orderId) {
           // Update hours if mismatch
           if (!hoursOk) {
             const expectedHoursDot = expectedHoursComma.replace(',', '.');
-            console.log(`[Verify] Setting hours to ${expectedHoursComma} (${expectedHoursDot})...`);
+            console.log(`[Verify] Setting hours to "${expectedHoursDot}" via keyboard simulation...`);
 
-            const hoursSetResult = await page.evaluate((val) => {
+            const hoursInputId = await page.evaluate(() => {
               // 1. Try the exact CSS path discovered in the Taxes DOM for the hours input.
               let el = document.querySelector('div.card-body > div > p > div:nth-child(2) > div:nth-child(1) > input');
-
               // 2. Fallback to the known input name used by the Taxes edit form.
-              if (!el) {
-                el = document.querySelector('input[name="horas_estimadas"]');
-              }
-
-              // 3. Last resort — fuzzy match by name/placeholder/label containing "horas".
+              if (!el) el = document.querySelector('input[name="horas_estimadas"]');
+              // 3. Last resort — fuzzy match
               if (!el) {
                 const inputs = Array.from(document.querySelectorAll('input'));
                 el = inputs.find(i => {
@@ -2741,84 +2695,43 @@ async function verifyWorkOrderWithPage(page, orderId) {
                   return name.includes('horas') || placeholder.includes('horas') || label.includes('horas');
                 });
               }
+              if (!el) return null;
+              if (!el.id) el.id = 'temp-fix-hours-single-' + Date.now();
+              return el.id;
+            });
 
-              if (!el) return { found: false };
-
-              const numericVal = parseFloat(val);
-
-              // Use the native HTMLInputElement value setter so Vue's proxied
-              // `value` accessor on the element doesn't swallow the assignment.
-              const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-
-              el.focus();
-
-              try {
-                nativeInputValueSetter.call(el, val);
-              } catch (e) {
-                el.value = val;
-              }
-
-              // For number inputs, also force valueAsNumber so Vue's v-model
-              // (which reads/writes the number type under the hood) picks up
-              // the numeric change even if the string setter above didn't "stick".
-              try {
-                if (el.type === 'number' && !Number.isNaN(numericVal)) {
-                  const nativeValueAsNumberSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'valueAsNumber').set;
-                  nativeValueAsNumberSetter.call(el, numericVal);
-                }
-              } catch (e) {
-                // ignore — fallback to string value already set above
-              }
-
-              // Fire events in the order the browser normally would, so Vue's
-              // v-model listeners (input) and any blur-based validation both fire.
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-              el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-              el.blur();
-
-              if (!el.id) el.id = 'temp-fix-hours-single';
-
-              return {
-                found: true,
-                id: el.id,
-                valueAfter: el.value,
-                valueAsNumberAfter: el.valueAsNumber
-              };
-            }, expectedHoursDot).catch((e) => ({ found: false, error: e.message }));
-
-            console.log(`[Verify] Hours input found: ${hoursSetResult.found}`);
-            if (hoursSetResult.found) {
-              console.log(`[Verify] Target hours value: "${expectedHoursDot}" — Value after setting: "${hoursSetResult.valueAfter}" (valueAsNumber: ${hoursSetResult.valueAsNumberAfter})`);
-            } else {
-              console.log(`[Verify] Could not locate hours input. Error: ${hoursSetResult.error || 'N/A'}`);
-            }
-
-            await delay(500);
-
-            // Re-read the element after a short delay to verify the value actually stuck
             let hoursStuck = false;
-            if (hoursSetResult.found && hoursSetResult.id) {
-              const recheck = await page.evaluate((id) => {
-                const el = document.getElementById(id);
-                if (!el) return { found: false };
-                return { found: true, value: el.value, valueAsNumber: el.valueAsNumber };
-              }, hoursSetResult.id);
+            if (hoursInputId) {
+              const sel = `#${hoursInputId}`;
+              await page.focus(sel).catch(() => {});
+              await page.click(sel, { clickCount: 3 }).catch(() => {});
+              await page.keyboard.press('Backspace').catch(() => {});
+              await page.type(sel, expectedHoursDot, { delay: 50 });
+              await page.evaluate((s) => {
+                const el = document.querySelector(s);
+                if (el) {
+                  el.dispatchEvent(new Event('input', { bubbles: true }));
+                  el.dispatchEvent(new Event('change', { bubbles: true }));
+                  el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+                }
+              }, sel);
 
-              if (recheck.found) {
+              await delay(300);
+
+              // Re-read to confirm it stuck
+              const recheck = await page.evaluate((s) => {
+                const el = document.querySelector(s);
+                return el ? { value: el.value } : null;
+              }, sel).catch(() => null);
+
+              if (recheck) {
                 const recheckNum = parseFloat(String(recheck.value).replace(',', '.'));
                 const expectedNum = parseFloat(expectedHoursDot);
                 hoursStuck = !Number.isNaN(recheckNum) && Math.abs(recheckNum - expectedNum) < 0.005;
-                console.log(`[Verify] Re-read hours value: "${recheck.value}" (valueAsNumber: ${recheck.valueAsNumber}) — stuck: ${hoursStuck}`);
+                console.log(`[Verify] Re-read hours value: "${recheck.value}" — stuck: ${hoursStuck}`);
               }
-            }
-
-            // Only fall back to keyboard typing if the direct value set didn't stick
-            if (!hoursStuck && hoursSetResult.found && hoursSetResult.id) {
-              console.log(`[Verify] Direct value set did not stick — falling back to keyboard typing.`);
-              await page.click(`#${hoursSetResult.id}`, { clickCount: 3 }).catch(() => {});
-              await page.keyboard.type(expectedHoursComma);
-              await delay(1500);
+            } else {
+              console.warn(`[Verify] Could not locate hours input to edit.`);
             }
 
             madeChanges = true;
