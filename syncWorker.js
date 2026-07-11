@@ -2907,6 +2907,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
           // before the next task in this loop searches again.
           await clearEmployeeFilterAndResearch();
           tableTasks = await readTableTasks();
+        }
+      }
     }
 
     // Double-check verification after all edits are done to ensure they actually persisted in Taxes.
