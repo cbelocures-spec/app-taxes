@@ -570,6 +570,51 @@ app.delete('/api/orders/:id', (req, res) => {
   }
 });
 
+// Get archived orders
+app.get('/api/orders/archived', (req, res) => {
+  try {
+    const archived = db.getArchivedOrders() || [];
+    res.json(archived);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Soft-archive a work order
+app.patch('/api/orders/:id/archive', (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ error: "Orden no encontrada" });
+    }
+    db.archiveWorkOrder(req.params.id);
+    res.json({ success: true, message: "Orden archivada." });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Un-archive a work order (re-sync)
+app.patch('/api/orders/:id/unarchive', (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ error: "Orden no encontrada" });
+    }
+    db.updateWorkOrder(req.params.id, {
+      archived: false,
+      archivedAt: null,
+      syncStatus: "pending",
+      syncError: null,
+      verifiedStatus: "idle",
+      verifiedError: null
+    });
+    res.json({ success: true, message: "Orden desarchivada y re-encolada para sincronización." });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Cleanup finished synced orders from the app
 app.post('/api/orders/cleanup', (req, res) => {
   try {
@@ -723,6 +768,13 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
 
     if (taxesOrderNumber !== undefined && taxesOrderNumber !== null) {
       updates.taxesOrderNumber = taxesOrderNumber;
+    }
+
+    // Auto-archive if both sync and verification are successful (green + blue)
+    if (updates.syncStatus === 'success' && updates.verifiedStatus === 'success') {
+      updates.archived = true;
+      updates.archivedAt = new Date().toISOString();
+      console.log(`[LocalSyncResult] Order ${req.params.id} is fully verified and synced. Auto-archived to history.`);
     }
 
     db.updateWorkOrder(req.params.id, updates);

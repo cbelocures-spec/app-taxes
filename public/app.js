@@ -1992,6 +1992,9 @@ function createHistoryCardHtml(order) {
             <span class="material-icons">visibility</span>
           </button>
           ${isAdmin ? `
+          <button class="icon-btn" onclick="unarchiveOrder('${order.id}')" title="Re-sincronizar (volver a pendientes)" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;">
+            <span class="material-icons">sync</span>
+          </button>
           <button class="icon-btn danger" onclick="deleteOrder('${order.id}')" title="Eliminar definitivamente de la App">
             <span class="material-icons">delete_forever</span>
           </button>
@@ -2000,6 +2003,33 @@ function createHistoryCardHtml(order) {
       </div>
     </div>
   `;
+}
+
+async function unarchiveOrder(orderId) {
+  if (confirm("¿Desarchivar esta orden y volver a encolarla para sincronización/control?")) {
+    try {
+      const currentUsername = localStorage.getItem('currentUserUsername') || '';
+      const res = await fetch(`/api/orders/${orderId}/unarchive`, {
+        method: 'PATCH',
+        headers: { 'x-user-username': currentUsername }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "Error al desarchivar orden", "danger");
+        return;
+      }
+      showToast("Orden desarchivada ✓ — encolada para sincronizar", "success");
+      fetchOrders();
+      // If historial view is currently open, refresh it too
+      const historialView = document.getElementById('view-historial');
+      if (historialView && historialView.classList.contains('active')) {
+        fetchArchivedOrders();
+      }
+    } catch (error) {
+      showToast("Error al desarchivar orden", "danger");
+      console.error(error);
+    }
+  }
 }
 
 function updateStats() {
