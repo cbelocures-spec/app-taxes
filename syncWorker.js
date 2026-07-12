@@ -1729,22 +1729,30 @@ async function syncWorkOrder(orderId) {
            !cleanStr(finalDescription).includes(cleanStr(formCards[ci].description)));
         if (descMismatch) {
           console.log(`[Reconcile] Card #${ci} description mismatch (Taxes: "${formCards[ci].description}"). Writing: "${finalDescription}"...`);
-          const descId = await page.evaluate((idx, val) => {
+          const descId = await page.evaluate((idx) => {
             const textareas = Array.from(document.querySelectorAll('textarea'));
             const el = textareas[idx];
             if (!el) return null;
-            el.focus();
-            try { Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(el, val); }
-            catch(e) { el.value = val; }
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-            if (!el.id) el.id = `rc-desc-${idx}`;
+            if (!el.id) el.id = `rc-desc-${idx}-${Date.now()}`;
             return el.id;
-          }, ci, finalDescription);
+          }, ci);
           if (descId) {
-            await page.click(`#${descId}`, { clickCount: 3 }).catch(() => {});
-            await page.keyboard.type(finalDescription);
-            await delay(2000);
+            const sel = `#${descId}`;
+            await page.focus(sel).catch(() => {});
+            await page.click(sel).catch(() => {});
+            await page.keyboard.down('Control');
+            await page.keyboard.press('A');
+            await page.keyboard.up('Control');
+            await page.keyboard.press('Backspace');
+            await page.type(sel, finalDescription, { delay: 50 });
+            await page.evaluate((s) => {
+              const el = document.querySelector(s);
+              if (el) {
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+            }, sel);
+            await delay(1000);
           }
         }
 
@@ -2689,20 +2697,28 @@ async function verifyWorkOrderWithPage(page, orderId) {
           // Update description if mismatch
           if (!descOkFinal) {
             console.log(`[Verify] Setting description to "${finalDescription}"...`);
-            const descId = await page.evaluate((val) => {
+            const descId = await page.evaluate(() => {
               const el = document.querySelector('textarea[name="descripcion"]') || document.querySelector('textarea');
               if (!el) return null;
-              try { Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(el, val); }
-              catch(e) { el.value = val; }
-              el.focus();
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-              if (!el.id) el.id = 'temp-fix-desc-single';
+              if (!el.id) el.id = 'temp-fix-desc-single-' + Date.now();
               return el.id;
-            }, finalDescription);
+            });
             if (descId) {
-              await page.click(`#${descId}`, { clickCount: 3 }).catch(() => {});
-              await page.keyboard.type(finalDescription);
+              const sel = `#${descId}`;
+              await page.focus(sel).catch(() => {});
+              await page.click(sel).catch(() => {});
+              await page.keyboard.down('Control');
+              await page.keyboard.press('A');
+              await page.keyboard.up('Control');
+              await page.keyboard.press('Backspace');
+              await page.type(sel, finalDescription, { delay: 50 });
+              await page.evaluate((s) => {
+                const el = document.querySelector(s);
+                if (el) {
+                  el.dispatchEvent(new Event('input', { bubbles: true }));
+                  el.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+              }, sel);
               await delay(1500);
               madeChanges = true;
             }
