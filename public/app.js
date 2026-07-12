@@ -573,7 +573,7 @@ async function submitPreOrderCheck() {
       
       const tasks = validTasks;
       const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
-      const isOutOfService = hasActiveOrPausedTimer || o.estadoUnidad === 'fuera_de_servicio';
+      const isOutOfService = o.estadoUnidad === 'fuera_de_servicio';
       return isOutOfService;
     });
   }
@@ -2116,15 +2116,13 @@ function createOrderCardHtml(order) {
             <div class="order-card-subtitle" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
               <span>Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion || 'Sin Clasificar'}</strong></span>
               ${(() => {
-                const tasks = order.tasks || [];
-                const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
-                const isOutOfService = hasActiveOrPausedTimer || order.estadoUnidad === 'fuera_de_servicio';
-                const tooltip = hasActiveOrPausedTimer ? 'Forzado Fuera de Servicio por tareas activas o en proceso' : (isOutOfService ? 'Haga clic para cambiar a Operativo' : 'Haga clic para cambiar a Fuera de Servicio');
+                const isOutOfService = order.estadoUnidad === 'fuera_de_servicio';
+                const tooltip = isOutOfService ? 'Haga clic para cambiar a Operativo' : 'Haga clic para cambiar a Fuera de Servicio';
                 
                 const clickAction = `onclick="toggleOrderEstadoUnidad(event, '${order.id}')"`;
                 
                 return `
-                  <div class="switch-container" style="display: inline-flex; align-items: center; gap: 6px; cursor: ${hasActiveOrPausedTimer ? 'not-allowed' : 'pointer'}; user-select: none; opacity: ${hasActiveOrPausedTimer ? '0.6' : '1'}; vertical-align: middle; margin-left: 8px;" ${clickAction} title="${tooltip}">
+                  <div class="switch-container" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; vertical-align: middle; margin-left: 8px;" ${clickAction} title="${tooltip}">
                     <span style="font-size: 11px; font-weight: 600; color: ${isOutOfService ? '#ef4444' : '#10b981'}; text-transform: uppercase;">
                       ${isOutOfService ? 'F. de Servicio' : 'Operativo'}
                     </span>
@@ -2402,7 +2400,7 @@ async function submitWorkOrder() {
     horario: horaEl.value,
     incidente: incidenteEl.value,
     tasks: tasks,
-    estadoUnidad: currentEditingOrderId ? (activeOrders.find(o => o.id === currentEditingOrderId)?.estadoUnidad || 'operativo') : 'operativo',
+    estadoUnidad: currentEditingOrderId ? (activeOrders.find(o => o.id === currentEditingOrderId)?.estadoUnidad || 'fuera_de_servicio') : 'fuera_de_servicio',
     combustibleReset: currentCombustibleReset
   };
  
@@ -6357,7 +6355,7 @@ async function submitMassiveOrders() {
       interno: interno,
       clasificacion: clasificacion,
       incidente: "",
-      estadoUnidad: "operativo",
+      estadoUnidad: "fuera_de_servicio",
       tasks: [{
         centroCosto: cc,
         empleado: empleado,
@@ -7002,7 +7000,7 @@ async function savePrevService() {
       clasificacion: 'Preventivo',
       incidente: incidente,
       tasks: [],
-      estadoUnidad: 'operativo',
+      estadoUnidad: 'fuera_de_servicio',
       createdBy: currentUser
     };
 

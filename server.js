@@ -320,7 +320,7 @@ app.post('/api/orders', (req, res) => {
       incidente,
       tasks,
       createdBy,
-      estadoUnidad: estadoUnidad || 'operativo',
+      estadoUnidad: estadoUnidad || 'fuera_de_servicio',
       combustibleReset
     });
 
@@ -384,7 +384,7 @@ app.post('/api/orders/bulk', (req, res) => {
         incidente: incidente || '',
         tasks: tasks || [],
         createdBy,
-        estadoUnidad: estadoUnidad || 'operativo'
+        estadoUnidad: estadoUnidad || 'fuera_de_servicio'
       });
 
       checkAndTriggerGoogleSheetUpdates(null, newOrder.tasks, responsable, interno);
@@ -643,7 +643,7 @@ app.post('/api/orders/cleanup', (req, res) => {
       
       // Force out of service if active/paused timers exist
       const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
-      const isOutOfService = hasActiveOrPausedTimer || order.estadoUnidad === 'fuera_de_servicio';
+      const isOutOfService = order.estadoUnidad === 'fuera_de_servicio';
 
       const isSynced = order.syncStatus === 'success';
       const isVerified = order.verifiedStatus === 'success';
@@ -1760,7 +1760,7 @@ async function triggerActiveTasksGoogleSheetSync() {
       const tasks = order.tasks || [];
       
       const hasActiveOrPausedTimer = tasks.some(t => t.timerStarted || t.timerStart || t.status === 'En Proceso');
-      const isOutOfService = hasActiveOrPausedTimer || order.estadoUnidad === 'fuera_de_servicio';
+      const isOutOfService = order.estadoUnidad === 'fuera_de_servicio';
       const estadoUnidadLabel = isOutOfService ? "Fuera de Servicio" : "Operativo";
 
       tasks.forEach(task => {
