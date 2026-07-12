@@ -814,7 +814,7 @@ function editOrder(orderId) {
 }
 
 function viewOrder(orderId) {
-  const order = activeOrders.find(o => o.id === orderId);
+  const order = activeOrders.find(o => o.id === orderId) || archivedOrders.find(o => o.id === orderId);
   if (!order) return;
 
   // Open in read-only mode (no save, no edit)
@@ -2006,7 +2006,7 @@ function createHistoryCardHtml(order) {
 }
 
 async function unarchiveOrder(orderId) {
-  if (confirm("¿Desarchivar esta orden y volver a encolarla para sincronización/control?")) {
+  if (confirm("¿Desarchivar esta orden para poder editarla?\nVolverá al listado de pendientes con el lápiz de edición habilitado y podrás modificarla antes de volver a sincronizar.")) {
     try {
       const currentUsername = localStorage.getItem('currentUserUsername') || '';
       const res = await fetch(`/api/orders/${orderId}/unarchive`, {
@@ -2018,7 +2018,7 @@ async function unarchiveOrder(orderId) {
         showToast(data.error || "Error al desarchivar orden", "danger");
         return;
       }
-      showToast("Orden desarchivada ✓ — encolada para sincronizar", "success");
+      showToast("Orden desarchivada ✓ — Lápiz habilitado para editar", "success");
       fetchOrders();
       // If historial view is currently open, refresh it too
       const historialView = document.getElementById('view-historial');

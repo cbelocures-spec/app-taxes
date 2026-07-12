@@ -604,12 +604,12 @@ app.patch('/api/orders/:id/unarchive', (req, res) => {
     db.updateWorkOrder(req.params.id, {
       archived: false,
       archivedAt: null,
-      syncStatus: "pending",
+      syncStatus: "local",
       syncError: null,
       verifiedStatus: "idle",
       verifiedError: null
     });
-    res.json({ success: true, message: "Orden desarchivada y re-encolada para sincronización." });
+    res.json({ success: true, message: "Orden desarchivada y puesta en edición local." });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
