@@ -1980,7 +1980,10 @@ function createHistoryCardHtml(order) {
             <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion}</strong></div>
           </div>
         </div>
-        <span class="badge-status success"><span class="material-icons">check_circle</span> Sincronizado</span>
+        <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px;">
+          <span class="material-icons">check_circle</span>
+          <span>Sincronizado${order.taxesOrderNumber ? ` O.T.: ${order.taxesOrderNumber}` : ''}</span>
+        </span>
       </div>
       <div class="order-card-footer">
         <div class="tasks-summary">
