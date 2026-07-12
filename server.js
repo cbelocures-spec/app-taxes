@@ -771,10 +771,13 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
     }
 
     // Auto-archive if both sync and verification are successful (green + blue)
-    if (updates.syncStatus === 'success' && updates.verifiedStatus === 'success') {
+    // AND the unit status is 'operativo' (not kept active for further tasks)
+    const isSynced = updates.syncStatus === 'success' || (updates.syncStatus === undefined && existing.syncStatus === 'success');
+    const isVerified = updates.verifiedStatus === 'success' || (updates.verifiedStatus === undefined && existing.verifiedStatus === 'success');
+    if (isSynced && isVerified && existing.estadoUnidad === 'operativo') {
       updates.archived = true;
       updates.archivedAt = new Date().toISOString();
-      console.log(`[LocalSyncResult] Order ${req.params.id} is fully verified and synced. Auto-archived to history.`);
+      console.log(`[LocalSyncResult] Order ${req.params.id} is fully verified, synced and unit is OPERATIVO. Auto-archived to history.`);
     }
 
     db.updateWorkOrder(req.params.id, updates);

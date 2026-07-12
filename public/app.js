@@ -554,31 +554,21 @@ async function submitPreOrderCheck() {
 
   const isCarmona = currentUser === 'jcarmona@contenedoreshugo.com.ar' || currentUser === 'j.carmona@contenedoreshugo.com.ar';
 
-  // 1. Search for existing open order with this interno and clasificacion (not fully completed)
-  let existingOrder = activeOrders.find(o => {
-    const isSameInterno = String(o.interno).trim() === String(interno);
-    const isSameCls = String(o.clasificacion).trim().toLowerCase() === String(clasificacion).trim().toLowerCase();
-    const validTasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
-    const allCompleted = validTasks.length > 0 && validTasks.every(t => t.status === "Finalizada");
-    return isSameInterno && isSameCls && !allCompleted;
-  });
-
-  // 2. Fallback: Search for any open order of this Interno that is forced/marked Out of Service
-  if (!existingOrder) {
+  let existingOrder = null;
+  if (!isCarmona && userSector !== 'Herrería') {
+    // Taller/Other sectors: Only block duplication if there is an active order for this interno
+    // which is currently 'fuera_de_servicio'. If it is 'operativo', duplicate creation is allowed.
     existingOrder = activeOrders.find(o => {
       const isSameInterno = String(o.interno).trim() === String(interno);
+      if (!isSameInterno) return false;
       const validTasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
       const allCompleted = validTasks.length > 0 && validTasks.every(t => t.status === "Finalizada");
-      if (!isSameInterno || allCompleted) return false;
-      
-      const tasks = validTasks;
-      const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
-      const isOutOfService = o.estadoUnidad === 'fuera_de_servicio';
-      return isOutOfService;
+      if (allCompleted) return false;
+      return o.estadoUnidad === 'fuera_de_servicio';
     });
   }
 
-  if (existingOrder && !isCarmona && userSector !== 'Herrería') {
+  if (existingOrder) {
     const orderCls = existingOrder.clasificacion || "Sin Clasificar";
     showToast(`Abriendo orden en curso del interno ${interno} (${orderCls})...`, "warning");
     closePreOrderModal();

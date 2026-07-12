@@ -2958,15 +2958,23 @@ async function verifyWorkOrderWithPage(page, orderId) {
     } else {
       const msg = madeChanges ? 'Verificado y corregido correctamente vía listado de tareas.' : 'Todo correcto, verificado sin cambios necesarios.';
       console.log(`[Verify] SUCCESS. ${msg}`);
-      db.updateWorkOrder(orderId, {
+      const shouldArchive = order.estadoUnidad === 'operativo';
+      const updatePayload = {
         verifiedStatus: 'success',
         verifiedCount: count,
         verifiedError: null,
-        lastVerifyAttempt: new Date().toISOString(),
-        archived: true,
-        archivedAt: new Date().toISOString()
-      });
-      console.log(`[Verify] Order ${orderId} fully verified and synced. Auto-archived to history.`);
+        lastVerifyAttempt: new Date().toISOString()
+      };
+      if (shouldArchive) {
+        updatePayload.archived = true;
+        updatePayload.archivedAt = new Date().toISOString();
+      }
+      db.updateWorkOrder(orderId, updatePayload);
+      if (shouldArchive) {
+        console.log(`[Verify] Order ${orderId} fully verified and synced. Auto-archived to history.`);
+      } else {
+        console.log(`[Verify] Order ${orderId} fully verified and synced. Kept active because unit is Out of Service.`);
+      }
     }
 
   } catch (err) {
