@@ -1676,13 +1676,35 @@ async function syncWorkOrder(orderId) {
           const cardIdx = toDeleteIndices[di];
           page.once('dialog', d => d.accept().catch(() => {}));
           const deleted = await page.evaluate((idx) => {
-            const cards = Array.from(document.querySelectorAll('[class*="card"], [class*="task"], .col-12')).filter(c => c.querySelector('input[name="horas_estimadas"]'));
-            const card = cards[idx];
-            if (card) {
-              const redBtn = card.querySelector('button.btn-danger, a.btn-danger, button.btn-outline-danger, a.btn-outline-danger, [class*="danger"]');
-              if (redBtn && typeof redBtn.click === 'function') {
-                redBtn.click();
-                return true;
+            const clickConfirm = () => {
+              // Look for common confirmation dialog buttons in Vue/Bootstrap modals
+              const confirmBtn = Array.from(document.querySelectorAll('button, a, input[type="button"]')).find(b => {
+                const txt = (b.textContent || '').toLowerCase().trim();
+                return txt === 'aceptar' || txt === 'confirmar' || txt === 'sí' || txt === 'si' || txt === 'eliminar';
+              });
+              if (confirmBtn && typeof confirmBtn.click === 'function') {
+                confirmBtn.click();
+              }
+            };
+
+            const inputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
+            const el = inputs[idx];
+            if (el) {
+              let card = el.parentElement;
+              while (card && card !== document.body && 
+                     !card.classList.contains('card') && 
+                     !card.classList.contains('form-row') && 
+                     !card.classList.contains('row') &&
+                     !card.className.includes('col-12')) {
+                card = card.parentElement;
+              }
+              if (card) {
+                const redBtn = card.querySelector('button.btn-danger, a.btn-danger, button.btn-outline-danger, a.btn-outline-danger, [class*="danger"]');
+                if (redBtn && typeof redBtn.click === 'function') {
+                  redBtn.click();
+                  setTimeout(clickConfirm, 350);
+                  return true;
+                }
               }
             }
             // Fallback: global search
@@ -1691,6 +1713,7 @@ async function syncWorkOrder(orderId) {
             const btn = trashBtns[idx];
             if (btn && typeof btn.click === 'function') {
               btn.click();
+              setTimeout(clickConfirm, 350);
               return true;
             }
             return false;
