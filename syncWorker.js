@@ -1248,6 +1248,26 @@ async function scrapeCatalogs(triggerUsername = null) {
   }
 }
 
+// Helper to extract base description by stripping system suffixes (diagnostico, realizado, insumos)
+function extractBaseDescription(desc) {
+  if (!desc) return '';
+  let cleanDesc = desc;
+  
+  // 1. Remove [Insumos: ...]
+  cleanDesc = cleanDesc.replace(/\[Insumos:[^\]]*\]/gi, '');
+  
+  // 2. Remove Realizó/Realizo suffix
+  cleanDesc = cleanDesc.replace(/\.?\s*Realizó:\s*[^\n\r]*/gi, '');
+  cleanDesc = cleanDesc.replace(/\.?\s*Realizo:\s*[^\n\r]*/gi, '');
+  
+  // 3. Remove Diagnóstico suffix
+  cleanDesc = cleanDesc.replace(/\.?\s*-\s*Diagnóstico:\s*[^\n\r]*/gi, '');
+  cleanDesc = cleanDesc.replace(/\.?\s*Diagnóstico:\s*[^\n\r]*/gi, '');
+  
+  // Clean whitespace and punctuation to make compare robust
+  return cleanDesc.replace(/[.,\s]/g, '').toLowerCase();
+}
+
 // Helper to resolve employee name and handle custom fallbacks (like mapping to Vera)
 function resolveAndMapEmployee(task) {
   const employeeCatalog = db.getCatalogs().empleados || [];
@@ -1701,8 +1721,11 @@ async function syncWorkOrder(orderId) {
 
         // Fill/Fix Description if empty or doesn't match what the app has
         const { finalDescription } = resolveAndMapEmployee(appTask);
+        const localDescBase = (appTask.descripcion || '').replace(/[.,\s]/g, '').toLowerCase();
+        const taxesDescBase = extractBaseDescription(formCards[ci].description);
         const descMismatch = formCards[ci].description === '' ||
-          (!cleanStr(formCards[ci].description).includes(cleanStr(finalDescription)) &&
+          (localDescBase !== taxesDescBase &&
+           !cleanStr(formCards[ci].description).includes(cleanStr(finalDescription)) &&
            !cleanStr(finalDescription).includes(cleanStr(formCards[ci].description)));
         if (descMismatch) {
           console.log(`[Reconcile] Card #${ci} description mismatch (Taxes: "${formCards[ci].description}"). Writing: "${finalDescription}"...`);
@@ -2637,7 +2660,11 @@ async function verifyWorkOrderWithPage(page, orderId) {
         const hoursOk = (actualHours === 0 && expectedHours > 0) ? false : (Math.abs(expectedHours - actualHours) <= 0.05);
         const expectedRealizada = t.status === 'Finalizada' ? 'SI' : 'NO';
         const realizadaOk = matchedRow.realizada.toUpperCase() === expectedRealizada;
-        const descOkFinal = clean(matchedRow.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(matchedRow.description));
+        const localDescBase = (t.descripcion || '').replace(/[.,\s]/g, '').toLowerCase();
+        const taxesDescBase = extractBaseDescription(matchedRow.description);
+        const descOkFinal = localDescBase === taxesDescBase ||
+          clean(matchedRow.description).includes(clean(finalDescription)) ||
+          clean(finalDescription).includes(clean(matchedRow.description));
 
         console.log(`[Verify] Task #${idx+1}: hours expected=${expectedHoursStr} actual=${actualHours} OK=${hoursOk} | realizada expected=${expectedRealizada} actual=${matchedRow.realizada} OK=${realizadaOk} | description OK=${descOkFinal}`);
 
@@ -2866,7 +2893,11 @@ async function verifyWorkOrderWithPage(page, orderId) {
           const hoursOk = (actualHours === 0 && expectedHours > 0) ? false : (Math.abs(expectedHours - actualHours) <= 0.05);
           const expectedRealizada = t.status === 'Finalizada' ? 'SI' : 'NO';
           const realizadaOk = matchedRow.realizada.toUpperCase() === expectedRealizada;
-          const descOkFinal = clean(matchedRow.description).includes(clean(finalDescription)) || clean(finalDescription).includes(clean(matchedRow.description));
+          const localDescBase = (t.descripcion || '').replace(/[.,\s]/g, '').toLowerCase();
+          const taxesDescBase = extractBaseDescription(matchedRow.description);
+          const descOkFinal = localDescBase === taxesDescBase ||
+            clean(matchedRow.description).includes(clean(finalDescription)) ||
+            clean(finalDescription).includes(clean(matchedRow.description));
           
           if (!hoursOk) {
             errors.push(`Tarea #${idx + 1} (${employeeLabel}): Horas no coincidieron tras guardar (esperadas: ${expectedHoursStr}, en Taxes: ${actualHours}).`);
