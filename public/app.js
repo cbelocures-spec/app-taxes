@@ -5157,7 +5157,8 @@ function togglePasswordVisibility(inputId) {
 // Utility to determine sector by username (client-side)
 function getSectorByUsername(username) {
   if (!username) return 'Taller';
-  const email = username.toLowerCase().trim();
+  const cleanUsername = String(username).split(',')[0].trim();
+  const email = cleanUsername.toLowerCase().trim();
   
   if (email === 'taller@contenedoreshugo.com.ar' || email === 'paniol@contenedoreshugo.com.ar') {
     return 'Admin';

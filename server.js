@@ -117,7 +117,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Utility to determine sector by username
 function getSectorByUsername(username) {
   if (!username) return 'Taller';
-  const email = username.toLowerCase().trim();
+  const cleanUsername = String(username).split(',')[0].trim();
+  const email = cleanUsername.toLowerCase().trim();
   
   if (email === 'taller@contenedoreshugo.com.ar' || email === 'paniol@contenedoreshugo.com.ar') {
     return 'Admin';
