@@ -68,19 +68,38 @@ function releaseBrowserLock() {
   browserBusy = false;
 }
 
+const { exec } = require('child_process');
+
+function killZombieChromes() {
+  return new Promise((resolve) => {
+    if (process.platform === 'win32') return resolve();
+    console.log('[Puppeteer] Cleaning up potential zombie chrome processes on server...');
+    exec('pkill -9 -f chrome || true', (err) => {
+      if (err) console.warn('[Puppeteer] Zombie cleanup warning: ' + err.message);
+      resolve();
+    });
+  });
+}
+
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
 async function launchBrowser() {
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.PUPPETEER_EXECUTABLE_PATH;
+  // Free up PIDs and memory by killing any leftover chrome instances
+  await killZombieChromes().catch(() => {});
+
   const launchOptions = {
     headless: true, // Always headless on server
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
-    protocolTimeout: 30000, // Allow up to 30s for slow CDP/Runtime responses (e.g. Taxes listing DOM queries)
+    protocolTimeout: 30000, // Allow up to 30s for slow CDP/Runtime responses
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
-      '--disable-gpu'
+      '--disable-gpu',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process', // Crucial to prevent EAGAIN (spawn limit reached)
+      '--disable-extensions'
     ]
   };
   return await puppeteer.launch(launchOptions);
