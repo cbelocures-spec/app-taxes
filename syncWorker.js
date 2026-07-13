@@ -98,7 +98,6 @@ async function launchBrowser() {
       '--disable-gpu',
       '--no-first-run',
       '--no-zygote',
-      '--single-process', // Crucial to prevent EAGAIN (spawn limit reached)
       '--disable-extensions'
     ]
   };
