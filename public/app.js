@@ -2400,7 +2400,10 @@ async function submitWorkOrder() {
   try {
     const res = await fetch(url, {
       method: method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-user-username': localStorage.getItem('currentUserUsername') || ''
+      },
       body: JSON.stringify(payload)
     });
  
@@ -5119,7 +5122,10 @@ async function confirmVoiceOrder() {
     showToast('Creando orden por voz...', 'info');
     const res = await fetch('/api/orders', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-user-username': localStorage.getItem('currentUserUsername') || ''
+      },
       body: JSON.stringify(payload)
     });
     if (!res.ok) {
@@ -7013,7 +7019,10 @@ async function savePrevService() {
 
     const orderRes = await fetch('/api/orders', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-user-username': currentUser || ''
+      },
       body: JSON.stringify(orderPayload)
     });
     if (!orderRes.ok) {
@@ -8356,7 +8365,10 @@ async function savePtUnit() {
 
         const orderRes = await fetch('/api/orders', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-user-username': localStorage.getItem('currentUserUsername') || ''
+          },
           body: JSON.stringify(orderPayload)
         });
         if (!orderRes.ok) {
@@ -8481,7 +8493,10 @@ async function savePtUnit() {
 
           await fetch('/api/orders', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-user-username': localStorage.getItem('currentUserUsername') || ''
+            },
             body: JSON.stringify(orderPayload)
           });
           showToast(`Unidad actualizada y Orden de Trabajo Correctiva creada ✓`, 'success');
