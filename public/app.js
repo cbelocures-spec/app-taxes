@@ -561,9 +561,6 @@ async function submitPreOrderCheck() {
     existingOrder = activeOrders.find(o => {
       const isSameInterno = String(o.interno).trim() === String(interno);
       if (!isSameInterno) return false;
-      const validTasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
-      const allCompleted = validTasks.length > 0 && validTasks.every(t => t.status === "Finalizada");
-      if (allCompleted) return false;
       return o.estadoUnidad === 'fuera_de_servicio';
     });
   }
