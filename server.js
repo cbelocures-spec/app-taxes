@@ -121,27 +121,22 @@ function getSectorByUsername(username) {
   const email = cleanUsername.toLowerCase().trim();
   
   if (
-    email === 'taller@contenedoreshugo.com.ar' || 
-    email === 'paniol@contenedoreshugo.com.ar' ||
-    email === 'paniol' ||
-    email === 'panol' ||
-    email === 'taller'
+    email.includes('taller') || 
+    email.includes('paniol') || 
+    email.includes('panol') || 
+    email.includes('pañol')
   ) {
     return 'Admin';
   }
   if (
-    email === 'jcarmona@contenedoreshugo.com.ar' || 
-    email === 'j.carmona@contenedoreshugo.com.ar' ||
-    email === 'jcarmona' ||
-    email === 'j.carmona'
+    email.includes('jcarmona') || 
+    email.includes('carmona')
   ) {
     return 'Herrería';
   }
   if (
-    email === 'ftoledo@contenedoreshugo.com.ar' || 
-    email === 'f.toledo@contenedoreshugo.com.ar' ||
-    email === 'ftoledo' ||
-    email === 'f.toledo'
+    email.includes('ftoledo') || 
+    email.includes('toledo')
   ) {
     return 'Edilicio';
   }
@@ -704,9 +699,9 @@ app.post('/api/orders/retry/:id', async (req, res) => {
 
     const requester = req.headers['x-user-username'] || null;
     const sector = getSectorByUsername(requester);
-
-    // Check sector permission
     const existingCls = order.clasificacion;
+
+    console.log(`[Permission Audit - Sync Retry] Requester: "${requester}", Resolved Sector: "${sector}", Order Cls: "${existingCls}"`);
     if (sector === 'Herrería' && existingCls !== 'Herrería') {
       return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
     }

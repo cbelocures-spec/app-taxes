@@ -5167,27 +5167,22 @@ function getSectorByUsername(username) {
   const email = cleanUsername.toLowerCase().trim();
   
   if (
-    email === 'taller@contenedoreshugo.com.ar' || 
-    email === 'paniol@contenedoreshugo.com.ar' ||
-    email === 'paniol' ||
-    email === 'panol' ||
-    email === 'taller'
+    email.includes('taller') || 
+    email.includes('paniol') || 
+    email.includes('panol') || 
+    email.includes('pañol')
   ) {
     return 'Admin';
   }
   if (
-    email === 'jcarmona@contenedoreshugo.com.ar' || 
-    email === 'j.carmona@contenedoreshugo.com.ar' ||
-    email === 'jcarmona' ||
-    email === 'j.carmona'
+    email.includes('jcarmona') || 
+    email.includes('carmona')
   ) {
     return 'Herrería';
   }
   if (
-    email === 'ftoledo@contenedoreshugo.com.ar' || 
-    email === 'f.toledo@contenedoreshugo.com.ar' ||
-    email === 'ftoledo' ||
-    email === 'f.toledo'
+    email.includes('ftoledo') || 
+    email.includes('toledo')
   ) {
     return 'Edilicio';
   }
