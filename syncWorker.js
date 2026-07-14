@@ -1841,9 +1841,10 @@ async function syncWorkOrder(orderId) {
             console.log(`[Reconcile] Card #${ci} Using timer-derived hours: ${expectedHoursNum}h`);
           }
         }
-        const expectedHours = expectedHoursNum.toFixed(2);
+        const expectedHours = expectedHoursNum.toFixed(2).replace('.', ',');
+        const expectedHoursNum2 = parseFloat(expectedHoursNum.toFixed(2)); // numeric version for comparisons
         const actualHours = parseFloat(formCards[ci].hours.replace(',', '.')) || 0;
-        const hoursOk = (actualHours === 0 && parseFloat(expectedHours) > 0) ? false : (Math.abs(parseFloat(expectedHours) - actualHours) <= 0.05);
+        const hoursOk = (actualHours === 0 && expectedHoursNum2 > 0) ? false : (Math.abs(expectedHoursNum2 - actualHours) <= 0.05);
         const realizadaNeeded = appTask.status === 'Finalizada' && !formCards[ci].realizada;
 
         console.log(`[Reconcile] Card #${ci}: hours exp=${expectedHours} actual=${actualHours} ok=${hoursOk} | realizada needed=${realizadaNeeded}`);
@@ -2236,7 +2237,8 @@ async function syncWorkOrder(orderId) {
         console.log(`[Hours] Task #${i+1} Finalizada with 0 hours — using minimum 0.01 to avoid blank in Taxes.`);
       }
 
-      const hoursVal3 = effectiveHoras.toFixed(2);
+      // Taxes uses Spanish locale: comma as decimal separator (e.g. "0,12" not "0.12")
+      const hoursVal3 = effectiveHoras.toFixed(2).replace('.', ',');
       console.log(`[Hours] Target Horas Estimadas for task #${i+1}: "${hoursVal3}"`);
 
       // Resolve input ID
@@ -2277,7 +2279,7 @@ async function syncWorkOrder(orderId) {
           return { found: true, value: el.value };
         }, sel).catch(() => ({ found: false }));
 
-        hoursFilled = hoursVerify.found && parseFloat(hoursVerify.value) === parseFloat(hoursVal3);
+        hoursFilled = hoursVerify.found && Math.abs(parseFloat(String(hoursVerify.value).replace(',', '.')) - parseFloat(String(hoursVal3).replace(',', '.'))) < 0.005;
         console.log(`[Hours] Verification attempt 1 — value: "${hoursVerify.value}", expected: "${hoursVal3}", success: ${hoursFilled}`);
 
         // Attempt 2 (fallback): use Vue-compatible native setter if value didn't stick
@@ -2305,7 +2307,7 @@ async function syncWorkOrder(orderId) {
             return { found: true, value: el.value };
           }, sel).catch(() => ({ found: false }));
 
-          hoursFilled = hoursVerify2.found && parseFloat(hoursVerify2.value) === parseFloat(hoursVal3);
+          hoursFilled = hoursVerify2.found && Math.abs(parseFloat(String(hoursVerify2.value).replace(',', '.')) - parseFloat(String(hoursVal3).replace(',', '.'))) < 0.005;
           console.log(`[Hours] Verification attempt 2 — value: "${hoursVerify2.value}", expected: "${hoursVal3}", success: ${hoursFilled}`);
         }
       } else {
@@ -2851,7 +2853,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
           // Update hours if mismatch
           if (!hoursOk) {
-            const expectedHoursDot = expectedHoursComma.replace(',', '.');
+            // Taxes uses Spanish locale: use comma as decimal separator
+            const expectedHoursDot = expectedHoursComma; // already has comma from expectedHoursStr
             console.log(`[Verify] Setting hours to "${expectedHoursDot}" via keyboard simulation...`);
 
             const hoursInputId = await page.evaluate(() => {
