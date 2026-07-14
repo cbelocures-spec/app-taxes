@@ -2623,7 +2623,26 @@ async function verifyWorkOrderWithPage(page, orderId) {
     await page.keyboard.press('Backspace').catch(() => {});
     await page.keyboard.type(otNumClean, { delay: 60 }).catch(() => {});
     await page.keyboard.press('Tab').catch(() => {});
-    await delay(1000);
+    await delay(500);
+
+    // 3. Set 'Realizada' filter to 'Todos' (empty string) to make completed tasks visible
+    console.log(`[Verify] Setting 'Realizada' filter to 'Todos'...`);
+    await page.evaluate(() => {
+      const cleanText = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const labels = Array.from(document.querySelectorAll('label, div, span'));
+      const targetLabel = labels.find(l => cleanText(l.textContent) === 'realizada');
+      if (targetLabel) {
+        const container = targetLabel.closest('.field-compact, .form-group') || targetLabel.parentElement?.parentElement;
+        if (container) {
+          const select = container.querySelector('select');
+          if (select) {
+            select.value = ''; // 'Todos'
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }
+      }
+    });
+    await delay(500);
 
     const clickedBuscar = await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
