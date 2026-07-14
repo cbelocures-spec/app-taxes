@@ -1841,7 +1841,7 @@ async function syncWorkOrder(orderId) {
             console.log(`[Reconcile] Card #${ci} Using timer-derived hours: ${expectedHoursNum}h`);
           }
         }
-        const expectedHours = expectedHoursNum.toFixed(2).replace('.', ',');
+        const expectedHours = expectedHoursNum.toFixed(2); // Keep period decimal separator for number input value
         const expectedHoursNum2 = parseFloat(expectedHoursNum.toFixed(2)); // numeric version for comparisons
         const actualHours = parseFloat(formCards[ci].hours.replace(',', '.')) || 0;
         const hoursOk = (actualHours === 0 && expectedHoursNum2 > 0) ? false : (Math.abs(expectedHoursNum2 - actualHours) <= 0.05);
@@ -1864,6 +1864,7 @@ async function syncWorkOrder(orderId) {
             await page.click(sel, { clickCount: 3 }).catch(() => {});
             await page.keyboard.press('Backspace').catch(() => {});
             await page.type(sel, expectedHours, { delay: 50 });
+            await page.keyboard.press('Tab').catch(() => {}); // Force Vue blur to persist the value
             await page.evaluate((s) => {
               const el = document.querySelector(s);
               if (el) {
@@ -2237,8 +2238,9 @@ async function syncWorkOrder(orderId) {
         console.log(`[Hours] Task #${i+1} Finalizada with 0 hours — using minimum 0.01 to avoid blank in Taxes.`);
       }
 
-      // Taxes uses Spanish locale: comma as decimal separator (e.g. "0,12" not "0.12")
-      const hoursVal3 = effectiveHoras.toFixed(2).replace('.', ',');
+      // HTML5 type="number" inputs programmatically require period (.) as the decimal separator under the W3C spec,
+      // regardless of browser locale display. headless Chromium on Railway uses en-US locale and expects period.
+      const hoursVal3 = effectiveHoras.toFixed(2);
       console.log(`[Hours] Target Horas Estimadas for task #${i+1}: "${hoursVal3}"`);
 
       // Resolve input ID
@@ -2534,14 +2536,27 @@ async function verifyWorkOrderWithPage(page, orderId) {
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
 
     // 1b. Robust selector resolution for the OT search input
-    // Since Taxes removed placeholders on their search inputs, we locate the second input of the form-group or the one labeled for OT/Numero.
+    // Since Taxes removed placeholders on their search inputs, we locate the input next to label or by name/type.
     const getSearchInputId = async () => {
       return await page.evaluate(() => {
-        const labels = Array.from(document.querySelectorAll('label, div, span'));
-        const targetLabel = labels.find(l => l.textContent.includes('Buscar por Numero') || l.textContent.includes('Titulo de OT'));
+        const cleanText = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const labels = Array.from(document.querySelectorAll('label, div, span, legend'));
+        
+        // Find label containing "numero" or "ot" or "titulo"
+        const targetLabel = labels.find(l => {
+          const txt = cleanText(l.textContent);
+          return (txt.includes('buscar por numero') && txt.includes('ot')) || 
+                 (txt.includes('numero') && txt.includes('ot')) || 
+                 txt.includes('titulo de ot');
+        });
+        
         if (targetLabel) {
           if (targetLabel.getAttribute('for')) {
-            return '#' + targetLabel.getAttribute('for');
+            const input = document.getElementById(targetLabel.getAttribute('for'));
+            if (input) {
+              if (!input.id) input.id = 'tmp-search-ot-input';
+              return '#' + input.id;
+            }
           }
           const parent = targetLabel.parentElement;
           if (parent) {
@@ -2552,19 +2567,35 @@ async function verifyWorkOrderWithPage(page, orderId) {
             }
           }
         }
-        // Fallback: second text input
-        const inputs = Array.from(document.querySelectorAll('input.input-compact.form-control'));
-        if (inputs[1]) {
-          if (!inputs[1].id) inputs[1].id = 'tmp-search-ot-input-fallback';
-          return '#' + inputs[1].id;
+        
+        // Suffix fallback: search by name/id containing "ot" or "numero"
+        const inputs = Array.from(document.querySelectorAll('input'));
+        const otInput = inputs.find(i => {
+          const name = cleanText(i.name || '');
+          const id = cleanText(i.id || '');
+          const labelText = cleanText(i.closest('.form-group')?.textContent || '');
+          return name.includes('ot') || id.includes('ot') || 
+                 name.includes('numero') || id.includes('numero') ||
+                 labelText.includes('buscar por numero') || labelText.includes('ot');
+        });
+        if (otInput) {
+          if (!otInput.id) otInput.id = 'tmp-search-ot-input-name';
+          return '#' + otInput.id;
         }
+        
+        // Ultimate fallback: second text input
+        const textInputs = inputs.filter(i => i.type === 'text' || !i.type);
+        if (textInputs[1]) {
+          if (!textInputs[1].id) textInputs[1].id = 'tmp-search-ot-input-index';
+          return '#' + textInputs[1].id;
+        }
+        
         return null;
       });
     };
 
     let searchInpSelector = await getSearchInputId();
     if (!searchInpSelector) {
-      // Reload and retry
       console.warn(`[Verify] Search input not resolved. Reloading and retrying...`);
       await page.reload({ waitUntil: 'load', timeout: 30000 });
       searchInpSelector = await getSearchInputId();
@@ -2582,20 +2613,22 @@ async function verifyWorkOrderWithPage(page, orderId) {
     await page.waitForSelector(searchInpSelector, { timeout: 15000 });
     await delay(1500);
 
-    // 2. Search for OT number
+    // 2. Search for OT number with Vue events triggered
     console.log(`[Verify] Searching for OT ${otNumClean} in tasks page...`);
+    await page.focus(searchInpSelector);
+    await page.click(searchInpSelector, { clickCount: 3 }).catch(() => {});
+    await page.keyboard.press('Backspace').catch(() => {});
+    await page.keyboard.type(otNumClean, { delay: 80 });
+    await page.keyboard.press('Tab').catch(() => {});
     await page.evaluate((sel) => {
       const el = document.querySelector(sel);
       if (el) {
-        el.focus();
-        el.value = '';
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
       }
     }, searchInpSelector);
-    await delay(200);
-    await page.keyboard.type(otNumClean, { delay: 80 });
-    await delay(500);
+    await delay(800);
+
     const clickedBuscar = await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
       const btn = buttons.find(b => b.textContent.trim().toUpperCase().includes('BUSCAR') || (b.value || '').toUpperCase().includes('BUSCAR'));
@@ -2853,8 +2886,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
           // Update hours if mismatch
           if (!hoursOk) {
-            // Taxes uses Spanish locale: use comma as decimal separator
-            const expectedHoursDot = expectedHoursComma; // already has comma from expectedHoursStr
+            // HTML5 input type="number" programmatic value expects period (.) separator
+            const expectedHoursDot = expectedHoursStr;
             console.log(`[Verify] Setting hours to "${expectedHoursDot}" via keyboard simulation...`);
 
             const hoursInputId = await page.evaluate(() => {
