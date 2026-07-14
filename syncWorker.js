@@ -1751,7 +1751,33 @@ async function syncWorkOrder(orderId) {
         const appTask = order.tasks[appIdx];
         if (!appTask) continue;
 
-        // Fill Employee if empty
+        // 1. Fill/Fix Centro de Costo if empty
+        const ccCatalog = db.getCatalogs().centrosCosto || [];
+        const ccObj = ccCatalog.find(c => c.value === appTask.centroCosto);
+        const ccLabel = ccObj ? ccObj.label : appTask.centroCosto;
+        console.log(`[Reconcile] Card #${ci} Centro de Costo: "${ccLabel}" (ID: ${appTask.centroCosto})`);
+        await page.evaluate((idx, taskCC) => {
+          const selects = Array.from(document.querySelectorAll('select[id^="centro_costo_"], select[name*="centro_costo_id"]'));
+          const ccSelect = selects[idx];
+          if (ccSelect) {
+            const cleanForCompare = (str) => {
+              if (!str) return '';
+              return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            };
+            const cleanVal = cleanForCompare(taskCC);
+            const opt = Array.from(ccSelect.options).find(o => 
+              cleanForCompare(o.text).includes(cleanVal) || 
+              cleanForCompare(o.value) === cleanVal
+            );
+            if (opt) {
+              ccSelect.value = opt.value;
+              ccSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+        }, ci, ccLabel);
+        await delay(1000);
+
+        // 2. Fill Employee if empty
         const { employeeLabel } = resolveAndMapEmployee(appTask);
         if (formCards[ci].employee === '') {
           console.log(`[Reconcile] Card #${ci} has no employee. Selecting: "${employeeLabel}"...`);
@@ -1760,7 +1786,7 @@ async function syncWorkOrder(orderId) {
           await delay(2000);
         }
 
-        // Fill/Fix Description if empty or doesn't match what the app has
+        // 3. Fill/Fix Description if empty or doesn't match what the app has
         const { finalDescription } = resolveAndMapEmployee(appTask);
         const localDescBase = (appTask.descripcion || '').replace(/[.,\s]/g, '').toLowerCase();
         const taxesDescBase = extractBaseDescription(formCards[ci].description);
@@ -1771,7 +1797,7 @@ async function syncWorkOrder(orderId) {
         if (descMismatch) {
           console.log(`[Reconcile] Card #${ci} description mismatch (Taxes: "${formCards[ci].description}"). Writing: "${finalDescription}"...`);
           const descId = await page.evaluate((idx) => {
-            const textareas = Array.from(document.querySelectorAll('textarea'));
+            const textareas = Array.from(document.querySelectorAll('textarea[id^="descripcion_"], textarea[placeholder*="Describe las actividades"]'));
             const el = textareas[idx];
             if (!el) return null;
             if (!el.id) el.id = `rc-desc-${idx}-${Date.now()}`;
