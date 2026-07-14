@@ -2652,7 +2652,31 @@ async function verifyWorkOrderWithPage(page, orderId) {
     for (let idx = 0; idx < order.tasks.length; idx++) {
       const t = order.tasks[idx];
       const { employeeLabel, finalDescription } = resolveAndMapEmployee(t);
-      const expectedHours = parseFloat(String(t.horasEstimadas || '0').replace(',', '.')) || 0;
+      // Compute expected hours using the same logic as syncWorkOrder:
+      // 1. Use horasEstimadas (H.MM format) from DB
+      // 2. If 0, try to derive from timerHistory
+      // 3. If still 0 and Finalizada, use 0.01 minimum
+      function hmmToDecimal(hmmVal) {
+        const raw = parseFloat(String(hmmVal || '0').replace(',', '.')) || 0;
+        const hrs = Math.floor(raw);
+        const mins = Math.round((raw - hrs) * 100);
+        return parseFloat((hrs + mins / 60).toFixed(2));
+      }
+      let expectedHours = hmmToDecimal(t.horasEstimadas);
+      if (expectedHours === 0 && t.timerHistory && Array.isArray(t.timerHistory) && t.timerHistory.length >= 1) {
+        let totalMs = 0;
+        const sorted = [...t.timerHistory].sort((a, b) => a.timestamp - b.timestamp);
+        let currentStart = null;
+        sorted.forEach(ev => {
+          if (ev.type === 'Inició' || ev.type === 'Reanudó' || ev.type === 'Inicio') currentStart = ev.timestamp;
+          else if ((ev.type === 'Pausó' || ev.type === 'Fin' || ev.type === 'FIN') && currentStart !== null) {
+            totalMs += (ev.timestamp - currentStart);
+            currentStart = null;
+          }
+        });
+        if (totalMs > 0) expectedHours = Math.round((totalMs / 3600000) * 100) / 100;
+      }
+      if (expectedHours === 0 && t.status === 'Finalizada') expectedHours = 0.01;
       const expectedHoursStr = expectedHours.toFixed(2);
       const expectedHoursComma = expectedHoursStr.replace('.', ',');
 
@@ -2706,7 +2730,10 @@ async function verifyWorkOrderWithPage(page, orderId) {
         errors.push(`Tarea #${idx + 1} (${employeeLabel}): No encontrada en el listado de tareas`);
       } else {
         const actualHours = parseFloat(String(matchedRow.hours).replace(',', '.')) || 0;
-        const hoursOk = (actualHours === 0 && expectedHours > 0) ? false : (Math.abs(expectedHours - actualHours) <= 0.05);
+        // Also flag mismatch if tarea is Finalizada and Taxes shows 0 hours (blank field)
+        const hoursOk = (actualHours === 0 && (expectedHours > 0 || t.status === 'Finalizada'))
+          ? false
+          : (Math.abs(expectedHours - actualHours) <= 0.05);
         const expectedRealizada = t.status === 'Finalizada' ? 'SI' : 'NO';
         const realizadaOk = matchedRow.realizada.toUpperCase() === expectedRealizada;
         const localDescBase = (t.descripcion || '').replace(/[.,\s]/g, '').toLowerCase();
@@ -2959,7 +2986,11 @@ async function verifyWorkOrderWithPage(page, orderId) {
           errors.push(`Tarea #${idx + 1} (${employeeLabel}): No se encontró la tarea tras guardar cambios.`);
         } else {
           const actualHours = parseFloat(String(matchedRow.hours).replace(',', '.')) || 0;
-          const hoursOk = (actualHours === 0 && expectedHours > 0) ? false : (Math.abs(expectedHours - actualHours) <= 0.05);
+          // hoursOk: mismatch if expected > 0 but actual is 0 (blank in Taxes).
+          // Also block archiving if tarea is Finalizada and has 0 hours in Taxes (field was blank/unfilled).
+          const hoursOk = (actualHours === 0 && (expectedHours > 0 || t.status === 'Finalizada')) 
+            ? false 
+            : (Math.abs(expectedHours - actualHours) <= 0.05);
           const expectedRealizada = t.status === 'Finalizada' ? 'SI' : 'NO';
           const realizadaOk = matchedRow.realizada.toUpperCase() === expectedRealizada;
           const localDescBase = (t.descripcion || '').replace(/[.,\s]/g, '').toLowerCase();
@@ -2969,7 +3000,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
             clean(finalDescription).includes(clean(matchedRow.description));
           
           if (!hoursOk) {
-            errors.push(`Tarea #${idx + 1} (${employeeLabel}): Horas no coincidieron tras guardar (esperadas: ${expectedHoursStr}, en Taxes: ${actualHours}).`);
+            errors.push(`Tarea #${idx + 1} (${employeeLabel}): Horas en blanco o no coincidieron tras guardar (esperadas: ${expectedHoursStr}, en Taxes: ${actualHours}).`);
           }
           if (!realizadaOk) {
             errors.push(`Tarea #${idx + 1} (${employeeLabel}): Estado no coincidió tras guardar (esperado: ${expectedRealizada}, en Taxes: ${matchedRow.realizada}).`);
