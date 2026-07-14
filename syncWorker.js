@@ -1823,11 +1823,25 @@ async function syncWorkOrder(orderId) {
           }
         }
 
-        // Convert H.MM format (e.g. 1.30 = 1h30min) to decimal hours (e.g. 1.5) for Taxes portal
-        const rawHmm = parseFloat(String(appTask.horasEstimadas || '0').replace(',', '.')) || 0;
-        const hmmHours = Math.floor(rawHmm);
-        const hmmMins = Math.round((rawHmm - hmmHours) * 100);
-        const expectedHours = (hmmHours + hmmMins / 60).toFixed(2);
+        // horasEstimadas is already decimal hours from the timer — use directly, no H.MM conversion.
+        let expectedHoursNum = parseFloat(String(appTask.horasEstimadas || '0').replace(',', '.')) || 0;
+        if (expectedHoursNum === 0 && appTask.timerHistory && Array.isArray(appTask.timerHistory) && appTask.timerHistory.length >= 1) {
+          let totalMs = 0;
+          const sorted = [...appTask.timerHistory].sort((a, b) => a.timestamp - b.timestamp);
+          let currentStart = null;
+          sorted.forEach(event => {
+            if (event.type === 'Inició' || event.type === 'Reanudó' || event.type === 'Inicio') {
+              currentStart = event.timestamp;
+            } else if (event.type === 'Pausó' || event.type === 'Fin' || event.type === 'FIN') {
+              if (currentStart !== null) { totalMs += (event.timestamp - currentStart); currentStart = null; }
+            }
+          });
+          if (totalMs > 0) {
+            expectedHoursNum = Math.round((totalMs / 3600000) * 100) / 100;
+            console.log(`[Reconcile] Card #${ci} Using timer-derived hours: ${expectedHoursNum}h`);
+          }
+        }
+        const expectedHours = expectedHoursNum.toFixed(2);
         const actualHours = parseFloat(formCards[ci].hours.replace(',', '.')) || 0;
         const hoursOk = (actualHours === 0 && parseFloat(expectedHours) > 0) ? false : (Math.abs(parseFloat(expectedHours) - actualHours) <= 0.05);
         const realizadaNeeded = appTask.status === 'Finalizada' && !formCards[ci].realizada;
@@ -2193,16 +2207,9 @@ async function syncWorkOrder(orderId) {
       }
 
       // 3. Fill Hours — input[name="horas_estimadas"], type="number", index i
-      // IMPORTANT: horasEstimadas is stored in H.MM format (e.g., 1.30 = 1h30min).
-      // Must convert to decimal hours (e.g., 1.5) before sending to Taxes.
-      function hmmToDecimalHours(hmmVal) {
-        const raw = parseFloat(String(hmmVal || '0').replace(',', '.')) || 0;
-        const hours = Math.floor(raw);
-        const minutesFrac = Math.round((raw - hours) * 100); // H.MM → extract MM part
-        return parseFloat((hours + minutesFrac / 60).toFixed(2));
-      }
-
-      let effectiveHoras = hmmToDecimalHours(task.horasEstimadas);
+      // horasEstimadas is stored as decimal hours directly from the timer (e.g., 0.55 = 0.55h = 33 min).
+      // NO conversion needed — use the value as-is.
+      let effectiveHoras = parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0;
       if (effectiveHoras === 0 && task.timerHistory && Array.isArray(task.timerHistory) && task.timerHistory.length >= 1) {
         // Sum up all (Inició/Reanudó → Pausó/Fin) pairs in the timer history
         let totalMs = 0;
@@ -2219,7 +2226,7 @@ async function syncWorkOrder(orderId) {
           }
         });
         if (totalMs > 0) {
-          effectiveHoras = Math.round((totalMs / 3600000) * 100) / 100; // real decimal hours
+          effectiveHoras = Math.round((totalMs / 3600000) * 100) / 100; // real decimal hours from ms
           console.log(`[Hours] Using timer-derived decimal hours: ${effectiveHoras}h (${totalMs}ms) for task #${i+1}`);
         }
       }
@@ -2710,16 +2717,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
       const t = order.tasks[idx];
       const { employeeLabel, finalDescription } = resolveAndMapEmployee(t);
       // Compute expected hours using the same logic as syncWorkOrder:
-      // 1. Use horasEstimadas (H.MM format) from DB
-      // 2. If 0, try to derive from timerHistory
-      // 3. If still 0 and Finalizada, use 0.01 minimum
-      function hmmToDecimal(hmmVal) {
-        const raw = parseFloat(String(hmmVal || '0').replace(',', '.')) || 0;
-        const hrs = Math.floor(raw);
-        const mins = Math.round((raw - hrs) * 100);
-        return parseFloat((hrs + mins / 60).toFixed(2));
-      }
-      let expectedHours = hmmToDecimal(t.horasEstimadas);
+      // horasEstimadas is already decimal hours from the timer — use directly, no conversion.
+      let expectedHours = parseFloat(String(t.horasEstimadas || '0').replace(',', '.')) || 0;
       if (expectedHours === 0 && t.timerHistory && Array.isArray(t.timerHistory) && t.timerHistory.length >= 1) {
         let totalMs = 0;
         const sorted = [...t.timerHistory].sort((a, b) => a.timestamp - b.timestamp);
