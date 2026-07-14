@@ -2613,21 +2613,32 @@ async function verifyWorkOrderWithPage(page, orderId) {
     await page.waitForSelector(searchInpSelector, { timeout: 15000 });
     await delay(1500);
 
-    // 2. Search for OT number with Vue events triggered
+    // 2. Search for OT number with Vue events triggered via native setter
     console.log(`[Verify] Searching for OT ${otNumClean} in tasks page...`);
-    await page.focus(searchInpSelector);
-    await page.click(searchInpSelector, { clickCount: 3 }).catch(() => {});
-    await page.keyboard.press('Backspace').catch(() => {});
-    await page.keyboard.type(otNumClean, { delay: 80 });
-    await page.keyboard.press('Tab').catch(() => {});
-    await page.evaluate((sel) => {
+    await page.evaluate((sel, val) => {
       const el = document.querySelector(sel);
       if (el) {
+        // Use HTMLInputElement native setter to bypass Vue reactivity cache
+        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        if (nativeSetter) {
+          nativeSetter.call(el, val);
+        } else {
+          el.value = val;
+        }
+        el.focus();
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
       }
-    }, searchInpSelector);
-    await delay(800);
+    }, searchInpSelector, otNumClean);
+
+    // Keyboard simulation fallback and focus trigger
+    await page.focus(searchInpSelector).catch(() => {});
+    await page.click(searchInpSelector, { clickCount: 3 }).catch(() => {});
+    await page.keyboard.press('Backspace').catch(() => {});
+    await page.keyboard.type(otNumClean, { delay: 60 }).catch(() => {});
+    await page.keyboard.press('Tab').catch(() => {});
+    await delay(1000);
 
     const clickedBuscar = await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
