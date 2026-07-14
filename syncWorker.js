@@ -3048,6 +3048,12 @@ async function verifyWorkOrderWithPage(page, orderId) {
     if (madeChanges && errors.length === 0) {
       console.log(`[Verify] Re-reading tasks table to verify that edits actually persisted in Taxes...`);
       tableTasks = await readTableTasks();
+
+      // DIAG: log what the table contains after re-read
+      const diagHeaders = await page.evaluate(() => Array.from(document.querySelectorAll('table th')).map(h => `"${h.textContent.trim()}"`).join(', '));
+      console.log(`[Verify-DIAG] Table headers: ${diagHeaders}`);
+      console.log(`[Verify-DIAG] tableTasks after double-read: ${JSON.stringify(tableTasks)}`);
+
       for (let idx = 0; idx < order.tasks.length; idx++) {
         const t = order.tasks[idx];
         const { employeeLabel, finalDescription } = resolveAndMapEmployee(t);
@@ -3078,7 +3084,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
         } else {
           const actualHours = parseFloat(String(matchedRow.hours).replace(',', '.')) || 0;
           // hoursOk: mismatch if expected > 0 but actual is 0 (blank in Taxes).
-          // Also block archiving if tarea is Finalizada and has 0 hours in Taxes (field was blank/unfilled).
+          // Also block archiving if tarea is Finalizada and has 0 hours in Taxes (field was blank/unfilled).\
           const hoursOk = (actualHours === 0 && (expectedHours > 0 || t.status === 'Finalizada')) 
             ? false 
             : (Math.abs(expectedHours - actualHours) <= 0.05);
@@ -3089,6 +3095,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
           const descOkFinal = localDescBase === taxesDescBase ||
             clean(matchedRow.description).includes(clean(finalDescription)) ||
             clean(finalDescription).includes(clean(matchedRow.description));
+
+          console.log(`[Verify-DIAG] Task #${idx+1} double-check: expected=${expectedHoursStr} actual=${actualHours} hoursOk=${hoursOk} realizada=${realizadaOk} desc=${descOkFinal}`);
           
           if (!hoursOk) {
             errors.push(`Tarea #${idx + 1} (${employeeLabel}): Horas en blanco o no coincidieron tras guardar (esperadas: ${expectedHoursStr}, en Taxes: ${actualHours}).`);
@@ -3102,6 +3110,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
         }
       }
     }
+
 
     const count = (order.verifiedCount || 0) + 1;
     if (errors.length > 0) {
