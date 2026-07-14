@@ -1918,8 +1918,9 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   console.log(`[HTTP] Escuchando en http://localhost:${PORT}`);
   console.log(`[HTTP] Red local:      http://${localIP}:${PORT}`);
 
-  // Start the Puppeteer background sync worker if enabled (always locally, conditionally on production)
-  const enableWorker = process.env.NODE_ENV !== 'production' || process.env.ENABLE_BACKGROUND_WORKER === 'true';
+  // Start the Puppeteer background sync worker if enabled (only locally, never in Railway)
+  const isRailway = process.env.RAILWAY_ENVIRONMENT !== undefined;
+  const enableWorker = (process.env.NODE_ENV !== 'production' || process.env.ENABLE_BACKGROUND_WORKER === 'true') && !isRailway;
   if (enableWorker && process.env.DISABLE_BACKGROUND_WORKER !== 'true') {
     worker.startWorker();
   } else {

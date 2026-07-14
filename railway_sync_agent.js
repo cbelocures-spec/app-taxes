@@ -68,10 +68,55 @@ async function checkAndSync() {
         return;
       }
 
+      // 2. Synchronize all Railway orders with the local database copy
+      for (const target of orders) {
+        try {
+          const existing = db.getWorkOrderById(target.id);
+          if (!existing) {
+            // Create locally and preserve original values
+            db.createWorkOrder(target);
+            db.updateWorkOrder(target.id, {
+              syncStatus: target.syncStatus,
+              syncError: target.syncError,
+              syncDate: target.syncDate,
+              verifiedStatus: target.verifiedStatus,
+              verifiedError: target.verifiedError,
+              verifiedCount: target.verifiedCount,
+              taxesOrderNumber: target.taxesOrderNumber,
+              tasks: target.tasks,
+              archived: target.archived === true
+            });
+          } else {
+            // Update fields if it is not currently syncing locally
+            if (existing.syncStatus !== 'syncing') {
+              db.updateWorkOrder(target.id, {
+                rodado: target.rodado,
+                responsable: target.responsable,
+                fechaEntrega: target.fechaEntrega,
+                horario: target.horario,
+                interno: target.interno,
+                clasificacion: target.clasificacion,
+                incidente: target.incidente,
+                syncStatus: target.syncStatus,
+                syncError: target.syncError,
+                syncDate: target.syncDate,
+                tasks: target.tasks,
+                estadoUnidad: target.estadoUnidad,
+                combustibleReset: target.combustibleReset,
+                taxesOrderNumber: target.taxesOrderNumber,
+                verifiedStatus: target.verifiedStatus,
+                verifiedError: target.verifiedError,
+                verifiedCount: target.verifiedCount,
+                archived: target.archived === true
+              });
+            }
+          }
+        } catch (dbErr) {
+          console.error(`[RailwayAgent] Error updating local database for order ${target.id}:`, dbErr.message);
+        }
+      }
 
-      // Find any order that strictly needs sync (syncStatus is 'pending' only).
-      // Orders in 'error' are handled by syncWorker.js's own retry logic with
-      // proper throttling (autoSyncRetryCount + lastAutoSyncAttempt cooldown).
+      // 3. Find any order that strictly needs sync (syncStatus is 'pending' only).
       const pending = orders.filter(o => o.syncStatus === 'pending');
 
       if (pending.length === 0) {
@@ -122,7 +167,6 @@ async function checkAndSync() {
               verifiedCount,
               taxesOrderNumber: updatedLocal ? updatedLocal.taxesOrderNumber : null
             }, (uploadErr) => {
-
               if (uploadErr) {
                 console.error('[RailwayAgent] Error uploading sync result:', uploadErr.message);
               } else {
