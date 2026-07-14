@@ -2545,22 +2545,18 @@ async function verifyWorkOrderWithPage(page, orderId) {
         // Find label containing "numero" or "ot" or "titulo"
         const targetLabel = labels.find(l => {
           const txt = cleanText(l.textContent);
-          return (txt.includes('buscar por numero') && txt.includes('ot')) || 
-                 (txt.includes('numero') && txt.includes('ot')) || 
-                 txt.includes('titulo de ot');
+          return txt.includes('buscar por numero') && txt.includes('ot');
         });
         
         if (targetLabel) {
           if (targetLabel.getAttribute('for')) {
             const input = document.getElementById(targetLabel.getAttribute('for'));
-            if (input) {
-              if (!input.id) input.id = 'tmp-search-ot-input';
-              return '#' + input.id;
-            }
+            if (input) return '#' + input.id;
           }
-          const parent = targetLabel.parentElement;
-          if (parent) {
-            const input = parent.querySelector('input');
+          // Search closest field-compact or form-group container
+          const container = targetLabel.closest('.field-compact, .form-group, .col, [class*="col"]') || targetLabel.parentElement?.parentElement;
+          if (container) {
+            const input = container.querySelector('input[type="text"], input:not([type="hidden"])');
             if (input) {
               if (!input.id) input.id = 'tmp-search-ot-input';
               return '#' + input.id;
@@ -2569,25 +2565,14 @@ async function verifyWorkOrderWithPage(page, orderId) {
         }
         
         // Suffix fallback: search by name/id containing "ot" or "numero"
-        const inputs = Array.from(document.querySelectorAll('input'));
+        const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"])'));
         const otInput = inputs.find(i => {
-          const name = cleanText(i.name || '');
-          const id = cleanText(i.id || '');
-          const labelText = cleanText(i.closest('.form-group')?.textContent || '');
-          return name.includes('ot') || id.includes('ot') || 
-                 name.includes('numero') || id.includes('numero') ||
-                 labelText.includes('buscar por numero') || labelText.includes('ot');
+          const labelText = cleanText(i.closest('.field-compact, .form-group, [class*="col"]')?.textContent || '');
+          return labelText.includes('buscar por numero') || labelText.includes('titulo de ot');
         });
         if (otInput) {
-          if (!otInput.id) otInput.id = 'tmp-search-ot-input-name';
+          if (!otInput.id) otInput.id = 'tmp-search-ot-input-fallback';
           return '#' + otInput.id;
-        }
-        
-        // Ultimate fallback: second text input
-        const textInputs = inputs.filter(i => i.type === 'text' || !i.type);
-        if (textInputs[1]) {
-          if (!textInputs[1].id) textInputs[1].id = 'tmp-search-ot-input-index';
-          return '#' + textInputs[1].id;
         }
         
         return null;
