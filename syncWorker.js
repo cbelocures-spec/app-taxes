@@ -2219,6 +2219,8 @@ async function syncWorkOrder(orderId) {
       if (hoursInputId) {
         console.log(`[Hours] Found hours input at index ${i}. Focusing and typing value "${hoursVal3}"...`);
         const sel = `#${hoursInputId}`;
+
+        // Attempt 1: keyboard simulation (standard approach)
         await page.focus(sel).catch(() => {});
         await page.click(sel, { clickCount: 3 }).catch(() => {});
         await page.keyboard.press('Backspace').catch(() => {});
@@ -2242,7 +2244,36 @@ async function syncWorkOrder(orderId) {
         }, sel).catch(() => ({ found: false }));
 
         hoursFilled = hoursVerify.found && parseFloat(hoursVerify.value) === parseFloat(hoursVal3);
-        console.log(`[Hours] Verification — value retained: "${hoursVerify.value}", expected: "${hoursVal3}", success: ${hoursFilled}`);
+        console.log(`[Hours] Verification attempt 1 — value: "${hoursVerify.value}", expected: "${hoursVal3}", success: ${hoursFilled}`);
+
+        // Attempt 2 (fallback): use Vue-compatible native setter if value didn't stick
+        if (!hoursFilled) {
+          console.log(`[Hours] Attempt 1 failed. Retrying with Vue-native setter for index ${i}...`);
+          await page.evaluate((s, val) => {
+            const el = document.querySelector(s);
+            if (!el) return;
+            // Use HTMLInputElement native setter to bypass Vue's internal value caching
+            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+            if (nativeSetter && nativeSetter.set) {
+              nativeSetter.set.call(el, val);
+            } else {
+              el.value = val;
+            }
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+          }, sel, hoursVal3);
+          await delay(500);
+
+          const hoursVerify2 = await page.evaluate((s) => {
+            const el = document.querySelector(s);
+            if (!el) return { found: false };
+            return { found: true, value: el.value };
+          }, sel).catch(() => ({ found: false }));
+
+          hoursFilled = hoursVerify2.found && parseFloat(hoursVerify2.value) === parseFloat(hoursVal3);
+          console.log(`[Hours] Verification attempt 2 — value: "${hoursVerify2.value}", expected: "${hoursVal3}", success: ${hoursFilled}`);
+        }
       } else {
         console.warn(`[Hours] Could not locate input[name="horas_estimadas"] at index ${i}`);
       }
@@ -2820,6 +2851,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
             let hoursStuck = false;
             if (hoursInputId) {
               const sel = `#${hoursInputId}`;
+
+              // Attempt 1: keyboard simulation
               await page.focus(sel).catch(() => {});
               await page.click(sel, { clickCount: 3 }).catch(() => {});
               await page.keyboard.press('Backspace').catch(() => {});
@@ -2845,7 +2878,38 @@ async function verifyWorkOrderWithPage(page, orderId) {
                 const recheckNum = parseFloat(String(recheck.value).replace(',', '.'));
                 const expectedNum = parseFloat(expectedHoursDot);
                 hoursStuck = !Number.isNaN(recheckNum) && Math.abs(recheckNum - expectedNum) < 0.005;
-                console.log(`[Verify] Re-read hours value: "${recheck.value}" — stuck: ${hoursStuck}`);
+                console.log(`[Verify] Re-read hours value attempt 1: "${recheck.value}" — stuck: ${hoursStuck}`);
+              }
+
+              // Attempt 2 (fallback): Vue-native setter if keyboard didn't work
+              if (!hoursStuck) {
+                console.log(`[Verify] Hours not stuck after attempt 1. Retrying with Vue-native setter...`);
+                await page.evaluate((s, val) => {
+                  const el = document.querySelector(s);
+                  if (!el) return;
+                  const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+                  if (nativeSetter && nativeSetter.set) {
+                    nativeSetter.set.call(el, val);
+                  } else {
+                    el.value = val;
+                  }
+                  el.dispatchEvent(new Event('input', { bubbles: true }));
+                  el.dispatchEvent(new Event('change', { bubbles: true }));
+                  el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+                }, sel, expectedHoursDot);
+                await delay(500);
+
+                const recheck2 = await page.evaluate((s) => {
+                  const el = document.querySelector(s);
+                  return el ? { value: el.value } : null;
+                }, sel).catch(() => null);
+
+                if (recheck2) {
+                  const recheckNum2 = parseFloat(String(recheck2.value).replace(',', '.'));
+                  const expectedNum = parseFloat(expectedHoursDot);
+                  hoursStuck = !Number.isNaN(recheckNum2) && Math.abs(recheckNum2 - expectedNum) < 0.005;
+                  console.log(`[Verify] Re-read hours value attempt 2: "${recheck2.value}" — stuck: ${hoursStuck}`);
+                }
               }
             } else {
               console.warn(`[Verify] Could not locate hours input to edit.`);
