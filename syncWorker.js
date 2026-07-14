@@ -2258,6 +2258,7 @@ async function syncWorkOrder(orderId) {
         await page.click(sel, { clickCount: 3 }).catch(() => {});
         await page.keyboard.press('Backspace').catch(() => {});
         await page.type(sel, hoursVal3, { delay: 50 });
+        await page.keyboard.press('Tab').catch(() => {}); // Force Vue blur to persist the value
         await page.evaluate((s) => {
           const el = document.querySelector(s);
           if (el) {
@@ -2267,7 +2268,7 @@ async function syncWorkOrder(orderId) {
           }
         }, sel);
 
-        await delay(300);
+        await delay(800);
 
         // Verification step — re-read the input to confirm the value stuck
         const hoursVerify = await page.evaluate((s) => {
@@ -2882,6 +2883,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
               await page.click(sel, { clickCount: 3 }).catch(() => {});
               await page.keyboard.press('Backspace').catch(() => {});
               await page.type(sel, expectedHoursDot, { delay: 50 });
+              await page.keyboard.press('Tab').catch(() => {}); // Force Vue blur to persist the value
               await page.evaluate((s) => {
                 const el = document.querySelector(s);
                 if (el) {
@@ -2891,7 +2893,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
                 }
               }, sel);
 
-              await delay(300);
+              await delay(800);
 
               // Re-read to confirm it stuck
               const recheck = await page.evaluate((s) => {
