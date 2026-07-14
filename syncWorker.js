@@ -2838,24 +2838,36 @@ async function verifyWorkOrderWithPage(page, orderId) {
                 return options.includes('finalizada') || options.includes('realizada') || options.includes('pendiente');
               });
               if (statusSelect) {
-                const opt = Array.from(statusSelect.options).find(o => o.text.toLowerCase().includes(targetStatus.toLowerCase()));
+                const opt = Array.from(statusSelect.options).find(o => 
+                  o.text.toLowerCase().includes(targetStatus.toLowerCase()) || 
+                  (targetStatus === 'Finalizada' && o.text.toLowerCase() === 'si') || 
+                  (targetStatus === 'Pendiente' && o.text.toLowerCase() === 'no')
+                );
                 if (opt) {
                   statusSelect.value = opt.value;
                   statusSelect.dispatchEvent(new Event('change', { bubbles: true }));
                   return true;
                 }
               }
-              // 2. Try to find switch toggle next to 'Realizada' text
-              if (targetStatus === 'Finalizada') {
-                const labels = Array.from(document.querySelectorAll('label, span, div, .custom-control-label'));
-                const realLabel = labels.find(l => l.textContent.trim().toLowerCase() === 'realizada');
-                if (realLabel) {
-                  const parent = realLabel.closest('.custom-control, .form-group') || realLabel.parentElement;
-                  const cb = parent?.querySelector('input[type="checkbox"]');
-                  if (cb && !cb.checked) {
-                    realLabel.click();
-                    return true;
+              // 2. Try to find switch toggle or checkbox on the task edit page
+              const checkboxes = Array.from(document.querySelectorAll('input[type="checkbox"]'));
+              const cb = checkboxes.find(c => {
+                const id = (c.id || '').toLowerCase();
+                const name = (c.name || '').toLowerCase();
+                const label = c.closest('.custom-control, .form-group')?.textContent.toLowerCase() || '';
+                return id.includes('realizada') || id.includes('completada') || name.includes('realizada') || label.includes('realizada') || label.includes('completada') || label.includes('finalizada');
+              }) || checkboxes[0];
+
+              if (cb) {
+                const shouldBeChecked = targetStatus === 'Finalizada';
+                if (cb.checked !== shouldBeChecked) {
+                  const label = cb.closest('.custom-control, .form-group')?.querySelector('label');
+                  if (label) {
+                    label.click();
+                  } else {
+                    cb.click();
                   }
+                  return true;
                 }
               }
               return false;
@@ -3029,7 +3041,7 @@ async function verifyWorkOrder(orderId) {
     const page = await autoLogin(browser, username, password, settings.portalUrl);
     await verifyWorkOrderWithPage(page, orderId);
 
-    await browser.close();
+    await browser.close(); releaseBrowserLock();
     
     // Get updated status
     const updated = db.getWorkOrderById(orderId);
@@ -3041,6 +3053,7 @@ async function verifyWorkOrder(orderId) {
     };
   } catch (error) {
     if (browser) await browser.close();
+    releaseBrowserLock();
     return { success: false, message: error.message };
   }
 }
