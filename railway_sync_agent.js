@@ -45,8 +45,8 @@ async function checkAndSync() {
   isAgentRunning = true;
 
   try {
-    // 1. Fetch orders from Railway
-    apiCall('GET', '/api/orders', null, async (err, rawData) => {
+    // 1. Fetch ALL orders (active + archived) from Railway
+    apiCall('GET', '/api/orders/all', null, async (err, rawData) => {
       if (err) {
         console.error('[RailwayAgent] Error fetching orders:', err.message);
         isAgentRunning = false;
@@ -67,23 +67,26 @@ async function checkAndSync() {
         isAgentRunning = false;
         return;
       }
-      // 1.5 Delete local orders not present on Railway to keep databases in sync
-      try {
-        const localAll = db.read().workOrders || [];
-        const railwayIds = new Set(orders.map(o => o.id));
-        const idsToDelete = localAll.filter(o => !railwayIds.has(o.id)).map(o => o.id);
-        if (idsToDelete.length > 0) {
-          console.log(`[RailwayAgent] Deleting ${idsToDelete.length} local orders not present on Railway...`);
-          db.deleteWorkOrders(idsToDelete);
+      // 1.5 Delete local orders not present on Railway to keep databases in sync (ONLY if Railway returned valid orders)
+      if (orders.length > 0) {
+        try {
+          const localAll = db.read().workOrders || [];
+          const railwayIds = new Set(orders.map(o => o.id));
+          const idsToDelete = localAll.filter(o => !railwayIds.has(o.id)).map(o => o.id);
+          if (idsToDelete.length > 0) {
+            console.log(`[RailwayAgent] Deleting ${idsToDelete.length} local orders not present on Railway...`);
+            db.deleteWorkOrders(idsToDelete);
+          }
+        } catch (pruneErr) {
+          console.error('[RailwayAgent] Error pruning local database:', pruneErr.message);
         }
-      } catch (pruneErr) {
-        console.error('[RailwayAgent] Error pruning local database:', pruneErr.message);
       }
 
       // 2. Synchronize all Railway orders with the local database copy
       for (const target of orders) {
         try {
           const existing = db.getWorkOrderById(target.id);
+          const isArchivedLocallyOrRemotely = existing ? (existing.archived === true || target.archived === true) : (target.archived === true);
           if (!existing) {
             // Create locally and preserve original values
             db.createWorkOrder(target);
@@ -96,7 +99,7 @@ async function checkAndSync() {
               verifiedCount: target.verifiedCount,
               taxesOrderNumber: target.taxesOrderNumber,
               tasks: target.tasks,
-              archived: target.archived === true
+              archived: isArchivedLocallyOrRemotely
             });
           } else {
             // Update fields if it is not currently syncing locally
@@ -119,13 +122,31 @@ async function checkAndSync() {
                 verifiedStatus: target.verifiedStatus,
                 verifiedError: target.verifiedError,
                 verifiedCount: target.verifiedCount,
-                archived: target.archived === true
+                archived: isArchivedLocallyOrRemotely
               });
             }
           }
         } catch (dbErr) {
           console.error(`[RailwayAgent] Error updating local database for order ${target.id}:`, dbErr.message);
         }
+      }
+
+      // 2.5 Push locally archived orders to Railway so Railway's database archives them too
+      try {
+        const localArchived = db.getArchivedOrders() || [];
+        for (const archOrder of localArchived) {
+          const rwMatch = orders.find(o => o.id === archOrder.id);
+          if (rwMatch && !rwMatch.archived) {
+            console.log(`[RailwayAgent] Pushing local archived status to Railway for order ${archOrder.id}...`);
+            apiCall('POST', `/api/orders/local-sync-result/${archOrder.id}`, {
+              syncStatus: archOrder.syncStatus || 'success',
+              verifiedStatus: archOrder.verifiedStatus || 'success',
+              archived: true
+            }, () => {});
+          }
+        }
+      } catch (archPushErr) {
+        console.error('[RailwayAgent] Error pushing archived status to Railway:', archPushErr.message);
       }
 
       // 3. Find any order that strictly needs sync (syncStatus is 'pending' only).
@@ -167,6 +188,7 @@ async function checkAndSync() {
             const verifiedStatus = updatedLocal ? updatedLocal.verifiedStatus : 'ok';
             const verifiedError = updatedLocal ? updatedLocal.verifiedError : null;
             const verifiedCount = updatedLocal ? updatedLocal.verifiedCount : 1;
+            const archived = updatedLocal ? updatedLocal.archived === true : false;
 
             // Upload results back to Railway
             apiCall('POST', `/api/orders/local-sync-result/${target.id}`, {
@@ -177,7 +199,8 @@ async function checkAndSync() {
               verifiedStatus,
               verifiedError,
               verifiedCount,
-              taxesOrderNumber: updatedLocal ? updatedLocal.taxesOrderNumber : null
+              taxesOrderNumber: updatedLocal ? updatedLocal.taxesOrderNumber : null,
+              archived
             }, (uploadErr) => {
               if (uploadErr) {
                 console.error('[RailwayAgent] Error uploading sync result:', uploadErr.message);

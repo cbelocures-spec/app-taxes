@@ -582,6 +582,16 @@ app.delete('/api/orders/:id', (req, res) => {
   }
 });
 
+// Get ALL orders (active + archived) — used by sync agent to reconcile complete database
+app.get('/api/orders/all', (req, res) => {
+  try {
+    const all = db.read().workOrders || [];
+    res.json(all);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get archived orders
 app.get('/api/orders/archived', (req, res) => {
   try {
@@ -783,13 +793,13 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
     }
 
     // Auto-archive if both sync and verification are successful (green + blue)
-    // AND the unit status is 'operativo' (not kept active for further tasks)
+    // or if explicit archived flag is provided
     const isSynced = updates.syncStatus === 'success' || (updates.syncStatus === undefined && existing.syncStatus === 'success');
     const isVerified = updates.verifiedStatus === 'success' || (updates.verifiedStatus === undefined && existing.verifiedStatus === 'success');
-    if (isSynced && isVerified && existing.estadoUnidad === 'operativo') {
+    if (req.body.archived === true || (isSynced && isVerified)) {
       updates.archived = true;
-      updates.archivedAt = new Date().toISOString();
-      console.log(`[LocalSyncResult] Order ${req.params.id} is fully verified, synced and unit is OPERATIVO. Auto-archived to history.`);
+      updates.archivedAt = existing.archivedAt || new Date().toISOString();
+      console.log(`[LocalSyncResult] Order ${req.params.id} is verified and synced. Auto-archived to history.`);
     }
 
     db.updateWorkOrder(req.params.id, updates);
