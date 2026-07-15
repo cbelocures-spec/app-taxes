@@ -102,7 +102,8 @@ async function checkAndSync() {
       for (const target of orders) {
         try {
           const existing = db.getWorkOrderById(target.id);
-          const isArchivedLocallyOrRemotely = existing ? (existing.archived === true || target.archived === true) : (target.archived === true);
+          const isOutOfService = target.estadoUnidad === 'fuera_de_servicio';
+          const isArchivedLocallyOrRemotely = isOutOfService ? false : (existing ? (existing.archived === true || target.archived === true) : (target.archived === true));
           if (!existing) {
             // Create locally and preserve original values
             db.createWorkOrder(target);
@@ -152,8 +153,8 @@ async function checkAndSync() {
         const allLocal = db.read().workOrders || [];
         for (const localOrd of allLocal) {
           const rwMatch = orders.find(o => o.id === localOrd.id);
-          if (!rwMatch || (localOrd.archived && !rwMatch.archived)) {
-            console.log(`[RailwayAgent] Pushing local order ${localOrd.id} (${localOrd.interno}) to Railway (archived: ${!!localOrd.archived})...`);
+          if (!rwMatch || localOrd.archived !== rwMatch.archived) {
+            console.log(`[RailwayAgent] Pushing local order ${localOrd.id} (${localOrd.interno}) to Railway (archived: ${localOrd.archived === true})...`);
             apiCall('POST', `/api/orders/local-sync-result/${localOrd.id}`, {
               rodado: localOrd.rodado,
               responsable: localOrd.responsable,
