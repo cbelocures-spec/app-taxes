@@ -1117,6 +1117,20 @@ app.get('/api/catalogs', (req, res) => {
   }
 });
 
+// Update catalogs from sync agent or local backup
+app.post('/api/catalogs/update', (req, res) => {
+  try {
+    if (req.body && req.body.rodados && Array.isArray(req.body.rodados) && req.body.rodados.length > 0) {
+      db.saveCatalogs(req.body);
+      console.log(`[CatalogsUpdate] Successfully updated catalogs. Rodados: ${req.body.rodados.length}`);
+      return res.json({ success: true });
+    }
+    res.status(400).json({ error: "Invalid catalogs payload" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Trigger manual catalog extraction from website
 app.post('/api/catalogs/sync', async (req, res) => {
   try {

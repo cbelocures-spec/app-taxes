@@ -45,6 +45,22 @@ async function checkAndSync() {
   isAgentRunning = true;
 
   try {
+    // 0. Sync catalogs to Railway if Railway has empty catalogs
+    apiCall('GET', '/api/catalogs', null, (catErr, rawCat) => {
+      if (!catErr && rawCat) {
+        try {
+          const remoteCat = JSON.parse(rawCat);
+          if (!remoteCat.rodados || remoteCat.rodados.length === 0) {
+            const localCat = db.getCatalogs();
+            if (localCat && localCat.rodados && localCat.rodados.length > 0) {
+              console.log(`[RailwayAgent] Railway catalogs empty. Uploading ${localCat.rodados.length} local rodados to Railway...`);
+              apiCall('POST', '/api/catalogs/update', localCat, () => {});
+            }
+          }
+        } catch(e) {}
+      }
+    });
+
     // 1. Fetch ALL orders (active + archived) from Railway
     apiCall('GET', '/api/orders/all', null, async (err, rawData) => {
       if (err) {
