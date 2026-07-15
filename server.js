@@ -810,10 +810,16 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
     }
 
     // Auto-archive if both sync and verification are successful (green + blue)
-    // or if explicit archived flag is provided
+    // or if explicit archived flag is provided, but only if not out of service.
     const isSynced = updates.syncStatus === 'success' || (updates.syncStatus === undefined && existing.syncStatus === 'success');
     const isVerified = updates.verifiedStatus === 'success' || (updates.verifiedStatus === undefined && existing.verifiedStatus === 'success');
-    if (req.body.archived === true || (isSynced && isVerified)) {
+    const targetEstadoUnidad = req.body.estadoUnidad !== undefined ? req.body.estadoUnidad : existing.estadoUnidad;
+    const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
+
+    if (isOutOfService) {
+      updates.archived = false;
+      updates.archivedAt = null;
+    } else if (req.body.archived === true || (isSynced && isVerified)) {
       updates.archived = true;
       updates.archivedAt = existing.archivedAt || new Date().toISOString();
       console.log(`[LocalSyncResult] Order ${req.params.id} is verified and synced. Auto-archived to history.`);
