@@ -433,14 +433,17 @@ app.put('/api/orders/:id', (req, res) => {
 
     // Check sector permission
     const existingCls = existing.clasificacion;
-    if (sector === 'Herrería' && existingCls !== 'Herrería') {
-      return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
-    }
-    if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
-      return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
-    }
-    if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
-      return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
+    const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
+    if (!isPaniol) {
+      if (sector === 'Herrería' && existingCls !== 'Herrería') {
+        return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
+      }
+      if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
+        return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
+      }
+      if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
+        return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
+      }
     }
 
     // Force sector classification
@@ -449,7 +452,7 @@ app.put('/api/orders/:id', (req, res) => {
       finalClasificacion = 'Herrería';
     } else if (sector === 'Edilicio') {
       finalClasificacion = 'Edilicio';
-    } else if (sector === 'Taller') {
+    } else if (sector === 'Taller' && !isPaniol) {
       if (clasificacion === 'Herrería' || clasificacion === 'Edilicio') {
         return res.status(400).json({ error: "Clasificación no permitida para el sector Taller." });
       }
@@ -567,14 +570,17 @@ app.delete('/api/orders/:id', (req, res) => {
 
     // Check sector permission
     const existingCls = existing.clasificacion;
-    if (sector === 'Herrería' && existingCls !== 'Herrería') {
-      return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
-    }
-    if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
-      return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
-    }
-    if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
-      return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
+    const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
+    if (!isPaniol) {
+      if (sector === 'Herrería' && existingCls !== 'Herrería') {
+        return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
+      }
+      if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
+        return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
+      }
+      if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
+        return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
+      }
     }
 
     const success = db.deleteWorkOrder(req.params.id);
@@ -718,14 +724,17 @@ app.post('/api/orders/retry/:id', async (req, res) => {
     const existingCls = order.clasificacion;
 
     console.log(`[Permission Audit - Sync Retry] Requester: "${requester}", Resolved Sector: "${sector}", Order Cls: "${existingCls}"`);
-    if (sector === 'Herrería' && existingCls !== 'Herrería') {
-      return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
-    }
-    if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
-      return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
-    }
-    if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
-      return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
+    const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
+    if (!isPaniol) {
+      if (sector === 'Herrería' && existingCls !== 'Herrería') {
+        return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
+      }
+      if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
+        return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
+      }
+      if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
+        return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
+      }
     }
 
     // Solo bloquear reintento si la orden ya fue creada en Taxes (tiene taxesOrderNumber)
@@ -858,14 +867,17 @@ app.post('/api/orders/verify/:id', async (req, res) => {
 
     // Check sector permission
     const existingCls = order.clasificacion;
-    if (sector === 'Herrería' && existingCls !== 'Herrería') {
-      return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
-    }
-    if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
-      return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
-    }
-    if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
-      return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
+    const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
+    if (!isPaniol) {
+      if (sector === 'Herrería' && existingCls !== 'Herrería') {
+        return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
+      }
+      if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
+        return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
+      }
+      if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
+        return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
+      }
     }
 
     // Set checking status
