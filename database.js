@@ -515,6 +515,9 @@ class LocalDB {
     const initialCount = db.workOrders.length;
 
     db.workOrders = db.workOrders.filter(o => {
+      // Always keep archived orders (they belong in Historial)
+      if (o.archived === true) return true;
+
       // Keep if not fully synchronized and verified
       if (o.syncStatus !== 'success') return true;
       if (o.verifiedStatus !== 'success') return true;
