@@ -746,9 +746,26 @@ app.post('/api/orders/retry/:id', async (req, res) => {
 app.post('/api/orders/local-sync-result/:id', (req, res) => {
   try {
     const { syncStatus, syncError, syncDate, tasks, verifiedStatus, verifiedError, verifiedCount, taxesOrderNumber } = req.body;
-    const existing = db.getWorkOrderById(req.params.id);
+    let existing = db.getWorkOrderById(req.params.id);
     if (!existing) {
-      return res.status(404).json({ error: "Orden no encontrada" });
+      db.createWorkOrder({
+        id: req.params.id,
+        rodado: req.body.rodado || '',
+        responsable: req.body.responsable || 'AUTO',
+        fechaEntrega: req.body.fechaEntrega || '',
+        horario: req.body.horario || '',
+        interno: req.body.interno || '',
+        clasificacion: req.body.clasificacion || '',
+        incidente: req.body.incidente || '',
+        tasks: req.body.tasks || [],
+        estadoUnidad: req.body.estadoUnidad || 'operativo',
+        combustibleReset: req.body.combustibleReset,
+        taxesOrderNumber: req.body.taxesOrderNumber,
+        syncStatus: req.body.syncStatus || 'success',
+        verifiedStatus: req.body.verifiedStatus || 'success',
+        archived: req.body.archived === true
+      });
+      existing = db.getWorkOrderById(req.params.id);
     }
 
     // Normalize status strings coming from external agents, which may use

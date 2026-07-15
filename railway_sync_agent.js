@@ -131,22 +131,37 @@ async function checkAndSync() {
         }
       }
 
-      // 2.5 Push locally archived orders to Railway so Railway's database archives them too
+      // 2.5 Push all local orders (both active and archived) to Railway if missing on Railway
       try {
-        const localArchived = db.getArchivedOrders() || [];
-        for (const archOrder of localArchived) {
-          const rwMatch = orders.find(o => o.id === archOrder.id);
-          if (rwMatch && !rwMatch.archived) {
-            console.log(`[RailwayAgent] Pushing local archived status to Railway for order ${archOrder.id}...`);
-            apiCall('POST', `/api/orders/local-sync-result/${archOrder.id}`, {
-              syncStatus: archOrder.syncStatus || 'success',
-              verifiedStatus: archOrder.verifiedStatus || 'success',
-              archived: true
+        const allLocal = db.read().workOrders || [];
+        for (const localOrd of allLocal) {
+          const rwMatch = orders.find(o => o.id === localOrd.id);
+          if (!rwMatch || (localOrd.archived && !rwMatch.archived)) {
+            console.log(`[RailwayAgent] Pushing local order ${localOrd.id} (${localOrd.interno}) to Railway (archived: ${!!localOrd.archived})...`);
+            apiCall('POST', `/api/orders/local-sync-result/${localOrd.id}`, {
+              rodado: localOrd.rodado,
+              responsable: localOrd.responsable,
+              fechaEntrega: localOrd.fechaEntrega,
+              horario: localOrd.horario,
+              interno: localOrd.interno,
+              clasificacion: localOrd.clasificacion,
+              incidente: localOrd.incidente,
+              syncStatus: localOrd.syncStatus || 'success',
+              syncError: localOrd.syncError,
+              syncDate: localOrd.syncDate,
+              tasks: localOrd.tasks,
+              estadoUnidad: localOrd.estadoUnidad,
+              combustibleReset: localOrd.combustibleReset,
+              taxesOrderNumber: localOrd.taxesOrderNumber,
+              verifiedStatus: localOrd.verifiedStatus || 'success',
+              verifiedError: localOrd.verifiedError,
+              verifiedCount: localOrd.verifiedCount,
+              archived: !!localOrd.archived
             }, () => {});
           }
         }
       } catch (archPushErr) {
-        console.error('[RailwayAgent] Error pushing archived status to Railway:', archPushErr.message);
+        console.error('[RailwayAgent] Error pushing local orders to Railway:', archPushErr.message);
       }
 
       // 3. Find any order that strictly needs sync (syncStatus is 'pending' only).
