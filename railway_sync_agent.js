@@ -67,6 +67,18 @@ async function checkAndSync() {
         isAgentRunning = false;
         return;
       }
+      // 1.5 Delete local orders not present on Railway to keep databases in sync
+      try {
+        const localAll = db.read().workOrders || [];
+        const railwayIds = new Set(orders.map(o => o.id));
+        const idsToDelete = localAll.filter(o => !railwayIds.has(o.id)).map(o => o.id);
+        if (idsToDelete.length > 0) {
+          console.log(`[RailwayAgent] Deleting ${idsToDelete.length} local orders not present on Railway...`);
+          db.deleteWorkOrders(idsToDelete);
+        }
+      } catch (pruneErr) {
+        console.error('[RailwayAgent] Error pruning local database:', pruneErr.message);
+      }
 
       // 2. Synchronize all Railway orders with the local database copy
       for (const target of orders) {

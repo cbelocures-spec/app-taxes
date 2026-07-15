@@ -87,9 +87,21 @@ async function launchBrowser() {
   // Free up PIDs and memory by killing any leftover chrome instances
   await killZombieChromes().catch(() => {});
 
+  let execPath = process.env.PUPPETEER_EXECUTABLE_PATH || null;
+  if (!execPath && process.platform === 'win32') {
+    const fs = require('fs');
+    const stdPath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+    const x86Path = 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe';
+    if (fs.existsSync(stdPath)) {
+      execPath = stdPath;
+    } else if (fs.existsSync(x86Path)) {
+      execPath = x86Path;
+    }
+  }
+
   const launchOptions = {
-    headless: true, // Always headless on server
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
+    headless: process.env.PUPPETEER_HEADLESS === 'false' ? false : true, // Headless by default, visible if PUPPETEER_HEADLESS=false
+    executablePath: execPath,
     protocolTimeout: 30000, // Allow up to 30s for slow CDP/Runtime responses
     args: [
       '--no-sandbox',
@@ -1852,7 +1864,7 @@ async function syncWorkOrder(orderId) {
         if (!hoursOk) {
           console.log(`[Reconcile] Fixing hours for card #${ci} to "${expectedHours}"...`);
           const hoursId = await page.evaluate((idx) => {
-            const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
+            const inputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
             const el = inputs[idx];
             if (!el) return null;
             if (!el.id) el.id = `rc-hours-${idx}-${Date.now()}`;
@@ -2245,7 +2257,7 @@ async function syncWorkOrder(orderId) {
 
       // Resolve input ID
       const hoursInputId = await page.evaluate((idx) => {
-        const inputs = Array.from(document.querySelectorAll('input[name="horas_estimadas"]'));
+        const inputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
         const el = inputs[idx];
         if (!el) return null;
         if (!el.id) el.id = `temp-horas-${idx}-${Date.now()}`;
@@ -2540,13 +2552,21 @@ async function verifyWorkOrderWithPage(page, orderId) {
     const getSearchInputId = async () => {
       return await page.evaluate(() => {
         const cleanText = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-        const labels = Array.from(document.querySelectorAll('label, div, span, legend'));
+        const labels = Array.from(document.querySelectorAll('label'));
         
-        // Find label containing "numero" or "ot" or "titulo"
-        const targetLabel = labels.find(l => {
+        // 1. Try finding label containing "buscar por numero" and "ot"
+        let targetLabel = labels.find(l => {
           const txt = cleanText(l.textContent);
           return txt.includes('buscar por numero') && txt.includes('ot');
         });
+        
+        // 2. Try finding label containing just "numero" or "nro" or "ot"
+        if (!targetLabel) {
+          targetLabel = labels.find(l => {
+            const txt = cleanText(l.textContent);
+            return txt === 'numero' || txt === 'nro' || txt === 'ot';
+          });
+        }
         
         if (targetLabel) {
           if (targetLabel.getAttribute('for')) {
@@ -2568,7 +2588,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
         const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"])'));
         const otInput = inputs.find(i => {
           const labelText = cleanText(i.closest('.field-compact, .form-group, [class*="col"]')?.textContent || '');
-          return labelText.includes('buscar por numero') || labelText.includes('titulo de ot');
+          return labelText.includes('buscar por numero') || labelText.includes('titulo de ot') || labelText === 'numero' || labelText === 'ot';
         });
         if (otInput) {
           if (!otInput.id) otInput.id = 'tmp-search-ot-input-fallback';
@@ -2656,22 +2676,36 @@ async function verifyWorkOrderWithPage(page, orderId) {
     // Helper to read table tasks
     const readTableTasks = async () => {
       return await page.evaluate(() => {
-        const rows = Array.from(document.querySelectorAll('table tbody tr'));
+        const cleanText = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const tables = Array.from(document.querySelectorAll('table'));
+        const taskTable = tables.find(t => {
+          const headers = Array.from(t.querySelectorAll('th')).map(h => cleanText(h.textContent));
+          const hasTecnico = headers.some(h => h.includes('tecnico') || h.includes('empleado'));
+          const hasDesc = headers.some(h => h.includes('descripcion') || h.includes('detalle'));
+          return hasTecnico && hasDesc;
+        });
+
+        if (!taskTable) return [];
+
+        const headers = Array.from(taskTable.querySelectorAll('th')).map(h => cleanText(h.textContent));
+        const empIdx = headers.findIndex(h => h.includes('tecnico') || h.includes('empleado'));
+        const hrsIdx = headers.findIndex(h => h.includes('uni/hrs') || h.includes('horas') || h.includes('hs'));
+        const descIdx = headers.findIndex(h => h.includes('descripcion') || h.includes('detalle'));
+        const realIdx = headers.findIndex(h => h.includes('estado') || h.includes('realizada'));
+
+        const rows = Array.from(taskTable.querySelectorAll('tbody tr'));
+        if (rows.length === 0) return [];
         if (rows.length === 1 && (rows[0].textContent.includes('No hay datos') || rows[0].textContent.includes('mostrar'))) return [];
+
         return rows.map((r, idx) => {
           const cells = Array.from(r.querySelectorAll('td')).map(c => c.textContent.trim());
-          const headers = Array.from(document.querySelectorAll('table th')).map(h => h.textContent.trim().toLowerCase());
-          const empIdx = headers.indexOf('empleado');
-          const hrsIdx = headers.indexOf('horas estimadas');
-          const descIdx = headers.indexOf('descripcion');
-          const realIdx = headers.indexOf('realizada');
           
           return {
             rowIndex: idx,
             employee: empIdx !== -1 ? cells[empIdx] : '',
             hours: hrsIdx !== -1 ? cells[hrsIdx] : '0',
             description: descIdx !== -1 ? cells[descIdx] : '',
-            realizada: realIdx !== -1 ? cells[realIdx] : 'NO'
+            realizada: realIdx !== -1 ? (cells[realIdx].toUpperCase().includes('FIN') ? 'SI' : 'NO') : 'NO'
           };
         });
       });
@@ -2712,7 +2746,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
           console.warn('[Verify] Could not locate the "Empleado" filter field on the tasks page.');
           return false;
         }
-        await page.click(`#${empFieldId}`, { clickCount: 3 }).catch(() => {});
+        await page.click(empFieldId, { clickCount: 3 }).catch(() => {});
         await page.keyboard.press('Backspace').catch(() => {});
         await page.keyboard.type(employeeName, { delay: 60 });
         await delay(1200);
@@ -2854,7 +2888,15 @@ async function verifyWorkOrderWithPage(page, orderId) {
         if (!hoursOk || !realizadaOk || !descOkFinal) {
           console.log(`[Verify] Mismatch found for Task #${idx+1}. Clicking eye edit button...`);
           const eyeBtnId = await page.evaluate((rowIdx) => {
-            const rows = Array.from(document.querySelectorAll('table tbody tr'));
+            const cleanText = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+            const tables = Array.from(document.querySelectorAll('table'));
+            const taskTable = tables.find(t => {
+              const headers = Array.from(t.querySelectorAll('th')).map(h => cleanText(h.textContent));
+              return headers.some(h => h.includes('tecnico') || h.includes('empleado')) &&
+                     headers.some(h => h.includes('descripcion') || h.includes('detalle'));
+            });
+            if (!taskTable) return null;
+            const rows = Array.from(taskTable.querySelectorAll('tbody tr'));
             const row = rows[rowIdx];
             const btn = row ? row.querySelector('a, button') : null;
             if (!btn) return null;
@@ -2909,7 +2951,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
               // 1. Try the exact CSS path discovered in the Taxes DOM for the hours input.
               let el = document.querySelector('div.card-body > div > p > div:nth-child(2) > div:nth-child(1) > input');
               // 2. Fallback to the known input name used by the Taxes edit form.
-              if (!el) el = document.querySelector('input[name="horas_estimadas"]');
+              if (!el) el = document.querySelector('input[id^="horas_"], input[name="horas_estimadas"]');
               // 3. Last resort — fuzzy match
               if (!el) {
                 const inputs = Array.from(document.querySelectorAll('input'));
@@ -3000,26 +3042,30 @@ async function verifyWorkOrderWithPage(page, orderId) {
           if (!realizadaOk) {
             console.log(`[Verify] Setting status to ${t.status}...`);
             await page.evaluate((targetStatus) => {
+              const container = document.querySelector('.modal-content, .modal-dialog, .modal') || document;
               // 1. Try to find a select dropdown first
-              const selects = Array.from(document.querySelectorAll('select'));
+              const selects = Array.from(container.querySelectorAll('select'));
               const statusSelect = selects.find(s => {
-                const options = Array.from(s.options).map(o => o.text.toLowerCase());
-                return options.includes('finalizada') || options.includes('realizada') || options.includes('pendiente');
+                const options = Array.from(s.options).map(o => o.text.toLowerCase().trim());
+                const hasSiNo = options.includes('si') && options.includes('no');
+                const label = s.closest('.form-group, .col, [class*="col"]')?.textContent.toLowerCase() || '';
+                return options.includes('finalizada') || options.includes('realizada') || options.includes('pendiente') || label.includes('realizada') || label.includes('estado') || hasSiNo;
               });
               if (statusSelect) {
                 const opt = Array.from(statusSelect.options).find(o => 
                   o.text.toLowerCase().includes(targetStatus.toLowerCase()) || 
-                  (targetStatus === 'Finalizada' && o.text.toLowerCase() === 'si') || 
-                  (targetStatus === 'Pendiente' && o.text.toLowerCase() === 'no')
+                  (targetStatus === 'Finalizada' && (o.text.toLowerCase() === 'si' || o.text.toLowerCase().includes('finalizada'))) || 
+                  (targetStatus === 'Pendiente' && (o.text.toLowerCase() === 'no' || o.text.toLowerCase().includes('pendiente')))
                 );
                 if (opt) {
                   statusSelect.value = opt.value;
                   statusSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                  statusSelect.dispatchEvent(new Event('input', { bubbles: true }));
                   return true;
                 }
               }
               // 2. Try to find switch toggle or checkbox on the task edit page
-              const checkboxes = Array.from(document.querySelectorAll('input[type="checkbox"]'));
+              const checkboxes = Array.from(container.querySelectorAll('input[type="checkbox"]'));
               const cb = checkboxes.find(c => {
                 const id = (c.id || '').toLowerCase();
                 const name = (c.name || '').toLowerCase();
@@ -3036,6 +3082,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
                   } else {
                     cb.click();
                   }
+                  cb.dispatchEvent(new Event('change', { bubbles: true }));
+                  cb.dispatchEvent(new Event('input', { bubbles: true }));
                   return true;
                 }
               }
@@ -3063,6 +3111,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
           // Return to tasks list page and search again to verify remaining tasks
           await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+          searchInpSelector = await getSearchInputId() || searchInpSelector;
           await page.waitForSelector(searchInpSelector, { timeout: 15000 });
           await page.evaluate((sel) => {
             const el = document.querySelector(sel);
