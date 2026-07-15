@@ -37,6 +37,12 @@ console.log = function(...args) {
 
 // Capturar errores inesperados en el servidor y activar agentes de auto-curación
 process.on('uncaughtException', (err) => {
+  // Ignore harmless EBUSY/ENOTEMPTY puppeteer temp profile cleanup errors on Windows
+  if (err.code === 'EBUSY' || err.code === 'ENOTEMPTY' || (err.message && err.message.includes('puppeteer_dev_chrome_profile'))) {
+    console.warn(`[Warning] Ignored Puppeteer cleanup error: ${err.message}`);
+    return;
+  }
+
   const errorLogPath = path.join(__dirname, 'last_error.log');
   const errorDetails = `Fecha: ${new Date().toISOString()}\nError: ${err.message}\nStack:\n${err.stack}\n`;
   try {
