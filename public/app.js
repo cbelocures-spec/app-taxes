@@ -1890,12 +1890,14 @@ function renderHistoryOrders() {
   selectedHistoryOrderIds.clear();
   updateHistoryBulkDeleteActionBar();
 
-  if (archivedOrders.length === 0) {
+  const filteredHistory = getFilteredArchivedOrders();
+
+  if (filteredHistory.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <span class="material-icons">inventory_2</span>
-        <p>No hay órdenes archivadas.</p>
-        <small style="color:var(--text-muted);">Cuando archives una orden sincronizada aparecerá aquí.</small>
+        <p>No hay órdenes archivadas en este sector.</p>
+        <small style="color:var(--text-muted);">Cuando archives una orden de este sector aparecerá aquí.</small>
       </div>
     `;
     if (badge) badge.textContent = '';
@@ -1903,7 +1905,7 @@ function renderHistoryOrders() {
   }
 
   // Sort newest first
-  const sorted = [...archivedOrders].sort((a, b) => {
+  const sorted = [...filteredHistory].sort((a, b) => {
     const da = new Date(a.archivedAt || a.syncDate || a.createdAt).getTime();
     const db2 = new Date(b.archivedAt || b.syncDate || b.createdAt).getTime();
     return db2 - da;
@@ -5212,6 +5214,7 @@ function switchSector(sector) {
 
   // Re-filter and render
   renderOrders();
+  renderHistoryOrders();
   renderDashboard();
   updateStats();
   updateClassificationSelectOptions();
@@ -5282,6 +5285,31 @@ function getFilteredActiveOrders() {
   }
 
   return activeOrders.filter(o => {
+    const cls = o.clasificacion;
+    if (sectorFilter === 'Herrería') {
+      return cls === 'Herrería';
+    }
+    if (sectorFilter === 'Edilicio') {
+      return cls === 'Edilicio';
+    }
+    // Taller sees everything EXCEPT Herrería and Edilicio
+    return cls !== 'Herrería' && cls !== 'Edilicio';
+  });
+}
+
+function getFilteredArchivedOrders() {
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+
+  if (!archivedOrders || !Array.isArray(archivedOrders)) return [];
+
+  // Determine active sector filter
+  let sectorFilter = currentSelectedSector;
+  if (userSector !== 'Admin') {
+    sectorFilter = userSector;
+  }
+
+  return archivedOrders.filter(o => {
     const cls = o.clasificacion;
     if (sectorFilter === 'Herrería') {
       return cls === 'Herrería';
