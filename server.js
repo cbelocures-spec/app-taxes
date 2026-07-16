@@ -1655,14 +1655,13 @@ async function checkAndTriggerGoogleSheetUpdates(existingOrder, updatedTasks, su
         const updateUrl = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${queryParams.toString()}`;
         console.log(`[Google Sheets] Sending request to Apps Script URL: ${updateUrl}`);
         
-        fetch(updateUrl)
-          .then(async (res) => {
-            const text = await res.text();
-            console.log(`[Google Sheets] Apps Script Response (Status ${res.status}):`, text);
-          })
-          .catch(err => {
-            console.error("[Google Sheets] Error calling Apps Script:", err.message);
-          });
+        try {
+          const res = await fetch(updateUrl);
+          const text = await res.text();
+          console.log(`[Google Sheets] Apps Script Response (Status ${res.status}):`, text);
+        } catch (err) {
+          console.error("[Google Sheets] Error calling Apps Script:", err.message);
+        }
       }
     }
   } catch (error) {
@@ -1751,14 +1750,13 @@ async function checkAndSendInsumosToSheet(existingOrder, updatedTasks, superviso
         const updateUrl = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${queryParams.toString()}`;
         console.log(`[Google Sheets Insumos] Sending request to Apps Script URL: ${updateUrl}`);
 
-        fetch(updateUrl)
-          .then(async (res) => {
-            const text = await res.text();
-            console.log(`[Google Sheets Insumos] Apps Script Response (Status ${res.status}):`, text);
-          })
-          .catch(err => {
-            console.error("[Google Sheets Insumos] Error calling Apps Script:", err.message);
-          });
+        try {
+          const res = await fetch(updateUrl);
+          const text = await res.text();
+          console.log(`[Google Sheets Insumos] Apps Script Response (Status ${res.status}):`, text);
+        } catch (err) {
+          console.error("[Google Sheets Insumos] Error calling Apps Script:", err.message);
+        }
       }
     }
   } catch (error) {
