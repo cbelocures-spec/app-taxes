@@ -1249,6 +1249,8 @@ async function fetchCatalogs() {
     const bulkContainer = document.getElementById('bulk-tasks-container');
     if (bulkContainer) {
       bulkContainer.innerHTML = '';
+      activePreventivoTypes = new Set();
+      syncPreventivoButtons();
       addBulkTaskField();
     }
     
@@ -4532,6 +4534,8 @@ async function submitBulkOrders() {
       const container = document.getElementById('bulk-tasks-container');
       if (container) {
         container.innerHTML = '';
+        activePreventivoTypes = new Set();
+        syncPreventivoButtons();
         addBulkTaskField();
       }
       fetchOrders();
@@ -6444,6 +6448,28 @@ async function submitMassiveOrders() {
   }
 }
 
+// --- PREVENTIVO MULTI-SELECT STATE ---
+let activePreventivoTypes = new Set();
+const PREVENTIVO_LINES = {
+  'A':  ['Ctrol Refrigerante', 'Ctrol Aceite Motor', 'Ctrol Grasa Caja', 'Ctrol Grasa Diferencial', 'Ctrol Hco Direccion'],
+  'RM': ['Ctrol Refrigerante', 'Ctrol Aceite Motor'],
+  'C':  ['Ctrol Grasa Caja'],
+  'D':  ['Ctrol Grasa Diferencial']
+};
+
+// Sync button visual state to activePreventivoTypes
+function syncPreventivoButtons() {
+  document.querySelectorAll('[onclick^="loadPreventivoIntoBulkTasks"]').forEach(btn => {
+    const m = btn.getAttribute('onclick').match(/'([^']+)'/);
+    if (!m) return;
+    const t = m[1];
+    const active = activePreventivoTypes.has(t);
+    btn.style.outline    = active ? '2px solid currentColor' : '';
+    btn.style.fontWeight = active ? '700' : '';
+    btn.style.boxShadow  = active ? 'inset 0 0 0 2px currentColor' : '';
+  });
+}
+
 function updateBulkInsumosGrid() {
   const container = document.getElementById('bulk-insumos-grid-container');
   const tbody = document.getElementById('bulk-insumos-grid-body');
@@ -6451,13 +6477,12 @@ function updateBulkInsumosGrid() {
 
   const checkboxes = document.querySelectorAll('#bulk-vehicle-list input[type="checkbox"]:checked');
   
-  // Detect which preventivo types are active from task descriptions
-  const taskDescs = Array.from(document.querySelectorAll('.bulk-task-desc')).map(t => t.value.toLowerCase());
-  const isAActive   = taskDescs.some(desc => desc.includes('preventivo a') || desc.includes('preventivo fluidos') || (desc.includes('ctrol refrigerante') && desc.includes('ctrol grasa caja')));
-  const isRMActive  = taskDescs.some(desc => desc.includes('preventivo r/m') || (desc.includes('ctrol refrigerante') && !desc.includes('ctrol grasa caja')));
-  const isCActive   = taskDescs.some(desc => desc.includes('preventivo c') || desc.includes('ctrol grasa caja'));
-  const isDActive   = taskDescs.some(desc => desc.includes('preventivo d') || desc.includes('ctrol grasa diferencial'));
-  const isAnyActive = isAActive || isRMActive || isCActive || isDActive;
+  // Use activePreventivoTypes Set (set by preventivo buttons)
+  const isAActive  = activePreventivoTypes.has('A');
+  const isRMActive = activePreventivoTypes.has('RM');
+  const isCActive  = activePreventivoTypes.has('C');
+  const isDActive  = activePreventivoTypes.has('D');
+  const isAnyActive = activePreventivoTypes.size > 0;
 
   if (checkboxes.length === 0 || !isAnyActive) {
     container.style.display = 'none';
@@ -6525,42 +6550,49 @@ function loadPreventivoIntoBulkTasks(type) {
   const container = document.getElementById('bulk-tasks-container');
   if (!container) return;
 
-  // Find all existing task cards
+  // Toggle type in the active set
+  if (activePreventivoTypes.has(type)) {
+    activePreventivoTypes.delete(type);
+  } else {
+    activePreventivoTypes.add(type);
+  }
+  syncPreventivoButtons();
+
+  // Ensure at least one task card exists
   let cards = container.querySelectorAll('.bulk-task-item-card');
-  
-  // If there are no cards, add one
   if (cards.length === 0) {
     addBulkTaskField();
     cards = container.querySelectorAll('.bulk-task-item-card');
   }
-
-  // Find the first card
   const card = cards[0];
   if (!card) return;
 
-  // Find description textarea in the card and fill it
+  // Rebuild combined description (ordered A > RM > C > D, deduplicated)
   const descInput = card.querySelector('.bulk-task-desc');
   if (descInput) {
-    if (type === 'A') {
-      descInput.value = `Ctrol Refrigerante\nCtrol Aceite Motor\nCtrol Grasa Caja\nCtrol Grasa Diferencial\nCtrol Hco Direccion`;
-    } else if (type === 'RM') {
-      descInput.value = `Ctrol Refrigerante\nCtrol Aceite Motor`;
-    } else if (type === 'C') {
-      descInput.value = `Ctrol Grasa Caja`;
-    } else if (type === 'D') {
-      descInput.value = `Ctrol Grasa Diferencial`;
+    if (activePreventivoTypes.size === 0) {
+      descInput.value = '';
+    } else {
+      const allLines = [];
+      ['A', 'RM', 'C', 'D'].forEach(t => {
+        if (activePreventivoTypes.has(t)) {
+          (PREVENTIVO_LINES[t] || []).forEach(line => {
+            if (!allLines.includes(line)) allLines.push(line);
+          });
+        }
+      });
+      descInput.value = allLines.join('\n');
     }
   }
 
-  // Pre-select Centro de Costo to MECANICA (15) if available
+  // Pre-select Centro de Costo MECANICA (15) when any preventivo is active
   const ccSelect = card.querySelector('.bulk-task-cc');
-  if (ccSelect) {
+  if (ccSelect && activePreventivoTypes.size > 0) {
     ccSelect.value = "15";
-    // Trigger change to update employee list
     updateBulkEmployeeDropdownForCard(card);
   }
-  
-  // Refresh grid visibility since description changed
+
+  // Refresh insumos grid
   updateBulkInsumosGrid();
 }
 
