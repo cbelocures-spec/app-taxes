@@ -1842,9 +1842,10 @@ async function syncWorkOrder(orderId) {
           const sorted = [...appTask.timerHistory].sort((a, b) => a.timestamp - b.timestamp);
           let currentStart = null;
           sorted.forEach(event => {
-            if (event.type === 'Inició' || event.type === 'Reanudó' || event.type === 'Inicio') {
+            const type = String(event.type || '').trim().toLowerCase();
+            if (type.startsWith('inici') || type.startsWith('reanud')) {
               currentStart = event.timestamp;
-            } else if (event.type === 'Pausó' || event.type === 'Fin' || event.type === 'FIN') {
+            } else if (type.startsWith('paus') || type.startsWith('fin')) {
               if (currentStart !== null) { totalMs += (event.timestamp - currentStart); currentStart = null; }
             }
           });
@@ -2230,9 +2231,10 @@ async function syncWorkOrder(orderId) {
         const sorted = [...task.timerHistory].sort((a, b) => a.timestamp - b.timestamp);
         let currentStart = null;
         sorted.forEach(event => {
-          if (event.type === 'Inició' || event.type === 'Reanudó' || event.type === 'Inicio') {
+          const type = String(event.type || '').trim().toLowerCase();
+          if (type.startsWith('inici') || type.startsWith('reanud')) {
             currentStart = event.timestamp;
-          } else if (event.type === 'Pausó' || event.type === 'Fin' || event.type === 'FIN') {
+          } else if (type.startsWith('paus') || type.startsWith('fin')) {
             if (currentStart !== null) {
               totalMs += (event.timestamp - currentStart);
               currentStart = null;
@@ -2809,8 +2811,9 @@ async function verifyWorkOrderWithPage(page, orderId) {
         const sorted = [...t.timerHistory].sort((a, b) => a.timestamp - b.timestamp);
         let currentStart = null;
         sorted.forEach(ev => {
-          if (ev.type === 'Inició' || ev.type === 'Reanudó' || ev.type === 'Inicio') currentStart = ev.timestamp;
-          else if ((ev.type === 'Pausó' || ev.type === 'Fin' || ev.type === 'FIN') && currentStart !== null) {
+          const type = String(ev.type || '').trim().toLowerCase();
+          if (type.startsWith('inici') || type.startsWith('reanud')) currentStart = ev.timestamp;
+          else if ((type.startsWith('paus') || type.startsWith('fin')) && currentStart !== null) {
             totalMs += (ev.timestamp - currentStart);
             currentStart = null;
           }

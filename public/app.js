@@ -1400,11 +1400,23 @@ function updateEmployeeDropdownForCard(card) {
 function renderTimerHistoryHtml(history) {
   if (!Array.isArray(history) || history.length === 0) return '';
   return history.map(item => {
+    const type = String(item.type || '').trim().toLowerCase();
+    let label = item.type;
     let icon = 'play_arrow';
-    if (item.type === 'Pausó') icon = 'pause';
-    if (item.type === 'Reanudó') icon = 'replay';
-    if (item.type === 'Fin') icon = 'stop';
-    return `<span style="display: inline-flex; align-items: center; gap: 2px; background: #e2e8f0; padding: 2px 5px; border-radius: 4px; font-size: 10px; color: var(--text-color);"><span class="material-icons" style="font-size: 10px;">${icon}</span>${item.type}: <strong>${item.formatted}</strong></span>`;
+    if (type.startsWith('inici')) {
+      icon = 'play_arrow';
+      label = 'Inició';
+    } else if (type.startsWith('paus')) {
+      icon = 'pause';
+      label = 'Pausó';
+    } else if (type.startsWith('reanud')) {
+      icon = 'replay';
+      label = 'Reanudó';
+    } else if (type.startsWith('fin')) {
+      icon = 'stop';
+      label = 'Fin';
+    }
+    return `<span style="display: inline-flex; align-items: center; gap: 2px; background: #e2e8f0; padding: 2px 5px; border-radius: 4px; font-size: 10px; color: var(--text-color);"><span class="material-icons" style="font-size: 10px;">${icon}</span>${label}: <strong>${item.formatted}</strong></span>`;
   }).join(' ');
 }
 
@@ -2960,9 +2972,10 @@ function calculateTotalElapsedSeconds(timerHistory, timerStart) {
     const sorted = [...timerHistory].sort((a, b) => a.timestamp - b.timestamp);
     let currentStart = null;
     sorted.forEach(event => {
-      if (event.type === 'Inició' || event.type === 'Reanudó') {
+      const type = String(event.type || '').trim().toLowerCase();
+      if (type.startsWith('inici') || type.startsWith('reanud')) {
         currentStart = event.timestamp;
-      } else if (event.type === 'Pausó' || event.type === 'Fin') {
+      } else if (type.startsWith('paus') || type.startsWith('fin')) {
         if (currentStart !== null) {
           totalMs += (event.timestamp - currentStart);
           currentStart = null;
