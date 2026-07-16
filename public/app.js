@@ -939,6 +939,8 @@ async function fetchSettings() {
     if (prevScriptInput) prevScriptInput.value = data.preventivoScriptUrl || "";
     const ptScriptInput = document.getElementById('set-partetaller-script-url');
     if (ptScriptInput) ptScriptInput.value = data.parteTallerScriptUrl || "";
+    const geminiApiKeyInput = document.getElementById('set-gemini-api-key');
+    if (geminiApiKeyInput) geminiApiKeyInput.value = data.geminiApiKey || "";
     
     isCurrentUserSupervisor = !!data.isSupervisor;
     const hoursSection = document.getElementById('supervisor-hours-section');
@@ -969,6 +971,7 @@ async function saveSettings(e) {
   const googleActiveTasksUrl = document.getElementById('set-google-active-tasks-url')?.value || '';
   const preventivoScriptUrl = document.getElementById('set-preventivo-script-url')?.value || '';
   const parteTallerScriptUrl = document.getElementById('set-partetaller-script-url')?.value || '';
+  const geminiApiKey = document.getElementById('set-gemini-api-key')?.value || '';
   const currentUsername = localStorage.getItem('currentUserUsername') || '';
 
   try {
@@ -978,7 +981,7 @@ async function saveSettings(e) {
         'Content-Type': 'application/json',
         'x-user-username': currentUsername  // Tell server which user is saving
       },
-      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl })
+      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, geminiApiKey })
     });
 
     if (!res.ok) {
@@ -6594,6 +6597,217 @@ function loadPreventivoIntoBulkTasks(type) {
 
   // Refresh insumos grid
   updateBulkInsumosGrid();
+}
+
+async function handlePlanillaOcrUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const overlay = document.getElementById('ai-loading-overlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+  }
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const base64 = e.target.result;
+    try {
+      const res = await fetch('/api/bulk/parse-planilla', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error ${res.status}`);
+      }
+
+      const results = await res.json();
+      console.log("[OCR Results]", results);
+
+      if (!Array.isArray(results) || results.length === 0) {
+        showToast("No se detectaron datos legibles de vehículos en la foto.", "warning");
+        return;
+      }
+
+      applyOcrResultsToForm(results);
+
+    } catch (err) {
+      console.error(err);
+      showToast(`Error al escanear la planilla: ${err.message}`, "danger");
+    } finally {
+      if (overlay) {
+        overlay.style.display = 'none';
+      }
+      input.value = ''; // clear input
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function applyOcrResultsToForm(results) {
+  let checkedCount = 0;
+  let hasRefrig = false;
+  let hasAcMotor = false;
+  let hasCaja = false;
+  let hasDif = false;
+  let hasHco = false;
+
+  // 1. Mark checkboxes for controlled vehicles
+  results.forEach(item => {
+    if (!item.interno) return;
+    const cleanInterno = String(item.interno).trim();
+    if (!item.revisado) return;
+
+    const rodado = cachedCatalogs.rodados.find(r => {
+      const dbIntStr = String(r.interno || '').trim();
+      if (dbIntStr === cleanInterno) return true;
+      const dbIntNum = parseInt(dbIntStr, 10);
+      const cleanNum = parseInt(cleanInterno, 10);
+      if (!isNaN(dbIntNum) && !isNaN(cleanNum) && dbIntNum === cleanNum) return true;
+      return false;
+    });
+
+    if (!rodado) {
+      console.warn(`[OCR] No se encontró rodado con interno "${cleanInterno}" en catálogo.`);
+      return;
+    }
+
+    const checkbox = document.querySelector(`#bulk-vehicle-list input[type="checkbox"][value="${rodado.value}"]`);
+    if (checkbox) {
+      if (!checkbox.checked) {
+        checkbox.checked = true;
+      }
+      checkedCount++;
+    }
+  });
+
+  if (checkedCount === 0) {
+    showToast("No se encontró ningún número de interno coincidente de la planilla en la app.", "warning");
+    return;
+  }
+
+  // 2. Render badges and generate rows in the insumos grid
+  renderSelectedVehicleBadges();
+  updateBulkInsumosGrid();
+
+  // 3. Populate row values
+  results.forEach(item => {
+    if (!item.interno) return;
+    const cleanInterno = String(item.interno).trim();
+    if (!item.revisado) return;
+
+    const rodado = cachedCatalogs.rodados.find(r => {
+      const dbIntStr = String(r.interno || '').trim();
+      if (dbIntStr === cleanInterno) return true;
+      const dbIntNum = parseInt(dbIntStr, 10);
+      const cleanNum = parseInt(cleanInterno, 10);
+      if (!isNaN(dbIntNum) && !isNaN(cleanNum) && dbIntNum === cleanNum) return true;
+      return false;
+    });
+    if (!rodado) return;
+
+    // The grid usesinterno as part of id: bulk-row-{interno}
+    const interno = String(rodado.interno || '').trim();
+    const row = document.getElementById(`bulk-row-${interno}`);
+    if (row) {
+      const refrigInput = row.querySelector('input[data-insumo="refrigerante"]');
+      if (refrigInput && item.refrigerante !== null && item.refrigerante !== undefined && item.refrigerante !== 0 && String(item.refrigerante).toLowerCase().trim() !== 'ok') {
+        refrigInput.value = item.refrigerante;
+        hasRefrig = true;
+      }
+
+      const aceiteInput = row.querySelector('input[data-insumo="aceite_motor"]');
+      if (aceiteInput && item.aceite_motor !== null && item.aceite_motor !== undefined && item.aceite_motor !== 0 && String(item.aceite_motor).toLowerCase().trim() !== 'ok') {
+        aceiteInput.value = item.aceite_motor;
+        hasAcMotor = true;
+      }
+
+      const cajaInput = row.querySelector('input[data-insumo="grasa_caja"]');
+      if (cajaInput && item.grasa_caja !== null && item.grasa_caja !== undefined && item.grasa_caja !== 0 && String(item.grasa_caja).toLowerCase().trim() !== 'ok') {
+        cajaInput.value = item.grasa_caja;
+        hasCaja = true;
+      }
+
+      const difInput = row.querySelector('input[data-insumo="grasa_diferencial"]');
+      if (difInput && item.grasa_diferencial !== null && item.grasa_diferencial !== undefined && item.grasa_diferencial !== 0 && String(item.grasa_diferencial).toLowerCase().trim() !== 'ok') {
+        difInput.value = item.grasa_diferencial;
+        hasDif = true;
+      }
+
+      const hcoInput = row.querySelector('input[data-insumo="hco_direccion"]');
+      if (hcoInput && item.hco_direccion !== null && item.hco_direccion !== undefined && item.hco_direccion !== 0 && String(item.hco_direccion).toLowerCase().trim() !== 'ok') {
+        hcoInput.value = item.hco_direccion;
+        hasHco = true;
+      }
+
+      const otrosInput = row.querySelector('input[data-insumo="otros"]');
+      if (otrosInput && item.otros) {
+        otrosInput.value = item.otros;
+      }
+    }
+  });
+
+  // 4. Update preventivo active types
+  activePreventivoTypes.clear();
+  if (hasRefrig || hasAcMotor) {
+    activePreventivoTypes.add('RM');
+  }
+  if (hasCaja) {
+    activePreventivoTypes.add('C');
+  }
+  if (hasDif) {
+    activePreventivoTypes.add('D');
+  }
+  if (hasHco) {
+    activePreventivoTypes.add('A');
+  }
+
+  syncPreventivoButtons();
+
+  // 5. Update combined description in the first task card
+  const container = document.getElementById('bulk-tasks-container');
+  let cards = container.querySelectorAll('.bulk-task-item-card');
+  if (cards.length === 0) {
+    addBulkTaskField();
+    cards = container.querySelectorAll('.bulk-task-item-card');
+  }
+  const card = cards[0];
+  if (card) {
+    const descInput = card.querySelector('.bulk-task-desc');
+    if (descInput) {
+      const allLines = [];
+      ['A', 'RM', 'C', 'D'].forEach(t => {
+        if (activePreventivoTypes.has(t)) {
+          (PREVENTIVO_LINES[t] || []).forEach(line => {
+            if (!allLines.includes(line)) allLines.push(line);
+          });
+        }
+      });
+      descInput.value = allLines.join('\n');
+    }
+
+    // Set MECANICA cost center
+    const ccSelect = card.querySelector('.bulk-task-cc');
+    if (ccSelect) {
+      ccSelect.value = "15";
+      updateBulkEmployeeDropdownForCard(card);
+    }
+  }
+
+  // 6. Refresh grilla visibility and columns since description & active types updated
+  updateBulkInsumosGrid();
+  
+  // 7. Update count badge & summary totals
+  const selectedCount = document.querySelectorAll('#bulk-vehicle-list input[type="checkbox"]:checked').length;
+  const badge = document.getElementById('bulk-selected-count');
+  if (badge) {
+    badge.textContent = `${selectedCount} seleccionado${selectedCount === 1 ? '' : 's'}`;
+  }
+  updateBulkSummary();
+
+  showToast(`Planilla escaneada exitosamente: ${checkedCount} camiones cargados.`, "success");
 }
 
 function setupAllFieldsForSector() {

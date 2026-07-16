@@ -991,6 +991,7 @@ app.get('/api/settings', (req, res) => {
       googleActiveTasksUrl: settings.googleActiveTasksUrl || "",
       preventivoScriptUrl: settings.preventivoScriptUrl || "",
       parteTallerScriptUrl: settings.parteTallerScriptUrl || "",
+      geminiApiKey: settings.geminiApiKey ? "••••••••••••" : "",
       catalogSyncStatus: catalogStatus,
       catalogSyncError: settings.catalogSyncError || null,
       isSupervisor: !!isMainSupervisor
@@ -1005,7 +1006,7 @@ app.get('/api/settings', (req, res) => {
 // Save connection settings
 app.post('/api/settings', (req, res) => {
   try {
-    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl } = req.body;
+    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, geminiApiKey } = req.body;
     const requestingUser = req.headers['x-user-username'] || null;
     const current = db.getSettings();
     
@@ -1022,6 +1023,15 @@ app.post('/api/settings', (req, res) => {
       preventivoScriptUrl: preventivoScriptUrl !== undefined ? preventivoScriptUrl : current.preventivoScriptUrl,
       parteTallerScriptUrl: parteTallerScriptUrl !== undefined ? parteTallerScriptUrl : current.parteTallerScriptUrl
     };
+
+    if (geminiApiKey !== undefined) {
+      if (geminiApiKey === "••••••••••••") {
+        // preserve current
+        updates.geminiApiKey = current.geminiApiKey;
+      } else {
+        updates.geminiApiKey = geminiApiKey;
+      }
+    }
 
     // Only update global username/password if this is the global/primary user
     const isPrimaryUser = !current.username || 
@@ -1128,6 +1138,106 @@ app.post('/api/settings/test-google-active-tasks', async (req, res) => {
   } catch (error) {
     console.error("[Google Sheets Active Tasks Test] Connection test failed:", error.message);
     res.status(500).json({ error: `Falló la conexión: ${error.message}` });
+  }
+});
+
+// Parse physical sheets (OCR) using Google Gemini Vision API
+app.post('/api/bulk/parse-planilla', async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: "No se proporcionó ninguna imagen." });
+    }
+
+    const settings = db.getSettings();
+    const apiKey = settings.geminiApiKey;
+    if (!apiKey) {
+      return res.status(400).json({ error: "La Clave de API de Google Gemini no está configurada. Por favor, ve a Configuración e ingrésala." });
+    }
+
+    // Split the data URI prefix if present (e.g. data:image/jpeg;base64,...)
+    let mimeType = "image/jpeg";
+    let base64Data = image;
+    if (image.startsWith("data:")) {
+      const match = image.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        mimeType = match[1];
+        base64Data = match[2];
+      }
+    }
+
+    console.log(`[Gemini OCR] Sending image (${(base64Data.length/1024/1024).toFixed(2)} MB) to Google Gemini API...`);
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+    const promptText = `Analiza esta imagen que es una foto de una planilla física de taller donde se registran mantenimientos y consumo de insumos de vehículos (camiones).
+La planilla tiene columnas para el número de "Interno" (identificador del vehículo) y columnas para los insumos o notas (por ejemplo: "Refrigerante", "Aceite Motor", "Caja", "Diferencial", "Novedades", "Observaciones", "Notas", etc.).
+El mecánico escribe a mano números (litros de insumo usado), "OK" o "0" (si la unidad fue revisada pero no se usó insumo), o texto con novedades/notas en la columna de Notas.
+
+Tu tarea es extraer de forma precisa toda la información manuscrita para cada fila de la planilla.
+Devuelve estrictamente un array JSON de objetos con el siguiente formato, sin bloques de código markdown (\`\`\`json) y sin explicaciones adicionales. El resultado debe ser únicamente el string JSON válido para poder ser parseado directamente con JSON.parse:
+[
+  {
+    "interno": "número de interno (ej: 50)",
+    "revisado": true (si tiene cualquier anotación manuscrita en esa fila, número, OK, cero o nota, de lo contrario false),
+    "refrigerante": número de litros o null,
+    "aceite_motor": número de litros o null,
+    "grasa_caja": número de litros o null,
+    "grasa_diferencial": número de litros o null,
+    "hco_direccion": número de litros o null,
+    "otros": "texto escrito en la columna de Notas/Observaciones o null"
+  }
+]`;
+
+    const payload = {
+      contents: [
+        {
+          parts: [
+            { text: promptText },
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: base64Data
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: "application/json"
+      }
+    };
+
+    const response = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("[Gemini OCR] Google API Error:", errText);
+      throw new Error(`Google API returned status ${response.status}: ${errText}`);
+    }
+
+    const result = await response.json();
+    const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!responseText) {
+      throw new Error("No se recibió respuesta del modelo de IA.");
+    }
+
+    // Clean up the text response in case the model ignored responseMimeType and added markdown
+    let cleanJsonText = responseText.trim();
+    if (cleanJsonText.startsWith("```")) {
+      cleanJsonText = cleanJsonText.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+    }
+
+    const data = JSON.parse(cleanJsonText);
+    res.json(data);
+
+  } catch (error) {
+    console.error("[Gemini OCR] Error parsing planilla:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 

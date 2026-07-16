@@ -213,6 +213,10 @@
             <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('D')" style="display: flex; align-items: center; gap: 4px; background: #f0fdf4; border-color: #bbf7d0; color: #15803d;">
               <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo D
             </button>
+            <button type="button" class="btn btn-primary btn-xs" onclick="document.getElementById('bulk-ocr-file').click()" style="display: flex; align-items: center; gap: 4px; background: #8b5cf6; border-color: #7c3aed; color: #fff; margin-left: auto;">
+              <span class="material-icons" style="font-size: 14px;">photo_camera</span> Escanear Planilla (Foto)
+            </button>
+            <input type="file" id="bulk-ocr-file" accept="image/*" style="display: none;" onchange="handlePlanillaOcrUpload(this)">
           </div>
 
           <div id="bulk-tasks-container">
@@ -330,6 +334,14 @@
         <div class="form-group">
           <label for="set-partetaller-script-url">URL de Script de Parte Taller (Google Sheet)</label>
           <input type="url" id="set-partetaller-script-url" placeholder="https://script.google.com/macros/s/.../exec" style="width: 100%;">
+        </div>
+        <div class="form-group">
+          <label for="set-gemini-api-key">Clave de API de Google Gemini (para Escaneo de Planillas)</label>
+          <div class="password-wrapper" style="position: relative; width: 100%; display: block;">
+            <input type="password" id="set-gemini-api-key" placeholder="AIzaSy..." style="padding-right: 40px; margin-bottom: 0;">
+            <span class="material-icons password-toggle" onclick="togglePasswordVisibility('set-gemini-api-key')" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 6px; cursor: pointer; color: #3c4043 !important; user-select: none; z-index: 999 !important; font-size: 22px;">visibility_off</span>
+          </div>
+          <small style="color: var(--text-muted); display: block; margin-top: 4px;">Necesaria para procesar de forma automática las fotos de las planillas manuscritas mediante Inteligencia Artificial.</small>
         </div>
         
         <button type="submit" class="btn btn-primary btn-block">
@@ -1501,6 +1513,21 @@
   <datalist id="internos-datalist">
     <!-- Populated dynamically from app.js -->
   </datalist>
+
+  <!-- Loading Overlay for AI scanning -->
+  <div id="ai-loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; flex-direction: column; color: #fff; font-family: system-ui, -apple-system, sans-serif;">
+    <div class="ai-spinner" style="width: 50px; height: 50px; border: 5px solid rgba(255,255,255,0.1); border-top-color: #8b5cf6; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;"></div>
+    <h3 style="margin: 0 0 8px 0; font-weight: 600; font-size: 18px; letter-spacing: 0.5px;">Analizando Planilla con IA</h3>
+    <p style="margin: 0; color: #94a3b8; font-size: 14px; text-align: center; max-width: 300px; line-height: 1.5; padding: 0 20px;">
+      El modelo de Google Gemini está leyendo la foto y transcribiendo los datos manuscritos...
+    </p>
+  </div>
+  
+  <style>
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 
   <script src="app.js?v=65"></script>
 </body>
