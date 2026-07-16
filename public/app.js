@@ -6451,11 +6451,15 @@ function updateBulkInsumosGrid() {
 
   const checkboxes = document.querySelectorAll('#bulk-vehicle-list input[type="checkbox"]:checked');
   
-  // Check if Preventivo A description pattern is present in any task
+  // Detect which preventivo types are active from task descriptions
   const taskDescs = Array.from(document.querySelectorAll('.bulk-task-desc')).map(t => t.value.toLowerCase());
-  const isPreventivoActive = taskDescs.some(desc => desc.includes('ctrol refrigerante') || desc.includes('preventivo a'));
+  const isAActive   = taskDescs.some(desc => desc.includes('preventivo a') || (desc.includes('ctrol refrigerante') && desc.includes('ctrol grasa caja')));
+  const isRMActive  = taskDescs.some(desc => desc.includes('preventivo r/m') || (desc.includes('ctrol refrigerante') && !desc.includes('ctrol grasa caja')));
+  const isCActive   = taskDescs.some(desc => desc.includes('preventivo c') || desc.includes('ctrol grasa caja'));
+  const isDActive   = taskDescs.some(desc => desc.includes('preventivo d') || desc.includes('ctrol grasa diferencial'));
+  const isAnyActive = isAActive || isRMActive || isCActive || isDActive;
 
-  if (checkboxes.length === 0 || !isPreventivoActive) {
+  if (checkboxes.length === 0 || !isAnyActive) {
     container.style.display = 'none';
     tbody.innerHTML = '';
     return;
@@ -6493,16 +6497,28 @@ function updateBulkInsumosGrid() {
       row.style.borderBottom = '1px solid var(--border-color)';
       row.innerHTML = `
         <td style="padding: 8px; font-weight: 600; color: var(--text-main); font-size: 13px;">${rodado.label}</td>
-        <td style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="refrigerante" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
-        <td style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="aceite_motor" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
-        <td style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="grasa_caja" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
-        <td style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="grasa_diferencial" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
-        <td style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="hco_direccion" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+        <td class="col-refrig" style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="refrigerante" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+        <td class="col-ac-motor" style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="aceite_motor" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+        <td class="col-ac-caja" style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="grasa_caja" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+        <td class="col-ac-dif" style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="grasa_diferencial" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+        <td class="col-hco-dir" style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="hco_direccion" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
         <td style="padding: 4px;"><input type="text" class="bulk-insumo-val" data-interno="${interno}" data-insumo="otros" placeholder="Filtros, repuestos..." style="width: 100%; padding: 4px; box-sizing: border-box; border: 1px solid var(--border-color); border-radius: 6px;"></td>
       `;
       tbody.appendChild(row);
     }
   });
+
+  // Show/hide columns based on active preventivo types
+  const showRefrig   = isAActive || isRMActive;
+  const showAcMotor  = isAActive || isRMActive;
+  const showAcCaja   = isAActive || isCActive;
+  const showAcDif    = isAActive || isDActive;
+  const showHcoDir   = isAActive;
+  document.querySelectorAll('.col-refrig').forEach(el   => el.style.display = showRefrig  ? '' : 'none');
+  document.querySelectorAll('.col-ac-motor').forEach(el => el.style.display = showAcMotor ? '' : 'none');
+  document.querySelectorAll('.col-ac-caja').forEach(el  => el.style.display = showAcCaja  ? '' : 'none');
+  document.querySelectorAll('.col-ac-dif').forEach(el   => el.style.display = showAcDif   ? '' : 'none');
+  document.querySelectorAll('.col-hco-dir').forEach(el  => el.style.display = showHcoDir  ? '' : 'none');
 }
 
 function loadPreventivoIntoBulkTasks(type) {
@@ -6527,6 +6543,12 @@ function loadPreventivoIntoBulkTasks(type) {
   if (descInput) {
     if (type === 'A') {
       descInput.value = `Ctrol Refrigerante\nCtrol Aceite Motor\nCtrol Grasa Caja\nCtrol Grasa Diferencial\nCtrol Hco Direccion`;
+    } else if (type === 'RM') {
+      descInput.value = `Ctrol Refrigerante\nCtrol Aceite Motor`;
+    } else if (type === 'C') {
+      descInput.value = `Ctrol Grasa Caja`;
+    } else if (type === 'D') {
+      descInput.value = `Ctrol Grasa Diferencial`;
     }
   }
 

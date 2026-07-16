@@ -173,11 +173,11 @@
               <thead>
                 <tr style="background: #f1f5f9; border-bottom: 2px solid var(--border-color);">
                   <th style="padding: 8px; font-weight: 600;">Interno</th>
-                  <th style="padding: 8px; font-weight: 600; width: 75px;">Refrig. (L)</th>
-                  <th style="padding: 8px; font-weight: 600; width: 75px;">Ac. Motor (L)</th>
-                  <th style="padding: 8px; font-weight: 600; width: 75px;">Ac. Caja (L)</th>
-                  <th style="padding: 8px; font-weight: 600; width: 75px;">Ac. Dif. (L)</th>
-                  <th style="padding: 8px; font-weight: 600; width: 75px;">Hco. Dir. (L)</th>
+                  <th class="col-refrig" style="padding: 8px; font-weight: 600; width: 75px;">Refrig. (L)</th>
+                  <th class="col-ac-motor" style="padding: 8px; font-weight: 600; width: 75px;">Ac. Motor (L)</th>
+                  <th class="col-ac-caja" style="padding: 8px; font-weight: 600; width: 75px;">Ac. Caja (L)</th>
+                  <th class="col-ac-dif" style="padding: 8px; font-weight: 600; width: 75px;">Ac. Dif. (L)</th>
+                  <th class="col-hco-dir" style="padding: 8px; font-weight: 600; width: 75px;">Hco. Dir. (L)</th>
                   <th style="padding: 8px; font-weight: 600;">Otros Insumos / Notas</th>
                 </tr>
               </thead>
@@ -204,7 +204,15 @@
             <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('A')" style="display: flex; align-items: center; gap: 4px; background: #e2e8f0; border-color: #cbd5e1; color: #334155;">
               <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo A
             </button>
-            <!-- En el futuro se pueden agregar Preventivo B, C, etc. aquí -->
+            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('RM')" style="display: flex; align-items: center; gap: 4px; background: #e0f2fe; border-color: #bae6fd; color: #0369a1;">
+              <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo R/M
+            </button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('C')" style="display: flex; align-items: center; gap: 4px; background: #fef3c7; border-color: #fde68a; color: #b45309;">
+              <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo C
+            </button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('D')" style="display: flex; align-items: center; gap: 4px; background: #f0fdf4; border-color: #bbf7d0; color: #15803d;">
+              <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo D
+            </button>
           </div>
 
           <div id="bulk-tasks-container">
@@ -1494,6 +1502,6 @@
     <!-- Populated dynamically from app.js -->
   </datalist>
 
-  <script src="app.js?v=62"></script>
+  <script src="app.js?v=63"></script>
 </body>
 </html>
