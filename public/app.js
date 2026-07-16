@@ -1958,12 +1958,15 @@ function renderOrders() {
 function createHistoryCardHtml(order) {
   const syncDate = order.syncDate ? new Date(order.syncDate).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha desconocida';
   const isChecked = selectedHistoryOrderIds.has(order.id) ? 'checked' : '';
-  const isAdmin = getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Admin';
+  const currentUserForHistory = localStorage.getItem('currentUserUsername') || '';
+  const isAdmin = getSectorByUsername(currentUserForHistory) === 'Admin';
+  const isPaniolUser = currentUserForHistory.toLowerCase().includes('paniol') || currentUserForHistory.toLowerCase().includes('panol') || currentUserForHistory.toLowerCase().includes('pañol');
+  const canManageHistory = isAdmin || isPaniolUser;
   return `
     <div class="order-card">
       <div class="order-card-header">
         <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; margin-right: 8px;">
-          ${isAdmin ? `<input type="checkbox" class="history-order-select-checkbox" data-id="${order.id}" onchange="onHistoryOrderSelectionChange(event)" ${isChecked} style="margin: 0; width: 18px; height: 18px; cursor: pointer;">` : ''}
+          ${canManageHistory ? `<input type="checkbox" class="history-order-select-checkbox" data-id="${order.id}" onchange="onHistoryOrderSelectionChange(event)" ${isChecked} style="margin: 0; width: 18px; height: 18px; cursor: pointer;">` : ''}
           <div style="min-width: 0; flex: 1;">
             <div class="order-card-title">${order.rodado}</div>
             <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion}</strong></div>
@@ -1983,7 +1986,7 @@ function createHistoryCardHtml(order) {
           <button class="icon-btn primary" onclick="viewOrder('${order.id}')" title="Ver Orden">
             <span class="material-icons">visibility</span>
           </button>
-          ${isAdmin ? `
+          ${canManageHistory ? `
           <button class="icon-btn" onclick="unarchiveOrder('${order.id}')" title="Re-sincronizar (volver a pendientes)" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;">
             <span class="material-icons">sync</span>
           </button>
@@ -2152,8 +2155,10 @@ function createOrderCardHtml(order) {
             </button>
           ` : ''}
           ${(() => {
-            const isAdmin = getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Admin';
-            if (!isAdmin) return ''; // Herrería / Edilicio no pueden borrar ni archivar
+            const _cu = localStorage.getItem('currentUserUsername') || '';
+            const isAdmin = getSectorByUsername(_cu) === 'Admin';
+            const isPaniolU = _cu.toLowerCase().includes('paniol') || _cu.toLowerCase().includes('panol') || _cu.toLowerCase().includes('pañol');
+            if (!isAdmin && !isPaniolU) return ''; // Solo Admin y Paniol pueden archivar/borrar
             if (order.syncStatus === 'success') {
               // For synced orders: show Archive button (moves to history)
               return `
@@ -4089,16 +4094,12 @@ function filterBulkVehicles(isFinished = false) {
       isMatched = interno.includes(singlePart) || label.includes(singlePart) || patente.includes(singlePart);
     }
 
-    // Auto-check/uncheck based on query parts in real-time (to avoid accumulation of intermediate exact matches)
+    // Auto-check based on finished parts only. Never auto-uncheck — preserve manual selections.
     if (checkbox) {
       const isPartFinished = finishedParts.includes(interno);
       if (isPartFinished && !checkbox.checked) {
         checkbox.checked = true;
         item.classList.add('selected');
-        checkedAny = true;
-      } else if (!parts.includes(interno) && checkbox.checked) {
-        checkbox.checked = false;
-        item.classList.remove('selected');
         checkedAny = true;
       }
     }
