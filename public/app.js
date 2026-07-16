@@ -6453,7 +6453,7 @@ function updateBulkInsumosGrid() {
   
   // Detect which preventivo types are active from task descriptions
   const taskDescs = Array.from(document.querySelectorAll('.bulk-task-desc')).map(t => t.value.toLowerCase());
-  const isAActive   = taskDescs.some(desc => desc.includes('preventivo a') || (desc.includes('ctrol refrigerante') && desc.includes('ctrol grasa caja')));
+  const isAActive   = taskDescs.some(desc => desc.includes('preventivo a') || desc.includes('preventivo fluidos') || (desc.includes('ctrol refrigerante') && desc.includes('ctrol grasa caja')));
   const isRMActive  = taskDescs.some(desc => desc.includes('preventivo r/m') || (desc.includes('ctrol refrigerante') && !desc.includes('ctrol grasa caja')));
   const isCActive   = taskDescs.some(desc => desc.includes('preventivo c') || desc.includes('ctrol grasa caja'));
   const isDActive   = taskDescs.some(desc => desc.includes('preventivo d') || desc.includes('ctrol grasa diferencial'));
