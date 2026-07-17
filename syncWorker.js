@@ -2847,6 +2847,31 @@ async function verifyWorkOrderWithPage(page, orderId) {
             matchedRow = empCandidates[0];
           }
         }
+
+        // Fallback: match by description alone (when Taxes shows vehicle in employee column).
+        // Only use if description is unique across all table rows to avoid false positives.
+        if (!matchedRow && tableTasks.length > 0) {
+          const descCandidates = tableTasks.filter(row =>
+            clean(row.description).includes(clean(t.descripcion)) ||
+            clean(t.descripcion).includes(clean(row.description)) ||
+            clean(row.description).includes(clean(finalDescription)) ||
+            clean(finalDescription).includes(clean(row.description))
+          );
+          if (descCandidates.length === 1) {
+            console.log(`[Verify] Task #${idx+1}: employee column shows vehicle, matched by description alone.`);
+            matchedRow = descCandidates[0];
+          }
+        }
+
+        // Last resort positional fallback: if there is exactly one unmatched row and one unmatched task, pair them.
+        if (!matchedRow && tableTasks.length === order.tasks.length && tableTasks[idx]) {
+          const alreadyMatchedRowIndices = new Set();
+          // We can't know previously matched indices here without refactor, so only use when single row
+          if (tableTasks.length === 1) {
+            console.log(`[Verify] Task #${idx+1}: using positional fallback (single row in table).`);
+            matchedRow = tableTasks[0];
+          }
+        }
       }
 
       let usedNarrowedSearch = false;
