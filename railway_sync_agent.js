@@ -11,8 +11,15 @@ const POLL_INTERVAL_MS = 20000; // 20 seconds
 // when using Node.js built-in fetch which defaults to HTTP/2.
 function apiCall(method, path, bodyData) {
   return new Promise((resolve, reject) => {
+    // Append timestamp query parameter to bypass edge CDN caching on GET requests
+    const cleanPath = path + (path.includes('?') ? '&' : '?') + 't=' + Date.now();
     const body = bodyData ? JSON.stringify(bodyData) : null;
-    const headers = { 'x-user-username': USERNAME };
+    const headers = { 
+      'x-user-username': USERNAME,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    };
     if (body) {
       headers['Content-Type'] = 'application/json';
       headers['Content-Length'] = Buffer.byteLength(body);
@@ -20,7 +27,7 @@ function apiCall(method, path, bodyData) {
 
     const options = {
       hostname: HOST,
-      path,
+      path: cleanPath,
       method,
       headers,
       timeout: 30000
