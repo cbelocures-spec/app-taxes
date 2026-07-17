@@ -1643,7 +1643,7 @@ async function syncWorkOrder(orderId) {
 
       // 3. Wait for OT edit form to load (task cards)
       await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 8000 }).catch(() => {});
-      await delay(3500);
+      await delay(8000);
 
       // 4. Read ALL task cards currently in the form
       //    Each card has: empleado input/text, horas input, descripcion textarea, realizada checkbox, red trash button
@@ -1916,16 +1916,24 @@ async function syncWorkOrder(orderId) {
         }, ci, ccLabel);
         await delay(1000);
 
-        // 2. Fill Employee if empty, placeholder, or mismatch
+        // 2. Fill Employee if empty, placeholder, mismatch, or hidden input lacks value
         const { employeeLabel } = resolveAndMapEmployee(appTask);
+        
+        // Query the hidden input value directly from the DOM to ensure a real binding exists
+        const hiddenEmpValue = await page.evaluate((idx) => {
+          const inp = document.querySelector(`input[name="syj_empleado_id_tarea_${idx}"], input[name$="empleado_id_tarea_${idx}"], input[name*="empleado_id_tarea_${idx}"]`);
+          return inp ? inp.value : '';
+        }, ci);
+
         const isEmpEmptyOrPlaceholder = formCards[ci].employee === '' || 
                                        formCards[ci].employee.toLowerCase().includes('seleccionar') || 
-                                       formCards[ci].employee.toLowerCase().includes('buscar');
+                                       formCards[ci].employee.toLowerCase().includes('buscar') ||
+                                       !hiddenEmpValue; // If DOM input is empty, treat employee as not selected
         const isEmpMismatch = !cleanStr(formCards[ci].employee).includes(cleanStr(employeeLabel)) && 
                               !cleanStr(employeeLabel).includes(cleanStr(formCards[ci].employee));
                               
         if (isEmpEmptyOrPlaceholder || isEmpMismatch) {
-          console.log(`[Reconcile] Card #${ci} needs employee. Current: "${formCards[ci].employee}". Target: "${employeeLabel}"...`);
+          console.log(`[Reconcile] Card #${ci} needs employee. Current: "${formCards[ci].employee}". Target: "${employeeLabel}" (hidden value: "${hiddenEmpValue}")...`);
           const empFilled = await fillTaskEmployeeSearchableSelect(page, ci, employeeLabel);
           console.log(`[Reconcile] Card #${ci} employee select result: ${empFilled}`);
           await delay(2000);
