@@ -763,6 +763,8 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
     const { syncStatus, syncError, syncDate, tasks, verifiedStatus, verifiedError, verifiedCount, taxesOrderNumber } = req.body;
     let existing = db.getWorkOrderById(req.params.id);
     if (!existing) {
+      // If the Debian is pushing a soft-delete for an order that doesn't exist on Railway yet,
+      // create it already marked as deleted so it doesn't get processed.
       db.createWorkOrder({
         id: req.params.id,
         rodado: req.body.rodado || '',
@@ -778,9 +780,20 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
         taxesOrderNumber: req.body.taxesOrderNumber,
         syncStatus: req.body.syncStatus || 'success',
         verifiedStatus: req.body.verifiedStatus || 'success',
-        archived: req.body.archived === true
+        archived: req.body.archived === true,
+        deleted: req.body.deleted === true,
+        deletedAt: req.body.deletedAt || (req.body.deleted === true ? new Date().toISOString() : null)
       });
       existing = db.getWorkOrderById(req.params.id);
+    }
+
+    // If this is purely a soft-delete propagation (Debian deleted the order), update only deleted state
+    if (req.body.deleted === true) {
+      db.updateWorkOrder(req.params.id, {
+        deleted: true,
+        deletedAt: req.body.deletedAt || existing.deletedAt || new Date().toISOString()
+      });
+      return res.json({ success: true });
     }
 
     // Normalize status strings coming from external agents, which may use
@@ -838,6 +851,14 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
       updates.archived = true;
       updates.archivedAt = existing.archivedAt || new Date().toISOString();
       console.log(`[LocalSyncResult] Order ${req.params.id} is verified and synced. Auto-archived to history.`);
+    }
+
+    // Propagate soft-delete state if explicitly sent
+    if (req.body.hasOwnProperty('deleted')) {
+      updates.deleted = req.body.deleted === true;
+      updates.deletedAt = req.body.deleted === true
+        ? (req.body.deletedAt || existing.deletedAt || new Date().toISOString())
+        : null;
     }
 
     db.updateWorkOrder(req.params.id, updates);

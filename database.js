@@ -385,13 +385,13 @@ class LocalDB {
   // Returns ACTIVE (non-archived) orders only — used by the sync worker and main UI
   getWorkOrders() {
     const db = this.read();
-    return (db.workOrders || []).filter(o => !o.archived);
+    return (db.workOrders || []).filter(o => !o.archived && o.deleted !== true);
   }
 
   // Returns ARCHIVED orders only — used by the History/Historial section
   getArchivedOrders() {
     const db = this.read();
-    return (db.workOrders || []).filter(o => o.archived === true);
+    return (db.workOrders || []).filter(o => o.archived === true && o.deleted !== true);
   }
 
   getWorkOrderById(id) {
@@ -494,16 +494,24 @@ class LocalDB {
 
   deleteWorkOrder(id) {
     const db = this.read();
-    const filtered = db.workOrders.filter(o => o.id !== id);
-    db.workOrders = filtered;
-    this.write(db);
+    const order = db.workOrders.find(o => o.id === id);
+    if (order) {
+      order.deleted = true;
+      order.deletedAt = new Date().toISOString();
+      this.write(db);
+    }
     return true;
   }
 
   deleteWorkOrders(ids) {
     if (!Array.isArray(ids) || ids.length === 0) return true;
     const db = this.read();
-    db.workOrders = db.workOrders.filter(o => !ids.includes(o.id));
+    db.workOrders.forEach(o => {
+      if (ids.includes(o.id)) {
+        o.deleted = true;
+        o.deletedAt = new Date().toISOString();
+      }
+    });
     this.write(db);
     return true;
   }

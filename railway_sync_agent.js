@@ -109,6 +109,8 @@ async function checkAndSync() {
           ? false
           : (existing ? (existing.archived === true || target.archived === true) : (target.archived === true));
 
+        const isDeletedLocallyOrRemotely = target.deleted === true || (existing && existing.deleted === true);
+
         if (!existing) {
           db.createWorkOrder(target);
           db.updateWorkOrder(target.id, {
@@ -120,7 +122,9 @@ async function checkAndSync() {
             verifiedCount: target.verifiedCount,
             taxesOrderNumber: target.taxesOrderNumber,
             tasks: target.tasks,
-            archived: isArchivedLocallyOrRemotely
+            archived: isArchivedLocallyOrRemotely,
+            deleted: isDeletedLocallyOrRemotely,
+            deletedAt: target.deletedAt || (isDeletedLocallyOrRemotely ? new Date().toISOString() : null)
           });
         } else {
           const preserveLocalSync = (existing.syncStatus === 'success' || existing.syncStatus === 'error') &&
@@ -146,7 +150,9 @@ async function checkAndSync() {
             verifiedStatus: preserveLocalVerify ? existing.verifiedStatus : target.verifiedStatus,
             verifiedError: preserveLocalVerify ? existing.verifiedError : target.verifiedError,
             verifiedCount: preserveLocalVerify ? existing.verifiedCount : target.verifiedCount,
-            archived: isArchivedLocallyOrRemotely
+            archived: isArchivedLocallyOrRemotely,
+            deleted: isDeletedLocallyOrRemotely,
+            deletedAt: target.deletedAt || existing.deletedAt || (isDeletedLocallyOrRemotely ? new Date().toISOString() : null)
           });
         }
       } catch (dbErr) {
@@ -160,11 +166,25 @@ async function checkAndSync() {
       const allLocal = db.read().workOrders || [];
       for (const localOrd of allLocal) {
         const rwMatch = orders.find(o => o.id === localOrd.id);
+
+        // If this order is soft-deleted locally, push the deletion to Railway and skip further sync
+        if (localOrd.deleted === true) {
+          if (!rwMatch || rwMatch.deleted !== true) {
+            console.log(`[RailwayAgent] Propagating soft-delete for order ${localOrd.interno} (${localOrd.id}) to Railway...`);
+            await apiCall('POST', `/api/orders/local-sync-result/${localOrd.id}`, {
+              deleted: true,
+              deletedAt: localOrd.deletedAt || new Date().toISOString()
+            }).catch(e => console.warn(`[RailwayAgent] Delete push failed for ${localOrd.id}:`, e.message));
+          }
+          continue; // Skip further processing for deleted orders
+        }
+
         const statusDiffers = rwMatch && (
           localOrd.syncStatus !== rwMatch.syncStatus ||
           localOrd.verifiedStatus !== rwMatch.verifiedStatus ||
           localOrd.taxesOrderNumber !== rwMatch.taxesOrderNumber ||
-          localOrd.archived !== rwMatch.archived
+          localOrd.archived !== rwMatch.archived ||
+          !!localOrd.deleted !== !!rwMatch.deleted
         );
 
         if (!rwMatch || statusDiffers) {
@@ -191,7 +211,9 @@ async function checkAndSync() {
             verifiedStatus: localOrd.verifiedStatus || 'success',
             verifiedError: localOrd.verifiedError,
             verifiedCount: localOrd.verifiedCount,
-            archived: !!localOrd.archived
+            archived: !!localOrd.archived,
+            deleted: false,
+            deletedAt: null
           }).catch(pushErr => console.warn(`[RailwayAgent] Push failed for ${localOrd.id}:`, pushErr.message));
         }
       }
@@ -199,8 +221,8 @@ async function checkAndSync() {
       console.error('[RailwayAgent] Error pushing local orders:', pushErr.message);
     }
 
-    // ── 5. Find any PENDING order from Railway and sync it locally
-    const pending = orders.filter(o => o.syncStatus === 'pending');
+    // ── 5. Find any PENDING order from Railway and sync it locally (skip soft-deleted orders)
+    const pending = orders.filter(o => o.syncStatus === 'pending' && o.deleted !== true);
     if (pending.length === 0) {
       isAgentRunning = false;
       return;
