@@ -49,19 +49,43 @@ async function checkAndSync() {
   isAgentRunning = true;
 
   try {
-    // ── 0. On first startup: reset any 'syncing' orders on Railway back to 'pending'
-    //       (mirrors what syncWorker does locally on boot)
+    // ── 0. On first startup: resolve any 'syncing' orders on Railway
+    //       If local DB already has a definitive result (success/error), push it to Railway.
+    //       Only reset to 'pending' if the daemon genuinely crashed mid-sync (no local result yet).
     if (!startupDone) {
       startupDone = true;
       try {
         const rawAll = await apiCall('GET', '/api/orders/all', null);
         const allOrders = JSON.parse(rawAll);
         if (Array.isArray(allOrders)) {
-          const stuck = allOrders.filter(o => o.syncStatus === 'syncing');
+          const stuck = allOrders.filter(o => o.syncStatus === 'syncing' && o.deleted !== true);
           for (const o of stuck) {
-            console.log(`[RailwayAgent] Resetting stuck 'syncing' order ${o.interno} (${o.id}) to 'pending'...`);
-            await apiCall('POST', `/api/orders/local-sync-result/${o.id}`, { syncStatus: 'pending' })
-              .catch(e => console.warn(`[RailwayAgent] Failed to reset ${o.id}:`, e.message));
+            const localOrd = db.getWorkOrderById(o.id);
+            const localSyncStatus = localOrd ? localOrd.syncStatus : null;
+            const localVerifiedStatus = localOrd ? localOrd.verifiedStatus : null;
+            if (localSyncStatus === 'success' || localSyncStatus === 'error' || localVerifiedStatus === 'success') {
+              // Local has a definitive result — push it to Railway instead of resetting
+              console.log(`[RailwayAgent] Startup: order ${o.interno} (${o.id}) has local status ${localSyncStatus}/${localVerifiedStatus}. Pushing to Railway...`);
+              await apiCall('POST', `/api/orders/local-sync-result/${o.id}`, {
+                syncStatus: localOrd.syncStatus,
+                syncError: localOrd.syncError,
+                syncDate: localOrd.syncDate,
+                verifiedStatus: localOrd.verifiedStatus,
+                verifiedError: localOrd.verifiedError,
+                verifiedCount: localOrd.verifiedCount,
+                taxesOrderNumber: localOrd.taxesOrderNumber,
+                tasks: localOrd.tasks,
+                estadoUnidad: localOrd.estadoUnidad,
+                archived: !!localOrd.archived,
+                deleted: !!localOrd.deleted,
+                deletedAt: localOrd.deletedAt || null
+              }).catch(e => console.warn(`[RailwayAgent] Startup push failed for ${o.id}:`, e.message));
+            } else {
+              // No definitive local result — daemon crashed mid-sync, reset to pending so it retries
+              console.log(`[RailwayAgent] Startup: resetting stuck 'syncing' order ${o.interno} (${o.id}) to 'pending'...`);
+              await apiCall('POST', `/api/orders/local-sync-result/${o.id}`, { syncStatus: 'pending' })
+                .catch(e => console.warn(`[RailwayAgent] Failed to reset ${o.id}:`, e.message));
+            }
           }
         }
       } catch (startupErr) {
