@@ -1966,6 +1966,32 @@ async function syncWorkOrder(orderId) {
       }
 
       db.updateWorkOrder(orderId, { tasks: order.tasks });
+
+      // Fix date inputs before saving — Puppeteer headless can leave date fields empty or in wrong format
+      // Taxes requires dates in yyyy-MM-dd format for type="date" inputs
+      await page.evaluate((fechaEntrega) => {
+        const dateInputs = Array.from(document.querySelectorAll('input[type="date"]'));
+        dateInputs.forEach(input => {
+          const currentVal = input.value;
+          // If value is empty or not in yyyy-MM-dd format, set it from the order's fecha entrega
+          const isValidFormat = /^\d{4}-\d{2}-\d{2}$/.test(currentVal);
+          if (!isValidFormat && fechaEntrega) {
+            // Convert from dd/MM/yyyy or yyyy/MM/dd to yyyy-MM-dd if needed
+            let fixed = fechaEntrega;
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(fechaEntrega)) {
+              const [d, m, y] = fechaEntrega.split('/');
+              fixed = `${y}-${m}-${d}`;
+            } else if (/^\d{4}\/\d{2}\/\d{2}$/.test(fechaEntrega)) {
+              fixed = fechaEntrega.replace(/\//g, '-');
+            }
+            const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+            nativeSetter.call(input, fixed);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+      }, order.fechaEntrega || '');
+
       console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
       await delay(4000);
       const guardarBtnId = await page.evaluate(() => {
