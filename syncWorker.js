@@ -480,18 +480,52 @@ async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
   try {
     // Resolve searchable input and hidden input dynamically
     const inputInfo = await page.evaluate((idx) => {
-      const hiddenInput = document.querySelector(`input[name="syj_empleado_id_tarea_${idx}"], input[name$="empleado_id_tarea_${idx}"], input[name*="empleado_id_tarea_${idx}"]`);
-      if (hiddenInput) {
-        const parent = hiddenInput.closest('.searchable-select-wrapper') || hiddenInput.parentElement;
-        const searchInput = parent ? parent.querySelector('.searchable-input, input[type="text"]') : null;
-        if (searchInput) {
+      // 1. Get all hours inputs to locate the specific card container
+      const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
+      const targetHoursInput = horasInputs[idx];
+      if (!targetHoursInput) return { found: false, error: 'Hours input not found' };
+
+      // 2. Find target card container
+      let card = targetHoursInput.parentElement;
+      while (card && card !== document.body && 
+             !card.classList.contains('card') && 
+             !card.classList.contains('form-row') && 
+             !card.classList.contains('row') &&
+             !card.className.includes('col-12')) {
+        card = card.parentElement;
+      }
+      if (!card) return { found: false, error: 'Card container not found' };
+
+      // 3. Find the searchable select wrapper inside this card
+      const wrapper = card.querySelector('.searchable-select-wrapper, .multiselect');
+      if (!wrapper) return { found: false, error: 'Searchable select wrapper not found' };
+
+      // 4. Find the inputs inside this select wrapper
+      const hiddenInput = wrapper.querySelector('input[type="hidden"]') || wrapper.querySelector('input[name*="empleado_id"]');
+      const searchInput = wrapper.querySelector('.searchable-input, input[type="text"]');
+
+      if (hiddenInput && searchInput) {
+        const searchId = 'tmp_emp_search_' + idx + '_' + Date.now();
+        const hiddenId = 'tmp_emp_hidden_' + idx + '_' + Date.now();
+        searchInput.setAttribute('id', searchId);
+        hiddenInput.setAttribute('id', hiddenId);
+        return { searchId, hiddenId, found: true };
+      }
+      
+      // Fallback: search by input name attribute
+      const fallbackHidden = document.querySelector(`input[name="syj_empleado_id_tarea_${idx}"], input[name$="empleado_id_tarea_${idx}"], input[name*="empleado_id_tarea_${idx}"]`);
+      if (fallbackHidden) {
+        const parent = fallbackHidden.closest('.searchable-select-wrapper') || fallbackHidden.parentElement;
+        const fallbackSearch = parent ? parent.querySelector('.searchable-input, input[type="text"]') : null;
+        if (fallbackSearch) {
           const searchId = 'tmp_emp_search_' + idx + '_' + Date.now();
           const hiddenId = 'tmp_emp_hidden_' + idx + '_' + Date.now();
-          searchInput.setAttribute('id', searchId);
-          hiddenInput.setAttribute('id', hiddenId);
+          fallbackSearch.setAttribute('id', searchId);
+          fallbackHidden.setAttribute('id', hiddenId);
           return { searchId, hiddenId, found: true };
         }
       }
+
       return { found: false };
     }, index);
 
@@ -1769,8 +1803,22 @@ async function syncWorkOrder(orderId) {
         const ccLabel = ccObj ? ccObj.label : appTask.centroCosto;
         console.log(`[Reconcile] Card #${ci} Centro de Costo: "${ccLabel}" (ID: ${appTask.centroCosto})`);
         await page.evaluate((idx, taskCC) => {
-          const selects = Array.from(document.querySelectorAll('select[id^="centro_costo_"], select[name*="centro_costo_id"]'));
-          const ccSelect = selects[idx];
+          // Find CC select by proximity inside target card container
+          const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
+          const targetHoursInput = horasInputs[idx];
+          if (!targetHoursInput) return;
+
+          let card = targetHoursInput.parentElement;
+          while (card && card !== document.body && 
+                 !card.classList.contains('card') && 
+                 !card.classList.contains('form-row') && 
+                 !card.classList.contains('row') &&
+                 !card.className.includes('col-12')) {
+            card = card.parentElement;
+          }
+          if (!card) return;
+
+          const ccSelect = card.querySelector('select[id^="centro_costo_"], select[name*="centro_costo_id"], select');
           if (ccSelect) {
             const cleanForCompare = (str) => {
               if (!str) return '';
@@ -1789,10 +1837,16 @@ async function syncWorkOrder(orderId) {
         }, ci, ccLabel);
         await delay(1000);
 
-        // 2. Fill Employee if empty
+        // 2. Fill Employee if empty, placeholder, or mismatch
         const { employeeLabel } = resolveAndMapEmployee(appTask);
-        if (formCards[ci].employee === '') {
-          console.log(`[Reconcile] Card #${ci} has no employee. Selecting: "${employeeLabel}"...`);
+        const isEmpEmptyOrPlaceholder = formCards[ci].employee === '' || 
+                                       formCards[ci].employee.toLowerCase().includes('seleccionar') || 
+                                       formCards[ci].employee.toLowerCase().includes('buscar');
+        const isEmpMismatch = !cleanStr(formCards[ci].employee).includes(cleanStr(employeeLabel)) && 
+                              !cleanStr(employeeLabel).includes(cleanStr(formCards[ci].employee));
+                              
+        if (isEmpEmptyOrPlaceholder || isEmpMismatch) {
+          console.log(`[Reconcile] Card #${ci} needs employee. Current: "${formCards[ci].employee}". Target: "${employeeLabel}"...`);
           const empFilled = await fillTaskEmployeeSearchableSelect(page, ci, employeeLabel);
           console.log(`[Reconcile] Card #${ci} employee select result: ${empFilled}`);
           await delay(2000);
@@ -1912,8 +1966,6 @@ async function syncWorkOrder(orderId) {
       }
 
       db.updateWorkOrder(orderId, { tasks: order.tasks });
-
-      // 7. GUARDAR
       console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
       await delay(4000);
       const guardarBtnId = await page.evaluate(() => {
@@ -1923,14 +1975,41 @@ async function syncWorkOrder(orderId) {
         btn.id = id;
         return id;
       });
-      let savedOk = false;
+      let clickedOk = false;
       if (guardarBtnId) {
-        try { await page.click(`#${guardarBtnId}`); savedOk = true; }
-        catch (e) { console.warn(`[Reconcile] Native click on GUARDAR raised: ${e.message} (likely navigated away, treating as success)`); savedOk = true; }
+        try { 
+          await page.click(`#${guardarBtnId}`); 
+          clickedOk = true; 
+        } catch (e) { 
+          console.warn(`[Reconcile] Native click on GUARDAR raised: ${e.message} (likely navigated away, treating as success)`); 
+          clickedOk = true; 
+        }
       }
-      console.log(`[Reconcile] Guardar: ${savedOk}`);
-      if (savedOk) await delay(4000);
+      console.log(`[Reconcile] Guardar button clicked: ${clickedOk}`);
+      
+      // Wait for backend processing and redirects
+      await delay(5000);
 
+      // Verify if the form was actually saved by checking if we left the edit form
+      // or if there are validation error banners displayed.
+      const isFormStillOpen = await page.evaluate(() => {
+        const formInput = document.querySelector('input[name="horas_estimadas"], textarea[id^="descripcion_"]');
+        return !!formInput;
+      });
+
+      const validationErrors = await page.evaluate(() => {
+        const alertElements = document.querySelectorAll('.alert-danger, .is-invalid, .invalid-feedback, .text-danger');
+        return Array.from(alertElements)
+          .map(el => el.textContent.trim())
+          .filter(t => t.length > 0 && t.length < 200 && !t.includes('soporte') && !t.includes('comprobante'));
+      });
+
+      if (isFormStillOpen || validationErrors.length > 0) {
+        const errMsg = validationErrors.length > 0
+          ? `Errores de validación en la web de Taxes al guardar edición: ${validationErrors.join(" | ")}`
+          : "El formulario de edición de OT no se guardó correctamente (sigue abierto tras hacer click en Guardar).";
+        throw new Error(errMsg);
+      }
 
       db.updateWorkOrder(orderId, {
         syncStatus: 'success',
@@ -3243,38 +3322,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     const count = (order.verifiedCount || 0) + 1;
     if (errors.length > 0) {
-      // Special case: if every error is "not found" AND the table had fewer rows than the
-      // number of tasks (Taxes sometimes shows only 1 row per OT in the tasks list page
-      // even when the OT has multiple tasks), treat as verified — the reconcile already
-      // confirmed the save via GUARDAR success.
-      const allNotFoundErrors = errors.every(e => e.includes('No encontrada en el listado'));
-      const tableHadFewerRowsThanTasks = initialTableRowCount < order.tasks.length && initialTableRowCount > 0;
-      if (allNotFoundErrors && tableHadFewerRowsThanTasks) {
-        console.log(`[Verify] initialTableRowCount=${initialTableRowCount} order.tasks.length=${order.tasks.length}`);
-        console.log(`[Verify] All 'not found' errors are due to Taxes limiting task list display (${tableTasks.length} rows for ${order.tasks.length} tasks). Accepting as verified.`);
-        const shouldArchive = order.estadoUnidad !== 'fuera_de_servicio';
-        const updatePayload = {
-          verifiedStatus: 'success',
-          verifiedCount: count,
-          verifiedError: null,
-          lastVerifyAttempt: new Date().toISOString()
-        };
-        if (shouldArchive) {
-          updatePayload.archived = true;
-          updatePayload.archivedAt = new Date().toISOString();
-        } else {
-          updatePayload.archived = false;
-          updatePayload.archivedAt = null;
-        }
-        db.updateWorkOrder(orderId, updatePayload);
-        if (shouldArchive) {
-          console.log(`[Verify] Order ${orderId} fully verified and synced. Auto-archived to history.`);
-        }
-      } else {
-        console.log(`[Verify] Completed with issues:`, errors);
-        db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedCount: count, verifiedError: errors.join(' | '), lastVerifyAttempt: new Date().toISOString() });
-      }
-
+      console.log(`[Verify] Completed with issues:`, errors);
+      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedCount: count, verifiedError: errors.join(' | '), lastVerifyAttempt: new Date().toISOString() });
     } else {
       const msg = madeChanges ? 'Verificado y corregido correctamente vía listado de tareas.' : 'Todo correcto, verificado sin cambios necesarios.';
       console.log(`[Verify] SUCCESS. ${msg}`);
