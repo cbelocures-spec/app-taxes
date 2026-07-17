@@ -1967,30 +1967,36 @@ async function syncWorkOrder(orderId) {
 
       db.updateWorkOrder(orderId, { tasks: order.tasks });
 
-      // Fix date inputs before saving — Puppeteer headless can leave date fields empty or in wrong format
-      // Taxes requires dates in yyyy-MM-dd format for type="date" inputs
-      await page.evaluate((fechaEntrega) => {
+      // Fix date inputs before saving — Taxes pre-populates some date fields as "yyyy/MM/dd"
+      // (slashes) but the browser requires "yyyy-MM-dd" (dashes). Convert in-place.
+      const fixedDates = await page.evaluate(() => {
         const dateInputs = Array.from(document.querySelectorAll('input[type="date"]'));
+        const fixed = [];
         dateInputs.forEach(input => {
           const currentVal = input.value;
-          // If value is empty or not in yyyy-MM-dd format, set it from the order's fecha entrega
           const isValidFormat = /^\d{4}-\d{2}-\d{2}$/.test(currentVal);
-          if (!isValidFormat && fechaEntrega) {
-            // Convert from dd/MM/yyyy or yyyy/MM/dd to yyyy-MM-dd if needed
-            let fixed = fechaEntrega;
-            if (/^\d{2}\/\d{2}\/\d{4}$/.test(fechaEntrega)) {
-              const [d, m, y] = fechaEntrega.split('/');
-              fixed = `${y}-${m}-${d}`;
-            } else if (/^\d{4}\/\d{2}\/\d{2}$/.test(fechaEntrega)) {
-              fixed = fechaEntrega.replace(/\//g, '-');
+          if (!isValidFormat && currentVal) {
+            // Convert yyyy/MM/dd → yyyy-MM-dd
+            let corrected = currentVal.replace(/\//g, '-');
+            // Convert dd/MM/yyyy → yyyy-MM-dd
+            if (/^\d{2}-\d{2}-\d{4}$/.test(corrected)) {
+              const [d, m, y] = corrected.split('-');
+              corrected = `${y}-${m}-${d}`;
             }
-            const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-            nativeSetter.call(input, fixed);
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
+            if (/^\d{4}-\d{2}-\d{2}$/.test(corrected)) {
+              const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+              nativeSetter.call(input, corrected);
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+              fixed.push({ from: currentVal, to: corrected, name: input.name || input.id });
+            }
           }
         });
-      }, order.fechaEntrega || '');
+        return fixed;
+      });
+      if (fixedDates.length > 0) {
+        console.log(`[Reconcile] Fixed ${fixedDates.length} date input(s) before GUARDAR:`, JSON.stringify(fixedDates));
+      }
 
       console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
       await delay(4000);
