@@ -245,8 +245,32 @@ async function checkAndSync() {
       console.error('[RailwayAgent] Error pushing local orders:', pushErr.message);
     }
 
-    // ── 5. Find any PENDING order from Railway and sync it locally (skip soft-deleted orders)
-    const pending = orders.filter(o => o.syncStatus === 'pending' && o.deleted !== true);
+    // ── 5. Find any PENDING order from Railway and sync it locally (skip soft-deleted/already-done orders)
+    const pending = orders.filter(o => {
+      if (o.syncStatus !== 'pending' || o.deleted === true) return false;
+      
+      const localOrd = db.getWorkOrderById(o.id);
+      if (localOrd && (localOrd.syncStatus === 'success' || localOrd.verifiedStatus === 'success')) {
+        console.log(`[RailwayAgent] Pending order ${o.interno} (${o.id}) is already completed locally. Pushing status instead of running Puppeteer.`);
+        apiCall('POST', `/api/orders/local-sync-result/${o.id}`, {
+          syncStatus: localOrd.syncStatus,
+          syncError: localOrd.syncError,
+          syncDate: localOrd.syncDate,
+          verifiedStatus: localOrd.verifiedStatus,
+          verifiedError: localOrd.verifiedError,
+          verifiedCount: localOrd.verifiedCount,
+          taxesOrderNumber: localOrd.taxesOrderNumber,
+          tasks: localOrd.tasks,
+          estadoUnidad: localOrd.estadoUnidad,
+          archived: !!localOrd.archived,
+          deleted: !!localOrd.deleted,
+          deletedAt: localOrd.deletedAt || null
+        }).catch(e => console.warn(`[RailwayAgent] Failed to push local status for ${o.id}:`, e.message));
+        return false;
+      }
+      return true;
+    });
+
     if (pending.length === 0) {
       isAgentRunning = false;
       return;
