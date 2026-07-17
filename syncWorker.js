@@ -2055,38 +2055,56 @@ async function syncWorkOrder(orderId) {
       db.updateWorkOrder(orderId, { tasks: order.tasks });
 
       // Fix date inputs before saving:
-      // When Taxes's JS sets a date field with "yyyy/MM/dd" (slashes), the browser logs
-      // a warning and the input.value becomes "" (empty). The form then fails validation.
-      // Fix: fill any empty date inputs with the order's fechaEntrega in yyyy-MM-dd format.
-      if (order.fechaEntrega) {
-        let isoFecha = order.fechaEntrega;
-        // Normalize to yyyy-MM-dd (handle dd/MM/yyyy or yyyy/MM/dd)
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(isoFecha)) {
-          const [d, m, y] = isoFecha.split('/');
-          isoFecha = `${y}-${m}-${d}`;
-        } else if (/^\d{4}\/\d{2}\/\d{2}$/.test(isoFecha)) {
-          isoFecha = isoFecha.replace(/\//g, '-');
-        }
-        if (/^\d{4}-\d{2}-\d{2}$/.test(isoFecha)) {
-          const fixedDates = await page.evaluate((iso) => {
-            const inputs = Array.from(document.querySelectorAll('input[type="date"]'));
-            const fixed = [];
-            inputs.forEach(input => {
-              // Fill if empty (happens when Taxes JS sets it in wrong format)
-              if (!input.value) {
-                const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-                nativeSetter.call(input, iso);
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-                fixed.push({ name: input.name || input.id || '?', setValue: iso });
-              }
-            });
-            return fixed;
-          }, isoFecha);
-          if (fixedDates.length > 0) {
-            console.log(`[Reconcile] Filled ${fixedDates.length} empty date field(s) with ${isoFecha}:`, JSON.stringify(fixedDates));
+      // Force all date inputs to have valid formats.
+      // - inputs with type="date" strictly require "yyyy-MM-dd"
+      // - text inputs with date class/name require "dd/MM/yyyy"
+      let targetDateIso = order.fechaEntrega || new Date().toISOString().split('T')[0];
+      // Normalize to yyyy-MM-dd
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(targetDateIso)) {
+        const [d, m, y] = targetDateIso.split('/');
+        targetDateIso = `${y}-${m}-${d}`;
+      } else if (/^\d{4}\/\d{2}\/\d{2}$/.test(targetDateIso)) {
+        targetDateIso = targetDateIso.replace(/\//g, '-');
+      }
+      
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDateIso)) {
+        targetDateIso = new Date().toISOString().split('T')[0]; // fallback
+      }
+
+      // regional dd/MM/yyyy format for text-based date inputs
+      const [y, m, d] = targetDateIso.split('-');
+      const targetDateRegional = `${d}/${m}/${y}`;
+
+      const fixedDates = await page.evaluate((iso, regional) => {
+        const fixed = [];
+        // 1. Force ISO format on all HTML5 type="date" inputs
+        const dateInputs = Array.from(document.querySelectorAll('input[type="date"]'));
+        dateInputs.forEach(input => {
+          const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+          nativeSetter.call(input, iso);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          fixed.push({ name: input.name || input.id || 'type=date', format: 'ISO', value: iso });
+        });
+
+        // 2. Force regional format on any text inputs related to dates
+        const textInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+        textInputs.forEach(input => {
+          const nameOrId = (input.name || input.id || '').toLowerCase();
+          const isDateRelated = nameOrId.includes('fecha') || nameOrId.includes('date') || nameOrId.includes('entrega');
+          if (isDateRelated) {
+            const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+            nativeSetter.call(input, regional);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            fixed.push({ name: input.name || input.id || 'type=text', format: 'regional', value: regional });
           }
-        }
+        });
+        return fixed;
+      }, targetDateIso, targetDateRegional);
+
+      if (fixedDates.length > 0) {
+        console.log(`[Reconcile] Normalized ${fixedDates.length} date input(s) before GUARDAR:`, JSON.stringify(fixedDates));
       }
 
       console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
@@ -2112,25 +2130,33 @@ async function syncWorkOrder(orderId) {
       
       // Wait for backend processing and redirects
       await delay(5000);
-
+ 
       // Verify if the form was actually saved by checking if we left the edit form
-      // or if there are validation error banners displayed.
       const isFormStillOpen = await page.evaluate(() => {
         const formInput = document.querySelector('input[name="horas_estimadas"], textarea[id^="descripcion_"]');
         return !!formInput;
       });
-
-      const validationErrors = await page.evaluate(() => {
-        const alertElements = document.querySelectorAll('.alert-danger, .is-invalid, .invalid-feedback, .text-danger');
-        return Array.from(alertElements)
-          .map(el => el.textContent.trim())
-          .filter(t => t.length > 0 && t.length < 200 && !t.includes('soporte') && !t.includes('comprobante'));
-      });
-
-      if (isFormStillOpen || validationErrors.length > 0) {
+ 
+      let validationErrors = [];
+      if (isFormStillOpen) {
+        // Collect validation errors only if the form remains open
+        validationErrors = await page.evaluate(() => {
+          const alertElements = document.querySelectorAll('.alert-danger, .is-invalid, .invalid-feedback, .text-danger');
+          return Array.from(alertElements)
+            .map(el => el.textContent.trim())
+            .filter(t => {
+              if (t.length === 0 || t.length > 200 || t.includes('soporte') || t.includes('comprobante')) return false;
+              // Ignore simple dates like "17/07/2026" or "17-07-2026" being matched as errors
+              const isDate = /^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(t) || /^\d{4}[\/\-]\d{2}[\/\-]\d{2}$/.test(t);
+              return !isDate;
+            });
+        });
+      }
+ 
+      if (isFormStillOpen) {
         const errMsg = validationErrors.length > 0
           ? `Errores de validación en la web de Taxes al guardar edición: ${validationErrors.join(" | ")}`
-          : "El formulario de edición de OT no se guardó correctamente (sigue abierto tras hacer click en Guardar).";
+          : "El formulario de edición de OT no se guardó correctamente (sigue abierto tras hacer click en Guardar y no reportó errores visibles).";
         throw new Error(errMsg);
       }
 
