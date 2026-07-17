@@ -1,38 +1,45 @@
 const worker = require('./syncWorker');
 const db = require('./database');
+const https = require('https');
 
 const HOST = 'app-taxes-production-ec67.up.railway.app';
 const USERNAME = 'paniol@contenedoreshugo.com.ar';
 const POLL_INTERVAL_MS = 20000; // 20 seconds
 
-// Promise-based API call using modern fetch (avoids https.request DNS/timeout issues)
+// Promise-based API call using https.request (HTTP/1.1) — avoids HTTP/2 routing issues
+// with Railway's edge network that cause persistent 404 "Application not found" errors
+// when using Node.js built-in fetch which defaults to HTTP/2.
 function apiCall(method, path, bodyData) {
   return new Promise((resolve, reject) => {
-    const url = `https://${HOST}${path}`;
+    const body = bodyData ? JSON.stringify(bodyData) : null;
     const headers = { 'x-user-username': USERNAME };
-    const options = { method, headers };
-
-    if (bodyData) {
-      options.body = JSON.stringify(bodyData);
+    if (body) {
       headers['Content-Type'] = 'application/json';
+      headers['Content-Length'] = Buffer.byteLength(body);
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-    options.signal = controller.signal;
+    const options = {
+      hostname: HOST,
+      path,
+      method,
+      headers,
+      timeout: 30000
+    };
 
-    fetch(url, options)
-      .then(async (res) => {
-        clearTimeout(timeoutId);
-        const text = await res.text();
-        resolve(text);
-      })
-      .catch((err) => {
-        clearTimeout(timeoutId);
-        reject(err);
-      });
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => resolve(data));
+    });
+
+    req.on('timeout', () => { req.destroy(); reject(new Error(`Request timed out after 30s: ${method} ${path}`)); });
+    req.on('error', (err) => reject(err));
+
+    if (body) req.write(body);
+    req.end();
   });
 }
+
 
 let isAgentRunning = false;
 let startupDone = false;
