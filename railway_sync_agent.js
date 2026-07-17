@@ -122,7 +122,12 @@ async function checkAndSync() {
             tasks: target.tasks,
             archived: isArchivedLocallyOrRemotely
           });
-        } else if (existing.syncStatus !== 'syncing') {
+        } else {
+          const preserveLocalSync = (existing.syncStatus === 'success' || existing.syncStatus === 'error') &&
+                                    (target.syncStatus === 'syncing' || target.syncStatus === 'pending');
+          const preserveLocalVerify = (existing.verifiedStatus === 'success' || existing.verifiedStatus === 'error') &&
+                                      (target.verifiedStatus === 'pending');
+
           db.updateWorkOrder(target.id, {
             rodado: target.rodado,
             responsable: target.responsable,
@@ -131,16 +136,16 @@ async function checkAndSync() {
             interno: target.interno,
             clasificacion: target.clasificacion,
             incidente: target.incidente,
-            syncStatus: target.syncStatus,
-            syncError: target.syncError,
-            syncDate: target.syncDate,
+            syncStatus: preserveLocalSync ? existing.syncStatus : target.syncStatus,
+            syncError: preserveLocalSync ? existing.syncError : target.syncError,
+            syncDate: preserveLocalSync ? existing.syncDate : target.syncDate,
             tasks: target.tasks,
             estadoUnidad: target.estadoUnidad,
             combustibleReset: target.combustibleReset,
             taxesOrderNumber: target.taxesOrderNumber,
-            verifiedStatus: target.verifiedStatus,
-            verifiedError: target.verifiedError,
-            verifiedCount: target.verifiedCount,
+            verifiedStatus: preserveLocalVerify ? existing.verifiedStatus : target.verifiedStatus,
+            verifiedError: preserveLocalVerify ? existing.verifiedError : target.verifiedError,
+            verifiedCount: preserveLocalVerify ? existing.verifiedCount : target.verifiedCount,
             archived: isArchivedLocallyOrRemotely
           });
         }
