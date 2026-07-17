@@ -1706,31 +1706,50 @@ async function syncWorkOrder(orderId) {
         console.log(`[Reconcile] After adding missing tasks: ${formCards.length} cards now in form`);
       }
 
-      // 5. DELETE duplicate/extra cards (reverse order to keep indices valid)
-      //    Strategy: for each app task, find ONE matching form card. Mark rest for deletion.
-      const usedCardIndices = new Set();
-      const cardToAppMap = []; // for each form card index: matched app task index or -1
+      // 5. DELETE duplicate/extra cards
+      //    Strategy: determine which cards match local tasks to keep them, then delete unmatched ones.
+      const matchedCardIndices = new Set();
+      const matchedAppIndices = new Set();
 
+      // First pass: strict match (both employee and description)
       for (let ai = 0; ai < order.tasks.length; ai++) {
         const appTask = order.tasks[ai];
-        const { employeeLabel, finalDescription } = resolveAndMapEmployee(appTask);
+        const { employeeLabel } = resolveAndMapEmployee(appTask);
         for (let ci = 0; ci < formCards.length; ci++) {
-          if (usedCardIndices.has(ci)) continue;
+          if (matchedCardIndices.has(ci)) continue;
           const card = formCards[ci];
-          const empOk = cleanStr(card.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(card.employee)) || card.employee === '';
-          const descOk = cleanStr(card.description).includes(cleanStr(appTask.descripcion)) || cleanStr(appTask.descripcion).includes(cleanStr(card.description)) || card.description === '';
-          if (empOk || descOk) { // loose match — one of the two must match
-            usedCardIndices.add(ci);
-            cardToAppMap[ci] = ai;
+          const empOk = cleanStr(card.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(card.employee));
+          const descOk = cleanStr(card.description).includes(cleanStr(appTask.descripcion)) || cleanStr(appTask.descripcion).includes(cleanStr(card.description));
+          if (empOk && descOk) {
+            matchedCardIndices.add(ci);
+            matchedAppIndices.add(ai);
             break;
           }
         }
       }
 
-      // Cards not matched to any app task → delete
+      // Second pass: loose match (either employee or description)
+      for (let ai = 0; ai < order.tasks.length; ai++) {
+        if (matchedAppIndices.has(ai)) continue;
+        const appTask = order.tasks[ai];
+        const { employeeLabel } = resolveAndMapEmployee(appTask);
+        for (let ci = 0; ci < formCards.length; ci++) {
+          if (matchedCardIndices.has(ci)) continue;
+          const card = formCards[ci];
+          const empOk = cleanStr(card.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(card.employee));
+          const descOk = cleanStr(card.description).includes(cleanStr(appTask.descripcion)) || cleanStr(appTask.descripcion).includes(cleanStr(card.description));
+          if (empOk || descOk) {
+            matchedCardIndices.add(ci);
+            matchedAppIndices.add(ai);
+            break;
+          }
+        }
+      }
+
+      // Unmatched form cards are marked for deletion
       const toDeleteIndices = [];
       for (let ci = 0; ci < formCards.length; ci++) {
-        if (!usedCardIndices.has(ci)) toDeleteIndices.push(ci);
+        if (!matchedCardIndices.has(ci)) toDeleteIndices.push(ci);
       }
 
       if (toDeleteIndices.length > 0) {
@@ -1741,7 +1760,6 @@ async function syncWorkOrder(orderId) {
           page.once('dialog', d => d.accept().catch(() => {}));
           const deleted = await page.evaluate((idx) => {
             const clickConfirm = () => {
-              // Look for common confirmation dialog buttons in Vue/Bootstrap modals
               const confirmBtn = Array.from(document.querySelectorAll('button, a, input[type="button"]')).find(b => {
                 const txt = (b.textContent || '').toLowerCase().trim();
                 return txt === 'aceptar' || txt === 'confirmar' || txt === 'sí' || txt === 'si' || txt === 'eliminar';
@@ -1771,7 +1789,6 @@ async function syncWorkOrder(orderId) {
                 }
               }
             }
-            // Fallback: global search
             const trashBtns = Array.from(document.querySelectorAll('button.btn-danger, a.btn-danger, [class*="danger"]'))
               .filter(b => b.querySelector('.fa-trash, .fa-times, .fa-remove') || b.textContent.trim() === '' || b.title?.toLowerCase().includes('elim'));
             const btn = trashBtns[idx];
@@ -1789,6 +1806,68 @@ async function syncWorkOrder(orderId) {
         formCards = await readFormCards();
         console.log(`[Reconcile] After deletion: ${formCards.length} cards remain`);
       }
+
+      // Add missing cards if needed (e.g. if we deleted unmatched ones and now have fewer cards than tasks)
+      let currentLength = formCards.length;
+      if (currentLength < order.tasks.length) {
+        const toAdd = order.tasks.length - currentLength;
+        console.log(`[Reconcile] Form has ${currentLength} cards, but app has ${order.tasks.length}. Clicking AGREGAR TAREA ${toAdd} times...`);
+        for (let i = 0; i < toAdd; i++) {
+          const added = await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button, a, [role="button"], .btn'));
+            const addBtn = btns.find(b => b.textContent.toLowerCase().includes('agregar tarea'));
+            if (addBtn) {
+              addBtn.click();
+              return true;
+            }
+            return false;
+          });
+          console.log(`[Reconcile] Added task card ${i + 1}: ${added}`);
+          await delay(2500);
+        }
+        // Re-read form cards after adding
+        formCards = await readFormCards();
+        console.log(`[Reconcile] After adding missing tasks: ${formCards.length} cards now in form`);
+      }
+
+      // Now that formCards.length === order.tasks.length, compute the final mapping accurately
+      const cardToAppMap = [];
+      const finalUsedAppIndices = new Set();
+
+      // Pass 1: Map existing cards that match an app task by employee or description
+      for (let ci = 0; ci < formCards.length; ci++) {
+        const card = formCards[ci];
+        let bestAppIdx = -1;
+        for (let ai = 0; ai < order.tasks.length; ai++) {
+          if (finalUsedAppIndices.has(ai)) continue;
+          const appTask = order.tasks[ai];
+          const { employeeLabel } = resolveAndMapEmployee(appTask);
+          const empOk = cleanStr(card.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(card.employee));
+          const descOk = cleanStr(card.description).includes(cleanStr(appTask.descripcion)) || cleanStr(appTask.descripcion).includes(cleanStr(card.description));
+          if (empOk || descOk) {
+            bestAppIdx = ai;
+            break;
+          }
+        }
+        if (bestAppIdx !== -1) {
+          cardToAppMap[ci] = bestAppIdx;
+          finalUsedAppIndices.add(bestAppIdx);
+        }
+      }
+
+      // Pass 2: Map remaining empty/new cards to remaining app tasks
+      for (let ci = 0; ci < formCards.length; ci++) {
+        if (cardToAppMap[ci] !== undefined) continue;
+        for (let ai = 0; ai < order.tasks.length; ai++) {
+          if (!finalUsedAppIndices.has(ai)) {
+            cardToAppMap[ci] = ai;
+            finalUsedAppIndices.add(ai);
+            break;
+          }
+        }
+      }
+
+      console.log(`[Reconcile] Final Card to App Map:`, JSON.stringify(cardToAppMap));
 
       // 6. Update each remaining card with correct hours and realizada
       for (let ci = 0; ci < formCards.length; ci++) {
