@@ -1967,35 +1967,39 @@ async function syncWorkOrder(orderId) {
 
       db.updateWorkOrder(orderId, { tasks: order.tasks });
 
-      // Fix date inputs before saving — Taxes pre-populates some date fields as "yyyy/MM/dd"
-      // (slashes) but the browser requires "yyyy-MM-dd" (dashes). Convert in-place.
-      const fixedDates = await page.evaluate(() => {
-        const dateInputs = Array.from(document.querySelectorAll('input[type="date"]'));
-        const fixed = [];
-        dateInputs.forEach(input => {
-          const currentVal = input.value;
-          const isValidFormat = /^\d{4}-\d{2}-\d{2}$/.test(currentVal);
-          if (!isValidFormat && currentVal) {
-            // Convert yyyy/MM/dd → yyyy-MM-dd
-            let corrected = currentVal.replace(/\//g, '-');
-            // Convert dd/MM/yyyy → yyyy-MM-dd
-            if (/^\d{2}-\d{2}-\d{4}$/.test(corrected)) {
-              const [d, m, y] = corrected.split('-');
-              corrected = `${y}-${m}-${d}`;
-            }
-            if (/^\d{4}-\d{2}-\d{2}$/.test(corrected)) {
-              const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-              nativeSetter.call(input, corrected);
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-              input.dispatchEvent(new Event('change', { bubbles: true }));
-              fixed.push({ from: currentVal, to: corrected, name: input.name || input.id });
-            }
+      // Fix date inputs before saving:
+      // When Taxes's JS sets a date field with "yyyy/MM/dd" (slashes), the browser logs
+      // a warning and the input.value becomes "" (empty). The form then fails validation.
+      // Fix: fill any empty date inputs with the order's fechaEntrega in yyyy-MM-dd format.
+      if (order.fechaEntrega) {
+        let isoFecha = order.fechaEntrega;
+        // Normalize to yyyy-MM-dd (handle dd/MM/yyyy or yyyy/MM/dd)
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(isoFecha)) {
+          const [d, m, y] = isoFecha.split('/');
+          isoFecha = `${y}-${m}-${d}`;
+        } else if (/^\d{4}\/\d{2}\/\d{2}$/.test(isoFecha)) {
+          isoFecha = isoFecha.replace(/\//g, '-');
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(isoFecha)) {
+          const fixedDates = await page.evaluate((iso) => {
+            const inputs = Array.from(document.querySelectorAll('input[type="date"]'));
+            const fixed = [];
+            inputs.forEach(input => {
+              // Fill if empty (happens when Taxes JS sets it in wrong format)
+              if (!input.value) {
+                const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+                nativeSetter.call(input, iso);
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                fixed.push({ name: input.name || input.id || '?', setValue: iso });
+              }
+            });
+            return fixed;
+          }, isoFecha);
+          if (fixedDates.length > 0) {
+            console.log(`[Reconcile] Filled ${fixedDates.length} empty date field(s) with ${isoFecha}:`, JSON.stringify(fixedDates));
           }
-        });
-        return fixed;
-      });
-      if (fixedDates.length > 0) {
-        console.log(`[Reconcile] Fixed ${fixedDates.length} date input(s) before GUARDAR:`, JSON.stringify(fixedDates));
+        }
       }
 
       console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
