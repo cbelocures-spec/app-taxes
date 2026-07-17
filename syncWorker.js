@@ -2714,6 +2714,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
     };
 
     let tableTasks = await readTableTasks();
+    const initialTableRowCount = tableTasks.length; // Save before loop mutates tableTasks
     console.log(`[Verify] Found ${tableTasks.length} tasks in Taxes table:`, JSON.stringify(tableTasks));
 
     // Helper: use the page's own "Empleado" filter (in addition to the OT number
@@ -2902,7 +2903,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
         // Also flag mismatch if tarea is Finalizada and Taxes shows 0 hours (blank field)
         const hoursOk = (actualHours === 0 && (expectedHours > 0 || t.status === 'Finalizada'))
           ? false
-          : (Math.abs(expectedHours - actualHours) <= 0.05);
+          : (expectedHours === 0 ? true : (Math.abs(expectedHours - actualHours) <= 0.05));
         const expectedRealizada = t.status === 'Finalizada' ? 'SI' : 'NO';
         const realizadaOk = matchedRow.realizada.toUpperCase() === expectedRealizada;
         const localDescBase = (t.descripcion || '').replace(/[.,\s]/g, '').toLowerCase();
@@ -3215,7 +3216,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
           // Also block archiving if tarea is Finalizada and has 0 hours in Taxes (field was blank/unfilled).\
           const hoursOk = (actualHours === 0 && (expectedHours > 0 || t.status === 'Finalizada')) 
             ? false 
-            : (Math.abs(expectedHours - actualHours) <= 0.05);
+            : (expectedHours === 0 ? true : (Math.abs(expectedHours - actualHours) <= 0.05));
           const expectedRealizada = t.status === 'Finalizada' ? 'SI' : 'NO';
           const realizadaOk = matchedRow.realizada.toUpperCase() === expectedRealizada;
           const localDescBase = (t.descripcion || '').replace(/[.,\s]/g, '').toLowerCase();
@@ -3247,8 +3248,9 @@ async function verifyWorkOrderWithPage(page, orderId) {
       // even when the OT has multiple tasks), treat as verified — the reconcile already
       // confirmed the save via GUARDAR success.
       const allNotFoundErrors = errors.every(e => e.includes('No encontrada en el listado'));
-      const tableHadFewerRowsThanTasks = tableTasks.length < order.tasks.length && tableTasks.length > 0;
+      const tableHadFewerRowsThanTasks = initialTableRowCount < order.tasks.length && initialTableRowCount > 0;
       if (allNotFoundErrors && tableHadFewerRowsThanTasks) {
+        console.log(`[Verify] initialTableRowCount=${initialTableRowCount} order.tasks.length=${order.tasks.length}`);
         console.log(`[Verify] All 'not found' errors are due to Taxes limiting task list display (${tableTasks.length} rows for ${order.tasks.length} tasks). Accepting as verified.`);
         const shouldArchive = order.estadoUnidad !== 'fuera_de_servicio';
         const updatePayload = {
