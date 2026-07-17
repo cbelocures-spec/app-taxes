@@ -837,9 +837,10 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
       updates.taxesOrderNumber = taxesOrderNumber;
     }
 
-    // Auto-archive if both sync and verification are successful (green + blue)
-    // or if explicit archived flag is provided, but only if not out of service.
-    const isSynced = updates.syncStatus === 'success' || (updates.syncStatus === undefined && existing.syncStatus === 'success');
+    // Auto-archive when verification is successful (blue checkmark = data confirmed in Taxes)
+    // verifiedStatus:success is the true confirmation that data is in the system.
+    // We do NOT require syncStatus:success here — if verified passed, the order is done.
+    // Exception: fuera_de_servicio units stay active so the team knows the vehicle is still in the shop.
     const isVerified = updates.verifiedStatus === 'success' || (updates.verifiedStatus === undefined && existing.verifiedStatus === 'success');
     const targetEstadoUnidad = req.body.estadoUnidad !== undefined ? req.body.estadoUnidad : existing.estadoUnidad;
     const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
@@ -847,10 +848,10 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
     if (isOutOfService) {
       updates.archived = false;
       updates.archivedAt = null;
-    } else if (req.body.archived === true || (isSynced && isVerified)) {
+    } else if (req.body.archived === true || isVerified) {
       updates.archived = true;
       updates.archivedAt = existing.archivedAt || new Date().toISOString();
-      console.log(`[LocalSyncResult] Order ${req.params.id} is verified and synced. Auto-archived to history.`);
+      if (isVerified) console.log(`[LocalSyncResult] Order ${req.params.id} verified. Auto-archived to history.`);
     }
 
     // Propagate soft-delete state if explicitly sent
