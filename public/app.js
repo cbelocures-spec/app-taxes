@@ -1289,15 +1289,25 @@ async function fetchCatalogs() {
     populateSelect('form-rodado', data.rodados, "Seleccionar Rodado...");
     populateSelect('form-responsable', data.responsables, "Seleccionar Responsable...");
 
-    // Extract unique internal numbers from rodados catalog
-    const uniqueInternos = [...new Set((data.rodados || []).map(r => String(r.interno || '').trim()).filter(Boolean))];
+    // Extract unique internal numbers from rodados catalog, active orders, and complete range 1-250
+    const rawInternos = (data.rodados || []).map(r => String(r.interno || '').trim()).filter(Boolean);
+    if (Array.isArray(activeOrders)) {
+      activeOrders.forEach(o => {
+        if (o.interno) rawInternos.push(String(o.interno).trim());
+      });
+    }
+    for (let i = 1; i <= 250; i++) {
+      rawInternos.push(String(i));
+    }
+
+    const uniqueInternos = [...new Set(rawInternos)].filter(Boolean);
     uniqueInternos.sort((a, b) => {
       const numA = parseInt(a, 10);
       const numB = parseInt(b, 10);
       if (!isNaN(numA) && !isNaN(numB)) {
         return numA - numB;
       }
-      return a.localeCompare(b);
+      return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
     });
 
     const internoOptions = uniqueInternos.map(int => ({ value: int, label: int }));
