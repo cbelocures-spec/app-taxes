@@ -445,6 +445,51 @@ function closePreOrderModal() {
   document.getElementById('pre-order-modal').classList.remove('open');
 }
 
+function toggleDiagInsumosCollapse(forceOpen = null) {
+  const body = document.getElementById('diag-insumos-body');
+  const chevron = document.getElementById('diag-insumos-chevron');
+  const header = document.getElementById('diag-insumos-header');
+  if (!body || !chevron) return;
+
+  const shouldOpen = forceOpen !== null ? forceOpen : (body.style.display === 'none' || body.style.display === '');
+  if (shouldOpen) {
+    body.style.display = 'grid';
+    chevron.style.transform = 'rotate(180deg)';
+    if (header) header.style.borderRadius = '8px 8px 0 0';
+  } else {
+    body.style.display = 'none';
+    chevron.style.transform = 'rotate(0deg)';
+    if (header) header.style.borderRadius = '8px';
+  }
+}
+
+function updateDiagInsumosBadge() {
+  const modal = document.getElementById('diagnosis-modal');
+  if (!modal) return;
+  const badge = document.getElementById('diag-insumos-badge');
+  const count = modal.querySelectorAll('.diag-insumo-check:checked').length;
+  if (badge) {
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+}
+
+function updateDiagStatusLabel(isOperativo) {
+  const label = document.getElementById('diag-status-label');
+  if (!label) return;
+  if (isOperativo) {
+    label.textContent = 'Operativo';
+    label.style.color = '#22c55e';
+  } else {
+    label.textContent = 'Fuera de Servicio';
+    label.style.color = '#ef4444';
+  }
+}
+
 function promptDiagnosis(taskInfo = null) {
   return new Promise((resolve) => {
     const modal = document.getElementById('diagnosis-modal');
@@ -480,6 +525,21 @@ function promptDiagnosis(taskInfo = null) {
       toggleInsumoRow(chk); // Hide inline inputs
     });
 
+    // Reset collapsible insumos section to closed by default
+    toggleDiagInsumosCollapse(false);
+    updateDiagInsumosBadge();
+
+    // Set up unit status toggle switch
+    const statusSwitch = document.getElementById('diag-status-switch');
+    let isOperativo = true;
+    if (taskInfo && taskInfo.estadoUnidad) {
+      isOperativo = (taskInfo.estadoUnidad === 'operativo');
+    }
+    if (statusSwitch) {
+      statusSwitch.checked = isOperativo;
+      updateDiagStatusLabel(isOperativo);
+    }
+
     modal.classList.add('open');
 
     // Clear any previous event listeners by cloning buttons
@@ -510,11 +570,13 @@ function promptDiagnosis(taskInfo = null) {
         }
       });
       const insumosVal = lineas.join(' | ');
+      const newUnitStatus = statusSwitch && statusSwitch.checked ? 'operativo' : 'fuera_de_servicio';
 
       closeModal();
       resolve({
         diagnosis: val || null,
-        insumos: insumosVal || null
+        insumos: insumosVal || null,
+        estadoUnidad: newUnitStatus
       });
     });
 
@@ -1804,6 +1866,9 @@ function toggleInsumoRow(checkbox) {
       input.style.display = 'none';
       input.value = '';
     }
+  }
+  if (typeof updateDiagInsumosBadge === 'function') {
+    updateDiagInsumosBadge();
   }
 }
 
@@ -3761,7 +3826,8 @@ async function markDashboardTaskFinished(orderId, taskId) {
     rodado: order.rodado,
     empleado: empName,
     centroCosto: ccName,
-    descripcion: task.descripcion
+    descripcion: task.descripcion,
+    estadoUnidad: order.estadoUnidad || 'operativo'
   };
 
   // Prompt for optional diagnosis and insumos
@@ -3776,6 +3842,17 @@ async function markDashboardTaskFinished(orderId, taskId) {
     }
     if (result.insumos) {
       task.insumos = result.insumos;
+    }
+    if (result.estadoUnidad && order && order._id) {
+      if (order.estadoUnidad !== result.estadoUnidad) {
+        order.estadoUnidad = result.estadoUnidad;
+        renderOrders();
+        fetch(`/api/orders/${order._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(order)
+        }).catch(err => console.error('Error updating unit status from diagnosis modal:', err));
+      }
     }
   }
 
