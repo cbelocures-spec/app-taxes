@@ -6977,6 +6977,8 @@ function switchPrevSubTab(tab) {
     fetchPreventivoFlota();
   } else if (tab === 'combustible') {
     fetchPrevCombustible();
+  } else if (tab === 'livianas') {
+    fetchPrevLivianas();
   } else if (tab === 'alarmas') {
     fetchPrevAlertas();
   } else if (tab === 'historial') {
@@ -6986,6 +6988,7 @@ function switchPrevSubTab(tab) {
 
 function applyPrevFilters() {
   renderPrevFlotaTable();
+  if (typeof renderPrevLivianasTable === 'function') renderPrevLivianasTable();
 }
 
 function filterByAlertState(state) {
@@ -7246,6 +7249,160 @@ function filterCombustibleByAlert(state) {
       if (cardsList) cardsList.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 120);
   }
+}
+
+// --- UNIDADES LIVIANAS PREVENTIVOS ---
+let prevLivianasData = [];
+let prevLivianasFilter = 'all';
+
+async function fetchPrevLivianas() {
+  try {
+    const tbody = document.getElementById('prev-livianas-tbody');
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;"><span class="material-icons" style="animation:spin 1.5s linear infinite; vertical-align:middle;">sync</span> Cargando Unidades Livianas desde Google Sheets...</td></tr>';
+    }
+    const res = await fetch(`/api/preventivos/livianas?_=${Date.now()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rawData = await res.json();
+    prevLivianasData = Array.isArray(rawData) ? rawData : [];
+    renderPrevLivianasTable();
+  } catch (error) {
+    console.error('Error fetching livianas:', error);
+    const tbody = document.getElementById('prev-livianas-tbody');
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}</td></tr>`;
+    }
+  }
+}
+
+function filterLivianasByAlert(state) {
+  prevLivianasFilter = state;
+  renderPrevLivianasTable();
+  if (state !== 'all') {
+    setTimeout(() => {
+      const cardsList = document.getElementById('prev-livianas-cards');
+      if (cardsList) cardsList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+  }
+}
+
+function renderPrevLivianasTable() {
+  const tbody = document.getElementById('prev-livianas-tbody');
+  const cards = document.getElementById('prev-livianas-cards');
+  if (!tbody) return;
+
+  const searchTerm = (document.getElementById('prev-search-input')?.value || '').toLowerCase().trim();
+
+  let urgentes = 0;
+  let filtered = prevLivianasData.filter(item => {
+    const alerta = String(item.alerta || '').toLowerCase();
+    const isUrgente = alerta.includes('realizar') || alerta.includes('urgente') || alerta.includes('service');
+    if (isUrgente) urgentes++;
+
+    const matchSearch = !searchTerm ||
+      String(item.interno || '').toLowerCase().includes(searchTerm) ||
+      String(item.modelo || '').toLowerCase().includes(searchTerm) ||
+      String(item.sector || '').toLowerCase().includes(searchTerm);
+
+    if (!matchSearch) return false;
+    if (prevLivianasFilter === 'ok') return !isUrgente;
+    if (prevLivianasFilter === 'urgente') return isUrgente;
+    return true;
+  });
+
+  const total = prevLivianasData.length;
+  const el = id => document.getElementById(id);
+  if (el('livianas-metric-total')) el('livianas-metric-total').textContent = total;
+  if (el('livianas-metric-urgente')) el('livianas-metric-urgente').textContent = urgentes;
+  if (el('livianas-metric-ok')) el('livianas-metric-ok').textContent = total - urgentes;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">No se encontraron unidades livianas.</td></tr>';
+    if (cards) cards.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">No se encontraron unidades livianas.</div>';
+    return;
+  }
+
+  window._prevLivianasMap = {};
+  filtered.forEach(item => { window._prevLivianasMap[item.originalRowIndex] = item; });
+
+  tbody.innerHTML = filtered.map(item => {
+    const alerta = String(item.alerta || '');
+    const isUrgente = alerta.toLowerCase().includes('realizar') || alerta.toLowerCase().includes('urgente') || alerta.toLowerCase().includes('service');
+    const badgeClass = isUrgente ? 'warning' : 'ok';
+    const badgeText = isUrgente ? '⚠ Realizar Service' : '✓ Al Día';
+    const isHs = item.unidadMedida === 'hs' || String(item.serviFreq || '').toLowerCase().includes('hs');
+    const kmHsVal = isHs ? (item.hsReales || item.kmReales || 0) : (item.kmReales || 0);
+    const kmHsStr = Number(kmHsVal).toLocaleString('es-AR') + (isHs ? ' Hs' : ' km');
+    const ri = item.originalRowIndex;
+
+    return `<tr>
+      <td><strong style="color:var(--primary); font-size:15px;">${item.interno}</strong></td>
+      <td>${item.modelo || ''}</td>
+      <td><span class="badge" style="background:#f1f5f9; color:#475569; font-weight:600;">${item.sector || 'TALLER'}</span></td>
+      <td>${item.serviFreq || '-'}</td>
+      <td><strong>${kmHsStr}</strong></td>
+      <td style="color:${isUrgente ? 'var(--danger)' : 'var(--text-color)'}; font-weight:${isUrgente ? 'bold' : 'normal'};">${item.faltante || '-'}</td>
+      <td><span class="badge-prev ${badgeClass}">${badgeText}</span></td>
+      <td style="text-align:right;">
+        <div style="display:inline-flex; gap:6px;">
+          <button class="btn btn-secondary btn-xs" onclick="prevLivianasOpenService(${ri})" style="display:inline-flex; align-items:center; gap:2px;" title="Generar Orden de Trabajo y registrar Service">
+            <span class="material-icons" style="font-size:13px;">build</span> Servi / OT
+          </button>
+          <button class="btn btn-xs" onclick="prevLivianasOpenOdometer(${ri})" style="display:inline-flex; align-items:center; gap:2px; background-color: #0288d1; color: white; border-color: #0288d1;" title="Actualizar lectura Horas / Km">
+            <span class="material-icons" style="font-size:13px;">edit</span> Actualizar
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  if (cards) {
+    cards.innerHTML = filtered.map(item => {
+      const alerta = String(item.alerta || '');
+      const isUrgente = alerta.toLowerCase().includes('realizar') || alerta.toLowerCase().includes('urgente') || alerta.toLowerCase().includes('service');
+      const badgeClass = isUrgente ? 'warning' : 'ok';
+      const badgeText = isUrgente ? '⚠ Realizar Service' : '✓ Al Día';
+      const isHs = item.unidadMedida === 'hs' || String(item.serviFreq || '').toLowerCase().includes('hs');
+      const kmHsVal = isHs ? (item.hsReales || item.kmReales || 0) : (item.kmReales || 0);
+      const kmHsStr = Number(kmHsVal).toLocaleString('es-AR') + (isHs ? ' Hs' : ' km');
+      const ri = item.originalRowIndex;
+
+      return `<div class="prev-mobile-card">
+        <div class="prev-mobile-card-header">
+          <div>
+            <strong style="font-size:16px; color:var(--primary);">${item.interno}</strong>
+            <br><span style="font-size:12px; color:var(--text-muted);">${item.modelo || ''} (${item.sector || 'TALLER'})</span>
+          </div>
+          <span class="badge-prev ${badgeClass}">${badgeText}</span>
+        </div>
+        <div class="prev-mobile-card-row"><span>Frecuencia</span><strong>${item.serviFreq || '-'}</strong></div>
+        <div class="prev-mobile-card-row"><span>Lectura Actual</span><strong>${kmHsStr}</strong></div>
+        <div class="prev-mobile-card-row"><span>Faltante</span><strong>${item.faltante || '-'}</strong></div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="prevLivianasOpenService(${ri})" style="flex:1; display:flex; justify-content:center; align-items:center; gap:4px;">
+            <span class="material-icons" style="font-size:14px;">build</span> Servi / OT
+          </button>
+          <button class="btn btn-sm" onclick="prevLivianasOpenOdometer(${ri})" style="flex:1; display:flex; justify-content:center; align-items:center; gap:4px; background-color: #0288d1; color: white; border-color: #0288d1;">
+            <span class="material-icons" style="font-size:14px;">edit</span> Actualizar
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function prevLivianasOpenService(ri) {
+  const item = window._prevLivianasMap && window._prevLivianasMap[ri];
+  if (!item) return;
+  const isHs = item.unidadMedida === 'hs' || String(item.serviFreq || '').toLowerCase().includes('hs');
+  openPrevServiceModal(item.originalRowIndex, item.interno, item.modelo, isHs ? 0 : (item.kmReales || 0), isHs ? (item.hsReales || item.kmReales || 0) : 0);
+}
+
+function prevLivianasOpenOdometer(ri) {
+  const item = window._prevLivianasMap && window._prevLivianasMap[ri];
+  if (!item) return;
+  const isHs = item.unidadMedida === 'hs' || String(item.serviFreq || '').toLowerCase().includes('hs');
+  openPrevOdometerModal(item.originalRowIndex, item.interno, item.modelo, isHs ? 0 : (item.kmReales || 0), isHs ? (item.hsReales || item.kmReales || 0) : 0);
 }
 
 async function fetchPrevHistorial() {

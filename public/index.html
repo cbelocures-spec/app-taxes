@@ -397,6 +397,9 @@
         <button class="preventivos-tab-btn" onclick="switchPrevSubTab('combustible')">
           <span class="material-icons">local_gas_station</span> Combustible
         </button>
+        <button class="preventivos-tab-btn" onclick="switchPrevSubTab('livianas')">
+          <span class="material-icons">directions_car</span> Unidades Livianas
+        </button>
         <button class="preventivos-tab-btn" onclick="switchPrevSubTab('alarmas')">
           <span class="material-icons">notifications_active</span> Alarmas
         </button>
@@ -522,6 +525,60 @@
           </table>
         </div>
         <div class="prev-card-list" id="prev-combustible-cards">
+          <!-- Mobile dynamic -->
+        </div>
+      </div>
+
+      <!-- SUB-VIEW: UNIDADES LIVIANAS -->
+      <div id="prev-subview-livianas" class="prev-subview" style="display: none;">
+        <!-- Metric cards -->
+        <div class="prev-metrics-grid" style="margin-bottom: 14px;">
+          <div class="prev-metric-card" onclick="filterLivianasByAlert('all')" style="cursor: pointer;">
+            <div class="prev-metric-icon blue"><span class="material-icons">directions_car</span></div>
+            <div class="prev-metric-info">
+              <h4>Total Livianas</h4>
+              <p id="livianas-metric-total">0</p>
+            </div>
+          </div>
+          <div class="prev-metric-card" onclick="filterLivianasByAlert('ok')" style="cursor: pointer;">
+            <div class="prev-metric-icon green"><span class="material-icons">check_circle</span></div>
+            <div class="prev-metric-info">
+              <h4>Al Día</h4>
+              <p id="livianas-metric-ok">0</p>
+            </div>
+          </div>
+          <div class="prev-metric-card" onclick="filterLivianasByAlert('urgente')" style="cursor: pointer;">
+            <div class="prev-metric-icon red"><span class="material-icons">warning</span></div>
+            <div class="prev-metric-info">
+              <h4>Recomiendan Service</h4>
+              <p id="livianas-metric-urgente">0</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="prev-table-container">
+          <table class="prev-table">
+            <thead>
+              <tr>
+                <th>Interno</th>
+                <th>Modelo</th>
+                <th>Chofer / Sector</th>
+                <th>Frecuencia</th>
+                <th>Km / Hs Reales</th>
+                <th>Km / Hs Faltante</th>
+                <th>Estado</th>
+                <th style="text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="prev-livianas-tbody">
+              <tr>
+                <td colspan="8" style="text-align: center; padding: 20px;">Cargando unidades livianas...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prev-card-list" id="prev-livianas-cards">
           <!-- Mobile dynamic -->
         </div>
       </div>

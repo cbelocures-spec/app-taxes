@@ -1410,6 +1410,69 @@ app.get('/api/preventivos/combustible', async (req, res) => {
   }
 });
 
+app.get('/api/preventivos/livianas', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  
+  const defaultLivianas = [
+    { originalRowIndex: 4, interno: 'A01', modelo: 'TOYOTA HILUX', sector: 'TALLER', serviFreq: '10.000 km', kmReales: 168414, hsReales: 0, faltante: '300 km', unidadMedida: 'km', alerta: 'Realizar Service' },
+    { originalRowIndex: 5, interno: 'A02', modelo: 'VOLKSWAGEN SAVEIRO 1,6L', sector: 'TALLER', serviFreq: '10.000 km', kmReales: 74901, hsReales: 0, faltante: '3.732 km', unidadMedida: 'km', alerta: 'OK' },
+    { originalRowIndex: 6, interno: 'A04', modelo: 'VOLKSWAGEN AMAROK', sector: 'TALLER', serviFreq: '10.000 km', kmReales: 56916, hsReales: 0, faltante: '6.048 km', unidadMedida: 'km', alerta: 'OK' },
+    { originalRowIndex: 7, interno: 'A05', modelo: 'VOLKSWAGEN AMAROK', sector: 'TALLER', serviFreq: '10.000 km', kmReales: 68896, hsReales: 0, faltante: '5.891 km', unidadMedida: 'km', alerta: 'OK' },
+    { originalRowIndex: 8, interno: 'A07', modelo: 'VOLKSWAGEN AMAROK', sector: 'TALLER', serviFreq: '10.000 km', kmReales: 100443, hsReales: 0, faltante: '10.000 km', unidadMedida: 'km', alerta: 'OK' },
+    { originalRowIndex: 9, interno: 'A10', modelo: 'FIAT CRONOS', sector: 'BURGOS', serviFreq: '10.000 km', kmReales: 18232, hsReales: 0, faltante: '3.004 km', unidadMedida: 'km', alerta: 'OK' },
+    { originalRowIndex: 10, interno: 'A11', modelo: 'FIAT STRADA', sector: 'TOLEDO', serviFreq: '10.000 km', kmReales: 19416, hsReales: 0, faltante: '1.502 km', unidadMedida: 'km', alerta: 'OK' },
+    { originalRowIndex: 11, interno: 'AU09', modelo: 'HANGCHA S-30 CPCD25T8', sector: 'HERRERIA', serviFreq: '300 Hs', kmReales: 17191, hsReales: 0, faltante: '50 Hs', unidadMedida: 'hs', alerta: 'Realizar Service' },
+    { originalRowIndex: 12, interno: 'AU10', modelo: 'HANGCHA S-30 CPCD35N', sector: 'LAVADERO', serviFreq: '300 Hs', kmReales: 9161, hsReales: 0, faltante: '250 Hs', unidadMedida: 'hs', alerta: 'OK' },
+    { originalRowIndex: 13, interno: 'AU11', modelo: 'HANGCHA S-30 CPCD25T8', sector: 'TALLER', serviFreq: '300 Hs', kmReales: 13229, hsReales: 0, faltante: '300 Hs', unidadMedida: 'hs', alerta: 'OK' },
+    { originalRowIndex: 14, interno: 'AU12', modelo: 'HANGCHA S-30 CPCD25N', sector: 'RECICLAJE', serviFreq: '300 Hs', kmReales: 13933, hsReales: 0, faltante: '89 Hs', unidadMedida: 'hs', alerta: 'OK' },
+    { originalRowIndex: 15, interno: 'MP28', modelo: 'BOBCAT S570', sector: 'DESCARGA', serviFreq: '300 Hs', kmReales: 250000, hsReales: 0, faltante: '10 Hs', unidadMedida: 'hs', alerta: 'Realizar Service' },
+    { originalRowIndex: 16, interno: 'MP29', modelo: 'BOBCAT S570', sector: 'DESCARGA', serviFreq: '300 Hs', kmReales: 13647, hsReales: 0, faltante: '300 Hs', unidadMedida: 'hs', alerta: 'OK' },
+    { originalRowIndex: 17, interno: 'RT01', modelo: 'BY LION TRACTOR', sector: 'MDQ', serviFreq: '300 Hs', kmReales: 111111, hsReales: 0, faltante: '300 Hs', unidadMedida: 'hs', alerta: 'OK' }
+  ];
+
+  try {
+    let data = null;
+    if (scriptUrl) {
+      const sep = scriptUrl.includes('?') ? '&' : '?';
+      const url = `${scriptUrl}${sep}accion=getLivianasData&_t=${Date.now()}`;
+      try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
+        if (response.ok) {
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const raw = await response.json();
+            if (Array.isArray(raw) && raw.length > 0) data = raw;
+          }
+        }
+      } catch (err) {
+        // Fall back to defaultLivianas
+      }
+    }
+
+    if (!data) data = defaultLivianas;
+
+    // Apply local odometer overrides
+    const overrides = db.getOdometerOverrides();
+    if (Array.isArray(data) && Object.keys(overrides).length > 0) {
+      data = data.map(item => {
+        const key = String(item.interno || '').trim();
+        const ov = overrides[key];
+        if (!ov) return item;
+        const patched = { ...item };
+        if (ov.km !== undefined && !isNaN(ov.km)) patched.kmReales = ov.km;
+        if (ov.hs !== undefined && !isNaN(ov.hs)) patched.hsReales = ov.hs;
+        return patched;
+      });
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching preventivos livianas:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/preventivos/historial', async (req, res) => {
   const settings = db.getSettings();
   const scriptUrl = settings.preventivoScriptUrl;
