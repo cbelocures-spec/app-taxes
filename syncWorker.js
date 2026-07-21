@@ -3037,7 +3037,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
           
           if (empCandidates.length > 0) {
             const localEmpTasks = order.tasks.filter(task => {
-              const taskEmpOpt = (cachedCatalogs && cachedCatalogs.empleados) ? cachedCatalogs.empleados.find(e => e.value === task.empleado) : null;
+              const catalogs = db.getCatalogs() || {};
+              const taskEmpOpt = (catalogs.empleados || []).find(e => e.value === task.empleado);
               const taskEmpLabel = taskEmpOpt ? taskEmpOpt.label : (task.empleado || '');
               return clean(taskEmpLabel).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(taskEmpLabel));
             });
