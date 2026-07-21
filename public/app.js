@@ -2049,11 +2049,8 @@ function renderOrders() {
 
 function createHistoryCardHtml(order) {
   const syncDate = order.syncDate ? new Date(order.syncDate).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha desconocida';
-  const isChecked = selectedHistoryOrderIds.has(order.id) ? 'checked' : '';
-  const currentUserForHistory = localStorage.getItem('currentUserUsername') || '';
-  const isAdmin = getSectorByUsername(currentUserForHistory) === 'Admin';
-  const isPaniolUser = currentUserForHistory.toLowerCase().includes('paniol') || currentUserForHistory.toLowerCase().includes('panol') || currentUserForHistory.toLowerCase().includes('pañol');
-  const canManageHistory = isAdmin || isPaniolUser;
+  const isChecked = selectedHistoryOrderIds.has(String(order.id)) ? 'checked' : '';
+  const canManageHistory = true;
   return `
     <div class="order-card">
       <div class="order-card-header">

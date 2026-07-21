@@ -138,7 +138,7 @@ async function checkAndSync() {
         const existing = db.getWorkOrderById(target.id);
         const isArchivedLocallyOrRemotely = target.estadoUnidad === 'fuera_de_servicio'
           ? false
-          : (existing ? (existing.archived === true || target.archived === true) : (target.archived === true));
+          : (target.archived === true);
 
         const isDeletedLocallyOrRemotely = target.deleted === true || (existing && existing.deleted === true);
 

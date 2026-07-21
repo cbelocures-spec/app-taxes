@@ -791,12 +791,12 @@
       </div>
 
       <!-- Bulk delete bar for history -->
-      <div id="history-bulk-delete-bar" class="bulk-action-bar" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);">
-        <span id="history-bulk-delete-count" style="color:#fff;font-weight:600;">0 seleccionadas</span>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn-secondary" onclick="toggleSelectAllHistoryOrdersList(false)" style="background:rgba(255,255,255,0.2);color:#fff;border:none;">Deseleccionar todo</button>
-          <button class="btn-primary" onclick="resyncSelectedHistoryOrders()" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:600;display:inline-flex;align-items:center;gap:4px;"><span class="material-icons" style="font-size:16px;">sync</span> Mandar a Sincronizar (Órdenes)</button>
-          <button class="btn-danger" onclick="deleteSelectedHistoryOrders()" style="background:#ef4444;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:600;display:inline-flex;align-items:center;gap:4px;"><span class="material-icons" style="font-size:16px;">delete_forever</span> Borrar seleccionadas</button>
+      <div id="history-bulk-delete-bar" class="bulk-action-bar">
+        <span id="history-bulk-delete-count" style="color:#fff;font-weight:600;font-size:14px;">0 seleccionadas</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end;">
+          <button class="btn-secondary" onclick="toggleSelectAllHistoryOrdersList(false)" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Deseleccionar todo</button>
+          <button class="btn-primary" onclick="resyncSelectedHistoryOrders()" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><span class="material-icons" style="font-size:15px;">sync</span> Mandar a Sincronizar (Órdenes)</button>
+          <button class="btn-danger" onclick="deleteSelectedHistoryOrders()" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><span class="material-icons" style="font-size:15px;">delete_forever</span> Borrar seleccionadas</button>
         </div>
       </div>
 
