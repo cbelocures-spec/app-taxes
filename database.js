@@ -51,7 +51,7 @@ function cleanEncoding(text) {
     .replace(/Ã³/g, 'ó')
     .replace(/Ã¡/g, 'á')
     .replace(/Ã©/g, 'é')
-    .replace(/Ã*/g, 'í')
+    .replace(/Ã\*/g, 'í')
     .replace(/Ãº/g, 'ú')
     .replace(/Ã±/g, 'ñ')
     .replace(/Ã‘/g, 'Ñ');
