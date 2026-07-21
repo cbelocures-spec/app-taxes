@@ -2061,10 +2061,17 @@ function createHistoryCardHtml(order) {
             <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion}</strong></div>
           </div>
         </div>
-        <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px;">
-          <span class="material-icons">check_circle</span>
-          <span>Sincronizado${order.taxesOrderNumber ? ` O.T.: ${order.taxesOrderNumber}` : ''}</span>
-        </span>
+        ${order.taxesOrderNumber ? `
+          <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px;">
+            <span class="material-icons">check_circle</span>
+            <span>Sincronizado O.T.: ${order.taxesOrderNumber}</span>
+          </span>
+        ` : `
+          <span class="badge-status warning" style="display: inline-flex; align-items: center; gap: 4px; background-color:#fff7ed; color:#c2410c; border:1px solid rgba(194,65,12,0.2);" title="Esta orden no tiene número de O.T. asignado en Taxes">
+            <span class="material-icons" style="font-size:13px;">warning</span>
+            <span>Sin O.T. Asignada</span>
+          </span>
+        `}
       </div>
       <div class="order-card-footer">
         <div class="tasks-summary">

@@ -640,6 +640,8 @@ app.patch('/api/orders/:id/unarchive', (req, res) => {
       archivedAt: null,
       syncStatus: "local",
       syncError: null,
+      autoSyncRetryCount: 999,
+      lastAutoSyncAttempt: new Date().toISOString(),
       verifiedStatus: "idle",
       verifiedError: null
     });

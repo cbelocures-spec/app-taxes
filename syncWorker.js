@@ -3589,7 +3589,7 @@ async function startWorker() {
   while (isWorkerRunning) {
     try {
       const orders = db.getWorkOrders();
-      const pendingOrder = orders.find(o => o.syncStatus === 'pending');
+      const pendingOrder = orders.find(o => !o.archived && o.syncStatus === 'pending');
 
       if (pendingOrder) {
         console.log(`Found pending Work Order ID: ${pendingOrder.id}. Launching sync...`);
@@ -3600,7 +3600,7 @@ async function startWorker() {
         // or a later re-sync attempt itself failed (syncStatus: 'error') even
         // though they were already synced before (have a taxesOrderNumber).
         const brokenOrder = orders.find(o => {
-          if (!o.taxesOrderNumber) return false;
+          if (!o.taxesOrderNumber || o.archived || o.syncStatus === 'local' || o.syncStatus === 'draft') return false;
 
           const needsVerifyRetry = o.syncStatus === 'success' && o.verifiedStatus === 'error' &&
             (o.verifiedCount || 0) < MAX_AUTO_VERIFY_RETRIES &&
