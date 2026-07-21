@@ -21,7 +21,42 @@ function normalizeEmail(email) {
 
 function cleanEncoding(text) {
   if (typeof text !== 'string') return text;
-  return text
+  
+  let cleaned = text;
+  
+  // 1. Common encoding repair dictionary
+  const repairs = [
+    { regex: /Diagn[\uFFFD\s?]+stico/gi, replace: 'Diagnóstico' },
+    { regex: /cambi[\uFFFD\s?]+/gi, replace: 'cambió' },
+    { regex: /hidr[\uFFFD\s?]+lica/gi, replace: 'hidráulica' },
+    { regex: /ret[\uFFFD\s?]+n/gi, replace: 'retén' },
+    { regex: /direcci[\uFFFD\s?]+n/gi, replace: 'dirección' },
+    { regex: /reparaci[\uFFFD\s?]+n/gi, replace: 'reparación' },
+    { regex: /v[\uFFFD\s?]+lvula/gi, replace: 'válvula' },
+    { regex: /compresi[\uFFFD\s?]+n/gi, replace: 'compresión' },
+    { regex: /bater[\uFFFD\s?]+a/gi, replace: 'batería' },
+    { regex: /camion[\uFFFD\s?]+/gi, replace: 'camión' },
+    { regex: /el[\uFFFD\s?]+ctrico/gi, replace: 'eléctrico' },
+    { regex: /neum[\uFFFD\s?]+tico/gi, replace: 'neumático' }
+  ];
+  
+  for (const r of repairs) {
+    cleaned = cleaned.replace(r.regex, r.replace);
+  }
+  
+  // 2. Remove any remaining stray replacement characters/black diamonds/multiple question marks
+  cleaned = cleaned
+    .replace(/[\uFFFD]+/g, '')
+    // Also clean double-encoded or corrupted accent sequences
+    .replace(/Ã³/g, 'ó')
+    .replace(/Ã¡/g, 'á')
+    .replace(/Ã©/g, 'é')
+    .replace(/Ã*/g, 'í')
+    .replace(/Ãº/g, 'ú')
+    .replace(/Ã±/g, 'ñ')
+    .replace(/Ã‘/g, 'Ñ');
+
+  return cleaned
     // Replace common decoding artifacts from ISO-8859-1 vs UTF-8 mismatches
     .replace(/Jes\u01e7s/g, 'Jesús')
     .replace(/Jes\u00e7s/g, 'Jesús')
@@ -29,22 +64,19 @@ function cleanEncoding(text) {
     .replace(/Jesgs/gi, 'Jesús')
     .replace(/Jess/g, 'Jesús')
     .replace(/Jes\u00ad\u00ads/g, 'Jesús')
+    .replace(/Jes\u017ds/g, 'Jesús')
     .replace(/Jesǧs/g, 'Jesús')
     .replace(/Kev\uFFFDn/g, 'Kevín')
     .replace(/Kevn/g, 'Kevín')
     .replace(/Kev\u00ad\u00adn/g, 'Kevín')
-    .replace(/Kevn/g, 'Kevín')
     .replace(/Mat\uFFFDas/g, 'Matías')
     .replace(/Matas/g, 'Matías')
-    .replace(/Matas/g, 'Matías')
     .replace(/Garc\uFFFDa/g, 'García')
-    .replace(/Garca/g, 'García')
     .replace(/Garca/g, 'García')
     .replace(/Yamand\u01e7/g, 'Yamandú')
     .replace(/Yamand/g, 'Yamandú')
     .replace(/Yamandǧ/g, 'Yamandú')
     .replace(/V\uFFFDctor/g, 'Víctor')
-    .replace(/Vctor/g, 'Víctor')
     .replace(/Vctor/g, 'Víctor')
     .replace(/F\u01e8lix/g, 'Félix')
     .replace(/Flix/g, 'Félix')
@@ -56,42 +88,30 @@ function cleanEncoding(text) {
     .replace(/Dami\u00f1n/g, 'Damián')
     .replace(/Damin/g, 'Damián')
     .replace(/Damiǭn/g, 'Damián')
-    .replace(/Damin/g, 'Damián')
     .replace(/R\uFFFDoS/g, 'Ríos')
     .replace(/Ros/g, 'Ríos')
     .replace(/R\u00edos/g, 'Ríos')
     .replace(/Rios/g, 'Ríos')
-    .replace(/Ros/g, 'Ríos')
     .replace(/R\u00EDos/g, 'Ríos')
     .replace(/Hern\uFFFDn/g, 'Hernán')
     .replace(/Hernn/g, 'Hernán')
-    .replace(/Hernn/g, 'Hernán')
     .replace(/Sebasti\uFFFDn/g, 'Sebastián')
-    .replace(/Sebastin/g, 'Sebastián')
     .replace(/Sebastin/g, 'Sebastián')
     .replace(/Agust\uFFFDn/g, 'Agustín')
     .replace(/Agustn/g, 'Agustín')
-    .replace(/Agustn/g, 'Agustín')
     .replace(/Rom\uFFFDn/g, 'Román')
-    .replace(/Romn/g, 'Román')
     .replace(/Romn/g, 'Román')
     .replace(/Mart\uFFFDn/g, 'Martín')
     .replace(/Martn/g, 'Martín')
-    .replace(/Martn/g, 'Martín')
     .replace(/Nicol\uFFFDs/g, 'Nicolás')
-    .replace(/Nicols/g, 'Nicolás')
     .replace(/Nicols/g, 'Nicolás')
     .replace(/Ra\uFFFDu/g, 'Raúl')
     .replace(/Ral/g, 'Raúl')
-    .replace(/Ral/g, 'Raúl')
     .replace(/Adri\uFFFDn/g, 'Adrián')
-    .replace(/Adrin/g, 'Adrián')
     .replace(/Adrin/g, 'Adrián')
     .replace(/Guzm\uFFFDn/g, 'Guzmán')
     .replace(/Guzmn/g, 'Guzmán')
-    .replace(/Guzmn/g, 'Guzmán')
     .replace(/Jes\u00FAa/g, 'Jesús')
-    .replace(/\uFFFD/g, 'i') // general replacement
     .trim();
 }
 
@@ -420,7 +440,7 @@ class LocalDB {
       centroCosto: t.centroCosto || "",
       empleado: t.empleado || "",
       horasEstimadas: parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0,
-      descripcion: t.descripcion || "",
+      descripcion: cleanEncoding(t.descripcion || ""),
       status: t.status || "Pendiente", // Pendiente, Finalizada
       insumos: t.insumos || "",
       timerStart: t.timerStart || null,
@@ -462,6 +482,12 @@ class LocalDB {
       const cleanUpdates = { ...updates };
       if (cleanUpdates.createdBy) {
         cleanUpdates.createdBy = normalizeEmail(cleanUpdates.createdBy);
+      }
+      if (cleanUpdates.tasks) {
+        cleanUpdates.tasks = cleanUpdates.tasks.map(t => ({
+          ...t,
+          descripcion: cleanEncoding(t.descripcion || "")
+        }));
       }
       // SAFETY: strip undefined values so they never overwrite existing fields.
       // This prevents partial updates (e.g. local-sync-result with no 'tasks')

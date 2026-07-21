@@ -3917,17 +3917,6 @@ async function markDashboardTaskFinished(orderId, taskId) {
     if (result.insumos) {
       task.insumos = result.insumos;
     }
-    if (result.estadoUnidad && order && order._id) {
-      if (order.estadoUnidad !== result.estadoUnidad) {
-        order.estadoUnidad = result.estadoUnidad;
-        renderOrders();
-        fetch(`/api/orders/${order._id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(order)
-        }).catch(err => console.error('Error updating unit status from diagnosis modal:', err));
-      }
-    }
   }
 
   task.timerStart = null;
@@ -3940,6 +3929,22 @@ async function markDashboardTaskFinished(orderId, taskId) {
 
   task.status = "Finalizada";
 
+  // Check if there are other pending tasks in this order
+  const hasOtherPendingTasks = (order.tasks || []).some(t => t.id !== taskId && t.status !== 'Finalizada');
+
+  if (result) {
+    if (result.estadoUnidad === 'operativo') {
+      if (!hasOtherPendingTasks) {
+        order.estadoUnidad = 'operativo';
+      } else {
+        order.estadoUnidad = 'fuera_de_servicio';
+        showToast("La unidad sigue Fuera de Servicio porque hay otras tareas pendientes.", "warning");
+      }
+    } else {
+      order.estadoUnidad = 'fuera_de_servicio';
+    }
+  }
+
   // Kill the dashboard interval for this task immediately
   if (activeDashboardIntervals[taskId]) {
     clearInterval(activeDashboardIntervals[taskId]);
@@ -3948,6 +3953,7 @@ async function markDashboardTaskFinished(orderId, taskId) {
 
   // OPTIMISTIC UPDATE: re-render dashboard immediately so user sees the task disappear
   renderDashboard();
+  renderOrders(); // Re-render order list to update unit status badges
   showToast("Tarea finalizada", "success");
 
   const allCompleted = (order.tasks || []).filter(t => t !== null && t !== undefined).every(t => t.status === "Finalizada");
@@ -3965,7 +3971,8 @@ async function markDashboardTaskFinished(orderId, taskId) {
         interno: order.interno,
         clasificacion: order.clasificacion,
         incidente: order.incidente,
-        tasks: order.tasks
+        tasks: order.tasks,
+        estadoUnidad: order.estadoUnidad || 'operativo'
       })
     });
 
