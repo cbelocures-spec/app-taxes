@@ -2049,37 +2049,97 @@ function renderOrders() {
 
 function createHistoryCardHtml(order) {
   const syncDate = order.syncDate ? new Date(order.syncDate).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha desconocida';
+  const fechaOnly = order.syncDate ? new Date(order.syncDate).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : (order.createdAt ? new Date(order.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-');
   const isChecked = selectedHistoryOrderIds.has(String(order.id)) ? 'checked' : '';
   const canManageHistory = true;
+
+  const tasks = (order.tasks || []).filter(Boolean);
+  const tasksCount = tasks.length;
+
+  const tasksTableHtml = tasks.length === 0 ? `
+    <div style="padding:10px; color:var(--text-muted); font-size:12px; font-style:italic;">Sin tareas registradas en esta orden.</div>
+  ` : `
+    <div class="prev-table-container" style="margin-top:8px; margin-bottom:8px; border:1px solid #e2e8f0; border-radius:8px; overflow-x:auto; background:#fafafa;">
+      <table class="prev-table" style="font-size:12px; width:100%; margin:0; border-collapse:collapse;">
+        <thead style="background:#f1f5f9; color:#475569; border-bottom:1px solid #e2e8f0;">
+          <tr>
+            <th style="padding:6px 8px; font-size:11px; font-weight:700; text-align:left;">FECHA</th>
+            <th style="padding:6px 8px; font-size:11px; font-weight:700; text-align:left;">C. COSTO</th>
+            <th style="padding:6px 8px; font-size:11px; font-weight:700; text-align:left;">EMPLEADO</th>
+            <th style="padding:6px 8px; font-size:11px; font-weight:700; text-align:left;">HORAS ESTIMADAS</th>
+            <th style="padding:6px 8px; font-size:11px; font-weight:700; text-align:left;">DESCRIPCION</th>
+            <th style="padding:6px 8px; font-size:11px; font-weight:700; text-align:center;">REALIZADA</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tasks.map(t => {
+            const empOpt = (cachedCatalogs && cachedCatalogs.empleados) ? cachedCatalogs.empleados.find(e => e.value === t.empleado) : null;
+            const empName = empOpt ? empOpt.label : (t.empleado || 'Sin asignar');
+            
+            const ccOpt = (cachedCatalogs && cachedCatalogs.centrosCosto) ? cachedCatalogs.centrosCosto.find(c => c.value === t.centroCosto) : null;
+            const ccName = ccOpt ? ccOpt.label : (t.centroCosto || 'MECANICA');
+            
+            let displayHours = parseFloat(String(t.horasEstimadas || 0).replace(',', '.')) || 0;
+            if (displayHours === 0 && Array.isArray(t.timerHistory) && t.timerHistory.length > 0) {
+              const secs = calculateTotalElapsedSeconds(t.timerHistory, null);
+              displayHours = Math.round((secs / 3600) * 100) / 100;
+            }
+            const horasStr = displayHours > 0 ? `${displayHours} hs` : '-';
+            const isDone = t.status === 'Finalizada' || t.status === 'Sincronizada' || t.completed === true;
+
+            return `
+              <tr style="border-bottom:1px solid #f1f5f9; background:#ffffff;">
+                <td style="padding:6px 8px; color:var(--text-muted); font-size:11px;">${fechaOnly}</td>
+                <td style="padding:6px 8px;"><span class="badge" style="background:#e2e8f0; color:#334155; font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px;">${ccName}</span></td>
+                <td style="padding:6px 8px;"><strong style="color:var(--primary); font-size:12px;">${empName}</strong></td>
+                <td style="padding:6px 8px; font-weight:600; font-size:12px;">${horasStr}</td>
+                <td style="padding:6px 8px; font-size:12px;">${t.descripcion || '-'}</td>
+                <td style="padding:6px 8px; text-align:center;">
+                  <span style="display:inline-flex; align-items:center; justify-content:center; padding:2px 8px; border-radius:4px; background:${isDone ? '#d1fae5' : '#fef3c7'}; color:${isDone ? '#047857' : '#b45309'}; font-weight:700; font-size:11px;" title="${isDone ? 'Realizada' : 'Pendiente'}">
+                    ${isDone ? 'SI' : 'NO'}
+                  </span>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
   return `
-    <div class="order-card">
-      <div class="order-card-header">
+    <div class="order-card" style="margin-bottom:14px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+      <div class="order-card-header" style="padding:12px 14px; background:#f8fafc; border-bottom:1px solid #f1f5f9; border-radius:10px 10px 0 0;">
         <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; margin-right: 8px;">
           ${canManageHistory ? `<input type="checkbox" class="history-order-select-checkbox" data-id="${order.id}" onchange="onHistoryOrderSelectionChange(event)" ${isChecked} style="margin: 0; width: 18px; height: 18px; cursor: pointer;">` : ''}
           <div style="min-width: 0; flex: 1;">
-            <div class="order-card-title">${order.rodado}</div>
-            <div class="order-card-subtitle">Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion}</strong></div>
+            <div class="order-card-title" style="font-size:16px; font-weight:700; color:var(--primary);">${order.rodado}</div>
+            <div class="order-card-subtitle" style="font-size:13px; color:var(--text-muted); margin-top:2px;">Interno: <strong style="color:var(--text-color);">${order.interno}</strong> | Clasificación: <strong>${order.clasificacion || 'Preventivo'}</strong></div>
           </div>
         </div>
         ${order.taxesOrderNumber ? `
-          <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px;">
-            <span class="material-icons">check_circle</span>
+          <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px; padding:4px 10px; font-size:13px; font-weight:600;">
+            <span class="material-icons" style="font-size:16px;">check_circle</span>
             <span>Sincronizado O.T.: ${order.taxesOrderNumber}</span>
           </span>
         ` : `
-          <span class="badge-status warning" style="display: inline-flex; align-items: center; gap: 4px; background-color:#fff7ed; color:#c2410c; border:1px solid rgba(194,65,12,0.2);" title="Esta orden no tiene número de O.T. asignado en Taxes">
-            <span class="material-icons" style="font-size:13px;">warning</span>
+          <span class="badge-status warning" style="display: inline-flex; align-items: center; gap: 4px; background-color:#fff7ed; color:#c2410c; border:1px solid rgba(194,65,12,0.2); padding:4px 10px; font-size:12px;" title="Esta orden no tiene número de O.T. asignado en Taxes">
+            <span class="material-icons" style="font-size:14px;">warning</span>
             <span>Sin O.T. Asignada</span>
           </span>
         `}
       </div>
-      <div class="order-card-footer">
-        <div class="tasks-summary">
-          <span class="material-icons">format_list_bulleted</span>
-          <span>${(order.tasks || []).length} Tareas &nbsp;·&nbsp; <span class="material-icons" style="font-size:12px;vertical-align:middle;">cloud_upload</span> ${syncDate}</span>
+
+      <div style="padding:10px 14px;">
+        ${tasksTableHtml}
+      </div>
+
+      <div class="order-card-footer" style="padding:8px 14px 12px; border-top:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; background:#fafafa; border-radius:0 0 10px 10px;">
+        <div class="tasks-summary" style="font-size:12px; color:var(--text-muted);">
+          <span class="material-icons" style="font-size:15px; vertical-align:middle;">cloud_upload</span> ${syncDate} &nbsp;·&nbsp; <strong>${tasksCount} ${tasksCount === 1 ? 'Tarea' : 'Tareas'}</strong>
         </div>
-        <div class="card-actions">
-          <button class="icon-btn primary" onclick="viewOrder('${order.id}')" title="Ver Orden">
+        <div class="card-actions" style="display:flex; gap:6px;">
+          <button class="icon-btn primary" onclick="viewOrder('${order.id}')" title="Ver Orden Completa">
             <span class="material-icons">visibility</span>
           </button>
           ${canManageHistory ? `
