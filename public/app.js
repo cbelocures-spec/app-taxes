@@ -5740,6 +5740,56 @@ async function deleteSelectedHistoryOrders() {
   }
 }
 
+async function resyncSelectedHistoryOrders() {
+  if (selectedHistoryOrderIds.size === 0) {
+    showToast("No hay órdenes seleccionadas", "warning");
+    return;
+  }
+  
+  const count = selectedHistoryOrderIds.size;
+  if (confirm(`¿Mandar ${count} orden${count !== 1 ? 'es' : ''} al módulo Órdenes (Pendientes)?\n\nPodrás editarlas, agregarle tareas u horas faltantes, y volver a sincronizarlas en Taxes.`)) {
+    showToast(`Enviando ${count} órdenes a pendientes...`, "info");
+    
+    let successCount = 0;
+    let errorCount = 0;
+    const idsToResync = Array.from(selectedHistoryOrderIds);
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    
+    // Clear selection state
+    selectedHistoryOrderIds.clear();
+    updateHistoryBulkDeleteActionBar();
+    document.querySelectorAll('.history-order-select-checkbox').forEach(chk => chk.checked = false);
+    const selectAllChk = document.getElementById('history-select-all-chk');
+    if (selectAllChk) selectAllChk.checked = false;
+
+    for (const orderId of idsToResync) {
+      try {
+        const res = await fetch(`/api/orders/${orderId}/unarchive`, {
+          method: 'PATCH',
+          headers: { 'x-user-username': currentUsername }
+        });
+        if (res.ok) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      } catch (error) {
+        errorCount++;
+        console.error(`Error unarchiving order ${orderId}:`, error);
+      }
+    }
+    
+    if (errorCount === 0) {
+      showToast(`${successCount} orden${successCount !== 1 ? 'es' : ''} enviada${successCount !== 1 ? 's' : ''} a Órdenes ✓`, "success");
+    } else {
+      showToast(`${successCount} enviadas, ${errorCount} fallaron`, "warning");
+    }
+    
+    fetchArchivedOrders(); // Refresh historial view
+    fetchOrders();         // Refresh active orders list
+  }
+}
+
 
 // --- TIMER THRESHOLD & SUPERVISOR AUTHORIZATION LOGIC ---
 let currentAlertTaskId = null;
