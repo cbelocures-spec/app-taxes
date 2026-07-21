@@ -3056,6 +3056,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
       // Find matching row
       let matchedRow = null;
       if (tableTasks.length > 0) {
+        // Pass 1: Exact Match (Employee AND Description)
         for (const row of tableTasks) {
           const empOk = clean(row.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(row.employee));
           const descOk = clean(row.description).includes(clean(t.descripcion)) || clean(t.descripcion).includes(clean(row.description)) ||
@@ -3065,15 +3066,30 @@ async function verifyWorkOrderWithPage(page, orderId) {
             break;
           }
         }
-        // Fallback: if description was garbled/truncated on Taxes (typing issue on creation),
-        // match by employee alone when unambiguous (only one task and one candidate row).
-        if (!matchedRow && order.tasks.length === 1) {
+
+        // Pass 2: Match by Employee with unique candidate or sequential mapping
+        if (!matchedRow) {
           const empCandidates = tableTasks.filter(row =>
             clean(row.employee).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(row.employee))
           );
-          if (empCandidates.length === 1) {
-            console.log(`[Verify] Task #${idx+1}: description didn't match but employee matched uniquely. Using loose match.`);
-            matchedRow = empCandidates[0];
+          
+          if (empCandidates.length > 0) {
+            const localEmpTasks = order.tasks.filter(task => {
+              const taskEmpOpt = (cachedCatalogs && cachedCatalogs.empleados) ? cachedCatalogs.empleados.find(e => e.value === task.empleado) : null;
+              const taskEmpLabel = taskEmpOpt ? taskEmpOpt.label : (task.empleado || '');
+              return clean(taskEmpLabel).includes(clean(employeeLabel)) || clean(employeeLabel).includes(clean(taskEmpLabel));
+            });
+
+            if (empCandidates.length === localEmpTasks.length) {
+              const localIndex = localEmpTasks.findIndex(task => task.id === t.id);
+              if (localIndex !== -1 && empCandidates[localIndex]) {
+                console.log(`[Verify] Task #${idx+1}: matched by sequential employee index ${localIndex}.`);
+                matchedRow = empCandidates[localIndex];
+              }
+            } else if (empCandidates.length === 1) {
+              console.log(`[Verify] Task #${idx+1}: matched uniquely by employee name.`);
+              matchedRow = empCandidates[0];
+            }
           }
         }
 
@@ -3094,8 +3110,6 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
         // Last resort positional fallback: if there is exactly one unmatched row and one unmatched task, pair them.
         if (!matchedRow && tableTasks.length === order.tasks.length && tableTasks[idx]) {
-          const alreadyMatchedRowIndices = new Set();
-          // We can't know previously matched indices here without refactor, so only use when single row
           if (tableTasks.length === 1) {
             console.log(`[Verify] Task #${idx+1}: using positional fallback (single row in table).`);
             matchedRow = tableTasks[0];
