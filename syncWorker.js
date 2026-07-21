@@ -478,64 +478,12 @@ async function fillSearchableSelect(page, labelText, searchValue) {
 async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
   console.log(`Filling Employee for Task #${index} with: "${employeeName}"`);
   try {
-    // Resolve searchable input and hidden input dynamically
-    const inputInfo = await page.evaluate((idx) => {
-      // 1. Get all hours inputs to locate the specific card container
-      const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
-      const targetHoursInput = horasInputs[idx];
-      if (!targetHoursInput) return { found: false, error: 'Hours input not found' };
-
-      // 2. Find target card container
-      let card = targetHoursInput.parentElement;
-      while (card && card !== document.body && 
-             !card.classList.contains('card') && 
-             !card.classList.contains('form-row') && 
-             !card.classList.contains('row') &&
-             !card.className.includes('col-12')) {
-        card = card.parentElement;
-      }
-      if (!card) return { found: false, error: 'Card container not found' };
-
-      // 3. Find the searchable select wrapper inside this card
-      const wrapper = card.querySelector('.searchable-select-wrapper, .multiselect');
-      if (!wrapper) return { found: false, error: 'Searchable select wrapper not found' };
-
-      // 4. Find the inputs inside this select wrapper
-      const hiddenInput = wrapper.querySelector('input[type="hidden"]') || wrapper.querySelector('input[name*="empleado_id"]');
-      const searchInput = wrapper.querySelector('.searchable-input, input[type="text"]');
-
-      if (hiddenInput && searchInput) {
-        const searchId = 'tmp_emp_search_' + idx + '_' + Date.now();
-        const hiddenId = 'tmp_emp_hidden_' + idx + '_' + Date.now();
-        searchInput.setAttribute('id', searchId);
-        hiddenInput.setAttribute('id', hiddenId);
-        return { searchId, hiddenId, found: true };
-      }
-      
-      // Fallback: search by input name attribute
-      const fallbackHidden = document.querySelector(`input[name="syj_empleado_id_tarea_${idx}"], input[name$="empleado_id_tarea_${idx}"], input[name*="empleado_id_tarea_${idx}"]`);
-      if (fallbackHidden) {
-        const parent = fallbackHidden.closest('.searchable-select-wrapper') || fallbackHidden.parentElement;
-        const fallbackSearch = parent ? parent.querySelector('.searchable-input, input[type="text"]') : null;
-        if (fallbackSearch) {
-          const searchId = 'tmp_emp_search_' + idx + '_' + Date.now();
-          const hiddenId = 'tmp_emp_hidden_' + idx + '_' + Date.now();
-          fallbackSearch.setAttribute('id', searchId);
-          fallbackHidden.setAttribute('id', hiddenId);
-          return { searchId, hiddenId, found: true };
-        }
-      }
-
-      return { found: false };
-    }, index);
-
-    if (!inputInfo.found) {
-      console.log(`Could not find searchable employee input for task index: ${index}`);
-      return false;
-    }
-
-    const searchSelector = `#${inputInfo.searchId}`;
-    const hiddenSelector = `#${inputInfo.hiddenId}`;
+    // Resolve employee details from catalog for fallback
+    const employeeCatalog = db.getCatalogs().empleados || [];
+    const employeeObj = employeeCatalog.find(e => {
+      const clean = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      return clean(e.label).includes(clean(employeeName)) || clean(employeeName).includes(clean(e.label));
+    });
 
     // Try queries one by one via dropdown UI
     const queriesToTry = [employeeName];
@@ -547,19 +495,42 @@ async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
     for (const query of queriesToTry) {
       console.log(`Attempting employee search query: "${query}"...`);
       
-      // Check if dropdown is visible
-      const isDropdownOpen = await page.evaluate(() => {
-        const dropdownContainers = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"]'));
-        return dropdownContainers.some(container => container.offsetHeight > 0);
-      });
+      // Focus the input inside the correct card container using page.evaluate
+      const focused = await page.evaluate((idx) => {
+        const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
+        const targetHoursInput = horasInputs[idx];
+        if (!targetHoursInput) return false;
 
-      if (!isDropdownOpen) {
-        await page.click(searchSelector);
-        await delay(500);
+        let card = targetHoursInput.parentElement;
+        while (card && card !== document.body && 
+               !card.classList.contains('card') && 
+               !card.classList.contains('form-row') && 
+               !card.classList.contains('row') &&
+               !card.className.includes('col-12')) {
+          card = card.parentElement;
+        }
+        if (!card) return false;
+
+        const wrapper = card.querySelector('.searchable-select-wrapper, .multiselect');
+        if (!wrapper) return false;
+
+        const searchInput = wrapper.querySelector('.searchable-input, input[type="text"]');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.click();
+          return true;
+        }
+        return false;
+      }, index);
+
+      if (!focused) {
+        console.log(`Could not focus searchable employee input for task index: ${index}`);
+        continue;
       }
 
-      // Focus and clear input
-      await page.focus(searchSelector);
+      await delay(500);
+
+      // Clear the active focused input
       await page.keyboard.down('Control');
       await page.keyboard.press('A');
       await page.keyboard.up('Control');
@@ -567,7 +538,7 @@ async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
       await delay(300);
 
       // Type the query
-      await page.type(searchSelector, query, { delay: 50 });
+      await page.keyboard.type(query, { delay: 50 });
       await delay(2000); // Wait for dropdown to filter
 
       // Select option
@@ -578,124 +549,108 @@ async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
           if (container.offsetHeight > 0) {
             const divs = Array.from(container.querySelectorAll('div'));
             const leafDivs = divs.filter(d => d.querySelectorAll('div').length === 0 && d.textContent.trim().length > 0);
-            visibleOptions.push(...leafDivs);
+            leafDivs.forEach(d => {
+              visibleOptions.push({
+                element: d,
+                text: d.textContent.trim()
+              });
+            });
           }
         });
 
-        const clean = (str) => {
-          if (!str) return '';
-          return str.normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "")
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]/g, "");
-        };
-
-        const targetClean = clean(targetVal);
-        const filteredOptions = visibleOptions.filter(el => {
-          const text = el.textContent.trim().toLowerCase();
+        const filtered = visibleOptions.filter(opt => {
+          const text = opt.text.toLowerCase();
           return text.length > 0 && !text.includes('opciones') && !text.includes('cargando') && !text.includes('no hay') && !text.includes('no se encontraron');
         });
 
-        if (filteredOptions.length === 0) return { success: false };
+        if (filtered.length === 0) return null;
 
-        // Match by text comparison
-        let matched = filteredOptions.find(el => {
-          const textClean = clean(el.textContent);
-          return textClean.includes(targetClean) || targetClean.includes(textClean);
+        const cleanStr = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const targetClean = cleanStr(targetVal);
+
+        let matched = filtered.find(opt => {
+          const optClean = cleanStr(opt.text);
+          return optClean.includes(targetClean) || targetClean.includes(optClean);
         });
 
-        if (!matched && filteredOptions.length > 0) {
-          matched = filteredOptions[0]; // Fallback to first
+        if (!matched && filtered.length > 0) {
+          matched = filtered[0]; // Fallback to first
         }
 
-        if (matched) {
-          matched.click();
-          return { success: true, text: matched.textContent.trim() };
+        if (matched && matched.element) {
+          const tempId = 'tmp-opt-' + Date.now();
+          matched.element.id = tempId;
+          return { tempId, text: matched.text };
         }
-
-        return { success: false };
+        return null;
       }, employeeName);
 
-      if (optionClicked.success) {
-        console.log(`   ✓ Selected employee: "${optionClicked.text}"`);
-        await delay(1000);
-        
-        const hiddenValue = await page.evaluate((sel) => {
-          const el = document.querySelector(sel);
-          return el ? el.value : '(not found)';
-        }, hiddenSelector);
-        console.log(`   ✓ Hidden input value: "${hiddenValue}"`);
-        
-        if (hiddenValue !== '' && hiddenValue !== '(not found)') {
+      if (optionClicked && optionClicked.tempId) {
+        try {
+          await page.click(`#${optionClicked.tempId}`);
+          console.log(`   ✓ Selected employee option: "${optionClicked.text}"`);
+          await delay(1000);
           return true;
+        } catch (e) {
+          console.warn(`Clicking option raised error: ${e.message}, trying fallback...`);
         }
       }
     }
 
     // =====================================================================
-    // FALLBACK: Direct injection when dropdown is empty / AJAX didn't load
-    // The Taxes portal filters employees by Centro de Costo via AJAX,
-    // but our DOM-based CC selection doesn't always trigger Vue's watcher.
-    // So we directly set the hidden input value and visible text.
+    // FALLBACK: Direct injection when dropdown selection fails
     // =====================================================================
-    console.log(`Dropdown search failed. Attempting DIRECT INJECTION fallback...`);
-    
-    // Resolve the employee ID from our local catalog
-    const employeeCatalog = db.getCatalogs().empleados || [];
-    const employeeObj = employeeCatalog.find(e => {
-      const clean = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
-      return clean(e.label).includes(clean(employeeName)) || clean(employeeName).includes(clean(e.label));
-    });
+    if (employeeObj) {
+      console.log(`Dropdown selection failed. Attempting DIRECT INJECTION fallback for ID=${employeeObj.value}, Label="${employeeObj.label}"...`);
+      const injected = await page.evaluate((idx, empId, empLabel) => {
+        const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
+        const targetHoursInput = horasInputs[idx];
+        if (!targetHoursInput) return false;
 
-    if (!employeeObj) {
-      console.log(`Could not find employee "${employeeName}" in local catalog for direct injection.`);
-      return false;
+        let card = targetHoursInput.parentElement;
+        while (card && card !== document.body && 
+               !card.classList.contains('card') && 
+               !card.classList.contains('form-row') && 
+               !card.classList.contains('row') &&
+               !card.className.includes('col-12')) {
+          card = card.parentElement;
+        }
+        if (!card) return false;
+
+        const wrapper = card.querySelector('.searchable-select-wrapper, .multiselect');
+        if (!wrapper) return false;
+
+        const hiddenInput = wrapper.querySelector('input[type="hidden"]') || wrapper.querySelector('input[name*="empleado_id"]');
+        const searchInput = wrapper.querySelector('.searchable-input, input[type="text"]');
+
+        if (!hiddenInput) return false;
+
+        const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        nativeSetter.call(hiddenInput, empId);
+        hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+        if (searchInput) {
+          nativeSetter.call(searchInput, empLabel);
+          searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+          searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        if (wrapper && wrapper.__vue__) {
+          try {
+            wrapper.__vue__.$emit('input', empId);
+            wrapper.__vue__.$emit('change', empId);
+          } catch(e) {}
+        }
+        return true;
+      }, index, employeeObj.value, employeeObj.label);
+
+      return injected;
     }
 
-    console.log(`   Found employee in catalog: ID=${employeeObj.value}, Label="${employeeObj.label}"`);
-
-    const injected = await page.evaluate((hiddenSel, searchSel, empId, empLabel) => {
-      const hiddenInput = document.querySelector(hiddenSel);
-      const searchInput = document.querySelector(searchSel);
-      
-      if (!hiddenInput) return { success: false, error: 'Hidden input not found' };
-
-      // Set hidden input value (this is what gets submitted)
-      const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-      nativeSetter.call(hiddenInput, empId);
-      hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
-      hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-      // Set visible text input to show the employee name
-      if (searchInput) {
-        nativeSetter.call(searchInput, empLabel);
-        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-        searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-
-      // Also try to update Vue's internal state if the component has a __vue__ reference
-      const wrapper = hiddenInput.closest('.searchable-select-wrapper');
-      if (wrapper && wrapper.__vue__) {
-        try {
-          wrapper.__vue__.$emit('input', empId);
-          wrapper.__vue__.$emit('change', empId);
-        } catch(e) { /* ignore */ }
-      }
-
-      return { success: true, hiddenValue: hiddenInput.value, displayValue: searchInput ? searchInput.value : '' };
-    }, hiddenSelector, searchSelector, employeeObj.value, employeeObj.label);
-
-    if (injected.success) {
-      console.log(`   ✓ DIRECT INJECTION success: hidden="${injected.hiddenValue}", display="${injected.displayValue}"`);
-      await delay(500);
-      return true;
-    } else {
-      console.log(`   ✗ DIRECT INJECTION failed: ${injected.error}`);
-      return false;
-    }
-
+    return false;
   } catch (error) {
-    console.error(`Error filling task employee searchable select:`, error);
+    console.error(`Error filling task employee searchable select: ${error}`);
     return false;
   }
 }
@@ -2110,7 +2065,14 @@ async function syncWorkOrder(orderId) {
       console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
       await delay(4000);
       const guardarBtnId = await page.evaluate(() => {
-        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
+        let btn = document.querySelector('.taxes-btn-save');
+        if (!btn) {
+          const buttons = Array.from(document.querySelectorAll('button'));
+          btn = buttons.find(b => b.textContent.trim() === 'Guardar' || b.textContent.toLowerCase().includes('guardar'));
+        }
+        if (!btn) {
+          btn = document.querySelector('button[type="submit"]');
+        }
         if (!btn) return null;
         const id = 'tmp-guardar-btn-' + Date.now();
         btn.id = id;
@@ -3367,7 +3329,14 @@ async function verifyWorkOrderWithPage(page, orderId) {
           // Click GUARDAR
           console.log(`[Verify] Saving task edit...`);
           const guardarBtnId2 = await page.evaluate(() => {
-            const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('guardar'));
+            let btn = document.querySelector('.taxes-btn-save');
+            if (!btn) {
+              const buttons = Array.from(document.querySelectorAll('button'));
+              btn = buttons.find(b => b.textContent.trim() === 'Guardar' || b.textContent.toLowerCase().includes('guardar'));
+            }
+            if (!btn) {
+              btn = document.querySelector('button[type="submit"]');
+            }
             if (!btn) return null;
             const id = 'tmp-guardar-verify-btn-' + Date.now();
             btn.id = id;
