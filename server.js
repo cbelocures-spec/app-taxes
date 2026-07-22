@@ -1760,7 +1760,7 @@ app.get('/api/novelties', async (req, res) => {
 
 async function checkAndTriggerGoogleSheetUpdates(existingOrder, updatedTasks, supervisor, orderInterno) {
   const settings = db.getSettings();
-  const scriptUrl = settings.googleScriptUrl;
+  const scriptUrl = settings.googleScriptUrl || settings.googleActiveTasksUrl || "https://script.google.com/macros/s/AKfycbxBIPF6-uoK2aFNfRCxDUS5AAFxLeToB7iMz3rdf_J4JjJBvsNbOv7aIdXBBnoxRZiC/exec";
   if (!scriptUrl) {
     console.log("checkAndTriggerGoogleSheetUpdates: googleScriptUrl is not configured.");
     return;
@@ -1868,7 +1868,7 @@ async function checkAndTriggerGoogleSheetUpdates(existingOrder, updatedTasks, su
 
 async function checkAndSendInsumosToSheet(existingOrder, updatedTasks, supervisor, orderInterno) {
   const settings = db.getSettings();
-  const scriptUrl = settings.googleScriptUrl;
+  const scriptUrl = settings.googleScriptUrl || settings.googleActiveTasksUrl || "https://script.google.com/macros/s/AKfycbxBIPF6-uoK2aFNfRCxDUS5AAFxLeToB7iMz3rdf_J4JjJBvsNbOv7aIdXBBnoxRZiC/exec";
   if (!scriptUrl) {
     console.log("checkAndSendInsumosToSheet: googleScriptUrl is not configured.");
     return;

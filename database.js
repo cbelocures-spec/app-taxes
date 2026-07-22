@@ -148,10 +148,10 @@ const DEFAULT_DB = {
     username: "",
     password: "",
     portalUrl: "https://taxes.com.ar",
-    googleScriptUrl: "",
-    googleActiveTasksUrl: "",
-    preventivoScriptUrl: "",
-    parteTallerScriptUrl: "",
+    googleScriptUrl: "https://script.google.com/macros/s/AKfycbxBIPF6-uoK2aFNfRCxDUS5AAFxLeToB7iMz3rdf_J4JjJBvsNbOv7aIdXBBnoxRZiC/exec",
+    googleActiveTasksUrl: "https://script.google.com/macros/s/AKfycbxBIPF6-uoK2aFNfRCxDUS5AAFxLeToB7iMz3rdf_J4JjJBvsNbOv7aIdXBBnoxRZiC/exec",
+    preventivoScriptUrl: "https://script.google.com/macros/s/AKfycbwuPIslBnq77dG5bhk19h2H2s9TlOeB6XrCpqCMDX-8dvO8uisNRdx7P43lyJtT1sZIgQ/exec",
+    parteTallerScriptUrl: "https://script.google.com/macros/s/AKfycbyoHEhogBxWcSIdDtzzUIV9mhzO25TNAChgBlCCJbuHPIylXNpIpX8LKM6qc4DQjij8/exec",
     catalogSyncStatus: "idle",
     catalogSyncError: null
   },
@@ -295,6 +295,18 @@ class LocalDB {
   getSettings() {
     const db = this.read();
     const settings = { ...DEFAULT_DB.settings, ...(db.settings || {}) };
+    if (!settings.googleScriptUrl) {
+      settings.googleScriptUrl = DEFAULT_DB.settings.googleScriptUrl;
+    }
+    if (!settings.googleActiveTasksUrl) {
+      settings.googleActiveTasksUrl = DEFAULT_DB.settings.googleActiveTasksUrl;
+    }
+    if (!settings.preventivoScriptUrl) {
+      settings.preventivoScriptUrl = DEFAULT_DB.settings.preventivoScriptUrl;
+    }
+    if (!settings.parteTallerScriptUrl) {
+      settings.parteTallerScriptUrl = DEFAULT_DB.settings.parteTallerScriptUrl;
+    }
     if (settings.username) {
       settings.username = normalizeEmail(settings.username);
     }
