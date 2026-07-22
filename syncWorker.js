@@ -2782,20 +2782,56 @@ async function verifyWorkOrderWithPage(page, orderId) {
           const labelText = cleanText(i.closest('.field-compact, .form-group, [class*="col"]')?.textContent || '');
           return labelText.includes('buscar por numero') || labelText.includes('titulo de ot') || labelText === 'numero' || labelText === 'ot';
         });
-        if (otInput) {
-          if (!otInput.id) otInput.id = 'tmp-search-ot-input-fallback';
-          return '#' + otInput.id;
-        }
-        
         return null;
       });
     };
 
-    let searchInpSelector = await getSearchInputId();
+    // 1c. Selector resolution for Interno search input (first box)
+    const getInternoSearchInputId = async () => {
+      return await page.evaluate(() => {
+        const cleanText = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const labels = Array.from(document.querySelectorAll('label'));
+        let targetLabel = labels.find(l => {
+          const txt = cleanText(l.textContent);
+          return txt === 'interno' || txt.includes('interno');
+        });
+        if (targetLabel) {
+          if (targetLabel.getAttribute('for')) {
+            const input = document.getElementById(targetLabel.getAttribute('for'));
+            if (input) return '#' + input.id;
+          }
+          const container = targetLabel.closest('.field-compact, .form-group, .col, [class*="col"]') || targetLabel.parentElement?.parentElement;
+          if (container) {
+            const input = container.querySelector('input[type="text"], input:not([type="hidden"])');
+            if (input) {
+              if (!input.id) input.id = 'tmp-search-interno-input';
+              return '#' + input.id;
+            }
+          }
+        }
+        return null;
+      });
+    };
+
+    let searchInpSelector = null;
+    let isSearchingByInterno = !order.taxesOrderNumber;
+
+    if (isSearchingByInterno) {
+      searchInpSelector = await getInternoSearchInputId();
+      console.log(`[Verify] Missing taxesOrderNumber for Interno ${order.interno}. Searching in Interno box (${searchInpSelector})...`);
+    } else {
+      searchInpSelector = await getSearchInputId();
+    }
+
     if (!searchInpSelector) {
       console.warn(`[Verify] Search input not resolved. Reloading and retrying...`);
       await page.reload({ waitUntil: 'load', timeout: 30000 });
-      searchInpSelector = await getSearchInputId();
+      searchInpSelector = isSearchingByInterno ? await getInternoSearchInputId() : await getSearchInputId();
+    }
+
+    if (!searchInpSelector) {
+      // Fallback: try the other selector
+      searchInpSelector = isSearchingByInterno ? await getSearchInputId() : await getInternoSearchInputId();
     }
 
     if (!searchInpSelector) {
@@ -2804,18 +2840,17 @@ async function verifyWorkOrderWithPage(page, orderId) {
         await page.screenshot({ path: path.join(__dirname, 'public', 'last_verify_error.png'), fullPage: true });
         console.warn(`[Verify] Debug screenshot saved to public/last_verify_error.png. URL: ${page.url()}`);
       } catch (se) {}
-      throw new Error(`No se pudo localizar el selector del input de búsqueda de OT en la página.`);
+      throw new Error(`No se pudo localizar el selector del input de búsqueda en la página.`);
     }
 
     await page.waitForSelector(searchInpSelector, { timeout: 15000 });
     await delay(1500);
 
-    // 2. Search for OT number with Vue events triggered via native setter
-    console.log(`[Verify] Searching for OT ${otNumClean} in tasks page...`);
+    const searchTerm = isSearchingByInterno ? String(order.interno).trim() : otNumClean;
+    console.log(`[Verify] Searching for ${searchTerm} in ${isSearchingByInterno ? 'Interno' : 'OT'} box...`);
     await page.evaluate((sel, val) => {
       const el = document.querySelector(sel);
       if (el) {
-        // Use HTMLInputElement native setter to bypass Vue reactivity cache
         const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
         if (nativeSetter) {
           nativeSetter.call(el, val);
@@ -2827,13 +2862,13 @@ async function verifyWorkOrderWithPage(page, orderId) {
         el.dispatchEvent(new Event('change', { bubbles: true }));
         el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
       }
-    }, searchInpSelector, otNumClean);
+    }, searchInpSelector, searchTerm);
 
     // Keyboard simulation fallback and focus trigger
     await page.focus(searchInpSelector).catch(() => {});
     await page.click(searchInpSelector, { clickCount: 3 }).catch(() => {});
     await page.keyboard.press('Backspace').catch(() => {});
-    await page.keyboard.type(otNumClean, { delay: 60 }).catch(() => {});
+    await page.keyboard.type(searchTerm, { delay: 60 }).catch(() => {});
     await page.keyboard.press('Tab').catch(() => {});
     await delay(500);
 
