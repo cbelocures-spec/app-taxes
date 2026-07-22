@@ -292,16 +292,32 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sector === 'Herrería') {
           // Herrería: do NOT auto-populate Interno, leave it empty or let them type
           internoInput.value = "";
+          if (internoInput.rebuildSearchable) {
+            internoInput.rebuildSearchable();
+          }
           showNoveltiesForInterno("");
         } else {
           // Taller / Admin / Edilicio: auto-populate Interno from rodado catalog data!
           const rodadoVal = rodadoSelect.value;
-          const rodadoOpt = cachedCatalogs.rodados.find(r => String(r.value) === String(rodadoVal));
+          const rodadoOpt = (cachedCatalogs.rodados || []).find(r => String(r.value) === String(rodadoVal));
           if (rodadoOpt && rodadoOpt.interno) {
-            internoInput.value = rodadoOpt.interno;
+            let optionExists = Array.from(internoInput.options).some(opt => opt.value === String(rodadoOpt.interno));
+            if (!optionExists) {
+              const newOpt = document.createElement('option');
+              newOpt.value = String(rodadoOpt.interno);
+              newOpt.textContent = String(rodadoOpt.interno);
+              internoInput.appendChild(newOpt);
+            }
+            internoInput.value = String(rodadoOpt.interno);
+            if (internoInput.rebuildSearchable) {
+              internoInput.rebuildSearchable();
+            }
             showNoveltiesForInterno(rodadoOpt.interno);
           } else {
             internoInput.value = "";
+            if (internoInput.rebuildSearchable) {
+              internoInput.rebuildSearchable();
+            }
             showNoveltiesForInterno("");
           }
         }
