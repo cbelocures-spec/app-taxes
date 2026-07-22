@@ -309,15 +309,40 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Listen for changes on interno field to show novelties sidebar
+function findRodadoForInterno(intVal) {
+  const cleanInt = String(intVal || '').trim();
+  if (!cleanInt) return null;
+  return (cachedCatalogs.rodados || []).find(r => 
+    String(r.interno || '').trim() === cleanInt ||
+    String(r.value || '').trim() === cleanInt ||
+    String(r.label || '').toUpperCase().includes(`INTERNO ${cleanInt}`)
+  );
+}
+
+  // Listen for changes on interno field to show novelties sidebar and auto-populate Rodado
   const internoInput = document.getElementById('form-interno');
   if (internoInput) {
-    internoInput.addEventListener('input', () => {
-      showNoveltiesForInterno(internoInput.value.trim());
-    });
-    internoInput.addEventListener('change', () => {
-      showNoveltiesForInterno(internoInput.value.trim());
-    });
+    const handleInternoChange = () => {
+      const val = internoInput.value.trim();
+      showNoveltiesForInterno(val);
+
+      const sector = getSectorByUsername(localStorage.getItem('currentUserUsername'));
+      if (sector !== 'Herrería' && val) {
+        const rodadoSelect = document.getElementById('form-rodado');
+        if (rodadoSelect) {
+          const rodadoOpt = findRodadoForInterno(val);
+          if (rodadoOpt && rodadoSelect.value !== rodadoOpt.value) {
+            rodadoSelect.value = rodadoOpt.value;
+            rodadoSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            if (rodadoSelect.rebuildSearchable) {
+              rodadoSelect.rebuildSearchable();
+            }
+          }
+        }
+      }
+    };
+    internoInput.addEventListener('input', handleInternoChange);
+    internoInput.addEventListener('change', handleInternoChange);
   }
 
   // Restore free mechanics visibility from localStorage
@@ -637,13 +662,16 @@ async function submitPreOrderCheck() {
     openNewOrderModal();
     
     if (isHerreria) {
-      // For Herrería: rodado is a select dropdown now, select matching option
-      const rodadoSelect = document.getElementById('form-rodado');
-      const rodadoOpt = cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno));
+    const rodadoSelect = document.getElementById('form-rodado');
+    const rodadoOpt = findRodadoForInterno(interno);
+
+    if (isHerreria) {
       if (rodadoOpt && rodadoSelect) {
         rodadoSelect.value = rodadoOpt.value;
+        rodadoSelect.dispatchEvent(new Event('change', { bubbles: true }));
       } else if (rodadoSelect) {
         rodadoSelect.value = "";
+        rodadoSelect.dispatchEvent(new Event('change', { bubbles: true }));
       }
       if (rodadoSelect && rodadoSelect.rebuildSearchable) {
         rodadoSelect.rebuildSearchable();
@@ -653,14 +681,14 @@ async function submitPreOrderCheck() {
       if (internoText) internoText.value = "";
     } else {
       // Auto-select the rodado based on the interno
-      const rodadoSelect = document.getElementById('form-rodado');
-      const rodadoOpt = cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno));
-      if (rodadoOpt) {
+      if (rodadoOpt && rodadoSelect) {
         rodadoSelect.value = rodadoOpt.value;
-      } else {
+        rodadoSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (rodadoSelect) {
         rodadoSelect.value = "";
+        rodadoSelect.dispatchEvent(new Event('change', { bubbles: true }));
       }
-      if (rodadoSelect.rebuildSearchable) {
+      if (rodadoSelect && rodadoSelect.rebuildSearchable) {
         rodadoSelect.rebuildSearchable();
       }
       
@@ -3327,19 +3355,27 @@ function convertSelectToSearchable(selectEl) {
     const totalCount = options.length - (options[0] && options[0].value === '' ? 1 : 0);
     countSpan.textContent = `${totalCount} de ${totalCount} opciones`;
 
+    const currentVal = String(selectEl.value || '').trim();
+    let hasSelected = false;
+
     options.forEach(opt => {
+      const optVal = String(opt.value || '').trim();
+      const isSelected = currentVal !== '' ? (optVal === currentVal) : (opt.selected || optVal === '');
+
       if (opt.value === '' && opt.text.includes('Seleccionar')) {
-        if (opt.selected) {
+        if (isSelected && currentVal === '') {
           labelSpan.textContent = opt.text;
+          hasSelected = true;
         }
         return;
       }
 
       const li = document.createElement('li');
       li.className = 'searchable-select-option';
-      if (opt.selected) {
+      if (isSelected && (currentVal !== '' || !hasSelected)) {
         li.classList.add('selected');
         labelSpan.textContent = opt.text;
+        hasSelected = true;
       }
       li.textContent = opt.text;
       li.dataset.value = opt.value;
@@ -3360,6 +3396,11 @@ function convertSelectToSearchable(selectEl) {
       listContainer.appendChild(li);
     });
 
+    if (!hasSelected && currentVal === '') {
+      const placeholderOpt = options.find(o => o.value === '');
+      labelSpan.textContent = placeholderOpt ? placeholderOpt.text : 'Seleccionar...';
+    }
+
     if (listContainer.children.length === 0) {
       const li = document.createElement('li');
       li.className = 'searchable-select-option no-results';
@@ -3367,6 +3408,11 @@ function convertSelectToSearchable(selectEl) {
       listContainer.appendChild(li);
     }
   }
+
+  // Auto rebuild when underlying select value changes
+  selectEl.addEventListener('change', () => {
+    rebuildList();
+  });
 
   function filterOptions(query) {
     const term = query.toLowerCase().trim();
