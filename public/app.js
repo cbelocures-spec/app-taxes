@@ -335,6 +335,40 @@ function findRodadoForInterno(intVal) {
   );
 }
 
+function findRodadoOption(selectEl, cleanInterno, rodadoOpt) {
+  if (!selectEl) return null;
+  const options = Array.from(selectEl.options || []);
+  if (options.length === 0) return null;
+
+  const intStr = String(cleanInterno || '').trim();
+
+  // 1. Match by rodadoOpt.value
+  if (rodadoOpt && rodadoOpt.value) {
+    const optMatch = options.find(opt => String(opt.value).trim() === String(rodadoOpt.value).trim());
+    if (optMatch) return optMatch;
+  }
+
+  // 2. Match by intStr as option value
+  if (intStr) {
+    const optMatchVal = options.find(opt => String(opt.value).trim() === intStr);
+    if (optMatchVal) return optMatchVal;
+  }
+
+  // 3. Match by text containing "INTERNO <intStr>"
+  if (intStr) {
+    const optMatchText = options.find(opt => {
+      const txt = String(opt.text || '').toUpperCase();
+      return txt.includes(`INTERNO ${intStr}`) ||
+             txt.includes(`INTERNO: ${intStr}`) ||
+             txt.startsWith(`${intStr} -`) ||
+             txt.startsWith(`${intStr} `);
+    });
+    if (optMatchText) return optMatchText;
+  }
+
+  return null;
+}
+
   // Listen for changes on interno field to show novelties sidebar and auto-populate Rodado
   const internoInput = document.getElementById('form-interno');
   if (internoInput) {
@@ -347,9 +381,9 @@ function findRodadoForInterno(intVal) {
         const rodadoSelect = document.getElementById('form-rodado');
         if (rodadoSelect) {
           const rodadoOpt = findRodadoForInterno(val);
-          if (rodadoOpt && rodadoSelect.value !== rodadoOpt.value) {
-            rodadoSelect.value = rodadoOpt.value;
-            rodadoSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          const matchedOpt = findRodadoOption(rodadoSelect, val, rodadoOpt);
+          if (matchedOpt && rodadoSelect.value !== matchedOpt.value) {
+            rodadoSelect.value = matchedOpt.value;
             if (rodadoSelect.rebuildSearchable) {
               rodadoSelect.rebuildSearchable();
             }
@@ -634,7 +668,8 @@ async function submitPreOrderCheck() {
   const preInternoSelect = document.getElementById('pre-form-interno');
   const preInternoText = document.getElementById('pre-form-interno-text');
   
-  let interno = preInternoSelect.value.trim();
+  let interno = preInternoSelect ? preInternoSelect.value.trim() : "";
+  console.log("[submitPreOrderCheck] Initial interno value:", interno);
   
   // Fallback if they typed in search box but didn't click/confirm (works for all sectors)
   if (!interno && preInternoSelect.closest) {
@@ -646,6 +681,7 @@ async function submitPreOrderCheck() {
   }
 
   const clasificacion = document.getElementById('pre-form-clasificacion').value;
+  console.log("[submitPreOrderCheck] Final interno:", interno, "clasificacion:", clasificacion);
 
   if (!interno || !clasificacion) {
     showToast("Por favor complete el Interno y la Clasificación", "danger");
@@ -677,6 +713,7 @@ async function submitPreOrderCheck() {
 }
 
 function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
+  console.log("[openNewOrderModal] presetInterno:", presetInterno, "presetClasificacion:", presetClasificacion);
   currentEditingOrderId = null;
   document.getElementById('modal-order-title').textContent = "Nueva Orden de Trabajo";
   
@@ -693,6 +730,7 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
   const isHerreria = (userSector === 'Herrería');
   const cleanInterno = String(presetInterno || '').trim();
   const rodadoOpt = findRodadoForInterno(cleanInterno);
+  console.log("[openNewOrderModal] found rodadoOpt:", rodadoOpt);
 
   // 1. Populate Interno select options FIRST before setting any values
   const internoSelect = document.getElementById('form-interno');
@@ -705,8 +743,9 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
   // 2. Auto-select matching Rodado
   const rodadoSelect = document.getElementById('form-rodado');
   if (rodadoSelect) {
-    if (rodadoOpt) {
-      rodadoSelect.value = rodadoOpt.value;
+    const matchedOpt = findRodadoOption(rodadoSelect, cleanInterno, rodadoOpt);
+    if (matchedOpt) {
+      rodadoSelect.value = matchedOpt.value;
     } else {
       rodadoSelect.value = "";
     }
