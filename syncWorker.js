@@ -3456,29 +3456,85 @@ async function verifyWorkOrderWithPage(page, orderId) {
     const count = (order.verifiedCount || 0) + 1;
     if (errors.length > 0) {
       console.log(`[Verify] Completed with issues:`, errors);
-      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedCount: count, verifiedError: errors.join(' | '), lastVerifyAttempt: new Date().toISOString() });
+      
+      // If the order was in Historial (archived) and failed verification or has missing OT/tasks in Taxes,
+      // un-archive it, move it back to active orders, and queue for re-sync!
+      if (order.archived) {
+        console.log(`[Verify-AutoRetry] Order ${orderId} in Historial failed verification (${errors.join(' | ')}). Unarchiving and queuing for re-sync!`);
+        db.updateWorkOrder(orderId, {
+          archived: false,
+          archivedAt: null,
+          syncStatus: 'pending',
+          syncError: null,
+          verifiedStatus: 'error',
+          verifiedCount: count,
+          verifiedError: errors.join(' | '),
+          lastVerifyAttempt: new Date().toISOString()
+        });
+      } else {
+        db.updateWorkOrder(orderId, {
+          verifiedStatus: 'error',
+          verifiedCount: count,
+          verifiedError: errors.join(' | '),
+          lastVerifyAttempt: new Date().toISOString()
+        });
+      }
     } else {
       const msg = madeChanges ? 'Verificado y corregido correctamente vía listado de tareas.' : 'Todo correcto, verificado sin cambios necesarios.';
       console.log(`[Verify] SUCCESS. ${msg}`);
-      const shouldArchive = order.estadoUnidad !== 'fuera_de_servicio';
-      const updatePayload = {
-        verifiedStatus: 'success',
-        verifiedCount: count,
-        verifiedError: null,
-        lastVerifyAttempt: new Date().toISOString()
-      };
-      if (shouldArchive) {
-        updatePayload.archived = true;
-        updatePayload.archivedAt = new Date().toISOString();
+
+      // If order is in Historial (archived) and verified 100% correct in Taxes (REALIZ = SI, matched):
+      // Record audit log entry and AUTO-DELETE from app!
+      if (order.archived) {
+        console.log(`[Verify-AutoDelete] Order ${orderId} (OT ${order.taxesOrderNumber || orderId}) is fully verified in Taxes. Recording audit log and auto-deleting from app...`);
+        
+        const catalogs = db.getCatalogs();
+        const tasksLog = (order.tasks || []).map(t => {
+          const empObj = (catalogs.empleados || []).find(e => String(e.value) === String(t.empleado));
+          return {
+            empleado: empObj ? empObj.label : (t.empleado || 'N/A'),
+            horasEstimadas: t.horasEstimadas || '0',
+            descripcion: t.descripcion || '',
+            realizada: 'SI'
+          };
+        });
+
+        db.saveDeletedOrderLog({
+          numeroOrden: order.taxesOrderNumber || order.id,
+          interno: order.interno,
+          empleado: tasksLog[0] ? tasksLog[0].empleado : 'N/A',
+          horas: tasksLog[0] ? tasksLog[0].horasEstimadas : '0',
+          descripcion: tasksLog[0] ? tasksLog[0].descripcion : 'N/A',
+          realizada: 'SI',
+          tasks: tasksLog,
+          deletedAt: new Date().toISOString(),
+          deletedBy: 'Agente de Control'
+        });
+
+        db.updateWorkOrder(orderId, {
+          deleted: true,
+          deletedAt: new Date().toISOString(),
+          verifiedStatus: 'success',
+          verifiedCount: count,
+          verifiedError: null,
+          lastVerifyAttempt: new Date().toISOString()
+        });
       } else {
-        updatePayload.archived = false;
-        updatePayload.archivedAt = null;
-      }
-      db.updateWorkOrder(orderId, updatePayload);
-      if (shouldArchive) {
-        console.log(`[Verify] Order ${orderId} fully verified and synced. Auto-archived to history.`);
-      } else {
-        console.log(`[Verify] Order ${orderId} fully verified and synced. Kept active because unit is Out of Service.`);
+        const shouldArchive = order.estadoUnidad !== 'fuera_de_servicio';
+        const updatePayload = {
+          verifiedStatus: 'success',
+          verifiedCount: count,
+          verifiedError: null,
+          lastVerifyAttempt: new Date().toISOString()
+        };
+        if (shouldArchive) {
+          updatePayload.archived = true;
+          updatePayload.archivedAt = new Date().toISOString();
+        } else {
+          updatePayload.archived = false;
+          updatePayload.archivedAt = null;
+        }
+        db.updateWorkOrder(orderId, updatePayload);
       }
     }
 

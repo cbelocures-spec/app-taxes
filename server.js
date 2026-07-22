@@ -615,6 +615,16 @@ app.get('/api/orders/archived', (req, res) => {
   }
 });
 
+// Get audit log of deleted orders
+app.get('/api/orders/deleted-log', (req, res) => {
+  try {
+    const logs = db.getDeletedOrdersLog() || [];
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Soft-archive a work order
 app.patch('/api/orders/:id/archive', (req, res) => {
   try {

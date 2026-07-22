@@ -614,6 +614,32 @@ class LocalDB {
       this.write(db);
     }
   }
+
+  // --- Audit Log for Auto-Deleted Verified Orders ---
+  getDeletedOrdersLog() {
+    const db = this.read();
+    return db.deletedOrdersLog || [];
+  }
+
+  saveDeletedOrderLog(entry) {
+    const db = this.read();
+    if (!db.deletedOrdersLog) db.deletedOrdersLog = [];
+    const logItem = {
+      id: 'LOG-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      numeroOrden: entry.numeroOrden || entry.taxesOrderNumber || entry.id || 'N/A',
+      interno: entry.interno || 'N/A',
+      empleado: entry.empleado || (entry.tasks && entry.tasks[0] ? entry.tasks[0].empleado : 'N/A'),
+      horas: entry.horas || (entry.tasks && entry.tasks[0] ? entry.tasks[0].horasEstimadas : '0'),
+      descripcion: entry.descripcion || (entry.tasks && entry.tasks[0] ? entry.tasks[0].descripcion : 'N/A'),
+      realizada: entry.realizada || 'SI',
+      tasks: entry.tasks || [],
+      deletedAt: entry.deletedAt || new Date().toISOString(),
+      deletedBy: entry.deletedBy || 'Agente de Control'
+    };
+    db.deletedOrdersLog.push(logItem);
+    this.write(db);
+    return logItem;
+  }
 }
 
 module.exports = new LocalDB();
