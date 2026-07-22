@@ -942,7 +942,7 @@ app.post('/api/orders/verify-all', async (req, res) => {
     // Only accept orders that are synced and currently not already checking
     const eligible = orderIds.filter(id => {
       const order = db.getWorkOrderById(id);
-      return order && order.taxesOrderNumber && order.verifiedStatus !== 'checking';
+      return order && order.verifiedStatus !== 'checking';
     });
 
     if (eligible.length === 0) {

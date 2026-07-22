@@ -9490,10 +9490,10 @@ async function verifyAllHistoryOrders() {
 
   try {
     const historyOrders = getFilteredArchivedOrders();
-    const eligibleIds = historyOrders.filter(o => o.taxesOrderNumber).map(o => o.id);
+    const eligibleIds = historyOrders.map(o => o.id);
 
     if (eligibleIds.length === 0) {
-      showToast('No hay órdenes archivadas con número de O.T. para controlar.', 'warning');
+      showToast('No hay órdenes archivadas en el historial para controlar.', 'warning');
       return;
     }
 

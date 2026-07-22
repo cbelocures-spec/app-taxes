@@ -3708,7 +3708,7 @@ async function startWorker() {
         } else {
           // Check for archived history orders that need verification control
           const archivedToVerify = orders.find(o => {
-            if (!o.taxesOrderNumber || !o.archived || o.deleted) return false;
+            if (!o.archived || o.deleted) return false;
             return (o.verifiedStatus === 'idle' || !o.verifiedStatus) ||
                    (o.verifiedStatus === 'error' && (o.verifiedCount || 0) < MAX_AUTO_VERIFY_RETRIES &&
                     (!o.lastVerifyAttempt || (Date.now() - new Date(o.lastVerifyAttempt).getTime()) >= AUTO_VERIFY_COOLDOWN_MS));
