@@ -122,6 +122,50 @@ function populateDatalist(datalistId, options) {
   el.innerHTML = options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
 }
 
+function findRodadoForInterno(intVal) {
+  const cleanInt = String(intVal || '').trim();
+  if (!cleanInt) return null;
+  return (cachedCatalogs.rodados || []).find(r => 
+    String(r.interno || '').trim() === cleanInt ||
+    String(r.value || '').trim() === cleanInt ||
+    String(r.label || '').toUpperCase().includes(`INTERNO ${cleanInt}`)
+  );
+}
+
+function findRodadoOption(selectEl, cleanInterno, rodadoOpt) {
+  if (!selectEl) return null;
+  const options = Array.from(selectEl.options || []);
+  if (options.length === 0) return null;
+
+  const intStr = String(cleanInterno || '').trim();
+
+  // 1. Match by rodadoOpt.value
+  if (rodadoOpt && rodadoOpt.value) {
+    const optMatch = options.find(opt => String(opt.value).trim() === String(rodadoOpt.value).trim());
+    if (optMatch) return optMatch;
+  }
+
+  // 2. Match by intStr as option value
+  if (intStr) {
+    const optMatchVal = options.find(opt => String(opt.value).trim() === intStr);
+    if (optMatchVal) return optMatchVal;
+  }
+
+  // 3. Match by text containing "INTERNO <intStr>"
+  if (intStr) {
+    const optMatchText = options.find(opt => {
+      const txt = String(opt.text || '').toUpperCase();
+      return txt.includes(`INTERNO ${intStr}`) ||
+             txt.includes(`INTERNO: ${intStr}`) ||
+             txt.startsWith(`${intStr} -`) ||
+             txt.startsWith(`${intStr} `);
+    });
+    if (optMatchText) return optMatchText;
+  }
+
+  return null;
+}
+
 // On Page Load
 document.addEventListener('DOMContentLoaded', () => {
   // Set default dates and times
@@ -324,50 +368,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-
-function findRodadoForInterno(intVal) {
-  const cleanInt = String(intVal || '').trim();
-  if (!cleanInt) return null;
-  return (cachedCatalogs.rodados || []).find(r => 
-    String(r.interno || '').trim() === cleanInt ||
-    String(r.value || '').trim() === cleanInt ||
-    String(r.label || '').toUpperCase().includes(`INTERNO ${cleanInt}`)
-  );
-}
-
-function findRodadoOption(selectEl, cleanInterno, rodadoOpt) {
-  if (!selectEl) return null;
-  const options = Array.from(selectEl.options || []);
-  if (options.length === 0) return null;
-
-  const intStr = String(cleanInterno || '').trim();
-
-  // 1. Match by rodadoOpt.value
-  if (rodadoOpt && rodadoOpt.value) {
-    const optMatch = options.find(opt => String(opt.value).trim() === String(rodadoOpt.value).trim());
-    if (optMatch) return optMatch;
-  }
-
-  // 2. Match by intStr as option value
-  if (intStr) {
-    const optMatchVal = options.find(opt => String(opt.value).trim() === intStr);
-    if (optMatchVal) return optMatchVal;
-  }
-
-  // 3. Match by text containing "INTERNO <intStr>"
-  if (intStr) {
-    const optMatchText = options.find(opt => {
-      const txt = String(opt.text || '').toUpperCase();
-      return txt.includes(`INTERNO ${intStr}`) ||
-             txt.includes(`INTERNO: ${intStr}`) ||
-             txt.startsWith(`${intStr} -`) ||
-             txt.startsWith(`${intStr} `);
-    });
-    if (optMatchText) return optMatchText;
-  }
-
-  return null;
-}
 
   // Listen for changes on interno field to show novelties sidebar and auto-populate Rodado
   const internoInput = document.getElementById('form-interno');
