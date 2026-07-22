@@ -3293,6 +3293,7 @@ function convertSelectToSearchable(selectEl) {
       dropdownPanel.classList.toggle('open', !isOpen);
       trigger.classList.toggle('active', !isOpen);
       if (!isOpen) {
+        rebuildList(); // Always rebuild from underlying <select> to prevent stale lists
         searchInput.value = '';
         searchInput.focus();
         filterOptions('');
@@ -3369,7 +3370,7 @@ function convertSelectToSearchable(selectEl) {
 
   function filterOptions(query) {
     const term = query.toLowerCase().trim();
-    const items = Array.from(listContainer.querySelectorAll('.searchable-select-option:not(.no-results)'));
+    const items = Array.from(listContainer.querySelectorAll('.searchable-select-option:not(.no-results):not(.searchable-select-custom-item)'));
     let matchCount = 0;
 
     items.forEach(item => {
