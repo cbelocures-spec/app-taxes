@@ -807,6 +807,9 @@
           <label for="history-select-all-chk" style="font-size:13px;color:var(--text-muted);cursor:pointer;">Seleccionar todas</label>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
+          <button type="button" class="btn btn-primary btn-xs" onclick="verifyAllHistoryOrders()" id="btn-verify-history" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;font-size:12px;font-weight:600;border-radius:8px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;cursor:pointer;">
+            <span class="material-icons" style="font-size:16px;">fact_check</span> Ejecutar Control de Historial Ahora
+          </button>
           <button type="button" class="btn btn-secondary btn-xs" onclick="openDeletedLogModal()" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;font-size:12px;font-weight:600;border-radius:8px;">
             <span class="material-icons" style="font-size:16px;color:#0ea5e9;">receipt_long</span> Registro de Auditoría (Borradas)
           </button>

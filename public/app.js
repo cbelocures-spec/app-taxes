@@ -9481,3 +9481,47 @@ function closeDeletedLogModal() {
   if (modal) modal.classList.remove('open');
 }
 
+async function verifyAllHistoryOrders() {
+  const btn = document.getElementById('btn-verify-history');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons" style="font-size:16px;">sync</span> Iniciando Control...';
+  }
+
+  try {
+    const historyOrders = getFilteredArchivedOrders();
+    const eligibleIds = historyOrders.filter(o => o.taxesOrderNumber).map(o => o.id);
+
+    if (eligibleIds.length === 0) {
+      showToast('No hay órdenes archivadas con número de O.T. para controlar.', 'warning');
+      return;
+    }
+
+    const res = await fetch('/api/orders/verify-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderIds: eligibleIds })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al iniciar control');
+
+    showToast(`✅ Control iniciado para ${data.queued || eligibleIds.length} orden(es) del historial. El agente las verificará en Taxes en breve.`, 'success');
+    
+    let polls = 0;
+    const pollInterval = setInterval(() => {
+      polls++;
+      fetchOrders();
+      if (polls >= 12) clearInterval(pollInterval);
+    }, 5000);
+
+  } catch (err) {
+    showToast('Error de conexión al iniciar control: ' + err.message, 'danger');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons" style="font-size:16px;">fact_check</span> Ejecutar Control de Historial Ahora';
+    }
+  }
+}
+
