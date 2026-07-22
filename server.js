@@ -418,6 +418,20 @@ app.post('/api/orders/bulk', (req, res) => {
   }
 });
 
+// TEMPORARY RESTORE DATABASE ENDPOINT
+app.post('/api/restore-database-safety-xyz', (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'db.json');
+    fs.writeFileSync(DB_PATH, JSON.stringify(req.body, null, 2), 'utf8');
+    console.log('[Restore] Database restored from backup.');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Update a work order
 app.put('/api/orders/:id', (req, res) => {
   try {
