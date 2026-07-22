@@ -2727,13 +2727,13 @@ async function syncWorkOrder(orderId) {
 // 2b. AGENT VERIFICATION SYSTEM FOR OT TASKS
 async function verifyWorkOrderWithPage(page, orderId) {
   const order = db.getWorkOrderById(orderId);
-  if (!order || !order.taxesOrderNumber) {
-    console.log(`[Verify] Cannot verify: order not found or missing Taxes OT number.`);
+  if (!order) {
+    console.log(`[Verify] Cannot verify: order not found.`);
     return;
   }
   const settings = db.getSettings();
-  const otNumClean = String(order.taxesOrderNumber).replace(/^#/, '').trim();
-  console.log(`[Verify] Starting tasks-list verification for OT #${order.interno} (Taxes: ${otNumClean})...`);
+  const otNumClean = order.taxesOrderNumber ? String(order.taxesOrderNumber).replace(/^#/, '').trim() : String(order.interno).trim();
+  console.log(`[Verify] Starting tasks-list verification for OT #${order.interno} (Search term: ${otNumClean})...`);
 
   try {
     // 1. Navigate to tasks list
@@ -2880,6 +2880,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
         if (!taskTable) return [];
 
         const headers = Array.from(taskTable.querySelectorAll('th')).map(h => cleanText(h.textContent));
+        const otIdx = headers.findIndex(h => h === 'ot' || h.includes('orden') || h.includes('nro'));
         const empIdx = headers.findIndex(h => h.includes('tecnico') || h.includes('empleado'));
         const hrsIdx = headers.findIndex(h => h.includes('uni/hrs') || h.includes('horas') || h.includes('hs'));
         const descIdx = headers.findIndex(h => h.includes('descripcion') || h.includes('detalle'));
@@ -2891,19 +2892,32 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
         return rows.map((r, idx) => {
           const cells = Array.from(r.querySelectorAll('td')).map(c => c.textContent.trim());
-          
+          let capturedOt = '';
+          if (otIdx !== -1 && cells[otIdx]) {
+            const match = cells[otIdx].match(/(\d{4,})/);
+            if (match) capturedOt = match[1];
+          }
           return {
             rowIndex: idx,
+            capturedOt: capturedOt,
             employee: empIdx !== -1 ? cells[empIdx] : '',
             hours: hrsIdx !== -1 ? cells[hrsIdx] : '0',
             description: descIdx !== -1 ? cells[descIdx] : '',
-            realizada: realIdx !== -1 ? (cells[realIdx].toUpperCase().includes('FIN') ? 'SI' : 'NO') : 'NO'
+            realizada: realIdx !== -1 ? (cells[realIdx].toUpperCase().includes('FIN') || cells[realIdx].toUpperCase().includes('SI') ? 'SI' : 'NO') : 'NO'
           };
         });
       });
     };
 
     let tableTasks = await readTableTasks();
+    if (tableTasks.length > 0) {
+      const foundOt = tableTasks.find(t => t.capturedOt && t.capturedOt.length >= 4);
+      if (foundOt && (!order.taxesOrderNumber || order.taxesOrderNumber !== foundOt.capturedOt)) {
+        console.log(`[Verify-AutoCapture] Recovered Taxes OT number for order ${orderId} (Interno ${order.interno}): ${foundOt.capturedOt}`);
+        db.updateWorkOrder(orderId, { taxesOrderNumber: foundOt.capturedOt });
+        order.taxesOrderNumber = foundOt.capturedOt;
+      }
+    }
     const initialTableRowCount = tableTasks.length; // Save before loop mutates tableTasks
     console.log(`[Verify] Found ${tableTasks.length} tasks in Taxes table:`, JSON.stringify(tableTasks));
 
