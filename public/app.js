@@ -659,60 +659,11 @@ async function submitPreOrderCheck() {
     editOrder(existingOrder.id);
   } else {
     closePreOrderModal();
-    openNewOrderModal();
-    
-    const rodadoSelect = document.getElementById('form-rodado');
-    const rodadoOpt = findRodadoForInterno(interno);
-
-    if (isHerreria) {
-      if (rodadoOpt && rodadoSelect) {
-        rodadoSelect.value = rodadoOpt.value;
-        rodadoSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      } else if (rodadoSelect) {
-        rodadoSelect.value = "";
-        rodadoSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      if (rodadoSelect && rodadoSelect.rebuildSearchable) {
-        rodadoSelect.rebuildSearchable();
-      }
-      // Interno Unidad stays a text input — reset/clear it
-      const internoText = document.getElementById('form-interno-text');
-      if (internoText) internoText.value = "";
-    } else {
-      // Auto-select the rodado based on the interno
-      if (rodadoOpt && rodadoSelect) {
-        rodadoSelect.value = rodadoOpt.value;
-        rodadoSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      } else if (rodadoSelect) {
-        rodadoSelect.value = "";
-        rodadoSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      if (rodadoSelect && rodadoSelect.rebuildSearchable) {
-        rodadoSelect.rebuildSearchable();
-      }
-      
-      // Auto-populate interno and clasificacion
-      const internoSelect = document.getElementById('form-interno');
-      if (internoSelect) {
-        let optionExists = Array.from(internoSelect.options).some(opt => opt.value === interno);
-        if (!optionExists && interno) {
-          const newOpt = document.createElement('option');
-          newOpt.value = interno;
-          newOpt.textContent = interno;
-          internoSelect.appendChild(newOpt);
-        }
-        internoSelect.value = interno || "";
-        if (internoSelect.rebuildSearchable) {
-          internoSelect.rebuildSearchable();
-        }
-      }
-    }
-    
-    document.getElementById('form-clasificacion').value = clasificacion;
+    openNewOrderModal(interno, clasificacion);
   }
 }
 
-function openNewOrderModal() {
+function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
   currentEditingOrderId = null;
   document.getElementById('modal-order-title').textContent = "Nueva Orden de Trabajo";
   
@@ -725,9 +676,20 @@ function openNewOrderModal() {
   // Set up input vs select based on user sector
   setupAllFieldsForSector();
 
+  const userSector = getSectorByUsername(localStorage.getItem('currentUserUsername'));
+  const isHerreria = (userSector === 'Herrería');
+  const cleanInterno = String(presetInterno || '').trim();
+  const rodadoOpt = findRodadoForInterno(cleanInterno);
+
+  // Auto-select matching Rodado
   const rodadoSelect = document.getElementById('form-rodado');
   if (rodadoSelect) {
-    rodadoSelect.value = "";
+    if (rodadoOpt) {
+      rodadoSelect.value = rodadoOpt.value;
+      rodadoSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      rodadoSelect.value = "";
+    }
     if (rodadoSelect.rebuildSearchable) {
       rodadoSelect.rebuildSearchable();
     }
@@ -737,12 +699,24 @@ function openNewOrderModal() {
     rodadoText.value = "";
   }
   
+  // Auto-populate Interno
   const internoSelect = document.getElementById('form-interno');
   if (internoSelect) {
     if (cachedInternoOptions && cachedInternoOptions.length > 0) {
       populateSelect('form-interno', cachedInternoOptions, "Seleccionar Interno...");
     }
-    internoSelect.value = "";
+    if (cleanInterno) {
+      let optionExists = Array.from(internoSelect.options).some(opt => opt.value === cleanInterno);
+      if (!optionExists) {
+        const newOpt = document.createElement('option');
+        newOpt.value = cleanInterno;
+        newOpt.textContent = cleanInterno;
+        internoSelect.appendChild(newOpt);
+      }
+      internoSelect.value = cleanInterno;
+    } else {
+      internoSelect.value = "";
+    }
     if (internoSelect.rebuildSearchable) {
       internoSelect.rebuildSearchable();
     }
@@ -750,7 +724,13 @@ function openNewOrderModal() {
   
   const internoText = document.getElementById('form-interno-text');
   if (internoText) {
-    internoText.value = "";
+    internoText.value = isHerreria ? cleanInterno : "";
+  }
+
+  // Auto-populate Clasificación
+  const clasificacionEl = document.getElementById('form-clasificacion');
+  if (clasificacionEl && presetClasificacion) {
+    clasificacionEl.value = presetClasificacion;
   }
   
   // Reset dates
