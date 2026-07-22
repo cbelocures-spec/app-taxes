@@ -694,12 +694,19 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
   const cleanInterno = String(presetInterno || '').trim();
   const rodadoOpt = findRodadoForInterno(cleanInterno);
 
-  // Auto-select matching Rodado
+  // 1. Populate Interno select options FIRST before setting any values
+  const internoSelect = document.getElementById('form-interno');
+  if (internoSelect) {
+    if (cachedInternoOptions && cachedInternoOptions.length > 0) {
+      populateSelect('form-interno', cachedInternoOptions, "Seleccionar Interno...");
+    }
+  }
+
+  // 2. Auto-select matching Rodado
   const rodadoSelect = document.getElementById('form-rodado');
   if (rodadoSelect) {
     if (rodadoOpt) {
       rodadoSelect.value = rodadoOpt.value;
-      rodadoSelect.dispatchEvent(new Event('change', { bubbles: true }));
     } else {
       rodadoSelect.value = "";
     }
@@ -712,12 +719,8 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
     rodadoText.value = "";
   }
   
-  // Auto-populate Interno
-  const internoSelect = document.getElementById('form-interno');
+  // 3. Auto-populate Interno value
   if (internoSelect) {
-    if (cachedInternoOptions && cachedInternoOptions.length > 0) {
-      populateSelect('form-interno', cachedInternoOptions, "Seleccionar Interno...");
-    }
     if (cleanInterno) {
       let optionExists = Array.from(internoSelect.options).some(opt => opt.value === cleanInterno);
       if (!optionExists) {
@@ -740,10 +743,10 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
     internoText.value = isHerreria ? cleanInterno : "";
   }
 
-  // Auto-populate Clasificación
+  // 4. Auto-populate Clasificación
   const clasificacionEl = document.getElementById('form-clasificacion');
-  if (clasificacionEl && presetClasificacion) {
-    clasificacionEl.value = presetClasificacion;
+  if (clasificacionEl) {
+    clasificacionEl.value = presetClasificacion || (isHerreria ? 'Herrería' : (userSector === 'Edilicio' ? 'Edilicio' : 'Correctivo'));
   }
   
   // Reset dates
