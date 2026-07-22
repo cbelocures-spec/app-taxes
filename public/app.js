@@ -661,7 +661,6 @@ async function submitPreOrderCheck() {
     closePreOrderModal();
     openNewOrderModal();
     
-    if (isHerreria) {
     const rodadoSelect = document.getElementById('form-rodado');
     const rodadoOpt = findRodadoForInterno(interno);
 
