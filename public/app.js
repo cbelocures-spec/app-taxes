@@ -446,20 +446,17 @@ function openPreOrderModal() {
   // Ensure classification options match the current selected sector tab
   updateClassificationSelectOptions();
 
-  // Reset the clasificacion select
+  // Set default classification (Correctivo for Taller, Herrería for Herrería, Edilicio for Edilicio)
   const clsEl = document.getElementById('pre-form-clasificacion');
   if (clsEl) {
-    clsEl.value = "";
-    if (clsEl.rebuildSearchable) {
-      clsEl.rebuildSearchable();
+    const currentUser = localStorage.getItem('currentUserUsername');
+    const userSector = getSectorByUsername(currentUser);
+    if (userSector === 'Herrería') {
+      clsEl.value = 'Herrería';
+    } else if (userSector === 'Edilicio') {
+      clsEl.value = 'Edilicio';
     } else {
-      const wrapper = clsEl.closest ? clsEl.closest('.searchable-select-container') : null;
-      if (wrapper) {
-        const searchInput = wrapper.querySelector('.searchable-select-search-input');
-        if (searchInput) searchInput.value = '';
-        const labelSpan = wrapper.querySelector('.trigger-label');
-        if (labelSpan) labelSpan.textContent = 'Seleccionar Clasificación...';
-      }
+      clsEl.value = 'Correctivo';
     }
   }
 
@@ -1296,15 +1293,12 @@ async function fetchCatalogs() {
     populateSelect('form-rodado', data.rodados, "Seleccionar Rodado...");
     populateSelect('form-responsable', data.responsables, "Seleccionar Responsable...");
 
-    // Extract unique internal numbers from rodados catalog, active orders, and complete range 1-250
+    // Extract unique internal numbers from rodados catalog and active orders
     const rawInternos = (data.rodados || []).map(r => String(r.interno || '').trim()).filter(Boolean);
     if (Array.isArray(activeOrders)) {
       activeOrders.forEach(o => {
         if (o.interno) rawInternos.push(String(o.interno).trim());
       });
-    }
-    for (let i = 1; i <= 250; i++) {
-      rawInternos.push(String(i));
     }
 
     const uniqueInternos = [...new Set(rawInternos)].filter(Boolean);
