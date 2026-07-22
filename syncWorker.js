@@ -3655,9 +3655,20 @@ async function startWorker() {
 
         if (brokenOrder) {
           console.log(`[AutoFix] Found order needing retry (ID: ${brokenOrder.id}, syncStatus=${brokenOrder.syncStatus}, verifiedStatus=${brokenOrder.verifiedStatus}). Retrying full reconciliation...`);
-          // Use the full sync/reconcile function (not just verify) so it can also
-          // create tasks that are completely missing on Taxes, not just fix field mismatches.
           await syncWorkOrder(brokenOrder.id);
+        } else {
+          // Check for archived history orders that need verification control
+          const archivedToVerify = orders.find(o => {
+            if (!o.taxesOrderNumber || !o.archived || o.deleted) return false;
+            return (o.verifiedStatus === 'idle' || !o.verifiedStatus) ||
+                   (o.verifiedStatus === 'error' && (o.verifiedCount || 0) < MAX_AUTO_VERIFY_RETRIES &&
+                    (!o.lastVerifyAttempt || (Date.now() - new Date(o.lastVerifyAttempt).getTime()) >= AUTO_VERIFY_COOLDOWN_MS));
+          });
+
+          if (archivedToVerify) {
+            console.log(`[AutoVerify-Agent] Found archived order in Historial needing verification (ID: ${archivedToVerify.id}, OT: ${archivedToVerify.taxesOrderNumber}). Running control agent...`);
+            await verifyWorkOrder(archivedToVerify.id);
+          }
         }
       }
     } catch (e) {
