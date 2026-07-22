@@ -9412,3 +9412,72 @@ async function reverifyOrderFromModal() {
   }
 }
 
+async function openDeletedLogModal() {
+  const modal = document.getElementById('deleted-log-modal');
+  const container = document.getElementById('deleted-log-table-container');
+  if (!modal || !container) return;
+
+  container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Cargando registros de auditoría...</div>';
+  modal.classList.add('open');
+
+  try {
+    const res = await fetch('/api/orders/deleted-log');
+    if (!res.ok) throw new Error('Error al cargar registros');
+    const logs = await res.json();
+
+    if (!logs || logs.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:30px;color:var(--text-muted);">
+          <span class="material-icons" style="font-size:36px;opacity:0.5;">assignment_turned_in</span>
+          <p style="margin-top:8px;font-size:13px;">No hay registros de órdenes borradas por el agente aún.</p>
+        </div>
+      `;
+      return;
+    }
+
+    let html = `
+      <table class="data-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:var(--bg-secondary);text-align:left;border-bottom:2px solid var(--border-color);">
+            <th style="padding:8px 10px;">Fecha Borrado</th>
+            <th style="padding:8px 10px;">N° O.T.</th>
+            <th style="padding:8px 10px;">Interno</th>
+            <th style="padding:8px 10px;">Empleado</th>
+            <th style="padding:8px 10px;">Horas</th>
+            <th style="padding:8px 10px;">Descripción</th>
+            <th style="padding:8px 10px;text-align:center;">Taxes Realizada</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    logs.slice().reverse().forEach(item => {
+      const fechaStr = item.deletedAt ? new Date(item.deletedAt).toLocaleString('es-AR') : 'N/A';
+      html += `
+        <tr style="border-bottom:1px solid var(--border-color);">
+          <td style="padding:8px 10px;white-space:nowrap;">${fechaStr}</td>
+          <td style="padding:8px 10px;font-weight:600;color:#0ea5e9;">${item.numeroOrden || item.id || 'N/A'}</td>
+          <td style="padding:8px 10px;">${item.interno || 'N/A'}</td>
+          <td style="padding:8px 10px;">${item.empleado || 'N/A'}</td>
+          <td style="padding:8px 10px;">${item.horas ? item.horas + ' hs' : '0 hs'}</td>
+          <td style="padding:8px 10px;max-width:250px;word-break:break-word;">${item.descripcion || 'N/A'}</td>
+          <td style="padding:8px 10px;text-align:center;">
+            <span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px;">SI</span>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('Error fetching deleted log:', err);
+    container.innerHTML = `<div style="color:var(--danger-color);padding:16px;">Error al cargar registros: ${err.message}</div>`;
+  }
+}
+
+function closeDeletedLogModal() {
+  const modal = document.getElementById('deleted-log-modal');
+  if (modal) modal.classList.remove('open');
+}
+
