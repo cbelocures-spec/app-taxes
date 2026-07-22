@@ -547,6 +547,7 @@ app.patch('/api/orders/:id/tasks/:taskId', (req, res) => {
     const updatedTasks = [...order.tasks];
     updatedTasks[taskIdx] = { ...updatedTasks[taskIdx], ...updates };
     db.updateWorkOrder(req.params.id, { tasks: updatedTasks });
+    checkAndSendInsumosToSheet(order, updatedTasks, order.responsable, order.interno);
 
     console.log(`[PATCH task] Order ${req.params.id} / Task ${req.params.taskId} updated:`, updates);
     res.json({ success: true, task: updatedTasks[taskIdx] });
@@ -1874,21 +1875,21 @@ async function checkAndSendInsumosToSheet(existingOrder, updatedTasks, superviso
     return;
   }
 
-  // Find newly finalized tasks
-  const newlyFinalized = (updatedTasks || []).filter(t => {
-    if (t.status !== "Finalizada") return false;
-    if (!existingOrder) return true;
-    const oldTask = (existingOrder.tasks || []).find(ot => ot.id === t.id);
-    return !oldTask || oldTask.status !== "Finalizada";
-  });
-
-  if (newlyFinalized.length === 0) return;
-
   try {
     const catalogs = db.getCatalogs();
+    const tasks = updatedTasks || [];
 
-    for (const task of newlyFinalized) {
+    for (const task of tasks) {
       if (!task.insumos || !task.insumos.trim()) continue;
+
+      if (!Array.isArray(task.sentInsumos)) {
+        task.sentInsumos = [];
+      }
+
+      const parsedInsumos = parseInsumosString(task.insumos);
+      const unsentInsumos = parsedInsumos.filter(item => !task.sentInsumos.includes(`${item.insumo}:${item.cantidad}`));
+
+      if (unsentInsumos.length === 0) continue;
 
       // Resolve mechanic name
       const mechanicObj = (catalogs.empleados || []).find(e => String(e.value) === String(task.empleado));
@@ -1928,12 +1929,10 @@ async function checkAndSendInsumosToSheet(existingOrder, updatedTasks, superviso
         }
       }
 
-      // Parse the insumos string
-      const parsedInsumos = parseInsumosString(task.insumos);
-      const otNumber = (existingOrder && existingOrder.taxesOrderNumber) ? existingOrder.taxesOrderNumber : "Sin Sincronizar";
+      const otNumber = (existingOrder && existingOrder.taxesOrderNumber) ? existingOrder.taxesOrderNumber : (existingOrder && existingOrder.id ? existingOrder.id : "Sin Sincronizar");
       const interno = orderInterno || (existingOrder ? existingOrder.interno : '');
 
-      for (const item of parsedInsumos) {
+      for (const item of unsentInsumos) {
         const queryParams = new URLSearchParams({
           action: 'addInsumo',
           interno: interno,
@@ -1951,10 +1950,15 @@ async function checkAndSendInsumosToSheet(existingOrder, updatedTasks, superviso
           const res = await fetch(updateUrl);
           const text = await res.text();
           console.log(`[Google Sheets Insumos] Apps Script Response (Status ${res.status}):`, text);
+          task.sentInsumos.push(`${item.insumo}:${item.cantidad}`);
         } catch (err) {
           console.error("[Google Sheets Insumos] Error calling Apps Script:", err.message);
         }
       }
+    }
+
+    if (existingOrder && existingOrder.id) {
+      db.updateWorkOrder(existingOrder.id, { tasks: tasks });
     }
   } catch (error) {
     console.error("Error in checkAndSendInsumosToSheet:", error);
