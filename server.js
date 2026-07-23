@@ -1203,7 +1203,7 @@ app.post('/api/bulk/parse-planilla', async (req, res) => {
 
     console.log(`[Gemini OCR] Sending image (${(base64Data.length/1024/1024).toFixed(2)} MB) to Google Gemini API...`);
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const promptText = `Analiza esta imagen que es una foto de una planilla física de taller donde se registran mantenimientos y consumo de insumos de vehículos (camiones).
 La planilla tiene columnas para el número de "Interno" (identificador del vehículo) y columnas para los insumos o notas (por ejemplo: "Refrigerante", "Aceite Motor", "Caja", "Diferencial", "Novedades", "Observaciones", "Notas", etc.).
@@ -1335,7 +1335,7 @@ app.post('/api/assistant/chat', async (req, res) => {
       return `Fecha: ${h.fecha || h.date || '-'}, Interno: ${h.interno || '-'}, Tipo: ${h.tipo || '-'}, Datos: ${h.datos || '-'}`;
     }).join('\n');
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     // System instruction / prompt prefix
     const systemPrompt = `Sos "Hugo AI", el asistente inteligente de mantenimiento de taller de Contenedores Hugo.
