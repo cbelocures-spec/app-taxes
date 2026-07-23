@@ -1027,6 +1027,7 @@ app.get('/api/settings', (req, res) => {
       preventivoScriptUrl: settings.preventivoScriptUrl || "",
       parteTallerScriptUrl: settings.parteTallerScriptUrl || "",
       geminiApiKey: settings.geminiApiKey ? "••••••••••••" : "",
+      claudeApiKey: settings.claudeApiKey ? "••••••••••••" : "",
       catalogSyncStatus: catalogStatus,
       catalogSyncError: settings.catalogSyncError || null,
       isSupervisor: !!isMainSupervisor
@@ -1041,7 +1042,7 @@ app.get('/api/settings', (req, res) => {
 // Save connection settings
 app.post('/api/settings', (req, res) => {
   try {
-    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, geminiApiKey } = req.body;
+    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, geminiApiKey, claudeApiKey } = req.body;
     const requestingUser = req.headers['x-user-username'] || null;
     const current = db.getSettings();
     
@@ -1061,10 +1062,17 @@ app.post('/api/settings', (req, res) => {
 
     if (geminiApiKey !== undefined) {
       if (geminiApiKey === "••••••••••••") {
-        // preserve current
         updates.geminiApiKey = current.geminiApiKey;
       } else {
         updates.geminiApiKey = geminiApiKey;
+      }
+    }
+
+    if (claudeApiKey !== undefined) {
+      if (claudeApiKey === "••••••••••••") {
+        updates.claudeApiKey = current.claudeApiKey;
+      } else {
+        updates.claudeApiKey = claudeApiKey;
       }
     }
 
@@ -1286,8 +1294,9 @@ app.post('/api/assistant/chat', async (req, res) => {
 
     const settings = db.getSettings();
     const apiKey = settings.geminiApiKey;
-    if (!apiKey) {
-      return res.status(400).json({ error: "La Clave de API de Google Gemini no está configurada. Por favor, ve a Ajustes e ingrésala." });
+    const claudeApiKey = settings.claudeApiKey;
+    if (!apiKey && !claudeApiKey) {
+      return res.status(400).json({ error: "La Clave de API de Google Gemini o Anthropic Claude no está configurada. Por favor, ve a Ajustes e ingrésala." });
     }
 
     const scriptUrl = settings.preventivoScriptUrl;
@@ -1335,9 +1344,8 @@ app.post('/api/assistant/chat', async (req, res) => {
       return `Fecha: ${h.fecha || h.date || '-'}, Interno: ${h.interno || '-'}, Tipo: ${h.tipo || '-'}, Datos: ${h.datos || '-'}`;
     }).join('\n');
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    let finalResponseText = "";
 
-    // System instruction / prompt prefix
     const systemPrompt = `Sos "Hugo AI", el asistente inteligente de mantenimiento de taller de Contenedores Hugo.
 Tu objetivo es ayudar al personal respondiendo preguntas sobre auxilios, reparaciones y cambios de repuestos de los vehículos basándote únicamente en el historial oficial de la empresa.
 
@@ -1350,49 +1358,92 @@ Instrucciones:
 3. Si el usuario pregunta por "auxilios" o "reparaciones", busca en la columna de Datos o Tipo las palabras relacionadas.
 4. Si no encuentras información sobre la consulta, indícalo amablemente sin inventar datos.`;
 
-    // Map conversation history to Gemini API format
-    const contents = [];
-    
-    // Add conversation history if present
-    if (history && Array.isArray(history)) {
-      history.forEach(h => {
-        contents.push({
-          role: h.role === "user" ? "user" : "model",
-          parts: [{ text: h.text }]
+    if (claudeApiKey) {
+      // Use Anthropic Claude API (claude-3-5-haiku-20241022 is extremely fast and capable)
+      const claudeUrl = "https://api.anthropic.com/v1/messages";
+      const messages = [];
+      if (history && Array.isArray(history)) {
+        history.forEach(h => {
+          messages.push({
+            role: h.role === "user" ? "user" : "assistant",
+            content: h.text
+          });
         });
+      }
+      messages.push({
+        role: "user",
+        content: message
       });
+
+      const payload = {
+        model: "claude-3-5-haiku-20241022",
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: messages
+      };
+
+      const claudeResponse = await fetch(claudeUrl, {
+        method: "POST",
+        headers: {
+          "x-api-key": claudeApiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!claudeResponse.ok) {
+        const errText = await claudeResponse.text();
+        console.error("[Claude Chat] API Error:", errText);
+        throw new Error(`Claude API returned status ${claudeResponse.status}: ${errText}`);
+      }
+
+      const result = await claudeResponse.json();
+      finalResponseText = result?.content?.[0]?.text || "";
+    } else {
+      // Use Google Gemini API
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const contents = [];
+      if (history && Array.isArray(history)) {
+        history.forEach(h => {
+          contents.push({
+            role: h.role === "user" ? "user" : "model",
+            parts: [{ text: h.text }]
+          });
+        });
+      }
+
+      const userPrompt = `${systemPrompt}\n\nPregunta del usuario: ${message}`;
+      contents.push({
+        role: "user",
+        parts: [{ text: userPrompt }]
+      });
+
+      const payload = {
+        contents: contents
+      };
+
+      const geminiResponse = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!geminiResponse.ok) {
+        const errText = await geminiResponse.text();
+        console.error("[Gemini Chat] API Error:", errText);
+        throw new Error(`Google API returned status ${geminiResponse.status}: ${errText}`);
+      }
+
+      const result = await geminiResponse.json();
+      finalResponseText = result?.candidates?.[0]?.content?.parts?.[0]?.text || "";
     }
 
-    // Append system instruction and user prompt
-    const userPrompt = `${systemPrompt}\n\nPregunta del usuario: ${message}`;
-    contents.push({
-      role: "user",
-      parts: [{ text: userPrompt }]
-    });
-
-    const payload = {
-      contents: contents
-    };
-
-    const geminiResponse = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text();
-      console.error("[Gemini Chat] API Error:", errText);
-      throw new Error(`Google API returned status ${geminiResponse.status}: ${errText}`);
-    }
-
-    const result = await geminiResponse.json();
-    const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!responseText) {
+    if (!finalResponseText) {
       throw new Error("No se recibió respuesta del asistente de IA.");
     }
 
-    res.json({ response: responseText.trim() });
+    res.json({ response: finalResponseText.trim() });
 
   } catch (error) {
     console.error("[Gemini Chat] Error:", error);

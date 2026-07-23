@@ -1065,6 +1065,8 @@ async function fetchSettings() {
     if (ptScriptInput) ptScriptInput.value = data.parteTallerScriptUrl || "";
     const geminiApiKeyInput = document.getElementById('set-gemini-api-key');
     if (geminiApiKeyInput) geminiApiKeyInput.value = data.geminiApiKey || "";
+    const claudeApiKeyInput = document.getElementById('set-claude-api-key');
+    if (claudeApiKeyInput) claudeApiKeyInput.value = data.claudeApiKey || "";
     
     isCurrentUserSupervisor = !!data.isSupervisor;
     const hoursSection = document.getElementById('supervisor-hours-section');
@@ -1096,6 +1098,7 @@ async function saveSettings(e) {
   const preventivoScriptUrl = document.getElementById('set-preventivo-script-url')?.value || '';
   const parteTallerScriptUrl = document.getElementById('set-partetaller-script-url')?.value || '';
   const geminiApiKey = document.getElementById('set-gemini-api-key')?.value || '';
+  const claudeApiKey = document.getElementById('set-claude-api-key')?.value || '';
   const currentUsername = localStorage.getItem('currentUserUsername') || '';
 
   try {
@@ -1105,7 +1108,7 @@ async function saveSettings(e) {
         'Content-Type': 'application/json',
         'x-user-username': currentUsername  // Tell server which user is saving
       },
-      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, geminiApiKey })
+      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, geminiApiKey, claudeApiKey })
     });
 
     if (!res.ok) {

@@ -350,12 +350,20 @@
           <input type="url" id="set-partetaller-script-url" placeholder="https://script.google.com/macros/s/.../exec" style="width: 100%;">
         </div>
         <div class="form-group">
-          <label for="set-gemini-api-key">Clave de API de Google Gemini (para Escaneo de Planillas)</label>
+          <label for="set-gemini-api-key">Clave de API de Google Gemini</label>
           <div class="password-wrapper" style="position: relative; width: 100%; display: block;">
             <input type="password" id="set-gemini-api-key" placeholder="AIzaSy..." style="padding-right: 40px; margin-bottom: 0;">
             <span class="material-icons password-toggle" onclick="togglePasswordVisibility('set-gemini-api-key')" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 6px; cursor: pointer; color: #3c4043 !important; user-select: none; z-index: 999 !important; font-size: 22px;">visibility_off</span>
           </div>
-          <small style="color: var(--text-muted); display: block; margin-top: 4px;">Necesaria para procesar de forma automática las fotos de las planillas manuscritas mediante Inteligencia Artificial.</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="set-claude-api-key">Clave de API de Anthropic Claude</label>
+          <div class="password-wrapper" style="position: relative; width: 100%; display: block;">
+            <input type="password" id="set-claude-api-key" placeholder="sk-ant-..." style="padding-right: 40px; margin-bottom: 0;">
+            <span class="material-icons password-toggle" onclick="togglePasswordVisibility('set-claude-api-key')" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 6px; cursor: pointer; color: #3c4043 !important; user-select: none; z-index: 999 !important; font-size: 22px;">visibility_off</span>
+          </div>
+          <small style="color: var(--text-muted); display: block; margin-top: 4px;">Configura al menos una clave de API (Gemini o Claude) para habilitar el asistente de chat Hugo AI y el escaneo de planillas.</small>
         </div>
         
         <button type="submit" class="btn btn-primary btn-block">
