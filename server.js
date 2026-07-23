@@ -1276,6 +1276,107 @@ Devuelve estrictamente un array JSON de objetos con el siguiente formato, sin bl
   }
 });
 
+// AI assistant chat endpoint
+app.post('/api/assistant/chat', async (req, res) => {
+  try {
+    const { message, history } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: "No se proporcionó ningún mensaje." });
+    }
+
+    const settings = db.getSettings();
+    const apiKey = settings.geminiApiKey;
+    if (!apiKey) {
+      return res.status(400).json({ error: "La Clave de API de Google Gemini no está configurada. Por favor, ve a Ajustes e ingrésala." });
+    }
+
+    const scriptUrl = settings.preventivoScriptUrl;
+    if (!scriptUrl) {
+      return res.status(400).json({ error: "URL del script de preventivos no configurada." });
+    }
+
+    // Fetch the history from Google Sheets
+    let sheetHistoryData = [];
+    try {
+      const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=getHistoryData`;
+      const response = await fetch(url);
+      if (response.ok) {
+        sheetHistoryData = await response.json();
+      }
+    } catch (err) {
+      console.error("Error fetching preventivos history for assistant:", err);
+    }
+
+    // Format a concise version of the history to keep context small and readable
+    const formattedHistory = sheetHistoryData.map(h => {
+      return `Fecha: ${h.fecha || h.date || '-'}, Interno: ${h.interno || '-'}, Tipo: ${h.tipo || '-'}, Datos: ${h.datos || '-'}`;
+    }).join('\n');
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+    // System instruction / prompt prefix
+    const systemPrompt = `Sos "Hugo AI", el asistente inteligente de mantenimiento de taller de Contenedores Hugo.
+Tu objetivo es ayudar al personal respondiendo preguntas sobre auxilios, reparaciones y cambios de repuestos de los vehículos basándote únicamente en el historial oficial de la empresa.
+
+Aquí está el historial completo de services extraído de Google Sheets:
+${formattedHistory || "No hay registros en el historial actualmente."}
+
+Instrucciones:
+1. Responde en español de forma concisa y amigable.
+2. Si el usuario te pregunta por la "última vez" de un repuesto o servicio para un vehículo específico, busca la fecha más reciente de ese evento en el historial.
+3. Si el usuario pregunta por "auxilios" o "reparaciones", busca en la columna de Datos o Tipo las palabras relacionadas.
+4. Si no encuentras información sobre la consulta, indícalo amablemente sin inventar datos.`;
+
+    // Map conversation history to Gemini API format
+    const contents = [];
+    
+    // Add conversation history if present
+    if (history && Array.isArray(history)) {
+      history.forEach(h => {
+        contents.push({
+          role: h.role === "user" ? "user" : "model",
+          parts: [{ text: h.text }]
+        });
+      });
+    }
+
+    // Append system instruction and user prompt
+    const userPrompt = `${systemPrompt}\n\nPregunta del usuario: ${message}`;
+    contents.push({
+      role: "user",
+      parts: [{ text: userPrompt }]
+    });
+
+    const payload = {
+      contents: contents
+    };
+
+    const geminiResponse = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      console.error("[Gemini Chat] API Error:", errText);
+      throw new Error(`Google API returned status ${geminiResponse.status}`);
+    }
+
+    const result = await geminiResponse.json();
+    const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!responseText) {
+      throw new Error("No se recibió respuesta del asistente de IA.");
+    }
+
+    res.json({ response: responseText.trim() });
+
+  } catch (error) {
+    console.error("[Gemini Chat] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get catalogs dropdown options
 app.get('/api/catalogs', (req, res) => {
   try {

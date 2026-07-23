@@ -9525,3 +9525,129 @@ async function verifyAllHistoryOrders() {
   }
 }
 
+// ============================================================
+// HUGO AI CHAT ASSISTANT FRONTEND LOGIC
+// ============================================================
+
+let hugoAIHistory = [];
+
+function toggleHugoAIChat(show) {
+  const modal = document.getElementById('hugo-ai-chat-modal');
+  if (modal) {
+    modal.style.display = show ? 'flex' : 'none';
+  }
+  if (show) {
+    const input = document.getElementById('hugo-ai-input-message');
+    if (input) input.focus();
+  }
+}
+
+async function sendHugoAIMessage() {
+  const input = document.getElementById('hugo-ai-input-message');
+  const messagesList = document.getElementById('hugo-ai-messages-list');
+  if (!input || !messagesList) return;
+
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Render user message
+  const userMsgDiv = document.createElement('div');
+  userMsgDiv.style.alignSelf = 'flex-end';
+  userMsgDiv.style.maxWidth = '85%';
+  userMsgDiv.style.background = '#2563eb';
+  userMsgDiv.style.color = '#fff';
+  userMsgDiv.style.padding = '12px 16px';
+  userMsgDiv.style.borderRadius = '14px 14px 2px 14px';
+  userMsgDiv.style.fontSize = '13.5px';
+  userMsgDiv.style.lineHeight = '1.5';
+  userMsgDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
+  userMsgDiv.style.fontFamily = "'Inter', sans-serif";
+  userMsgDiv.innerText = text;
+  messagesList.appendChild(userMsgDiv);
+
+  // Clear input
+  input.value = '';
+  messagesList.scrollTop = messagesList.scrollHeight;
+
+  // Render typing indicator
+  const typingDiv = document.createElement('div');
+  typingDiv.id = 'hugo-ai-typing-indicator';
+  typingDiv.style.alignSelf = 'flex-start';
+  typingDiv.style.maxWidth = '85%';
+  typingDiv.style.background = '#1e293b';
+  typingDiv.style.color = '#94a3b8';
+  typingDiv.style.padding = '10px 14px';
+  typingDiv.style.borderRadius = '12px 12px 12px 2px';
+  typingDiv.style.fontSize = '13px';
+  typingDiv.style.fontFamily = "'Inter', sans-serif";
+  typingDiv.innerText = 'Escribiendo...';
+  messagesList.appendChild(typingDiv);
+  messagesList.scrollTop = messagesList.scrollHeight;
+
+  try {
+    const response = await fetch('/api/assistant/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: text,
+        history: hugoAIHistory
+      })
+    });
+
+    // Remove typing indicator
+    const typingIndicator = document.getElementById('hugo-ai-typing-indicator');
+    if (typingIndicator) typingIndicator.remove();
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Error en el asistente');
+    }
+
+    // Render assistant response
+    const assistantMsgDiv = document.createElement('div');
+    assistantMsgDiv.style.alignSelf = 'flex-start';
+    assistantMsgDiv.style.maxWidth = '85%';
+    assistantMsgDiv.style.background = '#1e293b';
+    assistantMsgDiv.style.color = '#cbd5e1';
+    assistantMsgDiv.style.padding = '12px 16px';
+    assistantMsgDiv.style.borderRadius = '14px 14px 14px 2px';
+    assistantMsgDiv.style.fontSize = '13.5px';
+    assistantMsgDiv.style.lineHeight = '1.5';
+    assistantMsgDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
+    assistantMsgDiv.style.fontFamily = "'Inter', sans-serif";
+    
+    // Support basic Markdown newlines
+    assistantMsgDiv.innerHTML = data.response.replace(/\n/g, '<br>');
+    messagesList.appendChild(assistantMsgDiv);
+
+    // Save to conversation history
+    hugoAIHistory.push({ role: 'user', text: text });
+    hugoAIHistory.push({ role: 'model', text: data.response });
+    
+    // Limit local history to last 10 messages to save context overhead
+    if (hugoAIHistory.length > 10) {
+      hugoAIHistory = hugoAIHistory.slice(-10);
+    }
+
+  } catch (err) {
+    // Remove typing indicator
+    const typingIndicator = document.getElementById('hugo-ai-typing-indicator');
+    if (typingIndicator) typingIndicator.remove();
+
+    // Render error message
+    const errorDiv = document.createElement('div');
+    errorDiv.style.alignSelf = 'flex-start';
+    errorDiv.style.maxWidth = '85%';
+    errorDiv.style.background = '#7f1d1d';
+    errorDiv.style.color = '#fca5a5';
+    errorDiv.style.padding = '10px 14px';
+    errorDiv.style.borderRadius = '12px 12px 12px 2px';
+    errorDiv.style.fontSize = '13px';
+    errorDiv.style.fontFamily = "'Inter', sans-serif";
+    errorDiv.innerText = '⚠️ Error al conectar con Hugo AI: ' + err.message;
+    messagesList.appendChild(errorDiv);
+  }
+
+  messagesList.scrollTop = messagesList.scrollHeight;
+}
+
