@@ -3534,57 +3534,22 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
       // If order is in Historial (archived) and verified 100% correct in Taxes (REALIZ = SI, matched):
       // Record audit log entry and AUTO-DELETE from app!
-      if (order.archived) {
-        console.log(`[Verify-AutoDelete] Order ${orderId} (OT ${order.taxesOrderNumber || orderId}) is fully verified in Taxes. Recording audit log and auto-deleting from app...`);
-        
-        const catalogs = db.getCatalogs();
-        const tasksLog = (order.tasks || []).map(t => {
-          const empObj = (catalogs.empleados || []).find(e => String(e.value) === String(t.empleado));
-          return {
-            empleado: empObj ? empObj.label : (t.empleado || 'N/A'),
-            horasEstimadas: t.horasEstimadas || '0',
-            descripcion: t.descripcion || '',
-            realizada: 'SI'
-          };
-        });
-
-        db.saveDeletedOrderLog({
-          numeroOrden: order.taxesOrderNumber || order.id,
-          interno: order.interno,
-          empleado: tasksLog[0] ? tasksLog[0].empleado : 'N/A',
-          horas: tasksLog[0] ? tasksLog[0].horasEstimadas : '0',
-          descripcion: tasksLog[0] ? tasksLog[0].descripcion : 'N/A',
-          realizada: 'SI',
-          tasks: tasksLog,
-          deletedAt: new Date().toISOString(),
-          deletedBy: 'Agente de Control'
-        });
-
-        db.updateWorkOrder(orderId, {
-          deleted: true,
-          deletedAt: new Date().toISOString(),
-          verifiedStatus: 'success',
-          verifiedCount: count,
-          verifiedError: null,
-          lastVerifyAttempt: new Date().toISOString()
-        });
+      // Auto-deletion disabled by request: keep order in app without deleting
+      const shouldArchive = order.archived || order.estadoUnidad !== 'fuera_de_servicio';
+      const updatePayload = {
+        verifiedStatus: 'success',
+        verifiedCount: count,
+        verifiedError: null,
+        lastVerifyAttempt: new Date().toISOString()
+      };
+      if (shouldArchive) {
+        updatePayload.archived = true;
+        updatePayload.archivedAt = order.archivedAt || new Date().toISOString();
       } else {
-        const shouldArchive = order.estadoUnidad !== 'fuera_de_servicio';
-        const updatePayload = {
-          verifiedStatus: 'success',
-          verifiedCount: count,
-          verifiedError: null,
-          lastVerifyAttempt: new Date().toISOString()
-        };
-        if (shouldArchive) {
-          updatePayload.archived = true;
-          updatePayload.archivedAt = new Date().toISOString();
-        } else {
-          updatePayload.archived = false;
-          updatePayload.archivedAt = null;
-        }
-        db.updateWorkOrder(orderId, updatePayload);
-      }
+        updatePayload.archived = false;
+        updatePayload.archivedAt = null;
+      db.updateWorkOrder(orderId, updatePayload);
+    }
     }
 
   } catch (err) {
@@ -3706,18 +3671,7 @@ async function startWorker() {
           console.log(`[AutoFix] Found order needing retry (ID: ${brokenOrder.id}, syncStatus=${brokenOrder.syncStatus}, verifiedStatus=${brokenOrder.verifiedStatus}). Retrying full reconciliation...`);
           await syncWorkOrder(brokenOrder.id);
         } else {
-          // Check for archived history orders that need verification control
-          const archivedToVerify = orders.find(o => {
-            if (!o.archived || o.deleted) return false;
-            return (o.verifiedStatus === 'idle' || !o.verifiedStatus) ||
-                   (o.verifiedStatus === 'error' && (o.verifiedCount || 0) < MAX_AUTO_VERIFY_RETRIES &&
-                    (!o.lastVerifyAttempt || (Date.now() - new Date(o.lastVerifyAttempt).getTime()) >= AUTO_VERIFY_COOLDOWN_MS));
-          });
-
-          if (archivedToVerify) {
-            console.log(`[AutoVerify-Agent] Found archived order in Historial needing verification (ID: ${archivedToVerify.id}, OT: ${archivedToVerify.taxesOrderNumber}). Running control agent...`);
-            await verifyWorkOrder(archivedToVerify.id);
-          }
+          // Automatic verification control of archived history orders is disabled by request.
         }
       }
     } catch (e) {
