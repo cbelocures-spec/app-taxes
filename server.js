@@ -1383,7 +1383,7 @@ Instrucciones:
     if (!geminiResponse.ok) {
       const errText = await geminiResponse.text();
       console.error("[Gemini Chat] API Error:", errText);
-      throw new Error(`Google API returned status ${geminiResponse.status}`);
+      throw new Error(`Google API returned status ${geminiResponse.status}: ${errText}`);
     }
 
     const result = await geminiResponse.json();
