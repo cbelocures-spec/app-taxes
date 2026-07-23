@@ -1284,6 +1284,25 @@ Devuelve estrictamente un array JSON de objetos con el siguiente formato, sin bl
   }
 });
 
+app.get('/api/assistant/models', async (req, res) => {
+  try {
+    const settings = db.getSettings();
+    const claudeApiKey = settings.claudeApiKey;
+    if (!claudeApiKey) return res.json({ error: "No Claude Key configured." });
+    const response = await fetch("https://api.anthropic.com/v1/models", {
+      method: "GET",
+      headers: {
+        "x-api-key": claudeApiKey,
+        "anthropic-version": "2023-06-01"
+      }
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // AI assistant chat endpoint
 app.post('/api/assistant/chat', async (req, res) => {
   try {
