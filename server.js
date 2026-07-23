@@ -1307,8 +1307,31 @@ app.post('/api/assistant/chat', async (req, res) => {
       console.error("Error fetching preventivos history for assistant:", err);
     }
 
+    // Filter and optimize history to avoid hitting Gemini 429 rate limits (8466 rows is too large)
+    let optimizedHistory = [];
+    const match = message.match(/(?:interno|unidad|camion|nro|nº)?\s*(\d{1,3})\b/i);
+    if (match) {
+      const targetInterno = match[1];
+      // Get all records for this specific vehicle
+      const vehicleHistory = sheetHistoryData.filter(h => String(h.interno).trim() === String(targetInterno).trim());
+      // Also get the most recent 100 general records
+      const generalHistory = sheetHistoryData.slice(0, 100);
+      // Combine and deduplicate
+      const combined = [...vehicleHistory, ...generalHistory];
+      const seenKeys = new Set();
+      optimizedHistory = combined.filter(h => {
+        const key = `${h.fecha || h.date}-${h.interno}-${h.tipo}`;
+        if (seenKeys.has(key)) return false;
+        seenKeys.add(key);
+        return true;
+      });
+    } else {
+      // Default to most recent 250 records
+      optimizedHistory = sheetHistoryData.slice(0, 250);
+    }
+
     // Format a concise version of the history to keep context small and readable
-    const formattedHistory = sheetHistoryData.map(h => {
+    const formattedHistory = optimizedHistory.map(h => {
       return `Fecha: ${h.fecha || h.date || '-'}, Interno: ${h.interno || '-'}, Tipo: ${h.tipo || '-'}, Datos: ${h.datos || '-'}`;
     }).join('\n');
 
