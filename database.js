@@ -1,7 +1,29 @@
 const fs = require('fs');
 const path = require('path');
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'db.json');
+function resolveUsableDbPath() {
+  const bundledPath = path.join(__dirname, 'db.json');
+  const targetPath = process.env.DB_PATH;
+  if (!targetPath || targetPath === bundledPath) {
+    return bundledPath;
+  }
+  
+  try {
+    const dir = path.dirname(targetPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const testFile = path.join(dir, `.writable_test_${Date.now()}`);
+    fs.writeFileSync(testFile, 'ok');
+    fs.unlinkSync(testFile);
+    return targetPath;
+  } catch (err) {
+    console.warn(`[DB] Configured DB_PATH (${targetPath}) is not writable: ${err.message}. Falling back to bundled path: ${bundledPath}`);
+    return bundledPath;
+  }
+}
+
+const DB_PATH = resolveUsableDbPath();
 
 function normalizeEmail(email) {
   if (!email) return email;
