@@ -243,8 +243,28 @@ class LocalDB {
         return JSON.parse(JSON.stringify(DEFAULT_DB));
       }
 
-      // Migration: Normalize email usernames and createdBy fields in memory
       let migrated = false;
+
+      // Seeding safeguard: If workOrders is empty in disk DB, seed from bundled db.json!
+      if (!Array.isArray(parsed.workOrders) || parsed.workOrders.length === 0) {
+        const bundledPath = path.join(__dirname, 'db.json');
+        if (DB_PATH !== bundledPath && fs.existsSync(bundledPath)) {
+          try {
+            const bundledData = JSON.parse(fs.readFileSync(bundledPath, 'utf8'));
+            if (Array.isArray(bundledData.workOrders) && bundledData.workOrders.length > 0) {
+              console.log(`[DB] Seeding empty workOrders array from bundled db.json (${bundledData.workOrders.length} orders).`);
+              parsed.workOrders = bundledData.workOrders;
+              if (bundledData.activeMechanics) parsed.activeMechanics = bundledData.activeMechanics;
+              if (bundledData.users) parsed.users = { ...bundledData.users, ...parsed.users };
+              migrated = true;
+            }
+          } catch (seedErr) {
+            console.error("Failed to seed workOrders from bundled db.json:", seedErr.message);
+          }
+        }
+      }
+
+      // Migration: Normalize email usernames and createdBy fields in memory
       if (parsed.users) {
         const cleanUsers = {};
         for (const rawKey of Object.keys(parsed.users)) {
