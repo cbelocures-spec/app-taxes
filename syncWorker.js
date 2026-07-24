@@ -1124,14 +1124,28 @@ async function scrapeCatalogs(triggerUsername = null) {
     console.log("Navigating to Ordenes de Trabajo list page...");
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
     
-    console.log("Waiting for selects to load...");
-    await page.waitForSelector('select', { timeout: 10000 });
-    
+    console.log("Waiting for selects to load via polling...");
+    await delay(4000);
+    // Poll for select elements (avoids waitForSelector detached frame issues)
+    for (let i = 0; i < 20; i++) {
+      try {
+        const hasSelect = await page.evaluate(() => !!document.querySelector('select'));
+        if (hasSelect) { console.log("Select found after polling."); break; }
+      } catch (e) { /* still navigating */ }
+      await delay(500);
+    }
+
     console.log("Waiting for employee select options to populate...");
-    await page.waitForFunction(() => {
-      const selects = Array.from(document.querySelectorAll('select'));
-      return selects.some(s => s.options.length > 50);
-    }, { timeout: 15000 }).catch(e => console.log("Timeout waiting for employee select options: " + e.message));
+    for (let i = 0; i < 30; i++) {
+      try {
+        const hasOptions = await page.evaluate(() => {
+          const selects = Array.from(document.querySelectorAll('select'));
+          return selects.some(s => s.options.length > 50);
+        });
+        if (hasOptions) { console.log("Employee options populated."); break; }
+      } catch (e) { /* still navigating */ }
+      await delay(500);
+    }
 
     // Scrape all employees from the select that has the most options
     console.log("Scraping employees/responsibles from list page...");
@@ -1177,9 +1191,16 @@ async function scrapeCatalogs(triggerUsername = null) {
       throw new Error("No se pudo encontrar el botón NUEVO en la página de Órdenes de Trabajo.");
     }
 
-    // Wait for the modal / creation form to open
-    console.log("Waiting for modal to open...");
-    await page.waitForSelector('select[name="inv_ot_clasificacion_id"]', { timeout: 10000 });
+    // Wait for the modal / creation form to open via polling
+    console.log("Waiting for modal to open via polling...");
+    await delay(2000);
+    for (let i = 0; i < 20; i++) {
+      try {
+        const found = await page.evaluate(() => !!document.querySelector('select[name="inv_ot_clasificacion_id"]'));
+        if (found) { console.log('Modal select found.'); break; }
+      } catch (e) { /* navigating */ }
+      await delay(500);
+    }
 
     // Click AGREGAR TAREA
     console.log("Clicking AGREGAR TAREA...");
@@ -1189,15 +1210,28 @@ async function scrapeCatalogs(triggerUsername = null) {
       if (addBtn) addBtn.click();
     });
     
-    // Wait for task card to appear
-    console.log("Waiting for task card to appear...");
-    await page.waitForSelector('select[name="syj_centro_costo_id_0"]', { timeout: 10000 });
+    // Wait for task card to appear via polling
+    console.log("Waiting for task card to appear via polling...");
+    await delay(2000);
+    for (let i = 0; i < 20; i++) {
+      try {
+        const found = await page.evaluate(() => !!document.querySelector('select[name="syj_centro_costo_id_0"]'));
+        if (found) { console.log('CC select found.'); break; }
+      } catch (e) { /* navigating */ }
+      await delay(500);
+    }
 
-    console.log("Waiting for Centro de Costo options to populate...");
-    await page.waitForFunction(() => {
-      const ccSelect = document.querySelector('select[name="syj_centro_costo_id_0"]');
-      return ccSelect && ccSelect.options.length > 1;
-    }, { timeout: 10000 }).catch(e => console.log("Timeout waiting for CC options: " + e.message));
+    console.log("Waiting for Centro de Costo options to populate via polling...");
+    for (let i = 0; i < 20; i++) {
+      try {
+        const ready = await page.evaluate(() => {
+          const ccSelect = document.querySelector('select[name="syj_centro_costo_id_0"]');
+          return ccSelect && ccSelect.options.length > 1;
+        });
+        if (ready) { console.log('CC options populated.'); break; }
+      } catch (e) { /* navigating */ }
+      await delay(500);
+    }
 
     // Scrape Centros de Costo from the newly added task card
     console.log("Scraping Centros de Costo from task card...");
