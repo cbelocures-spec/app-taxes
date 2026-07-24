@@ -764,13 +764,13 @@ app.post('/api/orders/retry/:id', async (req, res) => {
     console.log(`[Permission Audit - Sync Retry] Requester: "${requester}", Resolved Sector: "${sector}", Order Cls: "${existingCls}"`);
     const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
     if (!isPaniol) {
-      if (sector === 'Herrería' && existingCls !== 'Herrería') {
+      if (sector === 'Herrería' && !isHerreria(existingCls)) {
         return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
       }
-      if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
+      if (sector === 'Edilicio' && !isEdilicio(existingCls)) {
         return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
       }
-      if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
+      if (sector === 'Taller' && (isHerreria(existingCls) || isEdilicio(existingCls))) {
         return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
       }
     }
