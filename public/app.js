@@ -3198,7 +3198,8 @@ function calculateTotalElapsedSeconds(timerHistory, timerStart) {
     });
   }
   if (timerStart !== null && timerStart > 0) {
-    totalMs += (Date.now() - timerStart);
+    const elapsedMs = Date.now() - timerStart;
+    totalMs += Math.min(elapsedMs, 43200000); // Cap active timer to max 12 hours (43,200,000 ms)
   }
   return Math.max(0, Math.floor(totalMs / 1000));
 }
@@ -6497,7 +6498,7 @@ function getEmployeeTotalHours(employeeValue) {
           const timerKey = `timer_start_${card.id}`;
           const timerStartVal = localStorage.getItem(timerKey) ? parseInt(localStorage.getItem(timerKey)) : null;
           if (timerStartVal) {
-            const elapsedMs = Date.now() - timerStartVal;
+            const elapsedMs = Math.min(Date.now() - timerStartVal, 43200000);
             totalMinutes += elapsedMs / (1000 * 60);
           }
         }
@@ -6524,7 +6525,7 @@ function getEmployeeTotalHours(employeeValue) {
         totalMinutes += hmmToMinutes(savedHours);
         
         if (task.timerStart !== null && task.timerStart > 0) {
-          const elapsedMs = Date.now() - task.timerStart;
+          const elapsedMs = Math.min(Date.now() - task.timerStart, 43200000);
           totalMinutes += elapsedMs / (1000 * 60);
         }
       }
@@ -6591,7 +6592,7 @@ function getEmployeeTasksDetailsToday(employeeValue) {
           const timerStartVal = localStorage.getItem(timerKey) ? parseInt(localStorage.getItem(timerKey)) : null;
           let runningMins = 0;
           if (timerStartVal) {
-            runningMins = (Date.now() - timerStartVal) / (1000 * 60);
+            runningMins = Math.min((Date.now() - timerStartVal) / (1000 * 60), 720);
           }
 
           const descEl = card.querySelector('.task-desc');
@@ -6628,7 +6629,7 @@ function getEmployeeTasksDetailsToday(employeeValue) {
         const savedHours = parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0;
         let runningMins = 0;
         if (task.timerStart !== null && task.timerStart > 0) {
-          runningMins = (Date.now() - task.timerStart) / (1000 * 60);
+          runningMins = Math.min((Date.now() - task.timerStart) / (1000 * 60), 720);
         }
         
         const totalMinsForTask = hmmToMinutes(savedHours) + runningMins;
@@ -6647,114 +6648,13 @@ function getEmployeeTasksDetailsToday(employeeValue) {
 }
 
 function checkTimerThresholds(taskId, startTime) {
-  const info = getTaskInfoForAlert(taskId);
-  if (!info || !info.empleadoValue) return;
-
-  const employeeValue = info.empleadoValue;
-  const totalMinutes = getEmployeeTotalHours(employeeValue);
-  const totalHours = totalMinutes / 60;
-
-  // Prevent opening overlapping modals
-  const modal = document.getElementById('supervisor-auth-modal');
-  if (modal && modal.classList.contains('open')) {
-    if (currentAlertTaskId === taskId) {
-      return;
-    }
-    return;
-  }
-
-  const dateStr = getTodayDateString();
-  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
-
-  if (totalHours >= 8 && totalHours < 12) {
-    const warnedKey = `warned_8h_${employeeValue}_${taskId}_${dateStr}`;
-    if (localStorage.getItem(warnedKey) !== 'true') {
-      localStorage.setItem(warnedKey, 'true');
-      showSupervisorAuthModal(taskId, 8, elapsedSeconds, totalMinutes);
-    }
-  } else if (totalHours >= 12) {
-    const authKey = `authorized_12h_${employeeValue}_${taskId}_${dateStr}`;
-    if (localStorage.getItem(authKey) !== 'true') {
-      showSupervisorAuthModal(taskId, 12, elapsedSeconds, totalMinutes);
-    }
-  }
+  // Alert modal disabled per user request
+  return;
 }
 
 function showSupervisorAuthModal(taskId, hoursThreshold, elapsedSeconds, totalMinutes) {
-  const info = getTaskInfoForAlert(taskId);
-  if (!info) return;
-
-  currentAlertTaskId = taskId;
-
-  const modal = document.getElementById('supervisor-auth-modal');
-  const titleEl = document.getElementById('supervisor-auth-title');
-  const msgEl = document.getElementById('supervisor-auth-message');
-  const headerEl = document.getElementById('supervisor-auth-header');
-  const btnAuth = document.getElementById('btn-supervisor-authorize');
-
-  if (!modal || !titleEl || !msgEl || !headerEl || !btnAuth) return;
-
-  const formattedSessionTime = formatElapsedSecondsToHMS(elapsedSeconds);
-  const totalHmm = minutesToHmm(Math.round(totalMinutes));
-  const formattedTotalTime = formatDecimalHours(totalHmm);
-
-  const tasksDetails = getEmployeeTasksDetailsToday(info.empleadoValue);
-  let tasksHtml = '';
-  if (tasksDetails.length > 0) {
-    tasksHtml = `
-      <div style="margin-top: 10px; font-weight: bold; font-size: 12px; color: var(--text-color);">Detalle de tareas de hoy:</div>
-      <ul style="margin: 6px 0 0 0; padding-left: 20px; font-size: 12px; max-height: 120px; overflow-y: auto; line-height: 1.5;">
-        ${tasksDetails.map(t => `
-          <li style="margin-bottom: 4px;">
-            <strong>${t.rodado}</strong> (Int. ${t.interno}): ${t.descripcion} <span style="color: var(--primary); font-weight: 600;">(${t.durationFormatted})</span>
-          </li>
-        `).join('')}
-      </ul>
-    `;
-  }
-
-  if (hoursThreshold === 8) {
-    headerEl.style.backgroundColor = '#f59e0b'; // warning orange
-    titleEl.innerHTML = `<span class="material-icons" style="color: white;">warning</span> Advertencia de Tiempo (8h+)`;
-    msgEl.innerHTML = `
-      <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 12px; border-radius: 4px; color: #b45309; font-weight: bold;">
-        Advertencia de Tiempo Excedido
-      </div>
-      <p>El operario <strong>${info.empleado}</strong> ha superado las <strong>8 horas acumuladas</strong> de trabajo hoy:</p>
-      <div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 13px; line-height: 1.6;">
-        <div><strong>Operario:</strong> ${info.empleado}</div>
-        <div style="font-weight: bold; color: #d97706; font-size: 14px; margin-top: 4px;">Tiempo Total Acumulado Hoy: ${formattedTotalTime}</div>
-        ${tasksHtml}
-      </div>
-    `;
-    btnAuth.textContent = "Entendido";
-    btnAuth.onclick = () => {
-      closeSupervisorAuthModal();
-    };
-  } else {
-    headerEl.style.backgroundColor = '#ef4444'; // danger red
-    titleEl.innerHTML = `<span class="material-icons" style="color: white;">error</span> Alerta de Límite (12h+)`;
-    msgEl.innerHTML = `
-      <div style="background: #fee2e2; border-left: 4px solid #ef4444; padding: 12px; margin-bottom: 12px; border-radius: 4px; color: #991b1b; font-weight: bold;">
-        Límite de 12 Horas Alcanzado
-      </div>
-      <p>El operario <strong>${info.empleado}</strong> ha alcanzado o superado las <strong>12 horas acumuladas</strong> de trabajo hoy:</p>
-      <div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 13px; line-height: 1.6;">
-        <div><strong>Operario:</strong> ${info.empleado}</div>
-        <div style="font-weight: bold; color: #dc2626; font-size: 14px; margin-top: 4px;">Tiempo Total Acumulado Hoy: ${formattedTotalTime}</div>
-        ${tasksHtml}
-      </div>
-      <p style="margin-top: 12px; font-size: 13px; color: var(--text-muted);">
-        El cronómetro no puede continuar sin la autorización expresa del supervisor.
-      </p>
-    `;
-    btnAuth.textContent = "Autorizar Continuar";
-    btnAuth.onclick = () => {
-      approveSupervisorAuth(taskId);
-    };
-  }
-
-  modal.classList.add('open');
+  // Alert modal disabled per user request
+  return;
 }
 
 function closeSupervisorAuthModal() {
