@@ -8874,13 +8874,20 @@ function renderParteTallerDashboard(state) {
       : fueraDeServicio.map(item => {
           const internoPT = String(item.interno || '');
           const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
-          return `<div class="pt-mobile-card">
-            <div class="pt-mobile-card-header">
-              <div><strong style="font-size:15px;">${internoPT}</strong>${item.tipo ? `<br><span style="font-size:12px;color:var(--text-muted);">${item.tipo}</span>` : ''}</div>
+          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
               ${getDiasParadoHtml(item, desde)}
             </div>
-            <div class="pt-mobile-card-row"><span>Desde</span><strong>${desde}</strong></div>
-            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">${getOrdenBtnHtml(internoPT)} ${getEditBtnHtml(internoPT,'fuera_de_servicio')}</div>
+            <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>Ingreso: <strong>${desde}</strong></span></div>
+            <div style="margin:10px 0; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+              <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Novedades / Tareas Pendientes:</div>
+              ${getChecklistHtml(item, internoPT)}
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
+              ${getOrdenBtnHtml(internoPT)}
+              ${getEditBtnHtml(internoPT, 'fuera_de_servicio')}
+            </div>
           </div>`;
         }).join('');
   }
@@ -8918,13 +8925,20 @@ function renderParteTallerDashboard(state) {
       : reparacion.map(item => {
           const internoPT = String(item.interno || '');
           const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
-          return `<div class="pt-mobile-card">
-            <div class="pt-mobile-card-header">
-              <div><strong style="font-size:15px;">${internoPT}</strong>${item.tipo ? `<br><span style="font-size:12px;color:var(--text-muted);">${item.tipo}</span>` : ''}</div>
+          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
               ${getDiasParadoHtml(item, desde)}
             </div>
-            <div class="pt-mobile-card-row"><span>Desde</span><strong>${desde}</strong></div>
-            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">${getOrdenBtnHtml(internoPT)} ${getEditBtnHtml(internoPT,'reparacion')}</div>
+            <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>Ingreso: <strong>${desde}</strong></span></div>
+            <div style="margin:10px 0; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+              <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Tareas / Novedades Pendientes:</div>
+              ${getChecklistHtml(item, internoPT)}
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
+              ${getOrdenBtnHtml(internoPT)}
+              ${getEditBtnHtml(internoPT, 'reparacion')}
+            </div>
           </div>`;
         }).join('');
   }
@@ -8961,12 +8975,19 @@ function renderParteTallerDashboard(state) {
       : pendientes.map(item => {
           const internoPT = String(item.interno || '');
           const servicio = item.servicio || item.tipo_servicio || '—';
-          return `<div class="pt-mobile-card">
-            <div class="pt-mobile-card-header">
-              <div><strong style="font-size:15px;">${internoPT}</strong>${item.tipo ? `<br><span style="font-size:12px;color:var(--text-muted);">${item.tipo}</span>` : ''}</div>
+          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
               <span class="badge" style="background:#2196f3;color:white;font-size:11px;">${servicio}</span>
             </div>
-            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">${getOrdenBtnHtml(internoPT)} ${getEditBtnHtml(internoPT,'servicios_pendientes')}</div>
+            <div style="margin:10px 0; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+              <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Tareas / Novedades Pendientes:</div>
+              ${getChecklistHtml(item, internoPT)}
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
+              ${getOrdenBtnHtml(internoPT)}
+              ${getEditBtnHtml(internoPT, 'servicios_pendientes')}
+            </div>
           </div>`;
         }).join('');
   }
