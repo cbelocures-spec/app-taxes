@@ -1307,7 +1307,7 @@ app.post('/api/assistant/chat', async (req, res) => {
     // Fetch the history from Google Sheets (Try GViz CSV first for the 2026 DB, fallback to Apps Script)
     let sheetHistoryData = [];
     try {
-      const csvUrl = 'https://docs.google.com/spreadsheets/d/1QK698StrEr9v7HgJUrtN1GFtb3ixk_2ql78dkx1_3Vk/gviz/tq?tqx=out:csv&sheet=Historial%20Services';
+      const csvUrl = 'https://docs.google.com/spreadsheets/d/1QK698StrEr9v7HgJUrtN1GFtb3ixk_2ql78dkx1_3Vk/export?format=csv&gid=659919704';
       const response = await fetch(csvUrl, { signal: AbortSignal.timeout(6000) });
       if (response.ok) {
         const text = await response.text();
