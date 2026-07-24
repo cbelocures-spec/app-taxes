@@ -1432,7 +1432,7 @@ app.post('/api/assistant/chat', async (req, res) => {
     // Remove duplicates
     const seenKeys = new Set();
     optimizedHistory = optimizedHistory.filter(h => {
-      const key = `${h.fecha || h.date}-${h.interno}-${h.tipo}-${h.datos}`;
+      const key = `${h.interno}-${h.tipo}-${h.datos}-${h.day || ''}-${h.patente || h.fecha || ''}`;
       if (seenKeys.has(key)) return false;
       seenKeys.add(key);
       return true;
