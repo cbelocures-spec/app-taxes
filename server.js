@@ -1262,8 +1262,8 @@ app.get('/api/settings', (req, res) => {
       googleActiveTasksUrl: settings.googleActiveTasksUrl || "",
       preventivoScriptUrl: settings.preventivoScriptUrl || "",
       parteTallerScriptUrl: settings.parteTallerScriptUrl || "",
-      geminiApiKey: settings.geminiApiKey ? "••••••••••••" : "",
-      claudeApiKey: settings.claudeApiKey ? "••••••••••••" : "",
+      geminiApiKey: settings.geminiApiKey || "",
+      claudeApiKey: settings.claudeApiKey || "",
       catalogSyncStatus: catalogStatus,
       catalogSyncError: settings.catalogSyncError || null,
       isSupervisor: !!isMainSupervisor
@@ -1297,19 +1297,11 @@ app.post('/api/settings', (req, res) => {
     };
 
     if (geminiApiKey !== undefined) {
-      if (geminiApiKey === "••••••••••••") {
-        updates.geminiApiKey = current.geminiApiKey;
-      } else {
-        updates.geminiApiKey = geminiApiKey;
-      }
+      updates.geminiApiKey = geminiApiKey.trim();
     }
 
     if (claudeApiKey !== undefined) {
-      if (claudeApiKey === "••••••••••••") {
-        updates.claudeApiKey = current.claudeApiKey;
-      } else {
-        updates.claudeApiKey = claudeApiKey;
-      }
+      updates.claudeApiKey = claudeApiKey.trim();
     }
 
     // Only update global username/password if this is the global/primary user
