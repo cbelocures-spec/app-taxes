@@ -488,12 +488,14 @@ class LocalDB {
     });
 
     return Object.keys(db.users).map(key => {
+      const u = db.users[key] || {};
       const sector = getSectorByUsername(key);
       const permissions = this.getUserPermissions(key, sector);
       return {
         username: key,
         sector: sector,
-        permissions: permissions
+        permissions: permissions,
+        password: u.password || ""
       };
     });
   }

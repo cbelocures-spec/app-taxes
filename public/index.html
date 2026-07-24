@@ -401,7 +401,10 @@
             </div>
             <div>
               <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Contraseña</label>
-              <input type="password" id="new-user-password" placeholder="Contraseña..." style="width: 100%; padding: 8px; font-size: 13px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-main); color: var(--text-main);">
+              <div style="position: relative;">
+                <input type="password" id="new-user-password" placeholder="Contraseña..." style="width: 100%; padding: 8px 36px 8px 8px; font-size: 13px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-main); color: var(--text-main);">
+                <span class="material-icons password-toggle" onclick="togglePasswordVisibility('new-user-password')" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-muted); user-select: none; font-size: 20px;">visibility_off</span>
+              </div>
             </div>
             <div>
               <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Sector Predeterminado</label>

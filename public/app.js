@@ -5920,7 +5920,10 @@ async function renderUserAuthorizationsTable() {
             <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">Sector predeterminado: ${u.sector}</span>
           </td>
           <td style="padding:8px; text-align:center;">
-            <input type="password" class="input-user-password" placeholder="Nueva clave..." style="width:100px; padding:4px 6px; font-size:11px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-main); color:var(--text-main);">
+            <div style="position:relative; display:inline-block; width:110px;">
+              <input type="password" class="input-user-password" value="${u.password || ''}" placeholder="Nueva clave..." style="width:100%; padding:4px 22px 4px 6px; font-size:11px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-main); color:var(--text-main);">
+              <span class="material-icons" onclick="const inp=this.previousElementSibling; if(inp.type==='password'){inp.type='text'; this.textContent='visibility';}else{inp.type='password'; this.textContent='visibility_off';}" style="position:absolute; right:4px; top:50%; transform:translateY(-50%); cursor:pointer; font-size:14px; color:var(--text-muted); user-select:none;">visibility_off</span>
+            </div>
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-canDelete" ${p.canDelete ? 'checked' : ''}>
