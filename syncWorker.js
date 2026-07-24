@@ -734,8 +734,8 @@ async function autoLogin(browser, username, password, portalUrl) {
   console.log(`[autoLogin] Not logged in. Attempting login as ${username}...`);
 
   // Target selectors for email and password on Taxes.com.ar login page
-  const emailSelector = 'input[name="loginUser"]';
-  const passSelector = 'input[name="password"]';
+  const emailSelector = 'input[name="loginUser"], input[name="email"], input[name="username"], input[type="text"], input[type="email"]';
+  const passSelector = 'input[name="password"], input[type="password"]';
 
   // Poll for password input using evaluate (avoids detached frame from waitForSelector)
   console.log('[autoLogin] Waiting for password input via polling...');

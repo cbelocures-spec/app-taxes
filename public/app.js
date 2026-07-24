@@ -3640,7 +3640,7 @@ function renderDashboard() {
               <span class="material-icons" style="font-size:18px;">add</span>
             </button>
             <div class="dashboard-card-ot-badge" style="font-size: 11px; font-weight: 700; color: var(--primary); margin-bottom: 4px;">
-              OT #${t.interno}${t.taxesOrderNumber ? ` (Taxes: #${t.taxesOrderNumber})` : ''}
+              ${t.taxesOrderNumber ? `<span class="badge-status success" style="padding: 2px 6px; font-size: 11px; font-weight: 700;">OT Taxes: #${t.taxesOrderNumber}</span>` : `<span class="badge-status warning" style="padding: 2px 6px; font-size: 11px;">OT Pendiente Taxes (Interno #${t.interno})</span>`}
             </div>
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
             <div class="dashboard-card-subtitle">Interno ${t.interno} ${t.clasificacion ? ' - ' + t.clasificacion : ''}</div>
@@ -3682,7 +3682,7 @@ function renderDashboard() {
               <span class="material-icons" style="font-size:18px;">add</span>
             </button>
             <div class="dashboard-card-ot-badge" style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px;">
-              OT #${t.interno}${t.taxesOrderNumber ? ` (Taxes: #${t.taxesOrderNumber})` : ''}
+              ${t.taxesOrderNumber ? `<span class="badge-status success" style="padding: 2px 6px; font-size: 11px; font-weight: 700;">OT Taxes: #${t.taxesOrderNumber}</span>` : `<span class="badge-status warning" style="padding: 2px 6px; font-size: 11px;">OT Pendiente Taxes (Interno #${t.interno})</span>`}
             </div>
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
             <div class="dashboard-card-subtitle">Interno ${t.interno} ${t.clasificacion ? ' - ' + t.clasificacion : ''}</div>
