@@ -5670,40 +5670,47 @@ async function renderUserAuthorizationsTable() {
       const hasTaller = allowed.includes('Taller');
 
       html += `
-        <tr style="border-bottom:1px solid var(--border-color);">
+        <tr data-username="${u.username}" style="border-bottom:1px solid var(--border-color);">
           <td style="padding:8px; font-weight:600;">
             ${u.username}<br>
             <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">Sector predeterminado: ${u.sector}</span>
           </td>
           <td style="padding:8px; text-align:center;">
-            <input type="checkbox" ${p.canDelete ? 'checked' : ''} onchange="updateUserPermissionToggle('${u.username}', 'canDelete', this.checked)">
+            <input type="checkbox" class="chk-canDelete" ${p.canDelete ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
-            <input type="checkbox" ${p.canSync ? 'checked' : ''} onchange="updateUserPermissionToggle('${u.username}', 'canSync', this.checked)">
+            <input type="checkbox" class="chk-canSync" ${p.canSync ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
-            <input type="checkbox" ${p.canViewHistory ? 'checked' : ''} onchange="updateUserPermissionToggle('${u.username}', 'canViewHistory', this.checked)">
+            <input type="checkbox" class="chk-canViewHistory" ${p.canViewHistory ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
-            <input type="checkbox" ${p.canViewMasivas ? 'checked' : ''} onchange="updateUserPermissionToggle('${u.username}', 'canViewMasivas', this.checked)">
+            <input type="checkbox" class="chk-canViewMasivas" ${p.canViewMasivas ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
-            <input type="checkbox" ${p.canViewParteTaller ? 'checked' : ''} onchange="updateUserPermissionToggle('${u.username}', 'canViewParteTaller', this.checked)">
+            <input type="checkbox" class="chk-canViewParteTaller" ${p.canViewParteTaller ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
-            <input type="checkbox" ${hasHerreria ? 'checked' : ''} onchange="updateUserSectorPermissionToggle('${u.username}', 'Herrería', this.checked)">
+            <input type="checkbox" class="chk-sector-Herreria" ${hasHerreria ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
-            <input type="checkbox" ${hasEdilicio ? 'checked' : ''} onchange="updateUserSectorPermissionToggle('${u.username}', 'Edilicio', this.checked)">
+            <input type="checkbox" class="chk-sector-Edilicio" ${hasEdilicio ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
-            <input type="checkbox" ${hasTaller ? 'checked' : ''} onchange="updateUserSectorPermissionToggle('${u.username}', 'Taller', this.checked)">
+            <input type="checkbox" class="chk-sector-Taller" ${hasTaller ? 'checked' : ''}>
           </td>
         </tr>
       `;
     });
 
-    html += `</tbody></table>`;
+    html += `</tbody></table>
+      <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+        <button id="save-user-authorizations-btn" class="btn btn-primary" onclick="saveAllUserAuthorizations()" style="display:flex; align-items:center; gap:8px; padding:10px 22px; font-weight:600; border-radius:8px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+          <span class="material-icons">save</span>
+          <span>Guardar Autorizaciones</span>
+        </button>
+      </div>
+    `;
     container.innerHTML = html;
   } catch (err) {
     console.error('Error rendering authorizations:', err);
@@ -5711,71 +5718,61 @@ async function renderUserAuthorizationsTable() {
   }
 }
 
-async function updateUserPermissionToggle(targetUsername, field, isChecked) {
-  const currentUsername = localStorage.getItem('currentUserUsername') || '';
-  try {
-    const resGet = await originalFetch('/api/users/permissions');
-    const users = await resGet.json();
-    const userObj = users.find(u => u.username === targetUsername);
-    const perms = userObj ? { ...userObj.permissions } : {};
-
-    perms[field] = isChecked;
-
-    const resPost = await originalFetch('/api/users/permissions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-username': currentUsername
-      },
-      body: JSON.stringify({ username: targetUsername, permissions: perms })
-    });
-
-    if (!resPost.ok) {
-      const err = await resPost.json();
-      throw new Error(err.error || 'Error al guardar permiso');
-    }
-
-    showToast("Permiso actualizado", "success");
-  } catch (err) {
-    showToast(err.message, "danger");
-    renderUserAuthorizationsTable();
+async function saveAllUserAuthorizations() {
+  const saveBtn = document.getElementById('save-user-authorizations-btn');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = `<span class="material-icons" style="animation: spin 1s linear infinite;">autorenew</span><span>Guardando...</span>`;
   }
-}
 
-async function updateUserSectorPermissionToggle(targetUsername, sectorName, isChecked) {
   const currentUsername = localStorage.getItem('currentUserUsername') || '';
+  const rows = document.querySelectorAll('#user-permissions-table-container tbody tr');
+  
   try {
-    const resGet = await originalFetch('/api/users/permissions');
-    const users = await resGet.json();
-    const userObj = users.find(u => u.username === targetUsername);
-    const perms = userObj ? { ...userObj.permissions } : {};
-    let allowed = Array.isArray(perms.allowedSectors) ? [...perms.allowedSectors] : [];
+    for (const row of rows) {
+      const username = row.getAttribute('data-username');
+      if (!username) continue;
 
-    if (isChecked) {
-      if (!allowed.includes(sectorName)) allowed.push(sectorName);
-    } else {
-      allowed = allowed.filter(s => s !== sectorName);
+      const canDelete = row.querySelector('.chk-canDelete')?.checked || false;
+      const canSync = row.querySelector('.chk-canSync')?.checked || false;
+      const canViewHistory = row.querySelector('.chk-canViewHistory')?.checked || false;
+      const canViewMasivas = row.querySelector('.chk-canViewMasivas')?.checked || false;
+      const canViewParteTaller = row.querySelector('.chk-canViewParteTaller')?.checked || false;
+      
+      const allowedSectors = [];
+      if (row.querySelector('.chk-sector-Herreria')?.checked) allowedSectors.push('Herrería');
+      if (row.querySelector('.chk-sector-Edilicio')?.checked) allowedSectors.push('Edilicio');
+      if (row.querySelector('.chk-sector-Taller')?.checked) allowedSectors.push('Taller');
+
+      const permissions = {
+        canDelete,
+        canSync,
+        canViewHistory,
+        canViewMasivas,
+        canViewParteTaller,
+        allowedSectors
+      };
+
+      const res = await originalFetch('/api/users/permissions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-username': currentUsername
+        },
+        body: JSON.stringify({ username, permissions })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `Error al guardar permisos de ${username}`);
+      }
     }
 
-    perms.allowedSectors = allowed;
-
-    const resPost = await originalFetch('/api/users/permissions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-username': currentUsername
-      },
-      body: JSON.stringify({ username: targetUsername, permissions: perms })
-    });
-
-    if (!resPost.ok) {
-      const err = await resPost.json();
-      throw new Error(err.error || 'Error al guardar sector');
-    }
-
-    showToast("Sectores de usuario actualizados", "success");
+    showToast("¡Autorizaciones guardadas correctamente!", "success");
   } catch (err) {
-    showToast(err.message, "danger");
+    console.error(err);
+    showToast(err.message || "Error al guardar autorizaciones", "danger");
+  } finally {
     renderUserAuthorizationsTable();
   }
 }
