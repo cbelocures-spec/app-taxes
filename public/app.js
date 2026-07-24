@@ -2522,8 +2522,8 @@ async function submitWorkOrder() {
   const horaEl = document.getElementById('form-hora');
   const incidenteEl = document.getElementById('form-incidente');
 
-  // Auto-set current date and time on submission to ensure freshness (only for new orders)
-  if (!currentEditingOrderId) {
+  // Auto-set current date and time on submission ONLY if empty (allows selecting past dates like yesterday)
+  if (!currentEditingOrderId && !fechaEl.value) {
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
