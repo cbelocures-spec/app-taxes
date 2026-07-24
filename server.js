@@ -291,6 +291,19 @@ app.get('/api/debug/chrome-test', (req, res) => {
   });
 });
 
+app.get('/api/db-debug', (req, res) => {
+  const rawData = db.read();
+  const active = db.getWorkOrders();
+  const archived = db.getArchivedOrders();
+  res.json({
+    dbPath: process.env.DB_PATH || 'default',
+    workOrdersCount: (rawData.workOrders || []).length,
+    activeCount: active.length,
+    archivedCount: archived.length,
+    sampleOrder: (rawData.workOrders || [])[0] || null
+  });
+});
+
 // Get all work orders (filtered by user sector)
 app.get('/api/orders', (req, res) => {
   try {
