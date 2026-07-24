@@ -1284,11 +1284,6 @@ Devuelve estrictamente un array JSON de objetos con el siguiente formato, sin bl
   }
 });
 
-app.get('/api/assistant/debug_keys', (req, res) => {
-  const settings = db.getSettings();
-  res.json({ gemini: settings.geminiApiKey, claude: settings.claudeApiKey });
-});
-
 // AI assistant chat endpoint
 app.post('/api/assistant/chat', async (req, res) => {
   try {
@@ -1309,16 +1304,52 @@ app.post('/api/assistant/chat', async (req, res) => {
       return res.status(400).json({ error: "URL del script de preventivos no configurada." });
     }
 
-    // Fetch the history from Google Sheets
+    // Fetch the history from Google Sheets (Try GViz CSV first for the 2026 DB, fallback to Apps Script)
     let sheetHistoryData = [];
     try {
-      const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=getHistoryData`;
-      const response = await fetch(url);
+      const csvUrl = 'https://docs.google.com/spreadsheets/d/1QK698StrEr9v7HgJUrtN1GFtb3ixk_2ql78dkx1_3Vk/gviz/tq?tqx=out:csv&sheet=Historial%20Services';
+      const response = await fetch(csvUrl, { signal: AbortSignal.timeout(6000) });
       if (response.ok) {
-        sheetHistoryData = await response.json();
+        const text = await response.text();
+        const lines = text.trim().split('\n');
+        if (lines.length > 1) {
+          const parsed = [];
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i];
+            const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+            if (parts.length >= 6) {
+              const clean = (val) => (val || '').replace(/^"|"$/g, '').trim();
+              parsed.push({
+                rowIndex: i + 1,
+                fecha: clean(parts[0]),       // Column A (Equipo)
+                interno: clean(parts[1]),     // Column B (INTERNO)
+                tipo: clean(parts[2]),        // Column C (Movimiento)
+                datos: clean(parts[3]),       // Column D (Detalle)
+                conductor: clean(parts[4]),   // Column E (Proveedor)
+                patente: clean(parts[5]),     // Column F (Fecha)
+                litros: clean(parts[6]),      // Column G (MES)
+                day: clean(parts[7]),         // Column H (Trabajo)
+                month: clean(parts[8])        // Column I (Cantidad)
+              });
+            }
+          }
+          sheetHistoryData = parsed.reverse();
+        }
       }
-    } catch (err) {
-      console.error("Error fetching preventivos history for assistant:", err);
+    } catch (csvErr) {
+      console.warn("Could not fetch history from direct CSV, falling back to Apps Script:", csvErr);
+    }
+
+    if (sheetHistoryData.length === 0) {
+      try {
+        const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=getHistoryData`;
+        const response = await fetch(url);
+        if (response.ok) {
+          sheetHistoryData = await response.json();
+        }
+      } catch (err) {
+        console.error("Error fetching preventivos history for assistant:", err);
+      }
     }
 
     // Filter and optimize history to avoid hitting Gemini 429 rate limits or overloading context
@@ -1479,7 +1510,8 @@ Instrucciones:
       }
 
       const result = await claudeResponse.json();
-      finalResponseText = result?.content?.[0]?.text || "";
+      const textBlock = (result?.content || []).find(c => c.type === "text");
+      finalResponseText = textBlock?.text || "";
     } else {
       // Use Google Gemini API
       const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
