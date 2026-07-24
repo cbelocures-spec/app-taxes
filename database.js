@@ -26,8 +26,11 @@ function resolveUsableDbPath() {
 const DB_PATH = resolveUsableDbPath();
 
 function normalizeEmail(email) {
-  if (!email) return email;
+  if (!email) return '';
   let normalized = String(email).trim().toLowerCase();
+  if (!normalized.includes('@')) {
+    normalized += '@contenedoreshugo.com.ar';
+  }
   const parts = normalized.split('@');
   if (parts.length !== 2) {
     return normalized;
@@ -75,28 +78,33 @@ function getDefaultUserPermissions(username, sector) {
 
 function getSectorByUsername(username) {
   if (!username) return 'Taller';
-  const cleanUsername = String(username).split(',')[0].trim();
-  const email = cleanUsername.toLowerCase().trim();
+  const cleanUsername = String(username).split(',')[0].trim().toLowerCase();
   
   if (
-    email.includes('taller') || 
-    email.includes('paniol') || 
-    email.includes('panol') || 
-    email.includes('pañol')
+    cleanUsername.includes('paniol') || 
+    cleanUsername.includes('panol') || 
+    cleanUsername.includes('pañol') ||
+    cleanUsername.includes('admin')
   ) {
     return 'Admin';
   }
   if (
-    email.includes('jcarmona') || 
-    email.includes('carmona')
+    cleanUsername.includes('jcarmona') || 
+    cleanUsername.includes('carmona')
   ) {
     return 'Herrería';
   }
   if (
-    email.includes('ftoledo') || 
-    email.includes('toledo')
+    cleanUsername.includes('ftoledo') || 
+    cleanUsername.includes('toledo')
   ) {
     return 'Edilicio';
+  }
+  if (
+    cleanUsername.includes('sergios') || 
+    cleanUsername.includes('taller')
+  ) {
+    return 'Taller';
   }
   return 'Taller';
 }
