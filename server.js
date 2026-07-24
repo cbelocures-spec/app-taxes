@@ -178,26 +178,25 @@ app.post('/api/login', async (req, res) => {
     const cleanUsername = String(username).trim().toLowerCase();
     const existingUser = db.getUser(cleanUsername);
 
-    if (existingUser && existingUser.password) {
-      let isMatch = false;
-      const stored = existingUser.password;
+    if (!existingUser || !existingUser.password) {
+      return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
+    }
 
-      if (stored.startsWith('$2b$') || stored.startsWith('$2a$') || stored.startsWith('$2y$')) {
-        try {
-          isMatch = await bcrypt.compare(password, stored);
-        } catch (e) {
-          isMatch = (password === stored);
-        }
-      } else {
+    let isMatch = false;
+    const stored = existingUser.password;
+
+    if (stored.startsWith('$2b$') || stored.startsWith('$2a$') || stored.startsWith('$2y$')) {
+      try {
+        isMatch = await bcrypt.compare(password, stored);
+      } catch (e) {
         isMatch = (password === stored);
       }
-
-      if (!isMatch) {
-        return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
-      }
     } else {
-      // Save credentials in db.json
-      db.saveUser(cleanUsername, password);
+      isMatch = (password === stored);
+    }
+
+    if (!isMatch) {
+      return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
     }
 
     // Save this user's credentials in per-user store
