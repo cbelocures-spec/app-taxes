@@ -394,32 +394,16 @@ app.post('/api/orders', (req, res) => {
       return res.status(403).json({ error: "No tiene permiso configurado para crear órdenes." });
     }
 
-    // Validate/force classification by sector
-    // Use encoding-tolerant helpers + allowedSectors fallback for Admin users
+    // Normalize and assign final classification based on selection or user's sector
     let finalClasificacion = clasificacion;
-    const isPaniolAdmin = sector === 'Admin';
-    const allowedSectors = userPerms.allowedSectors || [];
-
-    if (sector === 'Herrería' || isHerreria(sector)) {
+    if (isHerreria(clasificacion)) {
+      finalClasificacion = 'Herrería';
+    } else if (isEdilicio(clasificacion)) {
+      finalClasificacion = 'Edilicio';
+    } else if (sector === 'Herrería' || isHerreria(sector)) {
       finalClasificacion = 'Herrería';
     } else if (sector === 'Edilicio' || isEdilicio(sector)) {
       finalClasificacion = 'Edilicio';
-    } else if (isPaniolAdmin) {
-      // Admin/Pañol: accept whatever clasificacion they submit (they manage all sectors)
-      if (isHerreria(clasificacion)) finalClasificacion = 'Herrería';
-      else if (isEdilicio(clasificacion)) finalClasificacion = 'Edilicio';
-      else finalClasificacion = clasificacion;
-    } else {
-      // Taller or unknown sector: use allowedSectors to determine what's permitted
-      const canHerreria = allowedSectors.some(s => isHerreria(s));
-      const canEdilicio = allowedSectors.some(s => isEdilicio(s));
-      if (isHerreria(clasificacion)) {
-        if (canHerreria) finalClasificacion = 'Herrería';
-        else return res.status(400).json({ error: "No tiene permiso para crear órdenes de Herrería." });
-      } else if (isEdilicio(clasificacion)) {
-        if (canEdilicio) finalClasificacion = 'Edilicio';
-        else return res.status(400).json({ error: "No tiene permiso para crear órdenes de Edilicio." });
-      }
     }
 
     const newOrder = db.createWorkOrder({
