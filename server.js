@@ -2163,6 +2163,96 @@ app.post('/api/parte-taller/novedad', async (req, res) => {
   }
 });
 
+// --- WHATSAPP BOT WEBHOOK ENDPOINT ---
+app.get(['/api/webhook/whatsapp', '/api/whatsapp'], (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode && token) {
+    return res.status(200).send(challenge);
+  }
+  res.send("WhatsApp Webhook OK");
+});
+
+app.post(['/api/webhook/whatsapp', '/api/whatsapp'], async (req, res) => {
+  try {
+    const settings = db.getSettings();
+    const scriptUrl = settings.parteTallerScriptUrl;
+    
+    // Extract message text from any WhatsApp provider format (Meta, Twilio, Evolution, Baileys, Custom)
+    let messageText = '';
+    const body = req.body || {};
+    
+    if (typeof body === 'string') {
+      messageText = body;
+    } else if (body.message) {
+      messageText = typeof body.message === 'string' ? body.message : (body.message.conversation || body.message.text || '');
+    } else if (body.text) {
+      messageText = typeof body.text === 'string' ? body.text : (body.text.body || '');
+    } else if (body.body) {
+      messageText = body.body;
+    } else if (body.entry && body.entry[0]?.changes[0]?.value?.messages[0]?.text?.body) {
+      messageText = body.entry[0].changes[0].value.messages[0].text.body;
+    } else if (body.novedad || body.observacion || body.motivo) {
+      messageText = body.novedad || body.observacion || body.motivo;
+    }
+
+    const lower = (messageText || '').toLowerCase();
+    const matchUnit = messageText.match(/(?:interno|unidad|camion|camión|nro|nº)?\s*#?(\d{1,4})\b/i);
+    const targetInterno = matchUnit ? matchUnit[1] : (body.interno || body.unit || '');
+
+    if (!targetInterno) {
+      return res.status(400).json({ error: "No se pudo identificar el número de interno en el mensaje de WhatsApp." });
+    }
+
+    let nuevoEstado = 'fuera_de_servicio';
+    if (lower.includes('operativo') || lower.includes('alta') || lower.includes('listo')) {
+      nuevoEstado = 'operativo';
+    } else if (lower.includes('reparacion') || lower.includes('reparación') || lower.includes('taller')) {
+      nuevoEstado = 'reparacion';
+    }
+
+    let noveltyText = messageText
+      .replace(/(?:marcar|unidad|interno|camion|camión|nro|nº)?\s*#?\d{1,4}/gi, '')
+      .replace(/fuera de servicio|novedad|parado|en taller|marcar como|esta en|está en/gi, '')
+      .trim();
+    if (!noveltyText || noveltyText.length < 2) {
+      noveltyText = messageText.trim();
+    }
+
+    const senderPhone = body.from || body.phone || body.sender || 'WhatsApp Bot';
+
+    if (scriptUrl) {
+      const ptResp = await fetch(scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accion: 'actualizar_estado_flota',
+          interno: targetInterno,
+          estado: nuevoEstado,
+          motivo: noveltyText,
+          responsable: `WhatsApp (${senderPhone})`,
+          sector: 'taller'
+        })
+      });
+      if (!ptResp.ok) {
+        console.warn('[WhatsApp Webhook] Script response not OK:', ptResp.status);
+      }
+    }
+
+    res.json({
+      success: true,
+      msg: `Novedad procesada para interno #${targetInterno}`,
+      interno: targetInterno,
+      estado: nuevoEstado,
+      novedad: noveltyText
+    });
+  } catch (error) {
+    console.error("Error processing WhatsApp webhook:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- GOOGLE SHEETS NOVELTIES INTEGRATION ---
 let noveltiesCache = null;
 let noveltiesCacheTime = 0;
