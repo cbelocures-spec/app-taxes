@@ -1406,8 +1406,63 @@ app.post('/api/assistant/chat', async (req, res) => {
     }
 
     const scriptUrl = settings.preventivoScriptUrl;
-    if (!scriptUrl) {
-      return res.status(400).json({ error: "URL del script de preventivos no configurada." });
+
+    // ── 0. Action Detection: Check if user is asking to record a novelty or change unit status in Parte de Taller ──
+    const lowerMsg = message.toLowerCase();
+    const isNovedadOrStatus = lowerMsg.includes('fuera de servicio') || 
+                              lowerMsg.includes('novedad') || 
+                              lowerMsg.includes('parado') || 
+                              lowerMsg.includes('reparacion') || 
+                              lowerMsg.includes('reparación') || 
+                              lowerMsg.includes('rotura') || 
+                              lowerMsg.includes('marcar interno') || 
+                              lowerMsg.includes('marcar unidad') || 
+                              lowerMsg.includes('marcar camion');
+
+    const matchUnit = message.match(/(?:interno|unidad|camion|camión|nro|nº)?\s*#?(\d{1,4})\b/i);
+
+    if (isNovedadOrStatus && matchUnit) {
+      const internoDetected = matchUnit[1];
+      let nuevoEstado = 'fuera_de_servicio';
+      if (lowerMsg.includes('operativo') || lowerMsg.includes('alta') || lowerMsg.includes('listo')) {
+        nuevoEstado = 'operativo';
+      } else if (lowerMsg.includes('reparacion') || lowerMsg.includes('reparación') || lowerMsg.includes('taller')) {
+        nuevoEstado = 'reparacion';
+      }
+
+      let noveltyText = message
+        .replace(/(?:marcar|unidad|interno|camion|camión|nro|nº)?\s*#?\d{1,4}/gi, '')
+        .replace(/fuera de servicio|novedad|parado|en taller|marcar como|esta en|está en/gi, '')
+        .trim();
+      if (!noveltyText || noveltyText.length < 3) {
+        noveltyText = message.trim();
+      }
+
+      const ptScriptUrl = settings.parteTallerScriptUrl;
+      if (ptScriptUrl) {
+        try {
+          const ptResp = await fetch(ptScriptUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              accion: 'actualizar_estado_flota',
+              interno: internoDetected,
+              estado: nuevoEstado,
+              motivo: noveltyText,
+              responsable: req.headers['x-user-username'] || 'Chatbot',
+              sector: 'taller'
+            })
+          });
+          if (ptResp.ok) {
+            const estadoLabel = nuevoEstado === 'fuera_de_servicio' ? '❌ Fuera de Servicio' : (nuevoEstado === 'reparacion' ? '🛠️ En Reparación' : '✅ Operativo');
+            return res.json({
+              reply: `✅ **Novedad registrada en Parte de Taller**:\n- **Unidad:** #${internoDetected}\n- **Estado:** ${estadoLabel}\n- **Novedad:** "${noveltyText}"\n\nEl Parte de Taller fue actualizado inmediatamente.`
+            });
+          }
+        } catch (actErr) {
+          console.error('[Chatbot Action] Error updating parte taller:', actErr);
+        }
+      }
     }
 
     // Fetch the history from Google Sheets (Try GViz CSV first for the 2026 DB, fallback to Apps Script)
@@ -2080,10 +2135,24 @@ app.post('/api/parte-taller/novedad', async (req, res) => {
     return res.status(400).json({ error: "URL del script de parte taller no configurada." });
   }
   try {
+    const payload = { ...req.body };
+    if (!payload.accion) {
+      payload.accion = 'actualizar_estado_flota';
+    }
+    if (!payload.motivo && (payload.novedad || payload.observacion || payload.text)) {
+      payload.motivo = payload.novedad || payload.observacion || payload.text;
+    }
+    if (!payload.estado && (payload.status || payload.state)) {
+      payload.estado = payload.status || payload.state;
+    }
+    if (!payload.estado) {
+      payload.estado = 'fuera_de_servicio';
+    }
+
     const response = await fetch(scriptUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
+      body: JSON.stringify(payload)
     });
     if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
     const data = await response.json();
