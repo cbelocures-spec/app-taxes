@@ -1,3 +1,15 @@
+// ---- Helper functions (mirror of server-side helpers) ----
+function isHerreria(cls) {
+  if (!cls) return false;
+  const norm = String(cls).toLowerCase().trim();
+  return norm.includes('herrer');
+}
+function isEdilicio(cls) {
+  if (!cls) return false;
+  const norm = String(cls).toLowerCase().trim();
+  return norm.includes('edil');
+}
+
 // Intercept fetch to automatically include supervisor username header and handle 401s
 const originalFetch = window.fetch;
 window.fetch = async function(url, options = {}) {

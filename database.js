@@ -487,8 +487,21 @@ class LocalDB {
     const userObj = db.users ? db.users[key] : null;
     const sector = sectorOverride || getSectorByUsername(key);
     const defaults = getDefaultUserPermissions(key, sector);
+
+    // Admin/Pañol always get full defaults — don't let corrupted DB values override them
+    const isPaniol = key.includes('paniol') || key.includes('panol') || key.includes('pañol') || sector === 'Admin';
+    if (isPaniol) return defaults;
     
     if (userObj && userObj.permissions && typeof userObj.permissions === 'object') {
+      // Normalize stored allowedSectors: replace any corrupted encoding
+      let allowedSectors = Array.isArray(userObj.permissions.allowedSectors) ? userObj.permissions.allowedSectors : defaults.allowedSectors;
+      allowedSectors = allowedSectors.map(s => {
+        const low = String(s).toLowerCase();
+        if (low.includes('herrer')) return 'Herrería';
+        if (low.includes('edil')) return 'Edilicio';
+        if (low.includes('taller')) return 'Taller';
+        return s;
+      });
       return {
         canDelete: userObj.permissions.canDelete !== undefined ? !!userObj.permissions.canDelete : defaults.canDelete,
         canSync: userObj.permissions.canSync !== undefined ? !!userObj.permissions.canSync : defaults.canSync,
@@ -498,7 +511,7 @@ class LocalDB {
         canViewMasivas: userObj.permissions.canViewMasivas !== undefined ? !!userObj.permissions.canViewMasivas : defaults.canViewMasivas,
         canViewParteTaller: userObj.permissions.canViewParteTaller !== undefined ? !!userObj.permissions.canViewParteTaller : defaults.canViewParteTaller,
         canViewPreventivos: userObj.permissions.canViewPreventivos !== undefined ? !!userObj.permissions.canViewPreventivos : defaults.canViewPreventivos,
-        allowedSectors: Array.isArray(userObj.permissions.allowedSectors) ? userObj.permissions.allowedSectors : defaults.allowedSectors
+        allowedSectors
       };
     }
     return defaults;
