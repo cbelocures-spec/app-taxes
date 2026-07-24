@@ -1293,8 +1293,8 @@ app.post('/api/assistant/chat', async (req, res) => {
     }
 
     const settings = db.getSettings();
-    const apiKey = settings.geminiApiKey;
-    const claudeApiKey = settings.claudeApiKey;
+    const apiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
+    const claudeApiKey = settings.claudeApiKey || process.env.CLAUDE_API_KEY;
     if (!apiKey && !claudeApiKey) {
       return res.status(400).json({ error: "La Clave de API de Google Gemini o Anthropic Claude no está configurada. Por favor, ve a Ajustes e ingrésala." });
     }
