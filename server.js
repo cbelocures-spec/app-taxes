@@ -904,21 +904,22 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
       updates.taxesOrderNumber = taxesOrderNumber;
     }
 
-    // Auto-archive when verification is successful (blue checkmark = data confirmed in Taxes)
-    // verifiedStatus:success is the true confirmation that data is in the system.
-    // We do NOT require syncStatus:success here — if verified passed, the order is done.
-    // Exception: fuera_de_servicio units stay active so the team knows the vehicle is still in the shop.
+    // Auto-archive when verification is successful AND all tasks are finished.
+    // Orders with tasks still in progress MUST remain active on the main screen with their Taxes OT number.
     const isVerified = updates.verifiedStatus === 'success' || (updates.verifiedStatus === undefined && existing.verifiedStatus === 'success');
     const targetEstadoUnidad = req.body.estadoUnidad !== undefined ? req.body.estadoUnidad : existing.estadoUnidad;
     const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
 
-    if (isOutOfService) {
-      updates.archived = false;
-      updates.archivedAt = null;
-    } else if (req.body.archived === true || isVerified) {
+    const currentTasks = updates.tasks || existing.tasks || [];
+    const allTasksFinished = currentTasks.length > 0 && currentTasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada'));
+
+    if (req.body.archived === true || (isVerified && allTasksFinished && !isOutOfService)) {
       updates.archived = true;
       updates.archivedAt = existing.archivedAt || new Date().toISOString();
-      if (isVerified) console.log(`[LocalSyncResult] Order ${req.params.id} verified. Auto-archived to history.`);
+      if (isVerified) console.log(`[LocalSyncResult] Order ${req.params.id} verified and completed. Auto-archived to history.`);
+    } else {
+      updates.archived = false;
+      updates.archivedAt = null;
     }
 
     // Propagate soft-delete state if explicitly sent
