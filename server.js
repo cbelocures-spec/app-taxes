@@ -149,6 +149,18 @@ function getSectorByUsername(username) {
   return 'Taller';
 }
 
+function isHerreria(cls) {
+  if (!cls) return false;
+  const norm = String(cls).toLowerCase().trim();
+  return norm.includes('herrer') || norm.includes('herreria') || norm.includes('herrería');
+}
+
+function isEdilicio(cls) {
+  if (!cls) return false;
+  const norm = String(cls).toLowerCase().trim();
+  return norm.includes('edilici') || norm.includes('edilicio');
+}
+
 // User Login (saves credentials locally for worker lookup)
 app.post('/api/login', (req, res) => {
   try {
@@ -291,10 +303,10 @@ app.get('/api/orders', (req, res) => {
     const filtered = orders.filter(o => {
       const cls = o.clasificacion;
       if (sector === 'Admin') return true;
-      if (sector === 'Herrería') return cls === 'Herrería';
-      if (sector === 'Edilicio') return cls === 'Edilicio';
+      if (sector === 'Herrería') return isHerreria(cls);
+      if (sector === 'Edilicio') return isEdilicio(cls);
       // Taller sees only Taller orders (neither Herrería nor Edilicio)
-      return cls !== 'Herrería' && cls !== 'Edilicio';
+      return !isHerreria(cls) && !isEdilicio(cls);
     });
 
     // Sort by createdAt descending
