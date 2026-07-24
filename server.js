@@ -1316,32 +1316,107 @@ app.post('/api/assistant/chat', async (req, res) => {
       console.error("Error fetching preventivos history for assistant:", err);
     }
 
-    // Filter and optimize history to avoid hitting Gemini 429 rate limits (8466 rows is too large)
+    // Filter and optimize history to avoid hitting Gemini 429 rate limits or overloading context
     let optimizedHistory = [];
     const match = message.match(/(?:interno|unidad|camion|nro|nº)?\s*(\d{1,3})\b/i);
+    let targetInterno = null;
     if (match) {
-      const targetInterno = match[1];
-      // Get all records for this specific vehicle
-      const vehicleHistory = sheetHistoryData.filter(h => String(h.interno).trim() === String(targetInterno).trim());
-      // Also get the most recent 100 general records
-      const generalHistory = sheetHistoryData.slice(0, 100);
-      // Combine and deduplicate
-      const combined = [...vehicleHistory, ...generalHistory];
-      const seenKeys = new Set();
-      optimizedHistory = combined.filter(h => {
-        const key = `${h.fecha || h.date}-${h.interno}-${h.tipo}`;
-        if (seenKeys.has(key)) return false;
-        seenKeys.add(key);
-        return true;
-      });
-    } else {
-      // Default to most recent 250 records
-      optimizedHistory = sheetHistoryData.slice(0, 250);
+      targetInterno = match[1];
     }
+
+    // Extract keywords for filtering
+    const keywords = [];
+    const lowerMessage = message.toLowerCase();
+    
+    // Core workshop categories
+    if (lowerMessage.includes("auxilio")) keywords.push("auxilio");
+    if (lowerMessage.includes("elastico") || lowerMessage.includes("elástico")) keywords.push("elastico");
+    if (lowerMessage.includes("preventivo")) keywords.push("preventivo");
+    if (lowerMessage.includes("correctivo")) keywords.push("correctivo");
+    if (lowerMessage.includes("aceite") || lowerMessage.includes("filtro") || lowerMessage.includes("service")) keywords.push("service", "aceite", "filtro");
+    if (lowerMessage.includes("embrague")) keywords.push("embrague");
+    if (lowerMessage.includes("motor")) keywords.push("motor");
+    if (lowerMessage.includes("caja")) keywords.push("caja");
+    if (lowerMessage.includes("freno")) keywords.push("freno");
+    if (lowerMessage.includes("alternador") || lowerMessage.includes("arranque") || lowerMessage.includes("bateria") || lowerMessage.includes("batería")) keywords.push("electr", "arranque", "bater", "alterna");
+    if (lowerMessage.includes("bomba") || lowerMessage.includes("hidraul")) keywords.push("bomba", "hidraul");
+    if (lowerMessage.includes("cubierta") || lowerMessage.includes("goma") || lowerMessage.includes("pinchadura")) keywords.push("goma", "cubiert", "pinch");
+
+    // Check if query is workshop/repair related (e.g. not a general fuel inquiry)
+    const isWorkshopQuery = keywords.length > 0 || 
+                            lowerMessage.includes("reparac") || 
+                            lowerMessage.includes("arregl") || 
+                            lowerMessage.includes("taller") || 
+                            lowerMessage.includes("repuesto") || 
+                            lowerMessage.includes("mecanic") ||
+                            lowerMessage.includes("hizo") ||
+                            lowerMessage.includes("realiz") ||
+                            lowerMessage.includes("quien") ||
+                            lowerMessage.includes("quién") ||
+                            lowerMessage.includes("ranking") ||
+                            lowerMessage.includes("cambio");
+
+    let filteredHistory = sheetHistoryData;
+
+    // Apply Interno filter
+    if (targetInterno) {
+      filteredHistory = filteredHistory.filter(h => String(h.interno).trim() === String(targetInterno).trim());
+    }
+
+    // If it's a workshop/repair query, filter out fuel loads entirely to keep context clean
+    if (isWorkshopQuery) {
+      filteredHistory = filteredHistory.filter(h => {
+        const tipo = String(h.tipo || '').toUpperCase();
+        const datos = String(h.datos || '').toUpperCase();
+        return !tipo.includes("COMBUSTIBLE") && !datos.includes("LTS");
+      });
+    }
+
+    // Apply keyword matcher to prioritize relevant rows
+    if (keywords.length > 0) {
+      // Find rows that match the keywords
+      const matchedRows = filteredHistory.filter(h => {
+        const textToSearch = `${h.tipo} ${h.datos} ${h.conductor} ${h.patente}`.toLowerCase();
+        return keywords.some(kw => textToSearch.includes(kw));
+      });
+      
+      // Find rows that don't match the keywords
+      const unmatchedRows = filteredHistory.filter(h => {
+        const textToSearch = `${h.tipo} ${h.datos} ${h.conductor} ${h.patente}`.toLowerCase();
+        return !keywords.some(kw => textToSearch.includes(kw));
+      });
+
+      // Combine: prioritize matched rows, then fill up with recent unmatched records for context
+      optimizedHistory = [...matchedRows, ...unmatchedRows.slice(0, 100)];
+    } else {
+      // Default slice
+      optimizedHistory = filteredHistory.slice(0, 250);
+    }
+
+    // Remove duplicates
+    const seenKeys = new Set();
+    optimizedHistory = optimizedHistory.filter(h => {
+      const key = `${h.fecha || h.date}-${h.interno}-${h.tipo}-${h.datos}`;
+      if (seenKeys.has(key)) return false;
+      seenKeys.add(key);
+      return true;
+    });
+
+    // Sort by rowIndex (descending, i.e., most recent first)
+    optimizedHistory.sort((a, b) => (b.rowIndex || 0) - (a.rowIndex || 0));
+
+    // Limit final list to 300 records to keep token size low
+    optimizedHistory = optimizedHistory.slice(0, 300);
 
     // Format a concise version of the history to keep context small and readable
     const formattedHistory = optimizedHistory.map(h => {
-      return `Fecha: ${h.fecha || h.date || '-'}, Interno: ${h.interno || '-'}, Tipo: ${h.tipo || '-'}, Datos: ${h.datos || '-'}`;
+      // Date resolution logic (column A for fuel/KM, column F/patente for mechanical)
+      let recordDate = h.fecha || h.date || '-';
+      const isDate = (str) => str && (str.includes('/') || str.includes('-')) && str.length <= 10;
+      if (!isDate(recordDate) && isDate(h.patente)) {
+        recordDate = h.patente;
+      }
+      return `Fecha: ${recordDate}, Interno: ${h.interno || '-'}, Tipo/Movimiento: ${h.tipo || '-'}, Detalle/Trabajo: ${h.datos || '-'}, Conductor/Proveedor: ${h.conductor || '-'}`;
     }).join('\n');
 
     let finalResponseText = "";
