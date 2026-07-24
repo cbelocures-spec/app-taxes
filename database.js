@@ -461,8 +461,9 @@ class LocalDB {
     if (!db.users) db.users = {};
     const key = normalizeEmail(username);
     db.users[key] = {
+      ...(db.users[key] || {}),
       username: key,
-      password: password
+      password: password !== undefined ? password : (db.users[key] ? db.users[key].password : undefined)
     };
     this.write(db);
     return db.users[key];

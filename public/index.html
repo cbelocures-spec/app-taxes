@@ -385,11 +385,45 @@
 
       <div id="user-authorizations-section" style="display: none;">
         <div class="section-title">
-          <h3>Autorizaciones de Usuarios</h3>
+          <h3>Gestión y Autorización de Usuarios (Solo Pañol / Admin)</h3>
         </div>
+
+        <!-- Card para agregar nuevo usuario y contraseña -->
+        <div class="catalog-sync-card" style="padding: 16px; margin-bottom: 16px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-color);">
+          <h4 style="margin: 0 0 12px 0; font-size: 14px; display: flex; align-items: center; gap: 8px; color: var(--text-main);">
+            <span class="material-icons" style="color: var(--primary);">person_add</span>
+            <span>Agregar Nuevo Usuario</span>
+          </h4>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end;">
+            <div>
+              <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Usuario / Email</label>
+              <input type="text" id="new-user-username" placeholder="ej: usuario@contenedoreshugo.com.ar" style="width: 100%; padding: 8px; font-size: 13px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-main); color: var(--text-main);">
+            </div>
+            <div>
+              <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Contraseña</label>
+              <input type="password" id="new-user-password" placeholder="Contraseña..." style="width: 100%; padding: 8px; font-size: 13px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-main); color: var(--text-main);">
+            </div>
+            <div>
+              <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Sector Predeterminado</label>
+              <select id="new-user-sector" style="width: 100%; padding: 8px; font-size: 13px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-card); color: var(--text-main);">
+                <option value="Taller">Taller</option>
+                <option value="Herrería">Herrería</option>
+                <option value="Edilicio">Edilicio</option>
+                <option value="Admin">Admin / Pañol</option>
+              </select>
+            </div>
+            <div>
+              <button type="button" class="btn btn-primary" onclick="addNewUserFromSettings()" style="width: 100%; padding: 9px 14px; font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <span class="material-icons" style="font-size: 18px;">person_add</span>
+                <span>Crear Usuario</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div class="catalog-sync-card" style="padding: 14px; overflow-x: auto;">
           <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-            Configuración de permisos y accesos granulares por usuario (exclusivo para Pañol / Admin). La casilla <b>🔄 Backup</b> autoriza a cada usuario a ver y restaurar el respaldo de 7 días.
+            Configuración de permisos y accesos granulares por usuario. Podés modificar permisos o establecer una nueva contraseña directamente en la tabla.
           </p>
           <div id="user-permissions-table-container">
             <div class="empty-dashboard-state">Cargando autorizaciones...</div>

@@ -5828,6 +5828,47 @@ async function restoreOrderFromBackup(orderId) {
   }
 }
 
+async function addNewUserFromSettings() {
+  const usernameInput = document.getElementById('new-user-username');
+  const passwordInput = document.getElementById('new-user-password');
+  const sectorSelect = document.getElementById('new-user-sector');
+
+  const username = usernameInput ? usernameInput.value.trim() : '';
+  const password = passwordInput ? passwordInput.value.trim() : '';
+  const sector = sectorSelect ? sectorSelect.value : 'Taller';
+
+  if (!username || !password) {
+    showToast('Por favor ingrese el usuario y la contraseña', 'danger');
+    return;
+  }
+
+  const requester = localStorage.getItem('currentUserUsername') || '';
+
+  try {
+    const res = await originalFetch('/api/users/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-username': requester
+      },
+      body: JSON.stringify({ username, password, sector })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Error al crear usuario');
+    }
+
+    showToast(data.message || `Usuario ${username} creado con éxito`, 'success');
+    if (usernameInput) usernameInput.value = '';
+    if (passwordInput) passwordInput.value = '';
+    renderUserAuthorizationsTable();
+  } catch (err) {
+    console.error('Error creating user:', err);
+    showToast(err.message || 'No se pudo crear el usuario', 'danger');
+  }
+}
+
 async function renderUserAuthorizationsTable() {
   const container = document.getElementById('user-permissions-table-container');
   if (!container) return;
@@ -5847,6 +5888,7 @@ async function renderUserAuthorizationsTable() {
         <thead>
           <tr style="border-bottom:2px solid var(--border-color); color:var(--text-muted);">
             <th style="padding:8px;">Usuario / Sector</th>
+            <th style="padding:8px; text-align:center;" title="Cambiar o restablecer contraseña">🔑 Cambiar Clave</th>
             <th style="padding:8px; text-align:center;" title="Permite eliminar órdenes localmente">🗑️ Borrar</th>
             <th style="padding:8px; text-align:center;" title="Permite subir órdenes a Taxes">☁️ Sync</th>
             <th style="padding:8px; text-align:center;" title="Permite crear nuevas órdenes">➕ Crear</th>
@@ -5876,6 +5918,9 @@ async function renderUserAuthorizationsTable() {
           <td style="padding:8px; font-weight:600;">
             ${u.username}<br>
             <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">Sector predeterminado: ${u.sector}</span>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="password" class="input-user-password" placeholder="Nueva clave..." style="width:100px; padding:4px 6px; font-size:11px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-main); color:var(--text-main);">
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-canDelete" ${p.canDelete ? 'checked' : ''}>
@@ -5921,7 +5966,7 @@ async function renderUserAuthorizationsTable() {
       <div style="margin-top:16px; display:flex; justify-content:flex-end;">
         <button id="save-user-authorizations-btn" class="btn btn-primary" onclick="saveAllUserAuthorizations()" style="display:flex; align-items:center; gap:8px; padding:10px 22px; font-weight:600; border-radius:8px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
           <span class="material-icons">save</span>
-          <span>Guardar Autorizaciones</span>
+          <span>Guardar Cambios</span>
         </button>
       </div>
     `;
@@ -5947,6 +5992,7 @@ async function saveAllUserAuthorizations() {
       const username = row.getAttribute('data-username');
       if (!username) continue;
 
+      const password = row.querySelector('.input-user-password')?.value?.trim() || undefined;
       const canDelete = row.querySelector('.chk-canDelete')?.checked || false;
       const canSync = row.querySelector('.chk-canSync')?.checked || false;
       const canCreateOrder = row.querySelector('.chk-canCreateOrder')?.checked || false;
@@ -5975,13 +6021,16 @@ async function saveAllUserAuthorizations() {
         allowedSectors
       };
 
+      const payload = { username, permissions };
+      if (password) payload.password = password;
+
       const res = await originalFetch('/api/users/permissions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-user-username': currentUsername
         },
-        body: JSON.stringify({ username, permissions })
+        body: JSON.stringify(payload)
       });
 
       if (!res.ok) {
@@ -5990,7 +6039,7 @@ async function saveAllUserAuthorizations() {
       }
     }
 
-    showToast("¡Autorizaciones guardadas correctamente!", "success");
+    showToast("¡Cambios de usuarios guardados correctamente!", "success");
   } catch (err) {
     console.error(err);
     showToast(err.message || "Error al guardar autorizaciones", "danger");

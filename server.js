@@ -398,6 +398,34 @@ app.get('/api/my-permissions', (req, res) => {
   }
 });
 
+app.post('/api/users/create', (req, res) => {
+  try {
+    const requester = req.headers['x-user-username'] || null;
+    const sector = getSectorByUsername(requester);
+    const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
+    
+    if (!isPaniol) {
+      return res.status(403).json({ error: "Solo Pañol / Admin puede agregar usuarios." });
+    }
+
+    const { username, password, sector: userSector, permissions } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: "Usuario y contraseña son requeridos." });
+    }
+
+    const cleanUsername = String(username).trim().toLowerCase();
+    db.saveUser(cleanUsername, password);
+
+    const defaultPerms = db.getUserPermissions(cleanUsername, userSector || getSectorByUsername(cleanUsername));
+    const finalPermissions = permissions || defaultPerms;
+    db.saveUserPermissions(cleanUsername, finalPermissions);
+
+    res.json({ success: true, message: `Usuario ${cleanUsername} creado exitosamente.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/users/permissions', (req, res) => {
   try {
     const requester = req.headers['x-user-username'] || null;
@@ -408,9 +436,13 @@ app.post('/api/users/permissions', (req, res) => {
       return res.status(403).json({ error: "Solo Pañol / Admin puede modificar autorizaciones de usuarios." });
     }
 
-    const { username, permissions } = req.body;
+    const { username, permissions, password } = req.body;
     if (!username || !permissions) {
       return res.status(400).json({ error: "username y permissions requeridos." });
+    }
+
+    if (password && String(password).trim() !== '') {
+      db.saveUser(username, String(password).trim());
     }
 
     const updated = db.saveUserPermissions(username, permissions);
