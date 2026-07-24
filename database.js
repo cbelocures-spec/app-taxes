@@ -104,7 +104,8 @@ function getSectorByUsername(username) {
   }
   if (
     cleanUsername.includes('sergios') || 
-    cleanUsername.includes('taller')
+    cleanUsername.includes('taller') ||
+    cleanUsername.includes('ibrahim')
   ) {
     return 'Taller';
   }
@@ -469,9 +470,23 @@ class LocalDB {
 
   getAllUsers() {
     const db = this.read();
-    const usersObj = db.users || {};
-    return Object.keys(usersObj).map(key => {
-      const user = usersObj[key];
+    if (!db.users) db.users = {};
+
+    // Ensure default system users exist in database
+    const defaultKnownUsers = [
+      'paniol@contenedoreshugo.com.ar',
+      'sergios@contenedoreshugo.com.ar',
+      'jcarmona@contenedoreshugo.com.ar',
+      'ftoledo@contenedoreshugo.com.ar',
+      'ibrahim@contenedoreshugo.com.ar'
+    ];
+    defaultKnownUsers.forEach(email => {
+      if (!db.users[email]) {
+        db.users[email] = { username: email };
+      }
+    });
+
+    return Object.keys(db.users).map(key => {
       const sector = getSectorByUsername(key);
       const permissions = this.getUserPermissions(key, sector);
       return {

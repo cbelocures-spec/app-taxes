@@ -5453,6 +5453,12 @@ function getSectorByUsername(username) {
   ) {
     return 'Edilicio';
   }
+  if (
+    email.includes('sergios') ||
+    email.includes('ibrahim')
+  ) {
+    return 'Taller';
+  }
   return 'Taller';
 }
 
@@ -5660,8 +5666,12 @@ async function loadUserPermissionsUI() {
     }
   }
 
-  // Load 7-day Backup Recovery section
-  renderBackupRecoveryTable();
+  // Load 7-day Backup Recovery section - Only reveal the details panel to authorized users
+  const backupSection = document.getElementById('backup-recovery-section');
+  if (backupSection) {
+    const canBackup = currentUserPermissions.canRestoreBackup === true;
+    backupSection.style.display = canBackup ? 'block' : 'none';
+  }
 }
 
 let currentBackupData = [];

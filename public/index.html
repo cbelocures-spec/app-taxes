@@ -397,11 +397,14 @@
         </div>
       </div>
 
-      <div id="backup-recovery-section" style="display: none; margin-top: 24px;">
-        <div class="section-title">
-          <h3>📦 Respaldo de Seguridad y Papelera (Últimos 7 Días)</h3>
-        </div>
-        <div class="catalog-sync-card" style="padding: 14px; overflow-x: auto;">
+      <details id="backup-recovery-section" style="display: none; margin-top: 24px;" ontoggle="if(this.open) renderBackupRecoveryTable()">
+        <summary style="cursor:pointer; list-style:none; user-select:none;">
+          <div class="section-title" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0;">
+            <h3 style="margin:0;">📦 Respaldo de Seguridad y Papelera (Últimos 7 Días)</h3>
+            <span class="material-icons" style="color:var(--text-muted); font-size:20px;" id="backup-chevron">expand_more</span>
+          </div>
+        </summary>
+        <div class="catalog-sync-card" style="padding: 14px; overflow-x: auto; margin-top: 12px;">
           <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
             Registro continuo de copias de seguridad de los últimos 7 días. Las órdenes rotan automáticamente y se eliminan del respaldo de a una al cumplir 7 días. Podés restaurar cualquier orden borrada o modificada con un clic.
           </p>
@@ -415,7 +418,7 @@
             <div class="empty-dashboard-state">Cargando órdenes del respaldo...</div>
           </div>
         </div>
-      </div>
+      </details>
 
       <div class="section-title">
         <h3>Demostración Interactiva</h3>
