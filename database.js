@@ -48,6 +48,8 @@ function getDefaultUserPermissions(username, sector) {
     return {
       canDelete: true,
       canSync: true,
+      canCreateOrder: true,
+      canViewSettings: true,
       canViewHistory: true,
       canViewMasivas: true,
       canViewParteTaller: true,
@@ -61,6 +63,8 @@ function getDefaultUserPermissions(username, sector) {
   return {
     canDelete: true,
     canSync: true,
+    canCreateOrder: true,
+    canViewSettings: true,
     canViewHistory: true,
     canViewMasivas: true,
     canViewParteTaller: true,
@@ -480,6 +484,8 @@ class LocalDB {
       return {
         canDelete: userObj.permissions.canDelete !== undefined ? !!userObj.permissions.canDelete : defaults.canDelete,
         canSync: userObj.permissions.canSync !== undefined ? !!userObj.permissions.canSync : defaults.canSync,
+        canCreateOrder: userObj.permissions.canCreateOrder !== undefined ? !!userObj.permissions.canCreateOrder : defaults.canCreateOrder,
+        canViewSettings: userObj.permissions.canViewSettings !== undefined ? !!userObj.permissions.canViewSettings : defaults.canViewSettings,
         canViewHistory: userObj.permissions.canViewHistory !== undefined ? !!userObj.permissions.canViewHistory : defaults.canViewHistory,
         canViewMasivas: userObj.permissions.canViewMasivas !== undefined ? !!userObj.permissions.canViewMasivas : defaults.canViewMasivas,
         canViewParteTaller: userObj.permissions.canViewParteTaller !== undefined ? !!userObj.permissions.canViewParteTaller : defaults.canViewParteTaller,

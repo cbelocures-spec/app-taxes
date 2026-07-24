@@ -5623,6 +5623,20 @@ async function loadUserPermissionsUI() {
     navPreventivos.style.display = currentUserPermissions.canViewPreventivos !== false ? 'flex' : 'none';
   }
 
+  const navSettings = document.getElementById('nav-settings');
+  if (navSettings) {
+    navSettings.style.display = currentUserPermissions.canViewSettings !== false ? 'flex' : 'none';
+  }
+
+  const btnNewOrder = document.getElementById('btn-new-order');
+  if (btnNewOrder) {
+    btnNewOrder.style.display = currentUserPermissions.canCreateOrder !== false ? 'inline-flex' : 'none';
+  }
+  const fabCreateOrder = document.getElementById('fab-create-order');
+  if (fabCreateOrder) {
+    fabCreateOrder.style.display = currentUserPermissions.canCreateOrder !== false ? 'flex' : 'none';
+  }
+
   // Show authorizations section if Pañol / Admin
   const sector = getSectorByUsername(username);
   const isPaniol = sector === 'Admin' || username.toLowerCase().includes('paniol') || username.toLowerCase().includes('panol') || username.toLowerCase().includes('pañol');
@@ -5656,10 +5670,12 @@ async function renderUserAuthorizationsTable() {
             <th style="padding:8px;">Usuario / Sector</th>
             <th style="padding:8px; text-align:center;" title="Permite eliminar órdenes localmente">🗑️ Borrar</th>
             <th style="padding:8px; text-align:center;" title="Permite subir órdenes a Taxes">☁️ Sync</th>
+            <th style="padding:8px; text-align:center;" title="Permite crear nuevas órdenes">➕ Crear</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Historial">📜 Historial</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Masivas">📋 Masivas</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Parte Taller">🚜 Parte Taller</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Preventivos">⚙️ Preventivos</th>
+            <th style="padding:8px; text-align:center;" title="Ver pestaña Ajustes">🔧 Ajustes</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Herrería">🛠️ Herrería</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Edilicio">🏗️ Edilicio</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Taller">🔧 Taller</th>
@@ -5671,9 +5687,9 @@ async function renderUserAuthorizationsTable() {
     users.forEach(u => {
       const p = u.permissions || {};
       const allowed = p.allowedSectors || [];
-      const hasHerreria = allowed.includes('Herrería');
-      const hasEdilicio = allowed.includes('Edilicio');
-      const hasTaller = allowed.includes('Taller');
+      const hasHerreria = allowed.some(s => isHerreria(s));
+      const hasEdilicio = allowed.some(s => isEdilicio(s));
+      const hasTaller = allowed.some(s => s === 'Taller');
 
       html += `
         <tr data-username="${u.username}" style="border-bottom:1px solid var(--border-color);">
@@ -5688,6 +5704,9 @@ async function renderUserAuthorizationsTable() {
             <input type="checkbox" class="chk-canSync" ${p.canSync ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
+            <input type="checkbox" class="chk-canCreateOrder" ${p.canCreateOrder !== false ? 'checked' : ''}>
+          </td>
+          <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-canViewHistory" ${p.canViewHistory ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
@@ -5698,6 +5717,9 @@ async function renderUserAuthorizationsTable() {
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-canViewPreventivos" ${p.canViewPreventivos !== false ? 'checked' : ''}>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" class="chk-canViewSettings" ${p.canViewSettings !== false ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-sector-Herreria" ${hasHerreria ? 'checked' : ''}>
@@ -5744,6 +5766,8 @@ async function saveAllUserAuthorizations() {
 
       const canDelete = row.querySelector('.chk-canDelete')?.checked || false;
       const canSync = row.querySelector('.chk-canSync')?.checked || false;
+      const canCreateOrder = row.querySelector('.chk-canCreateOrder')?.checked || false;
+      const canViewSettings = row.querySelector('.chk-canViewSettings')?.checked || false;
       const canViewHistory = row.querySelector('.chk-canViewHistory')?.checked || false;
       const canViewMasivas = row.querySelector('.chk-canViewMasivas')?.checked || false;
       const canViewParteTaller = row.querySelector('.chk-canViewParteTaller')?.checked || false;
@@ -5757,6 +5781,8 @@ async function saveAllUserAuthorizations() {
       const permissions = {
         canDelete,
         canSync,
+        canCreateOrder,
+        canViewSettings,
         canViewHistory,
         canViewMasivas,
         canViewParteTaller,

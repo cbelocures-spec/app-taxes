@@ -384,6 +384,10 @@ app.post('/api/orders', (req, res) => {
 
     const createdBy = req.headers['x-user-username'] || null;
     const sector = getSectorByUsername(createdBy);
+    const userPerms = db.getUserPermissions(createdBy);
+    if (!userPerms.canCreateOrder) {
+      return res.status(403).json({ error: "No tiene permiso configurado para crear órdenes." });
+    }
 
     // Validate/force classification by sector
     let finalClasificacion = clasificacion;
