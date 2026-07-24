@@ -1516,7 +1516,7 @@ Instrucciones:
 
       const payload = {
         model: "claude-sonnet-5",
-        max_tokens: 1024,
+        max_tokens: 4096,
         system: systemPrompt,
         messages: messages
       };
