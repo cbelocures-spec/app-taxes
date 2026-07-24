@@ -360,9 +360,9 @@ app.get('/api/orders', (req, res) => {
     const filtered = orders.filter(o => {
       const cls = o.clasificacion;
       if (sector === 'Admin') return true;
-      if (allowed.includes('Herrería') && isHerreria(cls)) return true;
-      if (allowed.includes('Edilicio') && isEdilicio(cls)) return true;
-      if (allowed.includes('Taller') && (!isHerreria(cls) && !isEdilicio(cls))) return true;
+      if (allowed.some(s => isHerreria(s)) && isHerreria(cls)) return true;
+      if (allowed.some(s => isEdilicio(s)) && isEdilicio(cls)) return true;
+      if (allowed.some(s => s === 'Taller') && (!isHerreria(cls) && !isEdilicio(cls))) return true;
       return false;
     });
 
@@ -652,9 +652,9 @@ app.delete('/api/orders/:id', (req, res) => {
       const orderIsTaller = !orderIsHerreria && !orderIsEdilicio;
 
       let hasPermission = false;
-      if (orderIsHerreria && allowedSectors.includes('Herrería')) hasPermission = true;
-      if (orderIsEdilicio && allowedSectors.includes('Edilicio')) hasPermission = true;
-      if (orderIsTaller && allowedSectors.includes('Taller')) hasPermission = true;
+      if (orderIsHerreria && allowedSectors.some(s => isHerreria(s))) hasPermission = true;
+      if (orderIsEdilicio && allowedSectors.some(s => isEdilicio(s))) hasPermission = true;
+      if (orderIsTaller && allowedSectors.some(s => s === 'Taller')) hasPermission = true;
 
       if (!hasPermission) {
         return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
@@ -827,9 +827,9 @@ app.post('/api/orders/retry/:id', async (req, res) => {
       const orderIsTaller = !orderIsHerreria && !orderIsEdilicio;
 
       let hasPermission = false;
-      if (orderIsHerreria && allowedSectors.includes('Herrería')) hasPermission = true;
-      if (orderIsEdilicio && allowedSectors.includes('Edilicio')) hasPermission = true;
-      if (orderIsTaller && allowedSectors.includes('Taller')) hasPermission = true;
+      if (orderIsHerreria && allowedSectors.some(s => isHerreria(s))) hasPermission = true;
+      if (orderIsEdilicio && allowedSectors.some(s => isEdilicio(s))) hasPermission = true;
+      if (orderIsTaller && allowedSectors.some(s => s === 'Taller')) hasPermission = true;
 
       if (!hasPermission) {
         return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
