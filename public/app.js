@@ -5649,7 +5649,7 @@ async function loadUserPermissionsUI() {
     fabCreateOrder.style.display = currentUserPermissions.canCreateOrder !== false ? 'flex' : 'none';
   }
 
-  // Show authorizations section if Pañol / Admin
+  // Show authorizations section if Pañol / Admin or authorized
   const sector = getSectorByUsername(username);
   const isPaniol = sector === 'Admin' || username.toLowerCase().includes('paniol') || username.toLowerCase().includes('panol') || username.toLowerCase().includes('pañol');
   const authSection = document.getElementById('user-authorizations-section');
@@ -5658,6 +5658,149 @@ async function loadUserPermissionsUI() {
     if (isPaniol) {
       renderUserAuthorizationsTable();
     }
+  }
+
+  // Load 7-day Backup Recovery section
+  renderBackupRecoveryTable();
+}
+
+let currentBackupData = [];
+
+async function renderBackupRecoveryTable() {
+  const container = document.getElementById('backup-table-container');
+  const backupSection = document.getElementById('backup-recovery-section');
+  if (!container) return;
+
+  const currentUsername = localStorage.getItem('currentUserUsername') || '';
+
+  try {
+    const res = await originalFetch('/api/backup/orders', {
+      headers: { 'x-user-username': currentUsername }
+    });
+
+    if (!res.ok) {
+      if (res.status === 403) {
+        if (backupSection) backupSection.style.display = 'none';
+        return;
+      }
+      throw new Error('Error al cargar respaldo');
+    }
+
+    if (backupSection) backupSection.style.display = 'block';
+    currentBackupData = await res.json();
+
+    filterBackupTable();
+  } catch (err) {
+    console.error('Error loading backup orders:', err);
+    container.innerHTML = `<div class="empty-dashboard-state" style="color:var(--danger);">No se pudo cargar el respaldo de seguridad.</div>`;
+  }
+}
+
+function filterBackupTable() {
+  const container = document.getElementById('backup-table-container');
+  if (!container) return;
+
+  const query = (document.getElementById('backup-search-input')?.value || '').toLowerCase().trim();
+
+  const filtered = currentBackupData.filter(o => {
+    if (!query) return true;
+    const intNo = String(o.interno || '').toLowerCase();
+    const otNo = String(o.taxesOrderNumber || '').toLowerCase();
+    const rodado = String(o.rodado || '').toLowerCase();
+    const tasks = (o.tasks || []).map(t => `${t.descripcion} ${t.empleado}`).join(' ').toLowerCase();
+    return intNo.includes(query) || otNo.includes(query) || rodado.includes(query) || tasks.includes(query);
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="empty-dashboard-state">No hay órdenes registradas en el respaldo de los últimos 7 días.</div>`;
+    return;
+  }
+
+  let html = `
+    <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border-color); color:var(--text-muted);">
+          <th style="padding:8px;">Fecha / Creación</th>
+          <th style="padding:8px;">Unidad / Interno</th>
+          <th style="padding:8px;">O.T. Taxes</th>
+          <th style="padding:8px;">Clasificación</th>
+          <th style="padding:8px;">Tareas & Mecánicos (Timeline / Pausas)</th>
+          <th style="padding:8px; text-align:center;">Estado</th>
+          <th style="padding:8px; text-align:center;">Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  filtered.forEach(o => {
+    const fecha = o.fechaEntrega || (o.createdAt ? o.createdAt.split('T')[0] : 'N/A');
+    const createdStr = o.createdAt ? new Date(o.createdAt).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+    const ot = o.taxesOrderNumber ? `<span class="badge badge-success" style="font-size:11px;">#${o.taxesOrderNumber}</span>` : `<span style="color:var(--text-muted); font-style:italic;">Pendiente</span>`;
+    
+    const tasksHtml = (o.tasks || []).map(t => {
+      const pauses = (t.timerHistory || []).filter(h => h.type === 'Pausó' || h.type === 'Inició' || h.type === 'Reanudó' || h.type === 'Fin').map(h => `${h.type} ${h.formatted}`).join(' → ');
+      const pausesBadge = pauses ? `<div style="font-size:10px; color:#64748b; margin-top:2px;">⏱️ ${pauses}</div>` : '';
+      return `<div><b>${t.descripcion || 'Sin desc.'}</b> (${t.empleado || 'S/A'}) ${pausesBadge}</div>`;
+    }).join('') || '<span style="color:var(--text-muted);">Sin tareas</span>';
+
+    const isDeleted = o.deleted === true;
+    const isArchived = o.archived === true;
+    let statusBadge = `<span class="badge badge-primary">Activa</span>`;
+    if (isDeleted) {
+      statusBadge = `<span class="badge badge-danger" style="background:#ef4444; color:#fff;">Eliminada</span>`;
+    } else if (isArchived) {
+      statusBadge = `<span class="badge badge-secondary" style="background:#64748b; color:#fff;">Archivada</span>`;
+    }
+
+    html += `
+      <tr style="border-bottom:1px solid var(--border-color);">
+        <td style="padding:8px;">
+          <b>${fecha}</b><br>
+          <span style="font-size:10px; color:var(--text-muted);">${createdStr}</span>
+        </td>
+        <td style="padding:8px;">
+          <b>Int. ${o.interno || 'S/N'}</b><br>
+          <span style="font-size:10px; color:var(--text-muted);">${o.rodado || ''}</span>
+        </td>
+        <td style="padding:8px;">${ot}</td>
+        <td style="padding:8px;">${o.clasificacion || 'Correctivo'}</td>
+        <td style="padding:8px;">${tasksHtml}</td>
+        <td style="padding:8px; text-align:center;">${statusBadge}</td>
+        <td style="padding:8px; text-align:center;">
+          <button class="btn btn-sm btn-primary" onclick="restoreOrderFromBackup('${o.id}')" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:4px 8px; border-radius:6px;">
+            <span class="material-icons" style="font-size:14px;">restore</span> Restaurar
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `</tbody></table>`;
+  container.innerHTML = html;
+}
+
+async function restoreOrderFromBackup(orderId) {
+  if (!confirm(`¿Desea restaurar esta orden a la pantalla principal?`)) return;
+
+  const currentUsername = localStorage.getItem('currentUserUsername') || '';
+  try {
+    const res = await originalFetch(`/api/backup/restore/${orderId}`, {
+      method: 'POST',
+      headers: { 'x-user-username': currentUsername }
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Error al restaurar orden');
+    }
+
+    showToast('¡Orden restaurada con éxito en la pantalla principal!', 'success');
+    await fetchActiveOrders();
+    renderOrders();
+    renderBackupRecoveryTable();
+  } catch (err) {
+    console.error('Error restoring order from backup:', err);
+    showToast(err.message || 'No se pudo restaurar la orden', 'danger');
   }
 }
 
@@ -5688,6 +5831,7 @@ async function renderUserAuthorizationsTable() {
             <th style="padding:8px; text-align:center;" title="Ver pestaña Parte Taller">🚜 Parte Taller</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Preventivos">⚙️ Preventivos</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Ajustes">🔧 Ajustes</th>
+            <th style="padding:8px; text-align:center;" title="Recuperar órdenes desde respaldo de 7 días">🔄 Backup</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Herrería">🛠️ Herrería</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Edilicio">🏗️ Edilicio</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Taller">🔧 Taller</th>
@@ -5732,6 +5876,9 @@ async function renderUserAuthorizationsTable() {
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-canViewSettings" ${p.canViewSettings !== false ? 'checked' : ''}>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" class="chk-canRestoreBackup" ${p.canRestoreBackup ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-sector-Herreria" ${hasHerreria ? 'checked' : ''}>
@@ -5784,6 +5931,7 @@ async function saveAllUserAuthorizations() {
       const canViewMasivas = row.querySelector('.chk-canViewMasivas')?.checked || false;
       const canViewParteTaller = row.querySelector('.chk-canViewParteTaller')?.checked || false;
       const canViewPreventivos = row.querySelector('.chk-canViewPreventivos')?.checked || false;
+      const canRestoreBackup = row.querySelector('.chk-canRestoreBackup')?.checked || false;
       
       const allowedSectors = [];
       if (row.querySelector('.chk-sector-Herreria')?.checked) allowedSectors.push('Herrería');
@@ -5799,6 +5947,7 @@ async function saveAllUserAuthorizations() {
         canViewMasivas,
         canViewParteTaller,
         canViewPreventivos,
+        canRestoreBackup,
         allowedSectors
       };
 

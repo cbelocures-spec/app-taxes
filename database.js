@@ -57,6 +57,7 @@ function getDefaultUserPermissions(username, sector) {
       canViewMasivas: true,
       canViewParteTaller: true,
       canViewPreventivos: true,
+      canRestoreBackup: true,
       allowedSectors: ['Herrería', 'Edilicio', 'Taller']
     };
   }
@@ -72,6 +73,7 @@ function getDefaultUserPermissions(username, sector) {
     canViewMasivas: true,
     canViewParteTaller: true,
     canViewPreventivos: true,
+    canRestoreBackup: false,
     allowedSectors: [defaultSector]
   };
 }
@@ -511,6 +513,7 @@ class LocalDB {
         canViewMasivas: userObj.permissions.canViewMasivas !== undefined ? !!userObj.permissions.canViewMasivas : defaults.canViewMasivas,
         canViewParteTaller: userObj.permissions.canViewParteTaller !== undefined ? !!userObj.permissions.canViewParteTaller : defaults.canViewParteTaller,
         canViewPreventivos: userObj.permissions.canViewPreventivos !== undefined ? !!userObj.permissions.canViewPreventivos : defaults.canViewPreventivos,
+        canRestoreBackup: userObj.permissions.canRestoreBackup !== undefined ? !!userObj.permissions.canRestoreBackup : defaults.canRestoreBackup,
         allowedSectors
       };
     }
@@ -659,6 +662,8 @@ class LocalDB {
 
     db.workOrders.push(newOrder);
     this.write(db);
+    // Save backup snapshot automatically
+    this.saveBackupSnapshot(newOrder);
     return newOrder;
   }
 
@@ -684,6 +689,8 @@ class LocalDB {
       });
       db.workOrders[idx] = { ...db.workOrders[idx], ...cleanUpdates };
       this.write(db);
+      // Save backup snapshot automatically on every meaningful update
+      this.saveBackupSnapshot(db.workOrders[idx]);
       return db.workOrders[idx];
     }
     return null;
@@ -814,6 +821,82 @@ class LocalDB {
     db.deletedOrdersLog.push(logItem);
     this.write(db);
     return logItem;
+  }
+
+  // ─── 7-DAY ROLLING BACKUP ────────────────────────────────────────────────────
+
+  saveBackupSnapshot(order) {
+    if (!order || !order.id) return;
+    const db = this.read();
+    if (!db.backupOrders) db.backupOrders = {};
+
+    // Prune old entries first (entries older than 7 days, one by one)
+    this.pruneBackupOrders(db);
+
+    // Store the latest snapshot keyed by order ID
+    db.backupOrders[order.id] = {
+      ...order,
+      _backupAt: new Date().toISOString()
+    };
+
+    this.write(db);
+  }
+
+  pruneBackupOrders(dbArg) {
+    const db = dbArg || this.read();
+    if (!db.backupOrders) return;
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    let pruned = 0;
+    for (const key of Object.keys(db.backupOrders)) {
+      const entry = db.backupOrders[key];
+      const backupTime = entry._backupAt ? new Date(entry._backupAt).getTime() : 0;
+      const createdTime = entry.createdAt ? new Date(entry.createdAt).getTime() : 0;
+      // Use the oldest of createdAt vs _backupAt — prune when createdAt is older than 7 days
+      if (createdTime && createdTime < sevenDaysAgo) {
+        delete db.backupOrders[key];
+        pruned++;
+      }
+    }
+    if (pruned > 0 && !dbArg) this.write(db);
+    return pruned;
+  }
+
+  getBackupOrders() {
+    const db = this.read();
+    if (!db.backupOrders) return [];
+    return Object.values(db.backupOrders).sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta; // newest first
+    });
+  }
+
+  restoreFromBackup(orderId) {
+    const db = this.read();
+    if (!db.backupOrders || !db.backupOrders[orderId]) return null;
+    const snapshot = { ...db.backupOrders[orderId] };
+    delete snapshot._backupAt;
+
+    // Restore: undelete, unarchive, reset sync to success if it has a Taxes number
+    snapshot.deleted = false;
+    snapshot.deletedAt = null;
+    snapshot.archived = false;
+    snapshot.archivedAt = null;
+    if (!snapshot.syncStatus || snapshot.syncStatus === 'pending' || snapshot.syncStatus === 'syncing') {
+      if (snapshot.taxesOrderNumber) {
+        snapshot.syncStatus = 'success';
+      }
+    }
+
+    // Upsert into workOrders
+    const idx = db.workOrders.findIndex(o => o.id === orderId);
+    if (idx !== -1) {
+      db.workOrders[idx] = snapshot;
+    } else {
+      db.workOrders.push(snapshot);
+    }
+    this.write(db);
+    return snapshot;
   }
 }
 

@@ -691,6 +691,57 @@ app.get('/api/orders/deleted-log', (req, res) => {
   }
 });
 
+// ─── 7-DAY ROLLING BACKUP ENDPOINTS ────────────────────────────────────────────
+
+// Get all backup snapshots (last 7 days)
+app.get('/api/backup/orders', (req, res) => {
+  try {
+    const requester = req.headers['x-user-username'] || null;
+    const userPerms = db.getUserPermissions(requester);
+    if (!userPerms.canRestoreBackup) {
+      return res.status(403).json({ error: 'No tiene permisos para ver el respaldo.' });
+    }
+    const backups = db.getBackupOrders();
+    res.json(backups);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Restore a specific order from backup
+app.post('/api/backup/restore/:id', (req, res) => {
+  try {
+    const requester = req.headers['x-user-username'] || null;
+    const userPerms = db.getUserPermissions(requester);
+    if (!userPerms.canRestoreBackup) {
+      return res.status(403).json({ error: 'No tiene permisos para restaurar órdenes desde el respaldo.' });
+    }
+    const restored = db.restoreFromBackup(req.params.id);
+    if (!restored) {
+      return res.status(404).json({ error: 'Orden no encontrada en el respaldo.' });
+    }
+    console.log(`[Backup] Restored order ${req.params.id} (Interno: ${restored.interno}) by ${requester}`);
+    res.json({ success: true, order: restored });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Manually trigger pruning of orders older than 7 days
+app.post('/api/backup/prune', (req, res) => {
+  try {
+    const requester = req.headers['x-user-username'] || null;
+    const userPerms = db.getUserPermissions(requester);
+    if (!userPerms.canRestoreBackup) {
+      return res.status(403).json({ error: 'No tiene permisos para ejecutar limpieza del respaldo.' });
+    }
+    const pruned = db.pruneBackupOrders();
+    res.json({ success: true, pruned });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Soft-archive a work order
 app.patch('/api/orders/:id/archive', (req, res) => {
   try {

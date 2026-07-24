@@ -389,10 +389,30 @@
         </div>
         <div class="catalog-sync-card" style="padding: 14px; overflow-x: auto;">
           <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-            Configuración de permisos y accesos granulares por usuario (exclusivo para Pañol / Admin).
+            Configuración de permisos y accesos granulares por usuario (exclusivo para Pañol / Admin). La casilla <b>🔄 Backup</b> autoriza a cada usuario a ver y restaurar el respaldo de 7 días.
           </p>
           <div id="user-permissions-table-container">
             <div class="empty-dashboard-state">Cargando autorizaciones...</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="backup-recovery-section" style="display: none; margin-top: 24px;">
+        <div class="section-title">
+          <h3>📦 Respaldo de Seguridad y Papelera (Últimos 7 Días)</h3>
+        </div>
+        <div class="catalog-sync-card" style="padding: 14px; overflow-x: auto;">
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+            Registro continuo de copias de seguridad de los últimos 7 días. Las órdenes rotan automáticamente y se eliminan del respaldo de a una al cumplir 7 días. Podés restaurar cualquier orden borrada o modificada con un clic.
+          </p>
+          <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; justify-content: space-between;">
+            <input type="text" id="backup-search-input" placeholder="Buscar por interno, O.T., tarea o mecánico..." onkeyup="filterBackupTable()" style="padding: 6px 12px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 6px; width: 60%;">
+            <button class="btn btn-secondary" onclick="renderBackupRecoveryTable()" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 12px;">
+              <span class="material-icons" style="font-size: 16px;">refresh</span> Actualizar Respaldo
+            </button>
+          </div>
+          <div id="backup-table-container">
+            <div class="empty-dashboard-state">Cargando órdenes del respaldo...</div>
           </div>
         </div>
       </div>
