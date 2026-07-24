@@ -39,6 +39,8 @@ function normalizeEmail(email) {
     domain = 'contenedoreshugo.com.ar';
   }
   return `${localPart}@${domain}`;
+}
+
 function getDefaultUserPermissions(username, sector) {
   const normUser = normalizeEmail(username || '');
   const isPaniol = normUser.includes('paniol') || normUser.includes('panol') || normUser.includes('pañol') || sector === 'Admin';
