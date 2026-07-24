@@ -1414,6 +1414,9 @@ app.post('/api/assistant/chat', async (req, res) => {
                               lowerMsg.includes('parado') || 
                               lowerMsg.includes('reparacion') || 
                               lowerMsg.includes('reparación') || 
+                              lowerMsg.includes('servicio pendiente') || 
+                              lowerMsg.includes('servicios pendientes') || 
+                              lowerMsg.includes('pendiente') || 
                               lowerMsg.includes('rotura') || 
                               lowerMsg.includes('marcar interno') || 
                               lowerMsg.includes('marcar unidad') || 
@@ -1426,15 +1429,19 @@ app.post('/api/assistant/chat', async (req, res) => {
       let nuevoEstado = 'fuera_de_servicio';
       if (lowerMsg.includes('operativo') || lowerMsg.includes('alta') || lowerMsg.includes('listo')) {
         nuevoEstado = 'operativo';
+      } else if (lowerMsg.includes('servicio pendiente') || lowerMsg.includes('servicios pendientes') || lowerMsg.includes('pendiente')) {
+        nuevoEstado = 'servicios_pendientes';
       } else if (lowerMsg.includes('reparacion') || lowerMsg.includes('reparación') || lowerMsg.includes('taller')) {
         nuevoEstado = 'reparacion';
+      } else if (lowerMsg.includes('fuera de servicio') || lowerMsg.includes('parado') || lowerMsg.includes('rotura')) {
+        nuevoEstado = 'fuera_de_servicio';
       }
 
       let noveltyText = message
         .replace(/(?:marcar|unidad|interno|camion|camión|nro|nº)?\s*#?\d{1,4}/gi, '')
-        .replace(/fuera de servicio|novedad|parado|en taller|marcar como|esta en|está en/gi, '')
+        .replace(/fuera de servicio|servicios pendientes|servicio pendiente|reparaciones|reparación|reparacion|novedad|parado|en taller|marcar como|esta en|está en|pendiente/gi, '')
         .trim();
-      if (!noveltyText || noveltyText.length < 3) {
+      if (!noveltyText || noveltyText.length < 2) {
         noveltyText = message.trim();
       }
 
@@ -1454,7 +1461,9 @@ app.post('/api/assistant/chat', async (req, res) => {
             })
           });
           if (ptResp.ok) {
-            const estadoLabel = nuevoEstado === 'fuera_de_servicio' ? '❌ Fuera de Servicio' : (nuevoEstado === 'reparacion' ? '🛠️ En Reparación' : '✅ Operativo');
+            const estadoLabel = nuevoEstado === 'fuera_de_servicio' ? '❌ Fuera de Servicio' : 
+                               (nuevoEstado === 'reparacion' ? '🔧 En Reparación' : 
+                               (nuevoEstado === 'servicios_pendientes' ? '📋 Servicios Pendientes' : '✅ Operativo'));
             return res.json({
               reply: `✅ **Novedad registrada en Parte de Taller**:\n- **Unidad:** #${internoDetected}\n- **Estado:** ${estadoLabel}\n- **Novedad:** "${noveltyText}"\n\nEl Parte de Taller fue actualizado inmediatamente.`
             });
@@ -2208,13 +2217,17 @@ app.post(['/api/webhook/whatsapp', '/api/whatsapp'], async (req, res) => {
     let nuevoEstado = 'fuera_de_servicio';
     if (lower.includes('operativo') || lower.includes('alta') || lower.includes('listo')) {
       nuevoEstado = 'operativo';
+    } else if (lower.includes('servicio pendiente') || lower.includes('servicios pendientes') || lower.includes('pendiente')) {
+      nuevoEstado = 'servicios_pendientes';
     } else if (lower.includes('reparacion') || lower.includes('reparación') || lower.includes('taller')) {
       nuevoEstado = 'reparacion';
+    } else if (lower.includes('fuera de servicio') || lower.includes('parado') || lower.includes('rotura')) {
+      nuevoEstado = 'fuera_de_servicio';
     }
 
     let noveltyText = messageText
       .replace(/(?:marcar|unidad|interno|camion|camión|nro|nº)?\s*#?\d{1,4}/gi, '')
-      .replace(/fuera de servicio|novedad|parado|en taller|marcar como|esta en|está en/gi, '')
+      .replace(/fuera de servicio|servicios pendientes|servicio pendiente|reparaciones|reparación|reparacion|novedad|parado|en taller|marcar como|esta en|está en|pendiente/gi, '')
       .trim();
     if (!noveltyText || noveltyText.length < 2) {
       noveltyText = messageText.trim();
