@@ -1284,6 +1284,11 @@ Devuelve estrictamente un array JSON de objetos con el siguiente formato, sin bl
   }
 });
 
+app.get('/api/assistant/debug_keys', (req, res) => {
+  const settings = db.getSettings();
+  res.json({ gemini: settings.geminiApiKey, claude: settings.claudeApiKey });
+});
+
 // AI assistant chat endpoint
 app.post('/api/assistant/chat', async (req, res) => {
   try {
