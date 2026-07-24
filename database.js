@@ -67,6 +67,34 @@ function getDefaultUserPermissions(username, sector) {
   };
 }
 
+function getSectorByUsername(username) {
+  if (!username) return 'Taller';
+  const cleanUsername = String(username).split(',')[0].trim();
+  const email = cleanUsername.toLowerCase().trim();
+  
+  if (
+    email.includes('taller') || 
+    email.includes('paniol') || 
+    email.includes('panol') || 
+    email.includes('pañol')
+  ) {
+    return 'Admin';
+  }
+  if (
+    email.includes('jcarmona') || 
+    email.includes('carmona')
+  ) {
+    return 'Herrería';
+  }
+  if (
+    email.includes('ftoledo') || 
+    email.includes('toledo')
+  ) {
+    return 'Edilicio';
+  }
+  return 'Taller';
+}
+
 function cleanEncoding(text) {
   if (typeof text !== 'string') return text;
   
