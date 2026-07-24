@@ -274,6 +274,48 @@ app.post('/api/admin/reset-order-status', (req, res) => {
   }
 });
 
+// User Permissions Management API
+app.get('/api/users/permissions', (req, res) => {
+  try {
+    const users = db.getAllUsers();
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/my-permissions', (req, res) => {
+  try {
+    const username = req.headers['x-user-username'] || null;
+    const permissions = db.getUserPermissions(username);
+    res.json(permissions);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/users/permissions', (req, res) => {
+  try {
+    const requester = req.headers['x-user-username'] || null;
+    const sector = getSectorByUsername(requester);
+    const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
+    
+    if (!isPaniol) {
+      return res.status(403).json({ error: "Solo Pañol / Admin puede modificar autorizaciones de usuarios." });
+    }
+
+    const { username, permissions } = req.body;
+    if (!username || !permissions) {
+      return res.status(400).json({ error: "username y permissions requeridos." });
+    }
+
+    const updated = db.saveUserPermissions(username, permissions);
+    res.json({ success: true, permissions: updated });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 app.get('/api/debug/logs', (req, res) => {
   res.json(lastConsoleErrors);
@@ -309,17 +351,19 @@ app.get('/api/orders', (req, res) => {
   try {
     const username = req.headers['x-user-username'] || null;
     const sector = getSectorByUsername(username);
+    const userPerms = db.getUserPermissions(username);
+    const allowed = userPerms.allowedSectors || [];
 
     const orders = db.getWorkOrders();
     
-    // Filter orders
+    // Filter orders based on user's authorized sectors
     const filtered = orders.filter(o => {
       const cls = o.clasificacion;
       if (sector === 'Admin') return true;
-      if (sector === 'Herrería') return isHerreria(cls);
-      if (sector === 'Edilicio') return isEdilicio(cls);
-      // Taller sees only Taller orders (neither Herrería nor Edilicio)
-      return !isHerreria(cls) && !isEdilicio(cls);
+      if (allowed.includes('Herrería') && isHerreria(cls)) return true;
+      if (allowed.includes('Edilicio') && isEdilicio(cls)) return true;
+      if (allowed.includes('Taller') && (!isHerreria(cls) && !isEdilicio(cls))) return true;
+      return false;
     });
 
     // Sort by createdAt descending
@@ -593,6 +637,10 @@ app.delete('/api/orders/:id', (req, res) => {
 
     const requester = req.headers['x-user-username'] || null;
     const sector = getSectorByUsername(requester);
+    const userPerms = db.getUserPermissions(requester);
+    if (!userPerms.canDelete) {
+      return res.status(403).json({ error: "No tiene permiso configurado para eliminar órdenes." });
+    }
 
     // Check sector permission
     const existingCls = existing.clasificacion;
@@ -762,7 +810,11 @@ app.post('/api/orders/retry/:id', async (req, res) => {
     const existingCls = order.clasificacion;
 
     console.log(`[Permission Audit - Sync Retry] Requester: "${requester}", Resolved Sector: "${sector}", Order Cls: "${existingCls}"`);
-    const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
+    const userPerms = db.getUserPermissions(requester);
+    if (!userPerms.canSync) {
+      return res.status(403).json({ error: "No tiene permiso configurado para sincronizar órdenes." });
+    }
+
     if (!isPaniol) {
       if (sector === 'Herrería' && !isHerreria(existingCls)) {
         return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });

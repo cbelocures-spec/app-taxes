@@ -5578,6 +5578,208 @@ function getFilteredArchivedOrders() {
   });
 }
 
+let currentUserPermissions = {
+  canDelete: true,
+  canSync: true,
+  canViewHistory: true,
+  canViewMasivas: true,
+  canViewParteTaller: true,
+  allowedSectors: ['Herrería', 'Edilicio', 'Taller']
+};
+
+async function loadUserPermissionsUI() {
+  const username = localStorage.getItem('currentUserUsername');
+  if (!username) return;
+
+  try {
+    const res = await originalFetch('/api/my-permissions', {
+      headers: { 'x-user-username': username }
+    });
+    if (res.ok) {
+      currentUserPermissions = await res.json();
+    }
+  } catch (e) {
+    console.error('Error fetching my permissions:', e);
+  }
+
+  // Apply nav item visibility based on permissions
+  const navHistorial = document.getElementById('nav-historial');
+  if (navHistorial) {
+    navHistorial.style.display = currentUserPermissions.canViewHistory ? 'flex' : 'none';
+  }
+
+  const navBulk = document.getElementById('nav-bulk');
+  if (navBulk) {
+    navBulk.style.display = currentUserPermissions.canViewMasivas ? 'flex' : 'none';
+  }
+
+  const navParteTaller = document.getElementById('nav-partetaller');
+  if (navParteTaller) {
+    navParteTaller.style.display = currentUserPermissions.canViewParteTaller ? 'flex' : 'none';
+  }
+
+  // Show authorizations section if Pañol / Admin
+  const sector = getSectorByUsername(username);
+  const isPaniol = sector === 'Admin' || username.toLowerCase().includes('paniol') || username.toLowerCase().includes('panol') || username.toLowerCase().includes('pañol');
+  const authSection = document.getElementById('user-authorizations-section');
+  if (authSection) {
+    authSection.style.display = isPaniol ? 'block' : 'none';
+    if (isPaniol) {
+      renderUserAuthorizationsTable();
+    }
+  }
+}
+
+async function renderUserAuthorizationsTable() {
+  const container = document.getElementById('user-permissions-table-container');
+  if (!container) return;
+
+  try {
+    const res = await originalFetch('/api/users/permissions');
+    if (!res.ok) throw new Error('Error al cargar permisos');
+    const users = await res.json();
+
+    if (!users || users.length === 0) {
+      container.innerHTML = `<div class="empty-dashboard-state">No se encontraron usuarios.</div>`;
+      return;
+    }
+
+    let html = `
+      <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border-color); color:var(--text-muted);">
+            <th style="padding:8px;">Usuario / Sector</th>
+            <th style="padding:8px; text-align:center;" title="Permite eliminar órdenes localmente">🗑️ Borrar</th>
+            <th style="padding:8px; text-align:center;" title="Permite subir órdenes a Taxes">☁️ Sync</th>
+            <th style="padding:8px; text-align:center;" title="Ver pestaña Historial">📜 Historial</th>
+            <th style="padding:8px; text-align:center;" title="Ver pestaña Masivas">📋 Masivas</th>
+            <th style="padding:8px; text-align:center;" title="Ver pestaña Parte Taller">🚜 Parte Taller</th>
+            <th style="padding:8px; text-align:center;" title="Ver órdenes de Herrería">🛠️ Herrería</th>
+            <th style="padding:8px; text-align:center;" title="Ver órdenes de Edilicio">🏗️ Edilicio</th>
+            <th style="padding:8px; text-align:center;" title="Ver órdenes de Taller">🔧 Taller</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    users.forEach(u => {
+      const p = u.permissions || {};
+      const allowed = p.allowedSectors || [];
+      const hasHerreria = allowed.includes('Herrería');
+      const hasEdilicio = allowed.includes('Edilicio');
+      const hasTaller = allowed.includes('Taller');
+
+      html += `
+        <tr style="border-bottom:1px solid var(--border-color);">
+          <td style="padding:8px; font-weight:600;">
+            ${u.username}<br>
+            <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">Sector predeterminado: ${u.sector}</span>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" ${p.canDelete ? 'checked' : ''} onchange="updateUserPermissionToggle('${u.username}', 'canDelete', this.checked)">
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" ${p.canSync ? 'checked' : ''} onchange="updateUserPermissionToggle('${u.username}', 'canSync', this.checked)">
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" ${p.canViewHistory ? 'checked' : ''} onchange="updateUserPermissionToggle('${u.username}', 'canViewHistory', this.checked)">
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" ${p.canViewMasivas ? 'checked' : ''} onchange="updateUserPermissionToggle('${u.username}', 'canViewMasivas', this.checked)">
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" ${p.canViewParteTaller ? 'checked' : ''} onchange="updateUserPermissionToggle('${u.username}', 'canViewParteTaller', this.checked)">
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" ${hasHerreria ? 'checked' : ''} onchange="updateUserSectorPermissionToggle('${u.username}', 'Herrería', this.checked)">
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" ${hasEdilicio ? 'checked' : ''} onchange="updateUserSectorPermissionToggle('${u.username}', 'Edilicio', this.checked)">
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" ${hasTaller ? 'checked' : ''} onchange="updateUserSectorPermissionToggle('${u.username}', 'Taller', this.checked)">
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('Error rendering authorizations:', err);
+    container.innerHTML = `<div class="empty-dashboard-state" style="color:var(--danger);">Error al cargar autorizaciones.</div>`;
+  }
+}
+
+async function updateUserPermissionToggle(targetUsername, field, isChecked) {
+  const currentUsername = localStorage.getItem('currentUserUsername') || '';
+  try {
+    const resGet = await originalFetch('/api/users/permissions');
+    const users = await resGet.json();
+    const userObj = users.find(u => u.username === targetUsername);
+    const perms = userObj ? { ...userObj.permissions } : {};
+
+    perms[field] = isChecked;
+
+    const resPost = await originalFetch('/api/users/permissions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-username': currentUsername
+      },
+      body: JSON.stringify({ username: targetUsername, permissions: perms })
+    });
+
+    if (!resPost.ok) {
+      const err = await resPost.json();
+      throw new Error(err.error || 'Error al guardar permiso');
+    }
+
+    showToast("Permiso actualizado", "success");
+  } catch (err) {
+    showToast(err.message, "danger");
+    renderUserAuthorizationsTable();
+  }
+}
+
+async function updateUserSectorPermissionToggle(targetUsername, sectorName, isChecked) {
+  const currentUsername = localStorage.getItem('currentUserUsername') || '';
+  try {
+    const resGet = await originalFetch('/api/users/permissions');
+    const users = await resGet.json();
+    const userObj = users.find(u => u.username === targetUsername);
+    const perms = userObj ? { ...userObj.permissions } : {};
+    let allowed = Array.isArray(perms.allowedSectors) ? [...perms.allowedSectors] : [];
+
+    if (isChecked) {
+      if (!allowed.includes(sectorName)) allowed.push(sectorName);
+    } else {
+      allowed = allowed.filter(s => s !== sectorName);
+    }
+
+    perms.allowedSectors = allowed;
+
+    const resPost = await originalFetch('/api/users/permissions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-username': currentUsername
+      },
+      body: JSON.stringify({ username: targetUsername, permissions: perms })
+    });
+
+    if (!resPost.ok) {
+      const err = await resPost.json();
+      throw new Error(err.error || 'Error al guardar sector');
+    }
+
+    showToast("Sectores de usuario actualizados", "success");
+  } catch (err) {
+    showToast(err.message, "danger");
+    renderUserAuthorizationsTable();
+  }
+}
+
 function checkUserSession() {
   const username = localStorage.getItem('currentUserUsername');
   const loginOverlay = document.getElementById('login-overlay');
@@ -5603,11 +5805,8 @@ function checkUserSession() {
       }
     }
     
-    // Show/hide nav Historial button — Admin only
-    const navHistorial = document.getElementById('nav-historial');
-    if (navHistorial) {
-      navHistorial.style.display = (sector === 'Admin') ? 'flex' : 'none';
-    }
+    // Show/hide nav Historial button & load user permissions
+    loadUserPermissionsUI();
 
     updateClassificationSelectOptions();
   }

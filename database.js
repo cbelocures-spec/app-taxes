@@ -39,6 +39,30 @@ function normalizeEmail(email) {
     domain = 'contenedoreshugo.com.ar';
   }
   return `${localPart}@${domain}`;
+function getDefaultUserPermissions(username, sector) {
+  const normUser = normalizeEmail(username || '');
+  const isPaniol = normUser.includes('paniol') || normUser.includes('panol') || normUser.includes('pañol') || sector === 'Admin';
+  if (isPaniol) {
+    return {
+      canDelete: true,
+      canSync: true,
+      canViewHistory: true,
+      canViewMasivas: true,
+      canViewParteTaller: true,
+      allowedSectors: ['Herrería', 'Edilicio', 'Taller']
+    };
+  }
+  
+  // Default for sector users
+  const defaultSector = sector || 'Herrería';
+  return {
+    canDelete: true,
+    canSync: true,
+    canViewHistory: true,
+    canViewMasivas: true,
+    canViewParteTaller: true,
+    allowedSectors: [defaultSector]
+  };
 }
 
 function cleanEncoding(text) {
@@ -395,6 +419,55 @@ class LocalDB {
     };
     this.write(db);
     return db.users[key];
+  }
+
+  getAllUsers() {
+    const db = this.read();
+    const usersObj = db.users || {};
+    return Object.keys(usersObj).map(key => {
+      const user = usersObj[key];
+      const sector = getSectorByUsername(key);
+      const permissions = this.getUserPermissions(key, sector);
+      return {
+        username: key,
+        sector: sector,
+        permissions: permissions
+      };
+    });
+  }
+
+  getUserPermissions(username, sectorOverride = null) {
+    if (!username) return getDefaultUserPermissions('', 'Taller');
+    const db = this.read();
+    const key = normalizeEmail(username);
+    const userObj = db.users ? db.users[key] : null;
+    const sector = sectorOverride || getSectorByUsername(key);
+    const defaults = getDefaultUserPermissions(key, sector);
+    
+    if (userObj && userObj.permissions && typeof userObj.permissions === 'object') {
+      return {
+        canDelete: userObj.permissions.canDelete !== undefined ? !!userObj.permissions.canDelete : defaults.canDelete,
+        canSync: userObj.permissions.canSync !== undefined ? !!userObj.permissions.canSync : defaults.canSync,
+        canViewHistory: userObj.permissions.canViewHistory !== undefined ? !!userObj.permissions.canViewHistory : defaults.canViewHistory,
+        canViewMasivas: userObj.permissions.canViewMasivas !== undefined ? !!userObj.permissions.canViewMasivas : defaults.canViewMasivas,
+        canViewParteTaller: userObj.permissions.canViewParteTaller !== undefined ? !!userObj.permissions.canViewParteTaller : defaults.canViewParteTaller,
+        allowedSectors: Array.isArray(userObj.permissions.allowedSectors) ? userObj.permissions.allowedSectors : defaults.allowedSectors
+      };
+    }
+    return defaults;
+  }
+
+  saveUserPermissions(username, permissions) {
+    if (!username) return null;
+    const db = this.read();
+    if (!db.users) db.users = {};
+    const key = normalizeEmail(username);
+    if (!db.users[key]) {
+      db.users[key] = { username: key };
+    }
+    db.users[key].permissions = permissions;
+    this.write(db);
+    return db.users[key].permissions;
   }
 
   normalizeEmail(email) {
