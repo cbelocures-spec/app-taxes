@@ -29,6 +29,19 @@ window.fetch = async function(url, options = {}) {
       options.headers['X-User-Username'] = username;
     }
   }
+  const usuarioLogueadoStr = localStorage.getItem('usuarioLogueado');
+  if (usuarioLogueadoStr) {
+    try {
+      const uObj = JSON.parse(usuarioLogueadoStr);
+      if (uObj && uObj.permisos) {
+        if (options.headers instanceof Headers) {
+          options.headers.set('X-User-Permissions', JSON.stringify(uObj.permisos));
+        } else {
+          options.headers['X-User-Permissions'] = JSON.stringify(uObj.permisos);
+        }
+      }
+    } catch(e) {}
+  }
   try {
     const response = await originalFetch(url, options);
     
@@ -6018,6 +6031,81 @@ function checkUserSession() {
   }
 }
 
+function mostrarPanelPrincipal() {
+  checkUserSession();
+}
+
+async function manejarLogin(username, password) {
+  try {
+    const respuesta = await originalFetch('/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'bypass-tunnel-reminder': 'true',
+        'ngrok-skip-browser-warning': 'true'
+      },
+      body: JSON.stringify({ username, password })
+    });
+
+    const datos = await respuesta.json();
+
+    if (!respuesta.ok) {
+      alert(datos.error || "Usuario o contraseña incorrectos");
+      return false;
+    }
+
+    const usuarioObj = datos.usuario || {
+      username: datos.username || username,
+      sector: datos.sector || 'Taller',
+      permisos: ['canSyncTaxes', 'canRestoreBackup']
+    };
+
+    // Save to localStorage
+    localStorage.setItem('usuarioLogueado', JSON.stringify(usuarioObj));
+    localStorage.setItem('currentUserUsername', usuarioObj.username);
+    localStorage.setItem('currentUserPassword', password);
+
+    showToast("Acceso concedido", "success");
+    mostrarPanelPrincipal();
+
+    fetchSettings();
+    fetchCatalogs();
+    fetchOrders();
+    fetchActiveMechanics();
+    return true;
+  } catch (error) {
+    console.error("Error en el login:", error);
+    alert("Error al conectar con el servidor.");
+    return false;
+  }
+}
+
+async function dispararSincronizacion() {
+  const usuarioStr = localStorage.getItem('usuarioLogueado');
+  const usuario = usuarioStr ? JSON.parse(usuarioStr) : null;
+
+  if (!usuario) {
+    alert("Sesión expirada. Volvé a ingresar.");
+    return;
+  }
+
+  const respuesta = await fetch('/api/sync-taxes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Permissions': JSON.stringify(usuario.permisos || [])
+    }
+  });
+
+  const datos = await respuesta.json();
+  if (!respuesta.ok) {
+    alert(datos.error || "No tenés permisos para sincronizar con Taxes.");
+    return;
+  }
+
+  alert(datos.mensaje || "Sincronización en curso...");
+}
+
 async function submitLoginForm() {
   const usernameEl = document.getElementById('login-username');
   const passwordEl = document.getElementById('login-password');
@@ -6044,39 +6132,7 @@ async function submitLoginForm() {
   }
 
   try {
-    const res = await originalFetch('/api/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'bypass-tunnel-reminder': 'true',
-        'ngrok-skip-browser-warning': 'true'
-      },
-      body: JSON.stringify({ username, password })
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || "Usuario o contraseña inválidos");
-    }
-
-    const data = await res.json();
-    
-    // Save to localStorage
-    localStorage.setItem('currentUserUsername', data.username);
-    localStorage.setItem('currentUserPassword', password);
-    showToast("Sesión iniciada correctamente", "success");
-    
-    // Hide overlay & refresh everything
-    checkUserSession();
-    
-    // Trigger initial data fetches
-    fetchSettings();
-    fetchCatalogs();
-    fetchOrders();
-    fetchActiveMechanics();
-  } catch (error) {
-    console.error(error);
-    showToast(error.message || "Error al iniciar sesión", "danger");
+    await manejarLogin(username, password);
   } finally {
     // Restore button state
     if (submitBtn) {

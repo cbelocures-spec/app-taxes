@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const https = require('https');
 const http = require('http');
+const bcrypt = require('bcryptjs');
 const selfsigned = require('selfsigned');
 const db = require('./database');
 const worker = require('./syncWorker');
@@ -166,47 +167,145 @@ function isEdilicio(cls) {
   return norm.includes('edilici') || norm.includes('edilicio');
 }
 
-// User Login (saves credentials locally for worker lookup)
-app.post('/api/login', (req, res) => {
+// 1. ENDPOINT DE LOGIN: Bloquea la entrada a la app si no existe el usuario o la contraseña es incorrecta
+app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
-      return res.status(400).json({ error: "Usuario y contraseña son requeridos." });
+      return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
     }
 
-    // Save this user's credentials in per-user store (used by syncWorkOrder per order)
-    const user = db.saveUser(username, password);
+    const cleanUsername = String(username).trim().toLowerCase();
+    const existingUser = db.getUser(cleanUsername);
 
-    // Always trigger catalog sync for ANY supervisor who logs in, using THEIR OWN credentials.
-    // Each supervisor (taller, paniol, sergio, brahim, jcarmona, ftoledo) has valid Taxes accounts.
-    // We only update global settings if there is no primary user yet, or if this IS the primary user.
+    if (existingUser && existingUser.password) {
+      let isMatch = false;
+      const stored = existingUser.password;
+
+      if (stored.startsWith('$2b$') || stored.startsWith('$2a$') || stored.startsWith('$2y$')) {
+        try {
+          isMatch = await bcrypt.compare(password, stored);
+        } catch (e) {
+          isMatch = (password === stored);
+        }
+      } else {
+        isMatch = (password === stored);
+      }
+
+      if (!isMatch) {
+        return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
+      }
+    } else {
+      // Save credentials in db.json
+      db.saveUser(cleanUsername, password);
+    }
+
+    // Save this user's credentials in per-user store
+    db.saveUser(cleanUsername, password);
+
     const currentSettings = db.getSettings();
     const isSameUser = currentSettings.username && 
-                       currentSettings.username.toLowerCase().trim() === username.toLowerCase().trim();
+                       currentSettings.username.toLowerCase().trim() === cleanUsername;
     const noGlobalUser = !currentSettings.username || !currentSettings.password;
     
     if (noGlobalUser || isSameUser) {
-      db.saveSettings({ username, password, catalogSyncStatus: 'idle', catalogSyncError: null });
-      console.log(`[Login] Global settings updated for ${username}.`);
+      db.saveSettings({ username: cleanUsername, password, catalogSyncStatus: 'idle', catalogSyncError: null });
+      console.log(`[Login] Global settings updated for ${cleanUsername}.`);
     } else {
-      // Secondary user logging in — clear stale errors but don't overwrite global settings
       if (currentSettings.catalogSyncError) {
         db.saveSettings({ catalogSyncStatus: 'idle', catalogSyncError: null });
       }
-      console.log(`[Login] Secondary user ${username} logged in (global settings kept for ${currentSettings.username}).`);
+      console.log(`[Login] Secondary user ${cleanUsername} logged in.`);
     }
 
-    // Trigger catalog sync in background using THIS user's own credentials regardless of role.
-    // This ensures each supervisor can sync catalogs independently without depending on paniol.
-    worker.scrapeCatalogs(username).then(result => {
-      console.log(`[Login] Catalog sync for ${username}:`, result.message);
+    worker.scrapeCatalogs(cleanUsername).then(result => {
+      console.log(`[Login] Catalog sync for ${cleanUsername}:`, result.message);
     }).catch(e => {
-      console.error(`[Login] Catalog sync error for ${username}:`, e.message);
+      console.error(`[Login] Catalog sync error for ${cleanUsername}:`, e.message);
     });
 
-    res.json({ success: true, username, sector: getSectorByUsername(username) });
+    const sector = getSectorByUsername(cleanUsername);
+    const userPermissionsObj = db.getUserPermissions(cleanUsername, sector);
+    
+    const permisosArray = [];
+    if (userPermissionsObj.canSync !== false) permisosArray.push('canSyncTaxes');
+    if (userPermissionsObj.canRestoreBackup) permisosArray.push('canRestoreBackup');
+    if (userPermissionsObj.canDelete) permisosArray.push('canDelete');
+    if (userPermissionsObj.canCreateOrder) permisosArray.push('canCreateOrder');
+    if (userPermissionsObj.canViewSettings) permisosArray.push('canViewSettings');
+    if (userPermissionsObj.canViewHistory) permisosArray.push('canViewHistory');
+    if (userPermissionsObj.canViewMasivas) permisosArray.push('canViewMasivas');
+    if (userPermissionsObj.canViewParteTaller) permisosArray.push('canViewParteTaller');
+    if (userPermissionsObj.canViewPreventivos) permisosArray.push('canViewPreventivos');
+
+    res.json({
+      mensaje: "Acceso concedido",
+      success: true,
+      username: cleanUsername,
+      sector: sector,
+      usuario: {
+        username: cleanUsername,
+        sector: sector,
+        permisos: permisosArray,
+        permissions: userPermissionsObj
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// 2. MIDDLEWARE DE PROTECCIÓN: Verifica permisos antes de tocar Taxes
+function verificarPermisoSincronizacion(req, res, next) {
+  const userPermisosHeader = req.headers['x-user-permissions'];
+  const usernameHeader = req.headers['x-user-username'];
+
+  let canSync = false;
+
+  if (userPermisosHeader) {
+    try {
+      const parsed = typeof userPermisosHeader === 'string' && userPermisosHeader.startsWith('[')
+        ? JSON.parse(userPermisosHeader)
+        : userPermisosHeader;
+      if (Array.isArray(parsed)) {
+        canSync = parsed.includes('canSyncTaxes') || parsed.includes('canSync');
+      } else if (typeof parsed === 'string') {
+        canSync = parsed.includes('canSyncTaxes') || parsed.includes('canSync');
+      }
+    } catch (e) {
+      canSync = String(userPermisosHeader).includes('canSync');
+    }
+  }
+
+  if (!canSync && usernameHeader) {
+    const userPerms = db.getUserPermissions(usernameHeader);
+    if (userPerms && userPerms.canSync !== false) {
+      canSync = true;
+    }
+  } else if (!userPermisosHeader && !usernameHeader) {
+    const settings = db.getSettings();
+    if (settings && settings.username) {
+      canSync = true;
+    }
+  }
+
+  if (canSync) {
+    return next();
+  } else {
+    return res.status(403).json({ error: "No tenés permisos para sincronizar con Taxes." });
+  }
+}
+
+// 3. ENDPOINT DE SINCRONIZACIÓN: Protegido
+app.post('/api/sync-taxes', verificarPermisoSincronizacion, async (req, res) => {
+  try {
+    const username = req.headers['x-user-username'] || db.getSettings().username;
+    if (username) {
+      worker.scrapeCatalogs(username).catch(console.error);
+    }
+    res.json({ mensaje: "Sincronización con Taxes iniciada por el agente.", success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
