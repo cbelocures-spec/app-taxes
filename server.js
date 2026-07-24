@@ -1408,18 +1408,29 @@ app.post('/api/assistant/chat', async (req, res) => {
       });
     }
 
+    // Sort filteredHistory by rowIndex descending so that the most recent rows are prioritized
+    filteredHistory.sort((a, b) => (b.rowIndex || 0) - (a.rowIndex || 0));
+
+    // Normalize keywords to singular (e.g. "auxilios" -> "auxilio") to improve matching
+    const normalizedKeywords = keywords.map(kw => {
+      if (kw.length > 3 && kw.endsWith('s')) {
+        return kw.slice(0, -1);
+      }
+      return kw;
+    });
+
     // Apply keyword matcher to prioritize relevant rows
-    if (keywords.length > 0) {
+    if (normalizedKeywords.length > 0) {
       // Find rows that match the keywords
       const matchedRows = filteredHistory.filter(h => {
-        const textToSearch = `${h.tipo} ${h.datos} ${h.conductor} ${h.patente}`.toLowerCase();
-        return keywords.some(kw => textToSearch.includes(kw));
+        const textToSearch = `${h.tipo} ${h.datos} ${h.conductor} ${h.patente} ${h.day || ''}`.toLowerCase();
+        return normalizedKeywords.some(kw => textToSearch.includes(kw));
       });
       
       // Find rows that don't match the keywords
       const unmatchedRows = filteredHistory.filter(h => {
-        const textToSearch = `${h.tipo} ${h.datos} ${h.conductor} ${h.patente}`.toLowerCase();
-        return !keywords.some(kw => textToSearch.includes(kw));
+        const textToSearch = `${h.tipo} ${h.datos} ${h.conductor} ${h.patente} ${h.day || ''}`.toLowerCase();
+        return !normalizedKeywords.some(kw => textToSearch.includes(kw));
       });
 
       // Combine: prioritize matched rows, then fill up with recent unmatched records for context
