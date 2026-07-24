@@ -643,16 +643,20 @@ app.delete('/api/orders/:id', (req, res) => {
     }
 
     // Check sector permission
-    const existingCls = existing.clasificacion;
+    const existingCls = existing.clasificacion || '';
     const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
     if (!isPaniol) {
-      if (sector === 'Herrería' && !isHerreria(existingCls)) {
-        return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
-      }
-      if (sector === 'Edilicio' && !isEdilicio(existingCls)) {
-        return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
-      }
-      if (sector === 'Taller' && (isHerreria(existingCls) || isEdilicio(existingCls))) {
+      const allowedSectors = userPerms.allowedSectors || [];
+      const orderIsHerreria = isHerreria(existingCls);
+      const orderIsEdilicio = isEdilicio(existingCls);
+      const orderIsTaller = !orderIsHerreria && !orderIsEdilicio;
+
+      let hasPermission = false;
+      if (orderIsHerreria && allowedSectors.includes('Herrería')) hasPermission = true;
+      if (orderIsEdilicio && allowedSectors.includes('Edilicio')) hasPermission = true;
+      if (orderIsTaller && allowedSectors.includes('Taller')) hasPermission = true;
+
+      if (!hasPermission) {
         return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
       }
     }
@@ -815,14 +819,19 @@ app.post('/api/orders/retry/:id', async (req, res) => {
       return res.status(403).json({ error: "No tiene permiso configurado para sincronizar órdenes." });
     }
 
+    const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
     if (!isPaniol) {
-      if (sector === 'Herrería' && !isHerreria(existingCls)) {
-        return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
-      }
-      if (sector === 'Edilicio' && !isEdilicio(existingCls)) {
-        return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
-      }
-      if (sector === 'Taller' && (isHerreria(existingCls) || isEdilicio(existingCls))) {
+      const allowedSectors = userPerms.allowedSectors || [];
+      const orderIsHerreria = isHerreria(existingCls);
+      const orderIsEdilicio = isEdilicio(existingCls);
+      const orderIsTaller = !orderIsHerreria && !orderIsEdilicio;
+
+      let hasPermission = false;
+      if (orderIsHerreria && allowedSectors.includes('Herrería')) hasPermission = true;
+      if (orderIsEdilicio && allowedSectors.includes('Edilicio')) hasPermission = true;
+      if (orderIsTaller && allowedSectors.includes('Taller')) hasPermission = true;
+
+      if (!hasPermission) {
         return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
       }
     }
