@@ -51,6 +51,7 @@ function getDefaultUserPermissions(username, sector) {
       canViewHistory: true,
       canViewMasivas: true,
       canViewParteTaller: true,
+      canViewPreventivos: true,
       allowedSectors: ['Herrería', 'Edilicio', 'Taller']
     };
   }
@@ -63,6 +64,7 @@ function getDefaultUserPermissions(username, sector) {
     canViewHistory: true,
     canViewMasivas: true,
     canViewParteTaller: true,
+    canViewPreventivos: true,
     allowedSectors: [defaultSector]
   };
 }
@@ -481,6 +483,7 @@ class LocalDB {
         canViewHistory: userObj.permissions.canViewHistory !== undefined ? !!userObj.permissions.canViewHistory : defaults.canViewHistory,
         canViewMasivas: userObj.permissions.canViewMasivas !== undefined ? !!userObj.permissions.canViewMasivas : defaults.canViewMasivas,
         canViewParteTaller: userObj.permissions.canViewParteTaller !== undefined ? !!userObj.permissions.canViewParteTaller : defaults.canViewParteTaller,
+        canViewPreventivos: userObj.permissions.canViewPreventivos !== undefined ? !!userObj.permissions.canViewPreventivos : defaults.canViewPreventivos,
         allowedSectors: Array.isArray(userObj.permissions.allowedSectors) ? userObj.permissions.allowedSectors : defaults.allowedSectors
       };
     }

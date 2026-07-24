@@ -5618,6 +5618,11 @@ async function loadUserPermissionsUI() {
     navParteTaller.style.display = currentUserPermissions.canViewParteTaller ? 'flex' : 'none';
   }
 
+  const navPreventivos = document.getElementById('nav-preventivos');
+  if (navPreventivos) {
+    navPreventivos.style.display = currentUserPermissions.canViewPreventivos !== false ? 'flex' : 'none';
+  }
+
   // Show authorizations section if Pañol / Admin
   const sector = getSectorByUsername(username);
   const isPaniol = sector === 'Admin' || username.toLowerCase().includes('paniol') || username.toLowerCase().includes('panol') || username.toLowerCase().includes('pañol');
@@ -5654,6 +5659,7 @@ async function renderUserAuthorizationsTable() {
             <th style="padding:8px; text-align:center;" title="Ver pestaña Historial">📜 Historial</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Masivas">📋 Masivas</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Parte Taller">🚜 Parte Taller</th>
+            <th style="padding:8px; text-align:center;" title="Ver pestaña Preventivos">⚙️ Preventivos</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Herrería">🛠️ Herrería</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Edilicio">🏗️ Edilicio</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Taller">🔧 Taller</th>
@@ -5689,6 +5695,9 @@ async function renderUserAuthorizationsTable() {
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-canViewParteTaller" ${p.canViewParteTaller ? 'checked' : ''}>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" class="chk-canViewPreventivos" ${p.canViewPreventivos !== false ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-sector-Herreria" ${hasHerreria ? 'checked' : ''}>
@@ -5738,6 +5747,7 @@ async function saveAllUserAuthorizations() {
       const canViewHistory = row.querySelector('.chk-canViewHistory')?.checked || false;
       const canViewMasivas = row.querySelector('.chk-canViewMasivas')?.checked || false;
       const canViewParteTaller = row.querySelector('.chk-canViewParteTaller')?.checked || false;
+      const canViewPreventivos = row.querySelector('.chk-canViewPreventivos')?.checked || false;
       
       const allowedSectors = [];
       if (row.querySelector('.chk-sector-Herreria')?.checked) allowedSectors.push('Herrería');
@@ -5750,6 +5760,7 @@ async function saveAllUserAuthorizations() {
         canViewHistory,
         canViewMasivas,
         canViewParteTaller,
+        canViewPreventivos,
         allowedSectors
       };
 
