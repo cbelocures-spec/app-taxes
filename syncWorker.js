@@ -902,13 +902,8 @@ async function scrapeCatalogs(triggerUsername = null) {
   try {
     db.saveSettings({ catalogSyncStatus: "syncing", catalogSyncError: null });
     browser = await launchBrowser();
-    const page = await browser.newPage();
-    await setupPage(page);
-
-    // Login
-    const loginPage = await autoLogin(browser, username, password, settings.portalUrl);
-    // Close the login page and open a fresh one for catalog scraping
-    await loginPage.close().catch(() => {});
+    // Login and use the authenticated page directly
+    const page = await autoLogin(browser, username, password, settings.portalUrl);
 
     // ============================================================
     // STEP A: SCRAPE ALL RODADOS FROM FLOTA > FLOTA (limit 999)
