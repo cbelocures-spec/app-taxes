@@ -11,5 +11,4 @@ run_catalog_sync_now.js
 .git
 .gitignore
 Dockerfile
-db.json
 *.zip
