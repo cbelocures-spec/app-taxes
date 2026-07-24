@@ -1447,12 +1447,29 @@ app.post('/api/assistant/chat', async (req, res) => {
     // Format a concise version of the history to keep context small and readable
     const formattedHistory = optimizedHistory.map(h => {
       // Date resolution logic (column A for fuel/KM, column F/patente for mechanical)
-      let recordDate = h.fecha || h.date || '-';
-      const isDate = (str) => str && (str.includes('/') || str.includes('-')) && str.length <= 10;
-      if (!isDate(recordDate) && isDate(h.patente)) {
+      const isDate = (str) => {
+        if (!str || str === '-') return false;
+        return /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(str);
+      };
+      
+      let recordDate = '-';
+      if (isDate(h.fecha)) {
+        recordDate = h.fecha;
+      } else if (isDate(h.patente)) {
         recordDate = h.patente;
+      } else if (isDate(h.date)) {
+        recordDate = h.date;
       }
-      return `Fecha: ${recordDate}, Interno: ${h.interno || '-'}, Tipo/Movimiento: ${h.tipo || '-'}, Detalle/Trabajo: ${h.datos || '-'}, Conductor/Proveedor: ${h.conductor || '-'}`;
+      
+      // Detalle/Trabajo resolution:
+      // Column D (index 3, h.datos) is "Detalle" (like "Auxilio").
+      // Column H (index 7, h.day) is "Trabajo" (like "sacar cardan 128...").
+      let detailText = h.datos || '-';
+      if (h.day && h.day !== '-' && h.day !== h.datos) {
+        detailText = `${h.datos} (${h.day})`;
+      }
+      
+      return `Fecha: ${recordDate}, Interno: ${h.interno || '-'}, Tipo/Movimiento: ${h.tipo || '-'}, Detalle/Trabajo: ${detailText}, Conductor/Proveedor: ${h.conductor || '-'}`;
     }).join('\n');
 
     let finalResponseText = "";
