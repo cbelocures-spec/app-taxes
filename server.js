@@ -645,29 +645,9 @@ app.delete('/api/orders/:id', (req, res) => {
     }
 
     const requester = req.headers['x-user-username'] || null;
-    const sector = getSectorByUsername(requester);
     const userPerms = db.getUserPermissions(requester);
     if (!userPerms.canDelete) {
       return res.status(403).json({ error: "No tiene permiso configurado para eliminar órdenes." });
-    }
-
-    // Check sector permission
-    const existingCls = existing.clasificacion || '';
-    const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
-    if (!isPaniol) {
-      const allowedSectors = userPerms.allowedSectors || [];
-      const orderIsHerreria = isHerreria(existingCls);
-      const orderIsEdilicio = isEdilicio(existingCls);
-      const orderIsTaller = !orderIsHerreria && !orderIsEdilicio;
-
-      let hasPermission = false;
-      if (orderIsHerreria && allowedSectors.some(s => isHerreria(s))) hasPermission = true;
-      if (orderIsEdilicio && allowedSectors.some(s => isEdilicio(s))) hasPermission = true;
-      if (orderIsTaller && allowedSectors.some(s => s === 'Taller')) hasPermission = true;
-
-      if (!hasPermission) {
-        return res.status(403).json({ error: "No tiene permisos para eliminar esta orden." });
-      }
     }
 
     const success = db.deleteWorkOrder(req.params.id);
@@ -819,30 +799,9 @@ app.post('/api/orders/retry/:id', async (req, res) => {
     }
 
     const requester = req.headers['x-user-username'] || null;
-    const sector = getSectorByUsername(requester);
-    const existingCls = order.clasificacion;
-
-    console.log(`[Permission Audit - Sync Retry] Requester: "${requester}", Resolved Sector: "${sector}", Order Cls: "${existingCls}"`);
     const userPerms = db.getUserPermissions(requester);
     if (!userPerms.canSync) {
       return res.status(403).json({ error: "No tiene permiso configurado para sincronizar órdenes." });
-    }
-
-    const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
-    if (!isPaniol) {
-      const allowedSectors = userPerms.allowedSectors || [];
-      const orderIsHerreria = isHerreria(existingCls);
-      const orderIsEdilicio = isEdilicio(existingCls);
-      const orderIsTaller = !orderIsHerreria && !orderIsEdilicio;
-
-      let hasPermission = false;
-      if (orderIsHerreria && allowedSectors.some(s => isHerreria(s))) hasPermission = true;
-      if (orderIsEdilicio && allowedSectors.some(s => isEdilicio(s))) hasPermission = true;
-      if (orderIsTaller && allowedSectors.some(s => s === 'Taller')) hasPermission = true;
-
-      if (!hasPermission) {
-        return res.status(403).json({ error: "No tiene permisos para sincronizar esta orden." });
-      }
     }
 
     // Solo bloquear reintento si la orden ya fue creada en Taxes (tiene taxesOrderNumber)
