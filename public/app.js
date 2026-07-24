@@ -2373,10 +2373,6 @@ function createOrderCardHtml(order) {
             </button>
           ` : ''}
           ${(() => {
-            const _cu = localStorage.getItem('currentUserUsername') || '';
-            const isAdmin = getSectorByUsername(_cu) === 'Admin';
-            const isPaniolU = _cu.toLowerCase().includes('paniol') || _cu.toLowerCase().includes('panol') || _cu.toLowerCase().includes('pañol');
-            if (!isAdmin && !isPaniolU) return ''; // Solo Admin y Paniol pueden archivar/borrar
             if (order.syncStatus === 'success') {
               // For synced orders: show Archive button (moves to history)
               return `
