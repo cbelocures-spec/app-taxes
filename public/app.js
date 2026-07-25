@@ -8849,6 +8849,77 @@ function renderParteTallerDashboard(state) {
     return item.sector === currentPtSector;
   }
 
+  // 0. En tránsito
+  const transito = (displayState.transito || []).filter(matchesPtSector).sort((a, b) => getDaysValue(b) - getDaysValue(a));
+  if (el('pt-trans-count')) el('pt-trans-count').textContent = transito.length;
+  if (el('pt-transito-tbody')) {
+    if (transito.length === 0) {
+      el('pt-transito-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades en tránsito.</td></tr>';
+    } else {
+      el('pt-transito-tbody').innerHTML = transito.map(item => {
+        const internoPT = String(item.interno || '');
+        const hasRodadoDesc = item.rodado && String(item.rodado).trim().toUpperCase() !== internoPT.trim().toUpperCase();
+        const displayLabel = (currentSelectedSector === 'Herrería' && hasRodadoDesc)
+          ? `<strong>${internoPT}</strong><div style="font-size:11px; color:var(--text-muted); font-weight:normal; margin-top:2px;">${item.rodado}</div>`
+          : `<strong>${internoPT}</strong>`;
+        const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
+        
+        let targetBadge = '<span class="badge" style="background:#ef4444; color:white; font-size:10px;">Fuera de Servicio</span>';
+        if (item.destinoIngreso === 'reparacion') {
+          targetBadge = '<span class="badge" style="background:#ff9800; color:white; font-size:10px;">En Reparación</span>';
+        } else if (item.destinoIngreso === 'servicios_pendientes') {
+          targetBadge = '<span class="badge" style="background:#2196f3; color:white; font-size:10px;">Servicios Pendientes</span>';
+        }
+
+        const ingresarBtn = `<button class="btn btn-success btn-xs" onclick="ingresarUnidadTransito('${internoPT}')" style="background:#16a34a; color:#fff; border:none; padding:4px 8px; font-weight:600; font-size:11px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="Marcar que la unidad llegó al taller">
+          <span class="material-icons" style="font-size:14px;">login</span> Ingresó Unidad
+        </button>`;
+
+        return `<tr>
+          <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEditBtnHtml(internoPT, 'transito')}</div></td>
+          <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
+          <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
+          <td>${targetBadge}</td>
+          <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
+          <td style="white-space:nowrap;">${ingresarBtn}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+  // Mobile cards for En Tránsito
+  const transMobile = el('pt-trans-mobile-cards');
+  if (transMobile) {
+    transMobile.innerHTML = transito.length === 0
+      ? '<p style="text-align:center;color:var(--text-muted);padding:12px 0;">No hay unidades en tránsito.</p>'
+      : transito.map(item => {
+          const internoPT = String(item.interno || '');
+          const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
+          let targetBadge = '<span class="badge" style="background:#ef4444; color:white; font-size:10px;">Fuera de Servicio</span>';
+          if (item.destinoIngreso === 'reparacion') {
+            targetBadge = '<span class="badge" style="background:#ff9800; color:white; font-size:10px;">En Reparación</span>';
+          } else if (item.destinoIngreso === 'servicios_pendientes') {
+            targetBadge = '<span class="badge" style="background:#2196f3; color:white; font-size:10px;">Servicios Pendientes</span>';
+          }
+          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
+              ${targetBadge}
+            </div>
+            <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>En ruta desde: <strong>${desde}</strong></span></div>
+            <div style="margin:10px 0; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+              <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Novedad en Ruta:</div>
+              ${getChecklistHtml(item, internoPT)}
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
+              <button class="btn btn-success btn-xs" onclick="ingresarUnidadTransito('${internoPT}')" style="background:#16a34a; color:#fff; border:none; padding:6px 12px; font-weight:600; font-size:12px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-icons" style="font-size:15px;">login</span> Ingresó Unidad
+              </button>
+              ${getEditBtnHtml(internoPT, 'transito')}
+            </div>
+          </div>`;
+        }).join('');
+  }
+
   // 1. Fuera de servicio
   const fueraDeServicio = (displayState.fuera_de_servicio || []).filter(matchesPtSector).sort((a, b) => getDaysValue(b) - getDaysValue(a));
   if (el('pt-out-count')) el('pt-out-count').textContent = fueraDeServicio.length;
@@ -9198,7 +9269,8 @@ function openPtAddUnitModal() {
   document.getElementById('pt-unit-interno').value = '';
   document.getElementById('pt-unit-interno').disabled = false;
   document.getElementById('pt-unit-tipo').value = 'COMPACTADOR';
-  document.getElementById('pt-unit-estado').value = 'servicios_pendientes';
+  document.getElementById('pt-unit-estado').value = 'transito';
+  document.getElementById('pt-unit-destino').value = 'fuera_de_servicio';
   document.getElementById('pt-unit-novedad').value = '';
   
   // Hide checklist editor, show plain textarea label
@@ -9207,7 +9279,23 @@ function openPtAddUnitModal() {
   const novedadLabel = document.getElementById('pt-unit-novedad-label');
   if (novedadLabel) novedadLabel.textContent = 'Novedad / Diagnóstico / Servicio';
 
+  ptOnEstadoChange();
+
+  const saveBtn = document.getElementById('btn-save-pt-unit');
+  if (saveBtn) {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Guardar Unidad';
+  }
+
   document.getElementById('pt-unit-modal').classList.add('open');
+}
+
+function ptOnEstadoChange() {
+  const estado = document.getElementById('pt-unit-estado').value;
+  const destContainer = document.getElementById('pt-unit-destino-container');
+  if (destContainer) {
+    destContainer.style.display = (estado === 'transito') ? 'block' : 'none';
+  }
 }
 
 // Opens the modal for editing an existing unit
@@ -9241,6 +9329,8 @@ function openPtEditUnitModal(interno, listName) {
   document.getElementById('pt-unit-interno').disabled = false;
   document.getElementById('pt-unit-tipo').value = item.tipo || 'COMPACTADOR';
   document.getElementById('pt-unit-estado').value = listName;
+  document.getElementById('pt-unit-destino').value = item.destinoIngreso || 'fuera_de_servicio';
+  ptOnEstadoChange();
 
   // --- Build interactive checklist editor with ALL items (pending + done) ---
   let allItems = []; // { texto, hecho }
@@ -9308,6 +9398,114 @@ function ptToggleEditItem(checkbox) {
   }
 }
 
+// Moves a unit from En Tránsito to its target state (Fuera de Servicio / En Reparación / Servicios Pendientes) upon arrival
+async function ingresarUnidadTransito(interno) {
+  if (!window._ptState) return;
+  const state = window._ptState;
+  const transList = state.transito || [];
+  const unit = transList.find(u => String(u.interno).trim() === String(interno).trim());
+  if (!unit) return;
+
+  const targetEstado = unit.destinoIngreso || 'fuera_de_servicio';
+  let targetLabel = 'Fuera de Servicio';
+  if (targetEstado === 'reparacion') targetLabel = 'En Reparación';
+  if (targetEstado === 'servicios_pendientes') targetLabel = 'Servicios Pendientes';
+
+  if (!confirm(`¿Confirmás que la unidad Interno ${interno} ingresó al taller?\n\nPasará a la tabla "${targetLabel}".`)) {
+    return;
+  }
+
+  const currentUser = localStorage.getItem('currentUserUsername') || 'Rodriguez Nicolas';
+
+  // 1. Remove from transito
+  const idx = transList.findIndex(u => String(u.interno).trim() === String(interno).trim());
+  if (idx !== -1) transList.splice(idx, 1);
+
+  // 2. Set entry date & new state
+  unit.estado = targetEstado;
+  unit.dia_parado = new Date().toLocaleDateString('es-AR');
+  unit.dias_en_reparacion = 0;
+  unit.fecha_ingreso = new Date().toLocaleDateString('es-AR');
+  delete unit.destinoIngreso;
+
+  // 3. Add to target state list
+  if (!state[targetEstado]) state[targetEstado] = [];
+  state[targetEstado].push(unit);
+
+  // 4. Send update to server / Google Sheets
+  try {
+    let novedadFormatted = unit.novedad || '';
+    if (Array.isArray(unit.novedad_items)) {
+      novedadFormatted = unit.novedad_items.map(x => `${x.hecho ? '[X]' : '[ ]'} ${x.texto}`).join('\n');
+    }
+    await fetch('/api/parte-taller/novedad', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accion: 'actualizar_estado_flota',
+        interno: unit.interno,
+        estado: targetEstado,
+        motivo: novedadFormatted,
+        responsable: currentUser,
+        sector: unit.sector || ((getSectorByUsername(currentUser) === 'Herrería') ? 'herreria' : 'taller')
+      })
+    });
+  } catch (e) {
+    console.error('Error updating Google Sheets on unit arrival:', e);
+  }
+
+  // 5. If moving to fuera_de_servicio or reparacion, auto-create Correctivo work order in Taxes if none exists
+  if (targetEstado === 'reparacion' || targetEstado === 'fuera_de_servicio') {
+    try {
+      const cleanInterno = String(interno).replace(/^(Irineo|Nico)\s+/i, '');
+      const hasOpenOrder = activeOrders && activeOrders.some(o =>
+        String(o.interno || '').trim() === cleanInterno &&
+        (!o.estado || o.estado.toLowerCase() !== 'cerrada')
+      );
+      if (!hasOpenOrder) {
+        const today = new Date().toISOString().split('T')[0];
+        let incidentDesc = unit.novedad || 'Ingreso desde En Tránsito';
+        if (Array.isArray(unit.novedad_items)) {
+          incidentDesc = unit.novedad_items.map(x => x.texto).join(', ');
+        }
+        incidentDesc = incidentDesc.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
+
+        let rodadoLabel = `Interno ${cleanInterno}`;
+        const rodadoOpt = cachedCatalogs.rodados
+          ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(cleanInterno).trim())
+          : null;
+        if (rodadoOpt) rodadoLabel = rodadoOpt.label;
+
+        const orderPayload = {
+          rodado: rodadoLabel,
+          responsable: "AUTO",
+          interno: cleanInterno,
+          clasificacion: "Correctivo",
+          fechaEntrega: today,
+          horario: "12:00",
+          incidente: incidentDesc,
+          tasks: [],
+          estadoUnidad: (targetEstado === 'fuera_de_servicio' ? 'fuera_de_servicio' : 'operativo')
+        };
+
+        await fetch('/api/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-username': currentUser
+          },
+          body: JSON.stringify(orderPayload)
+        });
+      }
+    } catch(err) {
+      console.error('Error auto-creating work order on arrival:', err);
+    }
+  }
+
+  showToast(`Unidad Interno ${interno} ingresó al taller y pasó a ${targetLabel} ✓`, 'success');
+  renderParteTallerDashboard(state);
+}
+
 
 function ptCheckForDuplicateUnit() {
   if (currentEditingPtInterno !== null) return; // Ignore if we specifically clicked edit pencil
@@ -9325,7 +9523,7 @@ function ptCheckForDuplicateUnit() {
 
   if (!window._ptState) return;
   const state = window._ptState;
-  const lists = ['servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
+  const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
   let foundUnit = null;
   let foundList = null;
 
@@ -9414,6 +9612,7 @@ async function savePtUnit() {
   const interno = document.getElementById('pt-unit-interno').value.trim();
   const tipo = document.getElementById('pt-unit-tipo').value;
   const estado = document.getElementById('pt-unit-estado').value;
+  const destinoIngreso = document.getElementById('pt-unit-destino').value;
   const novedadText = document.getElementById('pt-unit-novedad').value.trim();
   const currentUser = localStorage.getItem('currentUserUsername') || 'Rodriguez Nicolas';
 
@@ -9500,6 +9699,7 @@ async function savePtUnit() {
           accion: 'actualizar_estado_flota',
           interno: saveInterno,
           estado: estado,
+          destinoIngreso: (estado === 'transito' ? destinoIngreso : null),
           motivo: novedadFormatted,
           responsable: currentUser,
           sector: (getSectorByUsername(currentUser) === 'Herrería') ? 'herreria' : 'taller'
@@ -9553,6 +9753,8 @@ async function savePtUnit() {
         } else {
           showToast(`Unidad registrada y Orden de Trabajo Correctiva creada ✓`, 'success');
         }
+      } else if (estado === 'transito') {
+        showToast(`Unidad #${saveInterno} agregada a En Tránsito ✓`, 'success');
       } else {
         showToast('Unidad agregada con éxito a Servicios Pendientes.', 'success');
       }
@@ -9562,8 +9764,8 @@ async function savePtUnit() {
       if (!window._ptState) return;
       const state = window._ptState;
 
-      // 1. Remove from all three lists to start clean (using original internally stored interno)
-      const lists = ['servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
+      // 1. Remove from all four lists to start clean (using original internally stored interno)
+      const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
       let foundUnitObj = null;
 
       lists.forEach(listName => {
@@ -9590,6 +9792,7 @@ async function savePtUnit() {
         foundUnitObj.interno = saveInterno;
         foundUnitObj.tipo = tipo;
         foundUnitObj.novedad = novedadFormatted;
+        foundUnitObj.destinoIngreso = (estado === 'transito' ? destinoIngreso : null);
         // Also update novedad_items so the checklist re-renders correctly
         foundUnitObj.novedad_items = novedadFormatted.split('\n').map(line => {
           const hecho = line.startsWith('[X]') || line.startsWith('[x]');

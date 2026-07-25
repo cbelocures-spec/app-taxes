@@ -770,6 +770,38 @@
         </div>
       </div>
 
+      <!-- En Tránsito (Trabajando en Ruta) -->
+      <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('trans')">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3 style="font-size: 14px; font-weight: 700; margin: 0;">En Tránsito (Trabajando / Novedad en Ruta)</h3>
+          <span class="badge" style="background-color: #9333ea; color: white;" id="pt-trans-count">0</span>
+        </div>
+        <span class="material-icons" id="pt-trans-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
+      </div>
+      <div id="pt-trans-mobile-cards" class="pt-mobile-cards-list">
+        <!-- Mobile dynamic -->
+      </div>
+
+      <div class="prev-table-container">
+        <table class="prev-table">
+          <thead>
+            <tr>
+              <th>Interno</th>
+              <th>Tipo</th>
+              <th>Novedad en Ruta</th>
+              <th>Destino al Llegar</th>
+              <th>En Ruta Desde</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody id="pt-transito-tbody">
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 20px;">No hay unidades en tránsito.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <!-- Fuera de Servicio and Under Repair -->
       <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('fuera')">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -1669,10 +1701,19 @@
         </div>
         <div class="form-group">
           <label>Estado en Taller</label>
-          <select id="pt-unit-estado" style="width: 100%;">
+          <select id="pt-unit-estado" style="width: 100%;" onchange="ptOnEstadoChange()">
+            <option value="transito">🚛 En Tránsito (trabajando / novedad en ruta)</option>
             <option value="servicios_pendientes">📋 Servicios Pendientes (unidad operativa)</option>
             <option value="reparacion">🔧 En Reparación (unidad inactiva)</option>
             <option value="fuera_de_servicio">❌ Fuera de Servicio (unidad inactiva)</option>
+          </select>
+        </div>
+        <div class="form-group" id="pt-unit-destino-container" style="display:none;">
+          <label>Estado al Ingresar a Taller (cuando llegue la unidad)</label>
+          <select id="pt-unit-destino" style="width: 100%;">
+            <option value="fuera_de_servicio">❌ Fuera de Servicio (unidad inactiva al llegar)</option>
+            <option value="reparacion">🔧 En Reparación (unidad inactiva al llegar)</option>
+            <option value="servicios_pendientes">📋 Servicios Pendientes (unidad operativa al llegar)</option>
           </select>
         </div>
         <!-- EDIT MODE: Interactive checklist of existing items -->
