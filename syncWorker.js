@@ -3728,7 +3728,8 @@ function stopWorker() {
  * and reusing the same browser session for each credential group.
  * Up to MAX_PARALLEL_BROWSERS groups run simultaneously.
  */
-const MAX_PARALLEL_BROWSERS = 2;
+// Keep to 1 to avoid 429 rate-limiting from Taxes.com.ar — do NOT increase
+const MAX_PARALLEL_BROWSERS = 1;
 
 async function verifyMultipleOrders(orderIds) {
   const settings = db.getSettings();
@@ -3755,10 +3756,14 @@ async function verifyMultipleOrders(orderIds) {
   const groupList = Array.from(groups.values());
   console.log(`[VerifyAll] ${orderIds.length} orders grouped into ${groupList.length} credential group(s). Running up to ${MAX_PARALLEL_BROWSERS} browsers in parallel.`);
 
-  // Process groups in batches of MAX_PARALLEL_BROWSERS
+  // Process groups sequentially with a cooldown between each batch to avoid 429
   for (let i = 0; i < groupList.length; i += MAX_PARALLEL_BROWSERS) {
     const batch = groupList.slice(i, i + MAX_PARALLEL_BROWSERS);
     await Promise.allSettled(batch.map(group => verifyGroupWithBrowser(group, settings)));
+    if (i + MAX_PARALLEL_BROWSERS < groupList.length) {
+      console.log('[VerifyAll] Waiting 15s between browser batches to avoid rate-limiting...');
+      await delay(15000);
+    }
   }
 
   console.log(`[VerifyAll] All verifications complete.`);
@@ -3781,7 +3786,7 @@ async function verifyGroupWithBrowser(group, settings) {
         try {
           await Promise.race([
             verifyWorkOrderWithPage(page, orderId),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout: verificaci\u00f3n tard\u00f3 m\u00e1s de 90 segundos')), 90000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout: verificación tardó más de 90 segundos')), 90000))
           ]);
           lastErr = null;
           break; // success — go to next order
@@ -3789,8 +3794,8 @@ async function verifyGroupWithBrowser(group, settings) {
           lastErr = err;
           console.warn(`[VerifyAll] Order ${orderId} attempt ${attempt}/2 failed: ${err.message}`);
           if (attempt < 2) {
-            console.log(`[VerifyAll] Retrying order ${orderId} after 3s...`);
-            await delay(3000);
+            console.log(`[VerifyAll] Retrying order ${orderId} after 8s...`);
+            await delay(8000);
           }
         }
       }
@@ -3803,6 +3808,11 @@ async function verifyGroupWithBrowser(group, settings) {
           verifiedCount: count,
           verifiedError: `Error del agente (2 intentos): ${lastErr.message}`
         });
+      }
+      // Pause between orders to avoid 429 rate-limiting from Taxes.com.ar
+      if (group.ids.indexOf(orderId) < group.ids.length - 1) {
+        console.log(`[VerifyAll] Pausing 8s before next order to avoid rate-limiting...`);
+        await delay(8000);
       }
     }
 
