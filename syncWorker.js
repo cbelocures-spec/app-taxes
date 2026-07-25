@@ -450,7 +450,12 @@ async function fillSearchableSelect(page, labelText, searchValue) {
         }
 
         if (matched) {
-          matched.click();
+          ['mousedown', 'mouseup', 'click'].forEach(evtName => {
+            try {
+              const evt = new MouseEvent(evtName, { bubbles: true, cancelable: true, view: window });
+              matched.dispatchEvent(evt);
+            } catch (_) {}
+          });
           return { success: true, text: matched.textContent.trim() };
         }
 
@@ -460,17 +465,22 @@ async function fillSearchableSelect(page, labelText, searchValue) {
       if (optionClicked.success) {
         console.log(`   ✓ Selected option for "${labelText}": "${optionClicked.text}"`);
         
-        // Wait for Vue reactivity to update the hidden input
+        // Wait for Vue reactivity to update inputs
         await delay(1000);
         
-        // Verify the hidden input got a value
-        const hiddenValue = await page.evaluate((sel) => {
-          const el = document.querySelector(sel);
-          return el ? el.value : '(not found)';
-        }, hiddenSelector);
-        console.log(`   ✓ Hidden input value for "${labelText}": "${hiddenValue}"`);
+        // Verify either hidden input or search input got a value
+        const checkResult = await page.evaluate((hSel, sSel) => {
+          const hEl = document.querySelector(hSel);
+          const sEl = document.querySelector(sSel);
+          return {
+            hiddenVal: hEl ? hEl.value : '',
+            searchVal: sEl ? sEl.value : ''
+          };
+        }, hiddenSelector, searchSelector);
+
+        console.log(`   ✓ Hidden input value: "${checkResult.hiddenVal}" | Search input value: "${checkResult.searchVal}"`);
         
-        if (hiddenValue !== '' && hiddenValue !== '(not found)') {
+        if (checkResult.hiddenVal !== '' || checkResult.searchVal !== '') {
           return true;
         }
       }
@@ -2229,8 +2239,10 @@ async function syncWorkOrder(orderId) {
     console.log("Filling General Data form fields...");
 
     // Resolve "AUTO" Responsable to currently logged-in user
+    // Also treat email addresses as AUTO (e.g. paniol@contenedoreshugo.com.ar stored by mistake)
     let targetResponsable = order.responsable;
-    if (targetResponsable === 'AUTO') {
+    const isEmailOrAuto = !targetResponsable || targetResponsable === 'AUTO' || targetResponsable.includes('@');
+    if (isEmailOrAuto) {
       console.log("Resolving Responsable automatically...");
       const profileName = await page.evaluate(() => {
         const el = document.querySelector('.user-profile-name, .user-profile-toggle, .user-profile-info, .profile-user, .user-profile, .user-name, .nav-item .nav-link span, .dropdown-toggle');
@@ -2294,14 +2306,11 @@ async function syncWorkOrder(orderId) {
       if (matched) {
         targetResponsable = matched.label;
         console.log("Automatically selected matching Responsable:", targetResponsable);
-      } else if (list.length > 0) {
-        // Fallback to Cesar Belocures if we can find him in the list, otherwise first item
-        const defaultBelocures = list.find(r => r.label.toLowerCase().includes('belocures'));
-        targetResponsable = defaultBelocures ? defaultBelocures.label : list[0].label;
-        console.log("Fallback to matching/default Responsable in list:", targetResponsable);
       } else {
-        targetResponsable = "Belocures, Cesar Hernán"; // Absolute fallback
-        console.log("Fallback to default Responsable string:", targetResponsable);
+        // Fallback: always use Belocures (the global account owner)
+        const defaultBelocures = list.find(r => r.label.toLowerCase().includes('belocures'));
+        targetResponsable = defaultBelocures ? defaultBelocures.label : (list.length > 0 ? list[0].label : "Belocures, Cesar Hernán");
+        console.log("Fallback to Belocures as default Responsable:", targetResponsable);
       }
     }
 
