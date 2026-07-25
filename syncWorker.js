@@ -832,20 +832,26 @@ async function autoLogin(browser, username, password, portalUrl) {
   console.log(`Current URL after login check: ${currentUrl}`);
   
   if (currentUrl.includes('/login')) {
-    // We are still on the login page, so it failed. Let's find out why:
+    // We are still on the login page or got a 429 rate limit error, so it failed. Let's find out why:
     let errorMsg = "Credenciales incorrectas o error de inicio de sesión en Taxes.com.ar";
     try {
-      const hasErrorText = await page.evaluate(() => {
-        const bodyText = document.body.textContent.toLowerCase();
-        return bodyText.includes('credenciales inv') ||
-               bodyText.includes('credenciales incorrecta') ||
-               bodyText.includes('usuario o contrase') ||
-               bodyText.includes('contraseñaa incorrecta') ||
-               bodyText.includes('contraseña incorrecta') ||
-               bodyText.includes('datos incorrectos') ||
-               bodyText.includes('acceso denegado');
+      const pageInfo = await page.evaluate(() => {
+        const bodyText = document.body ? document.body.textContent.toLowerCase() : '';
+        const titleText = document.title ? document.title.toLowerCase() : '';
+        return {
+          isRateLimited: bodyText.includes('too many requests') || titleText.includes('too many requests') || bodyText.includes('429'),
+          isInvalidCreds: bodyText.includes('credenciales inv') ||
+                 bodyText.includes('credenciales incorrecta') ||
+                 bodyText.includes('usuario o contrase') ||
+                 bodyText.includes('contraseñaa incorrecta') ||
+                 bodyText.includes('contraseña incorrecta') ||
+                 bodyText.includes('datos incorrectos') ||
+                 bodyText.includes('acceso denegado')
+        };
       });
-      if (hasErrorText) {
+      if (pageInfo.isRateLimited) {
+        errorMsg = "Taxes.com.ar restringió temporalmente las solicitudes automáticas por exceso de tráfico (Error 429 Too Many Requests). Espere 3 a 5 minutos e intente nuevamente.";
+      } else if (pageInfo.isInvalidCreds) {
         errorMsg = "Credenciales incorrectas en Taxes.com.ar. Verifique su contraseña.";
       }
     } catch (e) {
@@ -3577,8 +3583,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
       } else {
         updatePayload.archived = false;
         updatePayload.archivedAt = null;
+      }
       db.updateWorkOrder(orderId, updatePayload);
-    }
     }
 
   } catch (err) {
