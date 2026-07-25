@@ -297,7 +297,15 @@ async function fillSearchableSelect(page, labelText, searchValue) {
         queriesToTry.push(`Interno ${internoMatch[1]}`); // Try "Interno 4" second
       }
 
-      queriesToTry.push(searchValue);
+      // Add query with commas/punctuation stripped
+      const cleanValue = searchValue.replace(/[,._\-]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (cleanValue) {
+        queriesToTry.push(cleanValue);
+      }
+      if (searchValue !== cleanValue) {
+        queriesToTry.push(searchValue);
+      }
+
       if (searchValue.includes(' - ')) {
         const parts = searchValue.split(' - ');
         const brand = parts[0].trim();
@@ -306,11 +314,13 @@ async function fillSearchableSelect(page, labelText, searchValue) {
         queriesToTry.push(rest);
         queriesToTry.push(brand);
       }
-      if (searchValue.includes(' ')) {
-        const words = searchValue.split(/\s+/);
-        queriesToTry.push(words[0]); // Last name (e.g. "BELOCURES")
-        if (words[1]) {
-          queriesToTry.push(words[1]); // First name (e.g. "CESAR")
+
+      // Extract individual words stripped of punctuation
+      const cleanWords = cleanValue.split(/\s+/).filter(w => w.length >= 3);
+      if (cleanWords.length > 0) {
+        queriesToTry.push(cleanWords[0]); // e.g. "Belocures"
+        if (cleanWords[1]) {
+          queriesToTry.push(cleanWords[1]); // e.g. "Cesar"
         }
       }
     }
@@ -805,11 +815,16 @@ async function autoLogin(browser, username, password, portalUrl) {
     console.log('[autoLogin] No CSRF meta tag found - proceeding without explicit token.');
   }
 
-  // Submit with Enter key (most reliable for this form)
-  console.log('[autoLogin] Submitting form with Enter key...');
+  // Submit by clicking the submit button AND pressing Enter
+  console.log('[autoLogin] Submitting form with button click and Enter key...');
+  await page.evaluate(() => {
+    const btn = document.querySelector('button[type="submit"], input[type="submit"], .btn-primary, form button, .btn');
+    if (btn) {
+      btn.click();
+    }
+  });
   await page.keyboard.press('Enter');
-  // Give the browser a moment to start the navigation before we poll the URL
-  await delay(1000);
+  await delay(1500);
 
 
 
@@ -2294,7 +2309,15 @@ async function syncWorkOrder(orderId) {
     const rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado);
     if (!rodadoFilled) throw new Error("No se pudo seleccionar el Rodado. Asegúrese de que el valor sea válido.");
 
-    const respFilled = await fillSearchableSelect(page, 'Responsable', targetResponsable);
+    let respFilled = await fillSearchableSelect(page, 'Responsable', targetResponsable);
+    if (!respFilled) {
+      console.log("Primary Responsable selection failed, trying fallback search with 'Belocures'...");
+      respFilled = await fillSearchableSelect(page, 'Responsable', 'Belocures');
+    }
+    if (!respFilled) {
+      console.log("Secondary Responsable selection failed, trying fallback search with 'Cesar'...");
+      respFilled = await fillSearchableSelect(page, 'Responsable', 'Cesar');
+    }
     if (!respFilled) throw new Error("No se pudo seleccionar el Responsable. Asegúrese de que el valor sea válido.");
 
     // Fill standard fields (Clasificacion, Interno, Date, Horario, Incidente)
@@ -2693,10 +2716,37 @@ async function syncWorkOrder(orderId) {
       return null;
     });
 
-    if (taxesOrderNumber) {
-      console.log(`Successfully captured Taxes Order Number: ${taxesOrderNumber}`);
+    let finalTaxesOrderNumber = taxesOrderNumber;
+    if (finalTaxesOrderNumber) {
+      console.log(`Successfully captured Taxes Order Number: ${finalTaxesOrderNumber}`);
     } else {
-      console.log("Warning: Could not capture Taxes Order Number from toast notifications.");
+      console.log("Warning: Could not capture Taxes Order Number from toast notifications. Attempting fallback search on list page...");
+      try {
+        await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 20000 });
+        await delay(2000);
+        const capturedFromList = await page.evaluate((rodadoVal) => {
+          const rows = Array.from(document.querySelectorAll('table tbody tr'));
+          for (const row of rows) {
+            const text = row.textContent || '';
+            if (text && rodadoVal && text.toLowerCase().includes(rodadoVal.toLowerCase().substring(0, 5))) {
+              const otMatch = text.match(/(\d{4,6})/);
+              if (otMatch) return otMatch[1];
+            }
+          }
+          if (rows.length > 0) {
+            const firstRowText = rows[0].textContent || '';
+            const match = firstRowText.match(/(\d{4,6})/);
+            if (match) return match[1];
+          }
+          return null;
+        }, order.rodado);
+        if (capturedFromList) {
+          finalTaxesOrderNumber = capturedFromList;
+          console.log(`Successfully captured Taxes Order Number from list page fallback: ${finalTaxesOrderNumber}`);
+        }
+      } catch (fallbackErr) {
+        console.log("Fallback search for Taxes Order Number failed:", fallbackErr.message);
+      }
     }
 
     // Close any visible toast notifications by clicking close button inside them
@@ -2725,7 +2775,7 @@ async function syncWorkOrder(orderId) {
       syncDate: new Date().toISOString(),
       syncError: null,
       autoSyncRetryCount: 0,
-      taxesOrderNumber: taxesOrderNumber || null,
+      taxesOrderNumber: finalTaxesOrderNumber || null,
       tasks: updatedTasks
     });
 
@@ -3634,6 +3684,10 @@ async function verifyWorkOrder(orderId) {
   } catch (error) {
     if (browser) await browser.close();
     releaseBrowserLock();
+    db.updateWorkOrder(orderId, {
+      verifiedStatus: "error",
+      verifiedError: error.message
+    });
     return { success: false, message: error.message };
   }
 }

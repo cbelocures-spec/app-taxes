@@ -35,8 +35,14 @@ function normalizeEmail(email) {
   if (parts.length !== 2) {
     return normalized;
   }
-  const localPart = parts[0];
+  let localPart = parts[0];
   let domain = parts[1];
+
+  // Automatically sanitize any paniol25 / ppaniol / panol typos to "paniol"
+  if (/^pan[i]?ol\d*$/i.test(localPart) || localPart.includes('paniol25') || localPart.includes('ppaniol')) {
+    localPart = 'paniol';
+  }
+
   // Correct any variations of contenedoreshugo or contrnedoreshugo
   if (domain.includes('contenedoreshugo') || domain.includes('contrnedoreshugo')) {
     domain = 'contenedoreshugo.com.ar';
@@ -368,6 +374,14 @@ class LocalDB {
               order.createdBy = normalizedCreatedBy;
               migrated = true;
             }
+          }
+          if (order.syncError && (order.syncError.includes('paniol25') || order.syncError.includes('ppaniol'))) {
+            order.syncError = order.syncError.replace(/paniol25|ppaniol/gi, 'paniol');
+            migrated = true;
+          }
+          if (order.verifiedError && (order.verifiedError.includes('paniol25') || order.verifiedError.includes('ppaniol'))) {
+            order.verifiedError = order.verifiedError.replace(/paniol25|ppaniol/gi, 'paniol');
+            migrated = true;
           }
         });
       }
