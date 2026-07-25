@@ -2240,23 +2240,35 @@ app.post('/api/preventivos/process-fuel', async (req, res) => {
   }
 });
 
-// --- PARTE TALLER PROXY ENDPOINTS ---
 app.get('/api/parte-taller/estado', async (req, res) => {
   const settings = db.getSettings();
   const scriptUrl = settings.parteTallerScriptUrl;
-  if (!scriptUrl) {
-    return res.status(400).json({ error: "URL del script de parte taller no configurada." });
+  const localPt = db.db && db.db.parteTallerState ? db.db.parteTallerState : {
+    servicios_pendientes: [],
+    reparacion: [],
+    fuera_de_servicio: [],
+    transito: []
+  };
+
+  if (scriptUrl) {
+    try {
+      const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=get_state`;
+      const response = await fetch(url);
+      const text = await response.text();
+      try {
+        const data = JSON.parse(text);
+        if (data && typeof data === 'object') {
+          return res.json(data);
+        }
+      } catch (jsonErr) {
+        console.warn("parteTallerScriptUrl returned non-JSON (HTML page), using local state fallback.");
+      }
+    } catch (error) {
+      console.error("Error fetching parte taller state:", error);
+    }
   }
-  try {
-    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=get_state`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    console.error("Error fetching parte taller state:", error);
-    res.status(500).json({ error: error.message });
-  }
+  
+  res.json(localPt);
 });
 
 app.post('/api/parte-taller/novedad', async (req, res) => {
