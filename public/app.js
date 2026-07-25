@@ -8434,8 +8434,9 @@ async function fetchParteTallerEstado() {
       throw new Error(err.error || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    if (!data.ok) throw new Error(data.msg || 'Error al leer estado');
-    renderParteTallerDashboard(data.state);
+    const state = (data && data.state) ? data.state : ((data && (data.servicios_pendientes || data.fuera_de_servicio || data.reparacion || data.transito)) ? data : null);
+    if (!state && data.ok === false) throw new Error(data.msg || 'Error al leer estado');
+    renderParteTallerDashboard(state || data);
   } catch (error) {
     console.error('Error fetching parte taller estado:', error);
     if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}. Configure la URL del script en Ajustes.</td></tr>`;
