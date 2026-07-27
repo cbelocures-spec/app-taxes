@@ -1596,7 +1596,76 @@ app.post('/api/assistant/chat', async (req, res) => {
       }
     }
 
-    // Fetch the history from Google Sheets (Try GViz CSV first for the 2026 DB, fallback to Apps Script)
+    // ── 1a. Fetch active in-app work orders ──
+    let activeOrdersContext = "";
+    try {
+      const activeOrders = db.getWorkOrders();
+      // Also include recently archived orders (last 30 days)
+      const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      const recentArchived = db.getArchivedOrders().filter(o => {
+        const archivedTs = new Date(o.archivedAt || o.createdAt || 0).getTime();
+        return archivedTs > thirtyDaysAgo;
+      });
+      const allOrdersForAI = [...activeOrders, ...recentArchived];
+
+      if (allOrdersForAI.length > 0) {
+        const ordersText = allOrdersForAI.map(o => {
+          const estadoLabel = o.estadoUnidad === 'fuera_de_servicio' ? 'FUERA DE SERVICIO' :
+                             (o.estadoUnidad === 'servicios_pendientes' ? 'SERVICIOS PENDIENTES' :
+                             (o.estadoUnidad === 'reparacion' ? 'EN REPARACIÓN' : 'OPERATIVO'));
+
+          // Calculate real hours from timerHistory if available
+          const tareasText = (o.tasks || []).map(t => {
+            let horasReales = parseFloat(t.horasEstimadas) || 0;
+            if (Array.isArray(t.timerHistory) && t.timerHistory.length > 0) {
+              horasReales = t.timerHistory.reduce((sum, h) => {
+                const end = h.end || Date.now();
+                return sum + (end - h.start) / 3600000;
+              }, 0);
+              horasReales = Math.round(horasReales * 10) / 10;
+            }
+            return `    - "${t.descripcion || 'Sin descripción'}" | Mecánico: ${t.empleado || 'N/A'} | Horas: ${horasReales}h | Estado: ${t.status || 'Pendiente'}${t.insumos ? ' | Insumos: ' + t.insumos : ''}`;
+          }).join('\n');
+
+          const pendientes = (o.tasks || []).filter(t => t.status !== 'Finalizada').length;
+          const finalizadas = (o.tasks || []).filter(t => t.status === 'Finalizada').length;
+          const totalHoras = (o.tasks || []).reduce((sum, t) => sum + (parseFloat(t.horasEstimadas) || 0), 0);
+
+          return `Interno: ${o.interno} | Unidad: ${o.rodado || 'N/A'} | Tipo: ${o.clasificacion || 'N/A'} | Estado unidad: ${estadoLabel} | Taxes OT: ${o.taxesOrderNumber ? '#' + o.taxesOrderNumber : 'N/A'} | ${o.archived ? '[EN HISTORIAL]' : '[ACTIVA]'}\n  Problema/Incidente: ${o.incidente || 'No especificado'}\n  Tareas (${finalizadas} finalizadas, ${pendientes} pendientes, ${totalHoras.toFixed(1)}h estimadas):\n${tareasText || '    (Sin tareas asignadas)'}`;
+        }).join('\n\n');
+        activeOrdersContext = `\n==== ÓRDENES DE TRABAJO EN LA APP ====\n${ordersText}\n====================================`;
+      }
+    } catch (ordersErr) {
+      console.warn('[AI Chat] Error fetching active orders:', ordersErr);
+    }
+
+    // ── 1b. Fetch Parte de Taller fleet status ──
+    let parteTallerContext = "";
+    try {
+      const ptScriptUrl = settings.parteTallerScriptUrl;
+      if (ptScriptUrl) {
+        const ptUrl = `${ptScriptUrl}${ptScriptUrl.includes('?') ? '&' : '?'}accion=getEstadoFlota`;
+        const ptResp = await fetch(ptUrl, { signal: AbortSignal.timeout(6000) });
+        if (ptResp.ok) {
+          const ptData = await ptResp.json();
+          if (Array.isArray(ptData) && ptData.length > 0) {
+            const fuera = ptData.filter(u => u.estado && u.estado !== 'operativo' && u.estado !== 'OPERATIVO');
+            if (fuera.length > 0) {
+              const ptText = fuera.map(u =>
+                `Interno ${u.interno}: ${u.estado}${u.motivo ? ' - ' + u.motivo : ''}${u.fecha ? ' (fecha: ' + u.fecha + ')' : ''}`
+              ).join('\n');
+              parteTallerContext = `\n==== PARTE MECÁNICO / PARTE DE TALLER (unidades fuera de servicio) ====\n${ptText}\n======================================================================`;
+            } else {
+              parteTallerContext = `\n==== PARTE MECÁNICO / PARTE DE TALLER ====\nTodas las unidades del parte están operativas.\n==========================================`;
+            }
+          }
+        }
+      }
+    } catch (ptErr) {
+      console.warn('[AI Chat] Error fetching parte taller:', ptErr);
+    }
+
+    // ── 1c. Fetch the history from Google Sheets (Try GViz CSV first for the 2026 DB, fallback to Apps Script) ──
     let sheetHistoryData = [];
     try {
       const csvUrl = 'https://docs.google.com/spreadsheets/d/1QK698StrEr9v7HgJUrtN1GFtb3ixk_2ql78dkx1_3Vk/export?format=csv&gid=659919704';
@@ -1778,16 +1847,27 @@ app.post('/api/assistant/chat', async (req, res) => {
     let finalResponseText = "";
 
     const systemPrompt = `Sos "Hugo AI", el asistente inteligente de mantenimiento de taller de Contenedores Hugo.
-Tu objetivo es ayudar al personal respondiendo preguntas sobre auxilios, reparaciones y cambios de repuestos de los vehículos basándote únicamente en el historial oficial de la empresa.
+Tu objetivo es ayudar al personal respondiendo preguntas sobre el estado de las órdenes de trabajo, tareas realizadas, horas trabajadas, mecánicos asignados, pendientes y servicios históricos.
 
-Aquí está el historial completo de services extraído de Google Sheets:
+Tenés acceso a TRES fuentes de información:
+1. Las ÓRDENES DE TRABAJO ACTIVAS en la app (tareas, horas, mecánicos, estado operativo/fuera de servicio, pendientes)
+2. El PARTE MECÁNICO / PARTE DE TALLER (estado actual de la flota)
+3. El HISTORIAL DE SERVICIOS en Google Sheets (preventivos y correctivos históricos)
+${activeOrdersContext}
+${parteTallerContext}
+
+==== HISTORIAL DE SERVICIOS (Google Sheets) ====
 ${formattedHistory || "No hay registros en el historial actualmente."}
+================================================
 
 Instrucciones:
-1. Responde en español de forma concisa y amigable.
-2. Si el usuario te pregunta por la "última vez" de un repuesto o servicio para un vehículo específico, busca la fecha más reciente de ese evento en el historial.
-3. Si el usuario pregunta por "auxilios" o "reparaciones", busca en la columna de Datos o Tipo las palabras relacionadas.
-4. Si no encuentras información sobre la consulta, indícalo amablemente sin inventar datos.`;
+1. Respondé en español de forma concisa y amigable.
+2. Para preguntas sobre una orden específica (qué trabajo se hizo, horas, mecánico, qué queda pendiente), priorizá las ÓRDENES DE TRABAJO EN LA APP.
+3. Si pregunta si una unidad está OPERATIVA o FUERA DE SERVICIO, buscá en las órdenes activas y en el Parte Mecánico.
+4. Si pregunta qué QUEDA PENDIENTE, listá las tareas con estado "Pendiente" de esa orden.
+5. Si pregunta cuántas HORAS tiene la orden, sumá las horas estimadas de todas las tareas.
+6. Para preguntas de historial de servicios pasados (última vez que se cambió X, etc.), usá el historial de Google Sheets.
+7. Si no encontrás información sobre la consulta, indicalo amablemente sin inventar datos.`;
 
     if (claudeApiKey) {
       // Use Anthropic Claude API (claude-3-5-haiku-20241022 is extremely fast and capable)
