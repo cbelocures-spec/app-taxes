@@ -1529,20 +1529,26 @@ app.post('/api/assistant/chat', async (req, res) => {
 
     const scriptUrl = settings.preventivoScriptUrl;
 
-    // ── 0. Action Detection: Check if user is asking to record a novelty or change unit status in Parte de Taller ──
+    // ── 0. Action Detection: Check if user explicitly wants to ACTION / RECORD a status change ──
     const lowerMsg = message.toLowerCase();
-    const isNovedadOrStatus = lowerMsg.includes('fuera de servicio') || 
-                              lowerMsg.includes('novedad') || 
-                              lowerMsg.includes('parado') || 
-                              lowerMsg.includes('reparacion') || 
-                              lowerMsg.includes('reparación') || 
-                              lowerMsg.includes('servicio pendiente') || 
-                              lowerMsg.includes('servicios pendientes') || 
-                              lowerMsg.includes('pendiente') || 
-                              lowerMsg.includes('rotura') || 
-                              lowerMsg.includes('marcar interno') || 
-                              lowerMsg.includes('marcar unidad') || 
-                              lowerMsg.includes('marcar camion');
+    const hasActionVerb = lowerMsg.includes('marcar') || 
+                          lowerMsg.includes('poner') || 
+                          lowerMsg.includes('cambiar') || 
+                          lowerMsg.includes('registrar') || 
+                          lowerMsg.includes('pasar a') || 
+                          lowerMsg.includes('setear');
+
+    const isNovedadOrStatus = hasActionVerb && (
+      lowerMsg.includes('fuera de servicio') || 
+      lowerMsg.includes('novedad') || 
+      lowerMsg.includes('parado') || 
+      lowerMsg.includes('reparacion') || 
+      lowerMsg.includes('reparación') || 
+      lowerMsg.includes('servicio pendiente') || 
+      lowerMsg.includes('servicios pendientes') || 
+      lowerMsg.includes('operativo') ||
+      lowerMsg.includes('rotura')
+    );
 
     const matchUnit = message.match(/(?:interno|unidad|camion|camión|nro|nº)?\s*#?(\d{1,4})\b/i);
 
@@ -1561,7 +1567,7 @@ app.post('/api/assistant/chat', async (req, res) => {
 
       let noveltyText = message
         .replace(/(?:marcar|unidad|interno|camion|camión|nro|nº)?\s*#?\d{1,4}/gi, '')
-        .replace(/fuera de servicio|servicios pendientes|servicio pendiente|reparaciones|reparación|reparacion|novedad|parado|en taller|marcar como|esta en|está en|pendiente/gi, '')
+        .replace(/fuera de servicio|servicios pendientes|servicio pendiente|reparaciones|reparación|reparacion|novedad|parado|en taller|marcar como|esta en|está en|pendiente|poner|cambiar|registrar/gi, '')
         .trim();
       if (!noveltyText || noveltyText.length < 2) {
         noveltyText = message.trim();
@@ -1587,7 +1593,7 @@ app.post('/api/assistant/chat', async (req, res) => {
                                (nuevoEstado === 'reparacion' ? '🔧 En Reparación' : 
                                (nuevoEstado === 'servicios_pendientes' ? '📋 Servicios Pendientes' : '✅ Operativo'));
             return res.json({
-              reply: `✅ **Novedad registrada en Parte de Taller**:\n- **Unidad:** #${internoDetected}\n- **Estado:** ${estadoLabel}\n- **Novedad:** "${noveltyText}"\n\nEl Parte de Taller fue actualizado inmediatamente.`
+              response: `✅ **Novedad registrada en Parte de Taller**:\n- **Unidad:** #${internoDetected}\n- **Estado:** ${estadoLabel}\n- **Novedad:** "${noveltyText}"\n\nEl Parte de Taller fue actualizado inmediatamente.`
             });
           }
         } catch (actErr) {
