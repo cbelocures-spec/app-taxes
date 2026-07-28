@@ -706,18 +706,23 @@ function promptDiagnosis(taskInfo = null) {
 async function submitPreOrderCheck() {
   const currentUser = localStorage.getItem('currentUserUsername');
   const userSector = getSectorByUsername(currentUser);
+  const preClasif = document.getElementById('pre-form-clasificacion') ? document.getElementById('pre-form-clasificacion').value : '';
+  const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || preClasif === 'Herrería');
 
   const preInternoSelect = document.getElementById('pre-form-interno');
+  const preInternoText = document.getElementById('pre-form-interno-text');
   
-  let interno = preInternoSelect ? preInternoSelect.value.trim() : "";
-  console.log("[submitPreOrderCheck] Initial interno value:", interno);
-  
-  // Fallback if they typed in search box but didn't click/confirm
-  if (!interno && preInternoSelect && preInternoSelect.closest) {
-    const wrapper = preInternoSelect.closest('.searchable-select-container');
-    const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
-    if (searchInput && searchInput.value.trim()) {
-      interno = searchInput.value.trim();
+  let interno = "";
+  if (isHerreria) {
+    interno = preInternoText ? preInternoText.value.trim() : "";
+  } else {
+    interno = preInternoSelect ? preInternoSelect.value.trim() : "";
+    if (!interno && preInternoSelect && preInternoSelect.closest) {
+      const wrapper = preInternoSelect.closest('.searchable-select-container');
+      const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
+      if (searchInput && searchInput.value.trim()) {
+        interno = searchInput.value.trim();
+      }
     }
   }
 
@@ -2596,14 +2601,23 @@ async function submitWorkOrder() {
     horaEl.value = `${hh}:${min}`;
   }
  
+  const userSector = getSectorByUsername(localStorage.getItem('currentUserUsername'));
+  const formClasif = clasificacionEl ? clasificacionEl.value : '';
+  const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || formClasif === 'Herrería');
   const rodadoVal = rodadoEl.value;
 
-  let internoVal = internoEl ? internoEl.value.trim() : "";
-  if (!internoVal && internoEl && internoEl.closest) {
-    const wrapper = internoEl.closest('.searchable-select-container');
-    const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
-    if (searchInput && searchInput.value.trim()) {
-      internoVal = searchInput.value.trim();
+  const internoTextEl = document.getElementById('form-interno-text');
+  let internoVal = "";
+  if (isHerreria) {
+    internoVal = internoTextEl ? internoTextEl.value.trim() : "";
+  } else {
+    internoVal = internoEl ? internoEl.value.trim() : "";
+    if (!internoVal && internoEl && internoEl.closest) {
+      const wrapper = internoEl.closest('.searchable-select-container');
+      const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
+      if (searchInput && searchInput.value.trim()) {
+        internoVal = searchInput.value.trim();
+      }
     }
   }
 
@@ -7847,8 +7861,11 @@ function applyOcrResultsToForm(results) {
 }
 
 function setupAllFieldsForSector() {
-  // Always display the searchable select dropdown for Interno in both modals for ALL sectors.
-  // This ensures the dropdown list with all vehicles/containers is available to everyone, while supporting custom text typing.
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+  const preClasif = document.getElementById('pre-form-clasificacion') ? document.getElementById('pre-form-clasificacion').value : '';
+  const formClasif = document.getElementById('form-clasificacion') ? document.getElementById('form-clasificacion').value : '';
+  const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || preClasif === 'Herrería' || formClasif === 'Herrería');
 
   // 1. Main modal: Rodado
   const rodadoSelectGroup = document.getElementById('form-rodado-group-select');
@@ -7867,10 +7884,17 @@ function setupAllFieldsForSector() {
   const preInternoSelect = document.getElementById('pre-form-interno');
   const preInternoText = document.getElementById('pre-form-interno-text');
 
-  if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'block';
-  if (preInternoTextGroup) preInternoTextGroup.style.display = 'none';
-  if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
-  if (preInternoText) preInternoText.removeAttribute('required');
+  if (isHerreria) {
+    if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'none';
+    if (preInternoTextGroup) preInternoTextGroup.style.display = 'block';
+    if (preInternoSelect) preInternoSelect.removeAttribute('required');
+    if (preInternoText) preInternoText.setAttribute('required', 'true');
+  } else {
+    if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'block';
+    if (preInternoTextGroup) preInternoTextGroup.style.display = 'none';
+    if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
+    if (preInternoText) preInternoText.removeAttribute('required');
+  }
 
   // 3. Main modal: Interno
   const internoSelectGroup = document.getElementById('form-interno-group-select');
@@ -7878,10 +7902,17 @@ function setupAllFieldsForSector() {
   const internoSelect = document.getElementById('form-interno');
   const internoText = document.getElementById('form-interno-text');
 
-  if (internoSelectGroup) internoSelectGroup.style.display = 'block';
-  if (internoTextGroup) internoTextGroup.style.display = 'none';
-  if (internoSelect) internoSelect.setAttribute('required', 'true');
-  if (internoText) internoText.removeAttribute('required');
+  if (isHerreria) {
+    if (internoSelectGroup) internoSelectGroup.style.display = 'none';
+    if (internoTextGroup) internoTextGroup.style.display = 'block';
+    if (internoSelect) internoSelect.removeAttribute('required');
+    if (internoText) internoText.setAttribute('required', 'true');
+  } else {
+    if (internoSelectGroup) internoSelectGroup.style.display = 'block';
+    if (internoTextGroup) internoTextGroup.style.display = 'none';
+    if (internoSelect) internoSelect.setAttribute('required', 'true');
+    if (internoText) internoText.removeAttribute('required');
+  }
 }
 
 
