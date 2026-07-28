@@ -5615,7 +5615,8 @@ function getSectorByUsername(username) {
   }
   if (
     email.includes('jcarmona') || 
-    email.includes('carmona')
+    email.includes('carmona') ||
+    email.includes('herrer')
   ) {
     return 'Herrería';
   }
