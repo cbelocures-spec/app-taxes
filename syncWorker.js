@@ -1290,8 +1290,15 @@ async function scrapeCatalogs(triggerUsername = null) {
     const mergedEmpleados = employees.length > 0 ? employees : MOCK_CATALOGS.empleados;
     const mergedCentros = centrosCosto.length > 0 ? centrosCosto : MOCK_CATALOGS.centrosCosto;
 
+    // Merge scraped rodados with existing database rodados (preserving manual entries like Interno 125)
+    const existingRodados = (db.getCatalogs() || {}).rodados || [];
+    const rodadosMap = new Map();
+    existingRodados.forEach(r => { if (r && r.interno) rodadosMap.set(String(r.interno).trim(), r); });
+    rodados.forEach(r => { if (r && r.interno) rodadosMap.set(String(r.interno).trim(), r); });
+    const mergedRodados = Array.from(rodadosMap.values()).sort((a, b) => (parseInt(a.interno) || 0) - (parseInt(b.interno) || 0));
+
     const finalCatalogs = {
-      rodados: rodados,
+      rodados: mergedRodados.length > 0 ? mergedRodados : rodados,
       responsables: mergedResponsables,
       empleados: mergedEmpleados,
       centrosCosto: mergedCentros
@@ -1353,43 +1360,64 @@ function resolveAndMapEmployee(task) {
   const employeeObj = employeeCatalog.find(e => e.value === task.empleado);
   let employeeLabel = employeeObj ? employeeObj.label : task.empleado;
 
-  const customMechanicNames = [
-    "DOMINIC DYLAN",
-    "PEREZ FACUNDO",
-    "LOPEZ GUSTAVO",
-    "CALOMINO DARIO",
-    "MUSDALINO FRANCO",
-    "RODRIGUEZ MARCELO",
-    "GODOY DAVID"
-  ];
+  // --- Dynamic employee mapping from Settings ---
+  // Falls back to hardcoded defaults if pañol hasn't saved a custom table yet.
+  const settings = db.getSettings();
+  const savedMappings = settings.employeeMappings;
 
-  const customHerreriaMechanicNames = [
-    "Federico",
-    "Luciano",
-    "Digno"
+  const FALLBACK_MAPPINGS = {
+    Taller: [
+      { appName: 'GODOY DAVID',               taxesName: 'Vera, Domingo Sergio' },
+      { appName: 'DOMINIC DYLAN',              taxesName: 'Vera, Domingo Sergio' },
+      { appName: 'PEREZ FACUNDO',              taxesName: 'Vera, Domingo Sergio' },
+      { appName: 'LOPEZ GUSTAVO',              taxesName: 'Vera, Domingo Sergio' },
+      { appName: 'CALOMINO DARIO',             taxesName: 'Vera, Domingo Sergio' },
+      { appName: 'MUSDALINO FRANCO',           taxesName: 'Vera, Domingo Sergio' },
+      { appName: 'RODRIGUEZ MARCELO',          taxesName: 'Vera, Domingo Sergio' },
+      { appName: 'Cuba Orosco, Kevín Genaro',  taxesName: 'Cuba Orosco, Kevín Genaro' }
+    ],
+    Herrería: [
+      { appName: 'Federico', taxesName: 'García, Yamandú Liborio' },
+      { appName: 'Luciano',  taxesName: 'Carmona González, Juan Manuel' },
+      { appName: 'Digno',    taxesName: 'García, Yamandú Liborio' }
+    ],
+    Edilicio: []
+  };
+
+  const effectiveMappings = (savedMappings && (savedMappings.Taller || savedMappings.Herrería || savedMappings.Edilicio))
+    ? savedMappings
+    : FALLBACK_MAPPINGS;
+
+  // Flatten all sectors into a single lookup list
+  const allMappings = [
+    ...(effectiveMappings.Taller   || []),
+    ...(effectiveMappings.Herrería || []),
+    ...(effectiveMappings.Edilicio || [])
   ];
 
   let finalDescription = task.descripcion || '';
-  const matchedCustomName = customMechanicNames.find(
-    name => name.toLowerCase() === employeeLabel.toLowerCase().trim()
-  );
-  const matchedCustomHerreriaName = customHerreriaMechanicNames.find(
-    name => name.toLowerCase() === employeeLabel.toLowerCase().trim()
+
+  const matchedEntry = allMappings.find(entry =>
+    entry.appName && entry.appName.trim().toLowerCase() === employeeLabel.trim().toLowerCase()
   );
 
-  if (matchedCustomName) {
-    console.log(`Mapping custom employee "${employeeLabel}" to "Vera, Domingo Sergio"`);
-    employeeLabel = "Vera, Domingo Sergio";
-    const suffix = `. Realizó: ${matchedCustomName}`;
-    if (!finalDescription.endsWith(suffix)) {
-      finalDescription = `${finalDescription}${suffix}`;
-    }
-  } else if (matchedCustomHerreriaName) {
-    console.log(`Mapping custom employee "${employeeLabel}" to "García, Yamandú Liborio"`);
-    employeeLabel = "García, Yamandú Liborio";
-    const suffix = `. Realizó: ${matchedCustomHerreriaName}`;
-    if (!finalDescription.endsWith(suffix)) {
-      finalDescription = `${finalDescription}${suffix}`;
+  if (matchedEntry && matchedEntry.taxesName && matchedEntry.taxesName.trim()) {
+    const isSameName = matchedEntry.appName.trim().toLowerCase() === matchedEntry.taxesName.trim().toLowerCase();
+    if (!isSameName) {
+      // Employee is NOT in Taxes under their own name → use proxy
+      console.log(`Mapping employee "${employeeLabel}" → "${matchedEntry.taxesName}" (proxy)`);
+      const suffix = `. Realizó: ${matchedEntry.appName.trim()}`;
+      if (!finalDescription.includes(suffix)) {
+        finalDescription = `${finalDescription}${suffix}`;
+      }
+      employeeLabel = matchedEntry.taxesName.trim();
+    } else {
+      // Employee IS in Taxes under their own name → use as-is, but still append suffix
+      console.log(`Mapping employee "${employeeLabel}" → same name in Taxes`);
+      const suffix = `. Realizó: ${matchedEntry.appName.trim()}`;
+      if (!finalDescription.includes(suffix)) {
+        finalDescription = `${finalDescription}${suffix}`;
+      }
     }
   }
 

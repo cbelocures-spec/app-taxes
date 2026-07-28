@@ -465,6 +465,16 @@ function switchView(viewId) {
 
   if (viewId === 'settings') {
     renderEmployeeHoursSummary();
+    const empMappingsSection = document.getElementById('employee-mappings-section');
+    if (empMappingsSection) {
+      empMappingsSection.style.display = 'block';
+      if (typeof loadAndRenderEmployeeMappings === 'function') {
+        loadAndRenderEmployeeMappings();
+      }
+    }
+    if (typeof loadUserPermissionsUI === 'function') {
+      loadUserPermissionsUI();
+    }
   }
 
   if (viewId === 'bulk') {
@@ -2349,7 +2359,7 @@ function createOrderCardHtml(order) {
           <div style="min-width: 0; flex: 1;">
             <div class="order-card-title">${order.rodado}</div>
             <div class="order-card-subtitle" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
-              <span>Interno: <strong>${order.interno}</strong> | Clasificación: <strong>${order.clasificacion || 'Sin Clasificar'}</strong></span>
+              <span>Interno: <strong>${(order.interno && order.interno !== '--') ? order.interno : '0KM'}</strong> | Clasificación: <strong>${order.clasificacion || 'Sin Clasificar'}</strong></span>
               ${(() => {
                 const isOutOfService = order.estadoUnidad === 'fuera_de_servicio';
                 const tooltip = isOutOfService ? 'Haga clic para cambiar a Operativo' : 'Haga clic para cambiar a Fuera de Servicio';
@@ -4112,24 +4122,31 @@ async function fetchActiveMechanics() {
   }
 }
 
+let customAddedMechanicsList = [];
+
 function openActiveMechanicsModal() {
   const container = document.getElementById('active-mechanics-checklist-container');
   if (!container) return;
 
   const currentUser = localStorage.getItem('currentUserUsername');
   const userSector = getSectorByUsername(currentUser);
-  const baseList = userSector === 'Herrería' ? HERRERIA_EMPLOYEES : MECANICA_EMPLOYEES;
+  let baseList = userSector === 'Herrería' ? [...HERRERIA_EMPLOYEES] : [...MECANICA_EMPLOYEES];
 
-  // Render checklist items
-  container.innerHTML = baseList.map((name, index) => {
-    const isChecked = activeMechanicsList.includes(name);
-    return `
-      <label class="mechanic-check-item">
-        <input type="checkbox" name="active_mechanic" value="${name}" ${isChecked ? 'checked' : ''}>
-        <span>${name}</span>
-      </label>
-    `;
-  }).join('');
+  if (Array.isArray(activeMechanicsList)) {
+    activeMechanicsList.forEach(m => {
+      if (m && !baseList.includes(m)) baseList.push(m);
+    });
+  }
+  if (Array.isArray(customAddedMechanicsList)) {
+    customAddedMechanicsList.forEach(m => {
+      if (m && !baseList.includes(m)) baseList.push(m);
+    });
+  }
+
+  renderActiveMechanicsChecklist(baseList);
+
+  const searchInput = document.getElementById('filter-mechanics-search');
+  if (searchInput) searchInput.value = '';
 
   const chkHide = document.getElementById('chk-hide-free-dashboard');
   if (chkHide) {
@@ -4137,6 +4154,72 @@ function openActiveMechanicsModal() {
   }
 
   document.getElementById('active-mechanics-modal').classList.add('open');
+}
+
+function renderActiveMechanicsChecklist(list) {
+  const container = document.getElementById('active-mechanics-checklist-container');
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = `<div class="empty-dashboard-state" style="padding:10px;">No hay empleados en la lista.</div>`;
+    return;
+  }
+
+  container.innerHTML = list.map((name) => {
+    const isChecked = activeMechanicsList.includes(name);
+    const safeName = name.replace(/'/g, "\\'");
+    return `
+      <div class="mechanic-check-row" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border-color); background: var(--card-bg); border-radius: 6px; margin-bottom: 4px;" data-mechanic-name="${name.toLowerCase()}">
+        <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; cursor: pointer; flex: 1; margin: 0; user-select: none;">
+          <input type="checkbox" name="active_mechanic" value="${name}" ${isChecked ? 'checked' : ''} style="width: 17px; height: 17px;">
+          <span>${name}</span>
+        </label>
+        <button type="button" class="btn btn-secondary btn-xs" onclick="removeMechanicFromModal('${safeName}')" title="Sacar empleado" style="padding: 2px 6px; font-size: 11px; color: var(--danger); border-color: var(--danger);">
+          <span class="material-icons" style="font-size: 14px;">delete</span> Sacar
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterActiveMechanicsModal(query) {
+  const term = String(query || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('.mechanic-check-row');
+  rows.forEach(row => {
+    const name = row.getAttribute('data-mechanic-name') || '';
+    row.style.display = name.includes(term) ? 'flex' : 'none';
+  });
+}
+
+function addNewCustomMechanicFromModal() {
+  const input = document.getElementById('new-custom-mechanic-name');
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) {
+    showToast("Ingresá el nombre del empleado", "warning");
+    return;
+  }
+
+  if (!customAddedMechanicsList.includes(name)) {
+    customAddedMechanicsList.push(name);
+  }
+  if (!activeMechanicsList.includes(name)) {
+    activeMechanicsList.push(name);
+  }
+
+  input.value = '';
+  showToast(`Empleado "${name}" colocado en la lista`, "success");
+  openActiveMechanicsModal();
+}
+
+function removeMechanicFromModal(name) {
+  if (confirm(`¿Sacar a "${name}" de la lista del turno?`)) {
+    activeMechanicsList = activeMechanicsList.filter(m => m !== name);
+    customAddedMechanicsList = customAddedMechanicsList.filter(m => m !== name);
+    const row = document.querySelector(`.mechanic-check-row[data-mechanic-name="${name.toLowerCase()}"]`);
+    if (row) row.remove();
+    showToast(`Empleado "${name}" sacado de la lista`, "info");
+  }
 }
 
 function closeActiveMechanicsModal() {
@@ -5686,9 +5769,169 @@ async function loadUserPermissionsUI() {
     const canBackup = currentUserPermissions.canRestoreBackup === true;
     backupSection.style.display = canBackup ? 'block' : 'none';
   }
+
+  // Show employee mappings section for Settings panel
+  const empMappingsSection = document.getElementById('employee-mappings-section');
+  if (empMappingsSection) {
+    empMappingsSection.style.display = 'block';
+    loadAndRenderEmployeeMappings();
+  }
 }
 
 let currentBackupData = [];
+
+// ── EMPLOYEE MAPPINGS (Pañol Settings) ─────────────────────────────────────────
+let currentEmployeeMappings = { Taller: [], Herrería: [], Edilicio: [] };
+let activeEmpMapTab = 'Taller';
+
+const EMP_MAP_DEFAULTS = {
+  Taller: [
+    { appName: 'GODOY DAVID',            taxesName: 'Vera, Domingo Sergio' },
+    { appName: 'DOMINIC DYLAN',          taxesName: 'Vera, Domingo Sergio' },
+    { appName: 'PEREZ FACUNDO',          taxesName: 'Vera, Domingo Sergio' },
+    { appName: 'LOPEZ GUSTAVO',          taxesName: 'Vera, Domingo Sergio' },
+    { appName: 'CALOMINO DARIO',         taxesName: 'Vera, Domingo Sergio' },
+    { appName: 'MUSDALINO FRANCO',       taxesName: 'Vera, Domingo Sergio' },
+    { appName: 'RODRIGUEZ MARCELO',      taxesName: 'Vera, Domingo Sergio' },
+    { appName: 'Cuba Orosco, Kevín Genaro', taxesName: 'Cuba Orosco, Kevín Genaro' }
+  ],
+  Herrería: [
+    { appName: 'Federico', taxesName: 'García, Yamandú Liborio' },
+    { appName: 'Luciano',  taxesName: 'Carmona González, Juan Manuel' },
+    { appName: 'Digno',    taxesName: 'García, Yamandú Liborio' }
+  ],
+  Edilicio: []
+};
+
+function switchEmpMapTab(sector) {
+  activeEmpMapTab = sector;
+  // Update tab button styles
+  document.querySelectorAll('.emp-map-tab-btn').forEach(btn => {
+    btn.style.borderBottom = '2px solid transparent';
+    btn.style.color = 'var(--text-muted)';
+  });
+  const sectorIdMap = { 'Taller': 'emp-tab-taller', 'Herrería': 'emp-tab-herreria', 'Edilicio': 'emp-tab-edilicio' };
+  const activeBtn = document.getElementById(sectorIdMap[sector]);
+  if (activeBtn) {
+    activeBtn.style.borderBottom = '2px solid var(--primary)';
+    activeBtn.style.color = 'var(--primary)';
+  }
+  // Show/hide panels
+  ['Taller', 'Herrería', 'Edilicio'].forEach(s => {
+    const panel = document.getElementById(`emp-map-table-${s}`);
+    if (panel) panel.style.display = s === sector ? 'block' : 'none';
+  });
+}
+
+function renderEmpMapRows(sector) {
+  const container = document.getElementById(`emp-map-rows-${sector}`);
+  if (!container) return;
+  const rows = currentEmployeeMappings[sector] || [];
+  if (rows.length === 0) {
+    container.innerHTML = `<div style="color:var(--text-muted); font-size:12px; padding:8px 0; text-align:center;">Sin empleados configurados. Agregá uno con el botón de abajo.</div>`;
+    return;
+  }
+  // Header row
+  let html = `
+    <div style="display:grid; grid-template-columns:1fr 1fr 36px; gap:8px; margin-bottom:6px; padding:0 2px;">
+      <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px;">Nombre en App</div>
+      <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px;">Nombre en Taxes</div>
+      <div></div>
+    </div>`;
+  rows.forEach((row, i) => {
+    const inTaxes = row.appName.trim().toLowerCase() === row.taxesName.trim().toLowerCase();
+    html += `
+      <div style="display:grid; grid-template-columns:1fr 1fr 36px; gap:8px; margin-bottom:7px; align-items:center;" id="emp-map-row-${sector}-${i}">
+        <input type="text" value="${escapeHtml(row.appName)}" placeholder="Nombre en App..."
+          style="padding:7px 9px; font-size:13px; border:1px solid var(--border-color); border-radius:6px; background:var(--bg-main); color:var(--text-main);"
+          onchange="updateEmpMapRow('${sector}', ${i}, 'appName', this.value)">
+        <div style="position:relative;">
+          <input type="text" value="${escapeHtml(row.taxesName)}" placeholder="Nombre en Taxes..."
+            style="padding:7px 9px; padding-left:${inTaxes ? '9px' : '28px'}; font-size:13px; border:1px solid ${inTaxes ? 'var(--success)' : 'var(--warning, #f59e0b)'}; border-radius:6px; background:var(--bg-main); color:var(--text-main); width:100%; box-sizing:border-box;"
+            onchange="updateEmpMapRow('${sector}', ${i}, 'taxesName', this.value)">
+          ${!inTaxes ? `<span title="Usa nombre proxy en Taxes" style="position:absolute;left:7px;top:50%;transform:translateY(-50%);font-size:14px;">🔀</span>` : `<span title="Nombre igual en Taxes" style="position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:14px; color:var(--success);">✓</span>`}
+        </div>
+        <button type="button" onclick="removeEmpMapRow('${sector}', ${i})"
+          style="background:transparent; border:1px solid var(--danger); border-radius:6px; color:var(--danger); cursor:pointer; padding:4px; display:flex; align-items:center; justify-content:center; width:34px; height:34px;">
+          <span class="material-icons" style="font-size:17px;">delete</span>
+        </button>
+      </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function updateEmpMapRow(sector, index, field, value) {
+  if (!currentEmployeeMappings[sector]) return;
+  if (currentEmployeeMappings[sector][index]) {
+    currentEmployeeMappings[sector][index][field] = value;
+    // Re-render after a short delay to update the indicator icons
+    setTimeout(() => renderEmpMapRows(sector), 50);
+  }
+}
+
+function addEmployeeMappingRow(sector) {
+  if (!currentEmployeeMappings[sector]) currentEmployeeMappings[sector] = [];
+  currentEmployeeMappings[sector].push({ appName: '', taxesName: '' });
+  renderEmpMapRows(sector);
+}
+
+function removeEmpMapRow(sector, index) {
+  if (!currentEmployeeMappings[sector]) return;
+  currentEmployeeMappings[sector].splice(index, 1);
+  renderEmpMapRows(sector);
+}
+
+async function loadAndRenderEmployeeMappings() {
+  try {
+    const username = localStorage.getItem('currentUserUsername') || '';
+    const res = await originalFetch('/api/settings', { headers: { 'x-user-username': username } });
+    if (!res.ok) throw new Error('Error cargando ajustes');
+    const data = await res.json();
+    const saved = data.employeeMappings;
+    if (saved && (saved.Taller || saved.Herrería || saved.Edilicio)) {
+      currentEmployeeMappings = {
+        Taller:    Array.isArray(saved.Taller)    ? saved.Taller    : EMP_MAP_DEFAULTS.Taller,
+        Herrería:  Array.isArray(saved.Herrería)  ? saved.Herrería  : EMP_MAP_DEFAULTS.Herrería,
+        Edilicio:  Array.isArray(saved.Edilicio)  ? saved.Edilicio  : EMP_MAP_DEFAULTS.Edilicio
+      };
+    } else {
+      // First time: pre-load defaults
+      currentEmployeeMappings = JSON.parse(JSON.stringify(EMP_MAP_DEFAULTS));
+    }
+  } catch (err) {
+    console.warn('Could not load employee mappings, using defaults:', err.message);
+    currentEmployeeMappings = JSON.parse(JSON.stringify(EMP_MAP_DEFAULTS));
+  }
+  ['Taller', 'Herrería', 'Edilicio'].forEach(s => renderEmpMapRows(s));
+}
+
+async function saveEmployeeMappings() {
+  const username = localStorage.getItem('currentUserUsername') || '';
+  const msgEl = document.getElementById('emp-map-save-msg');
+  try {
+    const res = await originalFetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-username': username },
+      body: JSON.stringify({ employeeMappings: currentEmployeeMappings })
+    });
+    if (!res.ok) throw new Error('Error al guardar');
+    if (msgEl) {
+      msgEl.textContent = '✓ Mapeo guardado correctamente';
+      msgEl.style.color = 'var(--success)';
+      msgEl.style.display = 'block';
+      setTimeout(() => { msgEl.style.display = 'none'; }, 3500);
+    }
+    // Re-render to update visual indicators
+    ['Taller', 'Herrería', 'Edilicio'].forEach(s => renderEmpMapRows(s));
+  } catch (err) {
+    if (msgEl) {
+      msgEl.textContent = '✗ Error al guardar: ' + err.message;
+      msgEl.style.color = 'var(--danger)';
+      msgEl.style.display = 'block';
+    }
+  }
+}
+// ── END EMPLOYEE MAPPINGS ────────────────────────────────────────────────────────
 
 async function renderBackupRecoveryTable() {
   const container = document.getElementById('backup-table-container');

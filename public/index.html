@@ -62,9 +62,11 @@
 
       <!-- OPERATOR DASHBOARD SECTION -->
       <div class="dashboard-section">
-        <div class="dashboard-header-row">
-          <span class="material-icons" style="color: #10b981;">engineering</span>
-          <h3>Estado de Operarios y Tareas</h3>
+        <div class="dashboard-header-row" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="material-icons" style="color: #10b981;">engineering</span>
+            <h3 style="margin: 0;">Estado de Operarios y Tareas</h3>
+          </div>
         </div>
 
         <!-- Section: En Proceso (Trabajando) -->
@@ -93,9 +95,6 @@
             <span class="indicator free"></span>
             <span>Mecánicos Libres / Disponibles (<span id="count-free">0</span>)</span>
           </div>
-          <button type="button" class="btn btn-secondary btn-xs" onclick="openActiveMechanicsModal()" style="padding: 2px 6px; font-size: 10px; height: auto; display: flex; align-items: center; gap: 2px;">
-            <span class="material-icons" style="font-size: 12px;">playlist_add_check</span> Activos Hoy
-          </button>
         </div>
         <div class="free-employees-list" id="list-free-employees">
           <!-- List of tags for free employees -->
@@ -431,6 +430,52 @@
           <div id="user-permissions-table-container">
             <div class="empty-dashboard-state">Cargando autorizaciones...</div>
           </div>
+        </div>
+      </div>
+
+      <!-- ── MAPEO DE EMPLEADOS (Solo Pañol / Admin) ── -->
+      <div id="employee-mappings-section" style="display: block; margin-top: 16px;">
+        <div class="section-title">
+          <h3>Mapeo de Empleados por Sector (Solo Pañol / Admin)</h3>
+        </div>
+        <div class="catalog-sync-card" style="padding: 16px;">
+          <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 14px 0; line-height: 1.5;">
+            Configurá para cada sector cómo se mapea el <strong>nombre que usa la app</strong> al <strong>nombre en Taxes</strong>.<br>
+            Si el empleado <em>no está</em> en Taxes, ingresá el nombre de quien lo representa (ej: García, Carmona).<br>
+            El nombre de Taxes se agrega automáticamente al final de la descripción de la tarea al sincronizar.
+          </p>
+
+          <!-- Sector tabs -->
+          <div style="display: flex; gap: 6px; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 0;">
+            <button type="button" class="emp-map-tab-btn active" id="emp-tab-taller" onclick="switchEmpMapTab('Taller')" style="padding: 7px 16px; font-size: 13px; font-weight: 600; border: none; border-bottom: 2px solid var(--primary); background: transparent; color: var(--primary); cursor: pointer; border-radius: 4px 4px 0 0;">🔧 Taller</button>
+            <button type="button" class="emp-map-tab-btn" id="emp-tab-herreria" onclick="switchEmpMapTab('Herrería')" style="padding: 7px 16px; font-size: 13px; font-weight: 600; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 4px 4px 0 0;">🔨 Herrería</button>
+            <button type="button" class="emp-map-tab-btn" id="emp-tab-edilicio" onclick="switchEmpMapTab('Edilicio')" style="padding: 7px 16px; font-size: 13px; font-weight: 600; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 4px 4px 0 0;">🏗️ Edilicio</button>
+          </div>
+
+          <!-- Tables per sector (shown/hidden by tab) -->
+          <div id="emp-map-table-Taller" class="emp-map-table-panel">
+            <div id="emp-map-rows-Taller" style="margin-bottom: 10px;"></div>
+            <button type="button" class="btn btn-secondary" onclick="addEmployeeMappingRow('Taller')" style="width:100%; padding:8px; font-size:13px; display:flex; align-items:center; justify-content:center; gap:6px;">
+              <span class="material-icons" style="font-size:17px;">person_add</span> Agregar empleado — Taller
+            </button>
+          </div>
+          <div id="emp-map-table-Herrería" class="emp-map-table-panel" style="display:none;">
+            <div id="emp-map-rows-Herrería" style="margin-bottom: 10px;"></div>
+            <button type="button" class="btn btn-secondary" onclick="addEmployeeMappingRow('Herrería')" style="width:100%; padding:8px; font-size:13px; display:flex; align-items:center; justify-content:center; gap:6px;">
+              <span class="material-icons" style="font-size:17px;">person_add</span> Agregar empleado — Herrería
+            </button>
+          </div>
+          <div id="emp-map-table-Edilicio" class="emp-map-table-panel" style="display:none;">
+            <div id="emp-map-rows-Edilicio" style="margin-bottom: 10px;"></div>
+            <button type="button" class="btn btn-secondary" onclick="addEmployeeMappingRow('Edilicio')" style="width:100%; padding:8px; font-size:13px; display:flex; align-items:center; justify-content:center; gap:6px;">
+              <span class="material-icons" style="font-size:17px;">person_add</span> Agregar empleado — Edilicio
+            </button>
+          </div>
+
+          <button type="button" class="btn btn-primary" onclick="saveEmployeeMappings()" style="width:100%; margin-top:14px; padding:10px; font-size:14px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;">
+            <span class="material-icons" style="font-size:18px;">save</span> Guardar Mapeo de Empleados
+          </button>
+          <div id="emp-map-save-msg" style="display:none; margin-top:8px; text-align:center; font-size:13px; font-weight:600; color: var(--success);"></div>
         </div>
       </div>
 
@@ -1428,23 +1473,40 @@
 
   <!-- ACTIVE MECHANICS MODAL -->
   <div class="modal-overlay" id="active-mechanics-modal">
-    <div class="dialog-modal">
-      <div class="dialog-header">
-        <h3>Mecánicos Activos Hoy</h3>
+    <div class="dialog-modal" style="max-width: 520px; width: 95%;">
+      <div class="dialog-header" style="display: flex; align-items: center; justify-content: space-between;">
+        <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons" style="color: var(--primary);">people</span> 👥 Colocar y Sacar Empleados
+        </h3>
         <button class="dialog-close" onclick="closeActiveMechanicsModal()">&times;</button>
       </div>
-      <div class="dialog-body" style="max-height: 380px; overflow-y: auto;">
-        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
-          Selecciona los mecánicos que están trabajando hoy en este turno. Solo los que estén marcados aparecerán en la lista de "Disponibles".
+      <div class="dialog-body" style="max-height: 440px; overflow-y: auto; padding: 16px;">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">
+          <strong>Colocar (✓ marcado):</strong> El empleado está en el taller hoy.<br>
+          <strong>Sacar (☐ desmarcado):</strong> El empleado está ausente, franco o fuera de turno.
         </p>
+
+        <!-- Dynamic Add Employee Box -->
+        <div style="display: flex; gap: 8px; margin-bottom: 14px; background: var(--bg-hover); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <input type="text" id="new-custom-mechanic-name" placeholder="Escribir nombre de nuevo empleado..." style="flex: 1; padding: 8px 10px; font-size: 13px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--card-bg); color: var(--text-color);" onkeydown="if(event.key==='Enter'){event.preventDefault();addNewCustomMechanicFromModal();}">
+          <button type="button" class="btn btn-primary" onclick="addNewCustomMechanicFromModal()" style="padding: 8px 12px; font-size: 12px; font-weight: 700; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+            <span class="material-icons" style="font-size: 16px;">person_add</span> ➕ Colocar
+          </button>
+        </div>
+
+        <!-- Filter / Quick search bar -->
+        <div style="margin-bottom: 12px;">
+          <input type="text" id="filter-mechanics-search" placeholder="🔍 Buscar empleado..." style="width: 100%; padding: 8px 10px; font-size: 13px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--card-bg); color: var(--text-color);" oninput="filterActiveMechanicsModal(this.value)">
+        </div>
+
         <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
           <div style="display: flex; gap: 8px;">
-            <button type="button" class="btn btn-secondary btn-xs" onclick="toggleAllActiveMechanics(true)" style="padding: 4px 8px; font-size: 11px;">Marcar Todos</button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="toggleAllActiveMechanics(false)" style="padding: 4px 8px; font-size: 11px;">Desmarcar Todos</button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="toggleAllActiveMechanics(true)" style="padding: 4px 10px; font-size: 11px; font-weight: 600;">✓ Marcar Todos (Colocar)</button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="toggleAllActiveMechanics(false)" style="padding: 4px 10px; font-size: 11px; font-weight: 600;">✗ Desmarcar Todos (Sacar)</button>
           </div>
           <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-color); cursor: pointer; margin-top: 4px; user-select: none;">
             <input type="checkbox" id="chk-hide-free-dashboard" onchange="toggleFreeMechanicsVisibility(this.checked)" style="width: 14px; height: 14px;">
-            <span>Ocultar todos en la pantalla principal (mantener activos)</span>
+            <span>Ocultar lista de libres en la pantalla principal</span>
           </label>
         </div>
         <form id="active-mechanics-form">
@@ -1455,8 +1517,8 @@
       </div>
       <div class="dialog-footer">
         <button class="btn btn-secondary" onclick="closeActiveMechanicsModal()">Cancelar</button>
-        <button class="btn btn-primary" onclick="saveActiveMechanicsList()">
-          <span class="material-icons">save</span> Guardar
+        <button class="btn btn-primary" onclick="saveActiveMechanicsList()" style="font-weight: 700; padding: 8px 18px;">
+          <span class="material-icons">save</span> Guardar Cambios
         </button>
       </div>
     </div>

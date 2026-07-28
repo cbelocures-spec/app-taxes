@@ -1266,7 +1266,8 @@ app.get('/api/settings', (req, res) => {
       claudeApiKey: settings.claudeApiKey || "",
       catalogSyncStatus: catalogStatus,
       catalogSyncError: settings.catalogSyncError || null,
-      isSupervisor: !!isMainSupervisor
+      isSupervisor: !!isMainSupervisor,
+      employeeMappings: settings.employeeMappings || null
     };
     res.json(responseSettings);
   } catch (error) {
@@ -1278,7 +1279,7 @@ app.get('/api/settings', (req, res) => {
 // Save connection settings
 app.post('/api/settings', (req, res) => {
   try {
-    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, geminiApiKey, claudeApiKey } = req.body;
+    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, geminiApiKey, claudeApiKey, employeeMappings } = req.body;
     const requestingUser = req.headers['x-user-username'] || null;
     const current = db.getSettings();
     
@@ -1304,6 +1305,12 @@ app.post('/api/settings', (req, res) => {
       updates.claudeApiKey = claudeApiKey.trim();
     }
 
+    // Save employee mappings (per-sector mapping table for Pañol)
+    if (employeeMappings !== undefined) {
+      updates.employeeMappings = employeeMappings;
+      console.log(`[Settings] Employee mappings updated by ${requestingUser || 'unknown'}`);
+    }
+
     // Only update global username/password if this is the global/primary user
     const isPrimaryUser = !current.username || 
                           (requestingUser && current.username.toLowerCase().trim() === (username || '').toLowerCase().trim());
@@ -1320,7 +1327,7 @@ app.post('/api/settings', (req, res) => {
     }
 
     const saved = db.saveSettings(updates);
-    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl, googleActiveTasksUrl: saved.googleActiveTasksUrl, preventivoScriptUrl: saved.preventivoScriptUrl, parteTallerScriptUrl: saved.parteTallerScriptUrl } });
+    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl, googleActiveTasksUrl: saved.googleActiveTasksUrl, preventivoScriptUrl: saved.preventivoScriptUrl, parteTallerScriptUrl: saved.parteTallerScriptUrl, employeeMappings: saved.employeeMappings || null } });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

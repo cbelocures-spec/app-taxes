@@ -257,7 +257,7 @@ async function checkAndSync() {
       if (o.syncStatus !== 'pending' || o.deleted === true) return false;
       
       const localOrd = db.getWorkOrderById(o.id);
-      if (localOrd && (localOrd.syncStatus === 'success' || localOrd.verifiedStatus === 'success')) {
+      if (localOrd && localOrd.taxesOrderNumber && (localOrd.syncStatus === 'success' || localOrd.verifiedStatus === 'success')) {
         console.log(`[RailwayAgent] Pending order ${o.interno} (${o.id}) is already completed locally. Pushing status instead of running Puppeteer.`);
         apiCall('POST', `/api/orders/local-sync-result/${o.id}`, {
           syncStatus: localOrd.syncStatus,
@@ -341,6 +341,10 @@ function startAgent() {
   setInterval(checkAndSync, POLL_INTERVAL_MS);
   // Initial check
   checkAndSync();
+}
+
+if (require.main === module) {
+  startAgent();
 }
 
 module.exports = { startAgent };
