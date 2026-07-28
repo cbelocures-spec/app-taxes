@@ -550,6 +550,9 @@ function openPreOrderModal() {
     }
   }
 
+  // Set up input vs select based on user sector AND updated classification
+  setupAllFieldsForSector();
+
   document.getElementById('pre-order-modal').classList.add('open');
 }
 
@@ -843,8 +846,12 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
   // 4. Auto-populate Clasificación
   const clasificacionEl = document.getElementById('form-clasificacion');
   if (clasificacionEl) {
-    clasificacionEl.value = presetClasificacion || (isHerreria ? 'Herrería' : (userSector === 'Edilicio' ? 'Edilicio' : 'Correctivo'));
+    const isHerreriaTabOrUser = isHerreria || currentSelectedSector === 'Herrería';
+    clasificacionEl.value = presetClasificacion || (isHerreriaTabOrUser ? 'Herrería' : (userSector === 'Edilicio' ? 'Edilicio' : 'Correctivo'));
   }
+  
+  // Re-run setupAllFieldsForSector now that Clasificación has been populated!
+  setupAllFieldsForSector();
   
   // Reset dates
   const today = new Date();
@@ -953,6 +960,7 @@ function editOrder(orderId) {
     }
   }
   document.getElementById('form-clasificacion').value = order.clasificacion;
+  setupAllFieldsForSector();
   document.getElementById('form-incidente').value = order.incidente;
   document.getElementById('form-fecha').value = order.fechaEntrega;
   document.getElementById('form-hora').value = order.horario;
