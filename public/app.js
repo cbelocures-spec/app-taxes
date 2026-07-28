@@ -512,7 +512,7 @@ function openPreOrderModal() {
   const preInternoSelect = document.getElementById('pre-form-interno');
   if (preInternoSelect) {
     if (cachedInternoOptions && cachedInternoOptions.length > 0) {
-      populateSelect('pre-form-interno', cachedInternoOptions, "Seleccionar Interno...");
+      populateSelect('pre-form-interno', cachedInternoOptions, "Seleccionar Rodado...");
     }
     preInternoSelect.value = "";
     if (preInternoSelect.rebuildSearchable) {
@@ -524,7 +524,7 @@ function openPreOrderModal() {
         const searchInput = wrapper.querySelector('.searchable-select-search-input');
         if (searchInput) searchInput.value = '';
         const labelSpan = wrapper.querySelector('.trigger-label');
-        if (labelSpan) labelSpan.textContent = 'Seleccionar Interno...';
+        if (labelSpan) labelSpan.textContent = 'Seleccionar Rodado...';
       }
     }
   }
