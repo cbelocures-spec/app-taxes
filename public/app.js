@@ -702,6 +702,7 @@ function promptDiagnosis(taskInfo = null) {
 
 async function submitPreOrderCheck() {
   const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
   const preClasif = document.getElementById('pre-form-clasificacion') ? document.getElementById('pre-form-clasificacion').value : '';
   const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || preClasif === 'Herrería');
 
