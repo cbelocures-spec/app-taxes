@@ -679,17 +679,48 @@ app.put('/api/orders/:id', (req, res) => {
     const isHerrer = sector === 'Herrería' || isHerreria(sector) || allowed.some(s => isHerreria(s));
     const isEdil = sector === 'Edilicio' || isEdilicio(sector) || allowed.some(s => isEdilicio(s));
 
+    const cachedCatalogs = db.read().catalogs || {};
+    const empleadosList = cachedCatalogs.empleados || [];
+    const centrosCostoList = cachedCatalogs.centrosCosto || [];
+
     const hasHerreriaTask = Array.isArray(tasks) && tasks.some(t => {
       if (!t) return false;
-      const cc = String(t.centroCosto || '').trim();
-      const emp = String(t.empleado || '').toLowerCase();
-      return cc === '11' || isHerreria(cc) || emp.includes('gonzalez') || emp.includes('carmona');
+      const ccVal = String(t.centroCosto || '').trim();
+      const empVal = String(t.empleado || '').trim();
+      
+      const ccOpt = centrosCostoList.find(c => String(c.value) === ccVal);
+      const ccLabel = ccOpt ? String(ccOpt.label).toLowerCase() : '';
+      
+      const empOpt = empleadosList.find(e => String(e.value) === empVal);
+      const empLabel = empOpt ? String(empOpt.label).toLowerCase() : '';
+
+      const cc = ccVal.toLowerCase();
+      const emp = empVal.toLowerCase();
+
+      const isCcHerreria = ccVal === '11' || ccVal === '16' || ccLabel.includes('herrer') || cc.includes('herrer');
+      const isEmpHerreria = empLabel.includes('gonzalez') || empLabel.includes('carmona') || empLabel.includes('ojeda') || empLabel.includes('rocha') || empLabel.includes('montiel') || emp.includes('gonzalez') || emp.includes('carmona');
+
+      return isCcHerreria || isEmpHerreria;
     });
+
     const hasEdilicioTask = Array.isArray(tasks) && tasks.some(t => {
       if (!t) return false;
-      const cc = String(t.centroCosto || '').trim();
-      const emp = String(t.empleado || '').toLowerCase();
-      return cc === '8' || isEdilicio(cc) || emp.includes('toledo');
+      const ccVal = String(t.centroCosto || '').trim();
+      const empVal = String(t.empleado || '').trim();
+      
+      const ccOpt = centrosCostoList.find(c => String(c.value) === ccVal);
+      const ccLabel = ccOpt ? String(ccOpt.label).toLowerCase() : '';
+      
+      const empOpt = empleadosList.find(e => String(e.value) === empVal);
+      const empLabel = empOpt ? String(empOpt.label).toLowerCase() : '';
+
+      const cc = ccVal.toLowerCase();
+      const emp = empVal.toLowerCase();
+
+      const isCcEdilicio = ccVal === '8' || ccVal === '17' || ccLabel.includes('edil') || cc.includes('edil');
+      const isEmpEdilicio = empLabel.includes('toledo') || emp.includes('toledo');
+
+      return isCcEdilicio || isEmpEdilicio;
     });
 
     if (!isPaniol) {
