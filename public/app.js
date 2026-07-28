@@ -351,6 +351,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Fetch novelties from Google Sheet on startup
   fetchNovelties();
 
+  const preClasifEl = document.getElementById('pre-form-clasificacion');
+  if (preClasifEl) preClasifEl.addEventListener('change', setupAllFieldsForSector);
+  const formClasifEl = document.getElementById('form-clasificacion');
+  if (formClasifEl) formClasifEl.addEventListener('change', setupAllFieldsForSector);
+
   // Listen for changes on rodado field to auto-populate interno
   const rodadoSelect = document.getElementById('form-rodado');
   if (rodadoSelect) {
@@ -536,9 +541,9 @@ function openPreOrderModal() {
   if (clsEl) {
     const currentUser = localStorage.getItem('currentUserUsername');
     const userSector = getSectorByUsername(currentUser);
-    if (userSector === 'Herrería') {
+    if (userSector === 'Herrería' || currentSelectedSector === 'Herrería') {
       clsEl.value = 'Herrería';
-    } else if (userSector === 'Edilicio') {
+    } else if (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio') {
       clsEl.value = 'Edilicio';
     } else {
       clsEl.value = 'Correctivo';
@@ -697,8 +702,8 @@ function promptDiagnosis(taskInfo = null) {
 
 async function submitPreOrderCheck() {
   const currentUser = localStorage.getItem('currentUserUsername');
-  const userSector = getSectorByUsername(currentUser);
-  const isHerreria = (userSector === 'Herrería');
+  const preClasif = document.getElementById('pre-form-clasificacion') ? document.getElementById('pre-form-clasificacion').value : '';
+  const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || preClasif === 'Herrería');
 
   const preInternoSelect = document.getElementById('pre-form-interno');
   const preInternoText = document.getElementById('pre-form-interno-text');
@@ -2590,7 +2595,9 @@ async function submitWorkOrder() {
     horaEl.value = `${hh}:${min}`;
   }
  
-  const isHerreria = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Herrería');
+  const userSector = getSectorByUsername(localStorage.getItem('currentUserUsername'));
+  const formClasif = clasificacionEl ? clasificacionEl.value : '';
+  const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || formClasif === 'Herrería');
   const rodadoVal = rodadoEl.value;
 
   const internoTextEl = document.getElementById('form-interno-text');
@@ -7850,7 +7857,9 @@ function applyOcrResultsToForm(results) {
 function setupAllFieldsForSector() {
   const currentUser = localStorage.getItem('currentUserUsername');
   const userSector = getSectorByUsername(currentUser);
-  const isHerreria = (userSector === 'Herrería');
+  const preClasif = document.getElementById('pre-form-clasificacion') ? document.getElementById('pre-form-clasificacion').value : '';
+  const formClasif = document.getElementById('form-clasificacion') ? document.getElementById('form-clasificacion').value : '';
+  const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || preClasif === 'Herrería' || formClasif === 'Herrería');
 
   // 1. Main modal: Rodado
   const rodadoSelectGroup = document.getElementById('form-rodado-group-select');
