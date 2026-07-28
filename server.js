@@ -711,9 +711,12 @@ app.put('/api/orders/:id', (req, res) => {
 
     // Force sector classification when appropriate
     let finalClasificacion = clasificacion;
-    if (isHerrer || isHerreria(clasificacion) || hasHerreriaTask) {
+    const isHerreriaOnlyUser = sector === 'Herrería' && !allowed.some(s => s === 'Taller');
+    const isEdilicioOnlyUser = sector === 'Edilicio' && !allowed.some(s => s === 'Taller');
+
+    if (isHerreria(clasificacion) || isHerreriaOnlyUser) {
       finalClasificacion = 'Herrería';
-    } else if (isEdil || isEdilicio(clasificacion) || hasEdilicioTask) {
+    } else if (isEdilicio(clasificacion) || isEdilicioOnlyUser) {
       finalClasificacion = 'Edilicio';
     }
 

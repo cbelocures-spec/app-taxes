@@ -697,26 +697,17 @@ function promptDiagnosis(taskInfo = null) {
 
 async function submitPreOrderCheck() {
   const currentUser = localStorage.getItem('currentUserUsername');
-  const userSector = getSectorByUsername(currentUser);
-  const isHerreria = (userSector === 'Herrería');
-
   const preInternoSelect = document.getElementById('pre-form-interno');
-  const preInternoText = document.getElementById('pre-form-interno-text');
   
-  let interno = "";
-  if (isHerreria) {
-    interno = preInternoText ? preInternoText.value.trim() : "";
-  } else {
-    interno = preInternoSelect ? preInternoSelect.value.trim() : "";
-    console.log("[submitPreOrderCheck] Initial interno value:", interno);
-    
-    // Fallback if they typed in search box but didn't click/confirm (works for all sectors)
-    if (!interno && preInternoSelect && preInternoSelect.closest) {
-      const wrapper = preInternoSelect.closest('.searchable-select-container');
-      const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
-      if (searchInput && searchInput.value.trim()) {
-        interno = searchInput.value.trim();
-      }
+  let interno = preInternoSelect ? preInternoSelect.value.trim() : "";
+  console.log("[submitPreOrderCheck] Initial interno value:", interno);
+  
+  // Fallback if they typed in search box but didn't click/confirm
+  if (!interno && preInternoSelect && preInternoSelect.closest) {
+    const wrapper = preInternoSelect.closest('.searchable-select-container');
+    const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
+    if (searchInput && searchInput.value.trim()) {
+      interno = searchInput.value.trim();
     }
   }
 
@@ -2590,11 +2581,16 @@ async function submitWorkOrder() {
     horaEl.value = `${hh}:${min}`;
   }
  
-  const isHerreria = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Herrería');
   const rodadoVal = rodadoEl.value;
 
-  const internoTextEl = document.getElementById('form-interno-text');
-  const internoVal = isHerreria ? (internoTextEl ? internoTextEl.value.trim() : '') : internoEl.value;
+  let internoVal = internoEl ? internoEl.value.trim() : "";
+  if (!internoVal && internoEl && internoEl.closest) {
+    const wrapper = internoEl.closest('.searchable-select-container');
+    const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
+    if (searchInput && searchInput.value.trim()) {
+      internoVal = searchInput.value.trim();
+    }
+  }
 
   // Manual validations for touch optimization
   if (!rodadoVal) return showToast("Por favor, selecciona un Rodado.", "danger");
@@ -7835,58 +7831,41 @@ function applyOcrResultsToForm(results) {
 }
 
 function setupAllFieldsForSector() {
-  const currentUser = localStorage.getItem('currentUserUsername');
-  const userSector = getSectorByUsername(currentUser);
-  const isHerreria = (userSector === 'Herrería');
-
+  // Always use the searchable select dropdown for Interno in both modals for all sectors (including Herrería)
+  // This allows Herrería users to select from the dropdown or type custom values using the searchable select's custom entry option.
+  
   // 1. Main modal: Rodado
   const rodadoSelectGroup = document.getElementById('form-rodado-group-select');
   const rodadoTextGroup = document.getElementById('form-rodado-group-text');
   const rodadoSelect = document.getElementById('form-rodado');
   const rodadoText = document.getElementById('form-rodado-text');
 
-  // Rodado: always use the searchable select for ALL sectors (Herrería included)
   if (rodadoSelectGroup) rodadoSelectGroup.style.display = 'block';
   if (rodadoTextGroup) rodadoTextGroup.style.display = 'none';
   if (rodadoSelect) rodadoSelect.setAttribute('required', 'true');
   if (rodadoText) rodadoText.removeAttribute('required');
 
-  // 2. Pre-order modal: Interno — always show the searchable select (for all sectors including Herrería)
+  // 2. Pre-order modal: Interno
   const preInternoSelectGroup = document.getElementById('pre-form-interno-group-select');
   const preInternoTextGroup = document.getElementById('pre-form-interno-group-text');
   const preInternoSelect = document.getElementById('pre-form-interno');
   const preInternoText = document.getElementById('pre-form-interno-text');
 
-  // Show select dropdown for non-Herrería, and free text input for Herrería
-  if (isHerreria) {
-    if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'none';
-    if (preInternoTextGroup) preInternoTextGroup.style.display = 'block';
-    if (preInternoSelect) preInternoSelect.removeAttribute('required');
-    if (preInternoText) preInternoText.setAttribute('required', 'true');
-  } else {
-    if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'block';
-    if (preInternoTextGroup) preInternoTextGroup.style.display = 'none';
-    if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
-    if (preInternoText) preInternoText.removeAttribute('required');
-  }
+  if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'block';
+  if (preInternoTextGroup) preInternoTextGroup.style.display = 'none';
+  if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
+  if (preInternoText) preInternoText.removeAttribute('required');
 
-  // 3. Main modal: Interno — for Herrería show text field (free type), for others show select
+  // 3. Main modal: Interno
   const internoSelectGroup = document.getElementById('form-interno-group-select');
   const internoTextGroup = document.getElementById('form-interno-group-text');
   const internoSelect = document.getElementById('form-interno');
   const internoText = document.getElementById('form-interno-text');
 
-  if (isHerreria) {
-    if (internoSelectGroup) internoSelectGroup.style.display = 'none';
-    if (internoTextGroup) internoTextGroup.style.display = 'block';
-    if (internoSelect) internoSelect.removeAttribute('required');
-    if (internoText) internoText.setAttribute('required', 'true');
-  } else {
-    if (internoSelectGroup) internoSelectGroup.style.display = 'block';
-    if (internoTextGroup) internoTextGroup.style.display = 'none';
-    if (internoSelect) internoSelect.setAttribute('required', 'true');
-    if (internoText) internoText.removeAttribute('required');
-  }
+  if (internoSelectGroup) internoSelectGroup.style.display = 'block';
+  if (internoTextGroup) internoTextGroup.style.display = 'none';
+  if (internoSelect) internoSelect.setAttribute('required', 'true');
+  if (internoText) internoText.removeAttribute('required');
 }
 
 
@@ -8630,21 +8609,23 @@ function openNewOrderModalWithFuelPreventivo(interno, tipo, rowIndex, litrosTota
   const internoText = document.getElementById('form-interno-text');
   const isHerreria = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Herrería');
   
-  if (isHerreria) {
-    if (internoText) {
-      internoText.value = interno;
-      const event = new Event('change');
-      internoText.dispatchEvent(event);
+  if (internoSelect) {
+    let optionExists = Array.from(internoSelect.options).some(opt => opt.value === interno);
+    if (!optionExists) {
+      const newOpt = document.createElement('option');
+      newOpt.value = interno;
+      newOpt.textContent = interno;
+      internoSelect.appendChild(newOpt);
     }
-  } else {
-    if (internoSelect) {
-      internoSelect.value = interno;
-      if (internoSelect.rebuildSearchable) {
-        internoSelect.rebuildSearchable();
-      }
-      const event = new Event('change');
-      internoSelect.dispatchEvent(event);
+    internoSelect.value = interno;
+    if (internoSelect.rebuildSearchable) {
+      internoSelect.rebuildSearchable();
     }
+    internoSelect.dispatchEvent(new Event('change'));
+  }
+  if (internoText) {
+    internoText.value = interno;
+    internoText.dispatchEvent(new Event('change'));
   }
 
   // Auto-populate Rodado based on selected Interno
@@ -9440,14 +9421,21 @@ function ptCrearOrden(internoPT) {
   const isHerreria = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Herrería');
   const internoSelect = document.getElementById('form-interno');
   const internoText  = document.getElementById('form-interno-text');
-  if (isHerreria) {
-    if (internoText) { internoText.value = taxesInterno; internoText.dispatchEvent(new Event('change')); }
-  } else {
-    if (internoSelect) {
-      internoSelect.value = taxesInterno;
-      if (internoSelect.rebuildSearchable) internoSelect.rebuildSearchable();
-      internoSelect.dispatchEvent(new Event('change'));
+  if (internoSelect) {
+    let optionExists = Array.from(internoSelect.options).some(opt => opt.value === taxesInterno);
+    if (!optionExists) {
+      const newOpt = document.createElement('option');
+      newOpt.value = taxesInterno;
+      newOpt.textContent = taxesInterno;
+      internoSelect.appendChild(newOpt);
     }
+    internoSelect.value = taxesInterno;
+    if (internoSelect.rebuildSearchable) internoSelect.rebuildSearchable();
+    internoSelect.dispatchEvent(new Event('change'));
+  }
+  if (internoText) {
+    internoText.value = taxesInterno;
+    internoText.dispatchEvent(new Event('change'));
   }
   const rodadoOpt = cachedCatalogs.rodados
     ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(taxesInterno).trim())
