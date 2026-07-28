@@ -109,14 +109,26 @@
           <div class="empty-dashboard-state">No hay operarios trabajando actualmente.</div>
         </div>
 
-        <!-- Section: Sin Iniciar (Esperando Operario) -->
+        <!-- Section: En Pausa -->
         <div class="dashboard-sub-title" style="margin-top: 20px;">
-          <span class="indicator pending"></span>
-          <span>Pendientes de Asignar (<span id="count-pending">0</span>)</span>
+          <span class="indicator paused"></span>
+          <span>Tareas en Pausa (<span id="count-paused">0</span>)</span>
         </div>
-        <div class="dashboard-grid pending" id="grid-pending">
-          <!-- Square cards for pending tasks -->
-          <div class="empty-dashboard-state">No hay tareas pendientes.</div>
+        <div class="dashboard-grid paused" id="grid-paused">
+          <!-- Square cards for paused tasks -->
+          <div class="empty-dashboard-state">No hay tareas en pausa.</div>
+        </div>
+
+        <!-- Section: Operarios Libres (Mecánicos sin tarea activa) -->
+        <div class="dashboard-sub-title" style="margin-top: 20px; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="indicator free"></span>
+            <span>Mecánicos Libres / Disponibles (<span id="count-free">0</span>)</span>
+          </div>
+        </div>
+        <div class="free-employees-list" id="list-free-employees">
+          <!-- List of tags for free employees -->
+          <div class="empty-dashboard-state">No hay mecánicos libres registrados.</div>
         </div>
       </div>
 

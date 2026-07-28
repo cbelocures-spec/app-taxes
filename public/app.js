@@ -3628,6 +3628,37 @@ function renderDashboard() {
 
     // Active tasks from all orders (including local, error, pending, syncing, success)
     const activeLocalOrders = getFilteredActiveOrders();
+
+    // Update Stats Dashboard Cards dynamically
+    const totalTallerEl = document.getElementById('stat-total-taller');
+    const subTallerEl = document.getElementById('stat-sub-taller');
+    const activeOrdersEl = document.getElementById('stat-active-orders');
+    const subActiveEl = document.getElementById('stat-sub-active');
+    const overduePrevEl = document.getElementById('stat-overdue-prev');
+    const subPrevEl = document.getElementById('stat-sub-prev');
+    const syncRateEl = document.getElementById('stat-sync-rate');
+
+    if (totalTallerEl) totalTallerEl.textContent = activeLocalOrders.length;
+    
+    let workingOrdersCount = 0;
+    let preventiveCount = 0;
+    activeLocalOrders.forEach(o => {
+      const isWorking = (o.tasks || []).some(t => t.timerStart !== null && t.timerStart > 0);
+      if (isWorking) workingOrdersCount++;
+      if (o.clasificacion === 'Preventivo') preventiveCount++;
+    });
+    
+    if (subTallerEl) subTallerEl.textContent = `${activeLocalOrders.length - workingOrdersCount} sin iniciar`;
+    if (activeOrdersEl) activeOrdersEl.textContent = activeLocalOrders.length;
+    if (subActiveEl) subActiveEl.textContent = `${workingOrdersCount} en proceso`;
+    if (overduePrevEl) overduePrevEl.textContent = preventiveCount;
+    if (subPrevEl) subPrevEl.textContent = `${preventiveCount} este mes`;
+    
+    if (syncRateEl) {
+      const syncedCount = activeLocalOrders.filter(o => o.taxesOrderNumber).length;
+      const rate = activeLocalOrders.length > 0 ? Math.round((syncedCount / activeLocalOrders.length) * 100) : 100;
+      syncRateEl.textContent = `${rate}%`;
+    }
     
     const workingTasks = [];
     const pausedTasks = [];
