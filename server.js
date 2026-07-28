@@ -136,13 +136,15 @@ function getSectorByUsername(username) {
   }
   if (
     cleanUsername.includes('jcarmona') || 
-    cleanUsername.includes('carmona')
+    cleanUsername.includes('carmona') ||
+    cleanUsername.includes('herrer')
   ) {
     return 'Herrería';
   }
   if (
     cleanUsername.includes('ftoledo') || 
-    cleanUsername.includes('toledo')
+    cleanUsername.includes('toledo') ||
+    cleanUsername.includes('edil')
   ) {
     return 'Edilicio';
   }
@@ -152,6 +154,13 @@ function getSectorByUsername(username) {
   ) {
     return 'Taller';
   }
+  try {
+    const userPerms = db.getUserPermissions(cleanUsername);
+    if (userPerms && Array.isArray(userPerms.allowedSectors)) {
+      if (userPerms.allowedSectors.some(s => isHerreria(s))) return 'Herrería';
+      if (userPerms.allowedSectors.some(s => isEdilicio(s))) return 'Edilicio';
+    }
+  } catch (e) {}
   return 'Taller';
 }
 
@@ -165,6 +174,23 @@ function isEdilicio(cls) {
   if (!cls) return false;
   const norm = String(cls).toLowerCase().trim();
   return norm.includes('edilici') || norm.includes('edilicio');
+}
+
+function isHerreriaExclusiveEquipment(rodado, interno) {
+  const str = (String(rodado || '') + ' ' + String(interno || '')).toUpperCase();
+  const cleanStr = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  
+  // Check key substrings/prefixes to avoid issues with accents, spelling, and encoding typos (e.g. "Contenedor metlico")
+  if (cleanStr.includes('PRENSA')) return true;
+  if (cleanStr.includes('FABRIC')) return true; // covers FABRICACIÓN, FABRICACIN, etc.
+  if (cleanStr.includes('FINAL')) return true; // covers FINALIZACIÓN, FINALIZACIN, etc.
+  if (cleanStr.includes('CONTENE')) return true; // covers CONTENEDOR, CONTENEDORE, etc.
+  if (cleanStr.includes('CONT. MET') || cleanStr.includes('CONT.MET') || cleanStr.includes('CONT. PLAS') || cleanStr.includes('CONT.PLAS')) return true;
+  if (cleanStr.includes('CAJA') || cleanStr.includes('ROLL-OFF')) return true; // covers CAJA ROLL-OFF, REP. CAJA ROLL-OFF
+  if (cleanStr.includes('VOLQUET')) return true; // covers REP. VOLQUETE, VOLQUETES
+  if (cleanStr.includes('CANASTO')) return true; // covers CANASTO RECICLAJE
+  if (cleanStr.includes('10171')) return true;
+  return false;
 }
 
 // 1. ENDPOINT DE LOGIN: Bloquea la entrada a la app si no existe el usuario o la contraseña es incorrecta
@@ -497,7 +523,12 @@ app.get('/api/orders', (req, res) => {
       if (sector === 'Admin') return true;
       if (allowed.some(s => isHerreria(s)) && isHerreria(cls)) return true;
       if (allowed.some(s => isEdilicio(s)) && isEdilicio(cls)) return true;
-      if (allowed.some(s => s === 'Taller') && (!isHerreria(cls) && !isEdilicio(cls))) return true;
+      if (allowed.some(s => s === 'Taller')) {
+        // Taller sees non-Herreria, non-Edilicio orders
+        if (!isHerreria(cls) && !isEdilicio(cls)) return true;
+        // Taller ALSO sees Herrería orders for regular vehicles (e.g. Rodado 61), hiding only exclusive equipment (Foto 1)
+        if (isHerreria(cls) && !isHerreriaExclusiveEquipment(o.rodado, o.interno)) return true;
+      }
       return false;
     });
 
@@ -642,28 +673,48 @@ app.put('/api/orders/:id', (req, res) => {
     // Check sector permission
     const existingCls = existing.clasificacion;
     const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
+    const userPerms = db.getUserPermissions(requester, sector);
+    const allowed = userPerms.allowedSectors || [];
+
+    const isHerrer = sector === 'Herrería' || isHerreria(sector) || allowed.some(s => isHerreria(s));
+    const isEdil = sector === 'Edilicio' || isEdilicio(sector) || allowed.some(s => isEdilicio(s));
+
+    const hasHerreriaTask = Array.isArray(tasks) && tasks.some(t => {
+      if (!t) return false;
+      const cc = String(t.centroCosto || '').trim();
+      const emp = String(t.empleado || '').toLowerCase();
+      return cc === '11' || isHerreria(cc) || emp.includes('gonzalez') || emp.includes('carmona');
+    });
+    const hasEdilicioTask = Array.isArray(tasks) && tasks.some(t => {
+      if (!t) return false;
+      const cc = String(t.centroCosto || '').trim();
+      const emp = String(t.empleado || '').toLowerCase();
+      return cc === '8' || isEdilicio(cc) || emp.includes('toledo');
+    });
+
     if (!isPaniol) {
-      if (sector === 'Herrería' && existingCls !== 'Herrería') {
-        return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
-      }
-      if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
-        return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
-      }
-      if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
-        return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
+      if (isHerrer) {
+        // Herreria user or user with Herrería sector access can edit if existing order, new classification, or any task is Herrería, or if updating their tasks
+        if (!isHerreria(existingCls) && !isHerreria(clasificacion) && !hasHerreriaTask && !allowed.some(s => s === 'Taller')) {
+          return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
+        }
+      } else if (isEdil) {
+        if (!isEdilicio(existingCls) && !isEdilicio(clasificacion) && !hasEdilicioTask && !allowed.some(s => s === 'Taller')) {
+          return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
+        }
+      } else if (sector === 'Taller' || allowed.some(s => s === 'Taller')) {
+        if (isHerreria(existingCls) && isHerreriaExclusiveEquipment(existing.rodado, existing.interno)) {
+          return res.status(403).json({ error: "No tiene permisos para modificar esta orden de Herrería de equipos exclusivos." });
+        }
       }
     }
 
-    // Force sector classification
+    // Force sector classification when appropriate
     let finalClasificacion = clasificacion;
-    if (sector === 'Herrería') {
+    if (isHerrer || isHerreria(clasificacion) || hasHerreriaTask) {
       finalClasificacion = 'Herrería';
-    } else if (sector === 'Edilicio') {
+    } else if (isEdil || isEdilicio(clasificacion) || hasEdilicioTask) {
       finalClasificacion = 'Edilicio';
-    } else if (sector === 'Taller' && !isPaniol) {
-      if (clasificacion === 'Herrería' || clasificacion === 'Edilicio') {
-        return res.status(400).json({ error: "Clasificación no permitida para el sector Taller." });
-      }
     }
 
     const createdBy = existing.createdBy || requester;
@@ -928,9 +979,9 @@ app.post('/api/orders/cleanup', (req, res) => {
     orders.forEach(order => {
       // Check sector permission
       const cls = order.clasificacion;
-      if (sector === 'Herrería' && cls !== 'Herrería') return;
-      if (sector === 'Edilicio' && cls !== 'Edilicio') return;
-      if (sector === 'Taller' && (cls === 'Herrería' || cls === 'Edilicio')) return;
+      if (sector === 'Herrería' && !isHerreria(cls)) return;
+      if (sector === 'Edilicio' && !isEdilicio(cls)) return;
+      if (sector === 'Taller' && (isHerreria(cls) || isEdilicio(cls))) return;
 
       const tasks = (order.tasks || []).filter(t => t !== null && t !== undefined);
       const allFinished = tasks.length === 0 || tasks.every(t => t.status === "Finalizada");
@@ -1140,13 +1191,13 @@ app.post('/api/orders/verify/:id', async (req, res) => {
     const existingCls = order.clasificacion;
     const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
     if (!isPaniol) {
-      if (sector === 'Herrería' && existingCls !== 'Herrería') {
+      if ((sector === 'Herrería' || isHerreria(sector)) && !isHerreria(existingCls)) {
         return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
       }
-      if (sector === 'Edilicio' && existingCls !== 'Edilicio') {
+      if ((sector === 'Edilicio' || isEdilicio(sector)) && !isEdilicio(existingCls)) {
         return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
       }
-      if (sector === 'Taller' && (existingCls === 'Herrería' || existingCls === 'Edilicio')) {
+      if (sector === 'Taller' && (isHerreria(existingCls) || isEdilicio(existingCls))) {
         return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
       }
     }

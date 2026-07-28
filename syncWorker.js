@@ -29,11 +29,26 @@ const MOCK_CATALOGS = {
   ]
 };
 
-// Initialize Mock Catalogs if they are empty
+// Initialize Catalogs if they are empty
 function initMockCatalogs() {
   const current = db.getCatalogs();
   if (!current.rodados || current.rodados.length === 0) {
-    console.log("Pre-populating local database with realistic mockup catalogs...");
+    console.log("Pre-populating local database with catalogs...");
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const prodPath = path.join(__dirname, 'prod_catalogs.json');
+      if (fs.existsSync(prodPath)) {
+        const prodData = JSON.parse(fs.readFileSync(prodPath, 'utf8'));
+        if (prodData.rodados && prodData.rodados.length > 0) {
+          console.log(`Loaded ${prodData.rodados.length} rodados from prod_catalogs.json`);
+          db.saveCatalogs(prodData);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load prod_catalogs.json, using fallback MOCK_CATALOGS:", e.message);
+    }
     db.saveCatalogs(MOCK_CATALOGS);
   }
 }

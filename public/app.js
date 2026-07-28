@@ -703,15 +703,20 @@ async function submitPreOrderCheck() {
   const preInternoSelect = document.getElementById('pre-form-interno');
   const preInternoText = document.getElementById('pre-form-interno-text');
   
-  let interno = preInternoSelect ? preInternoSelect.value.trim() : "";
-  console.log("[submitPreOrderCheck] Initial interno value:", interno);
-  
-  // Fallback if they typed in search box but didn't click/confirm (works for all sectors)
-  if (!interno && preInternoSelect.closest) {
-    const wrapper = preInternoSelect.closest('.searchable-select-container');
-    const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
-    if (searchInput && searchInput.value.trim()) {
-      interno = searchInput.value.trim();
+  let interno = "";
+  if (isHerreria) {
+    interno = preInternoText ? preInternoText.value.trim() : "";
+  } else {
+    interno = preInternoSelect ? preInternoSelect.value.trim() : "";
+    console.log("[submitPreOrderCheck] Initial interno value:", interno);
+    
+    // Fallback if they typed in search box but didn't click/confirm (works for all sectors)
+    if (!interno && preInternoSelect && preInternoSelect.closest) {
+      const wrapper = preInternoSelect.closest('.searchable-select-container');
+      const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
+      if (searchInput && searchInput.value.trim()) {
+        interno = searchInput.value.trim();
+      }
     }
   }
 
@@ -726,19 +731,31 @@ async function submitPreOrderCheck() {
   const isCarmona = currentUser === 'jcarmona@contenedoreshugo.com.ar' || currentUser === 'j.carmona@contenedoreshugo.com.ar';
 
   let existingOrder = null;
-  if (!isCarmona && userSector !== 'Herrería') {
-    // Taller/Other sectors: Only block duplication if there is an active order for this interno
-    // which is currently 'fuera_de_servicio'. If it is 'operativo', duplicate creation is allowed.
+  if (!isCarmona) {
+    // Only match existing order if it is fuera_de_servicio AND belongs to the SAME sector group
     existingOrder = activeOrders.find(o => {
       const isSameInterno = String(o.interno).trim() === String(interno);
       if (!isSameInterno) return false;
-      return o.estadoUnidad === 'fuera_de_servicio';
+      if (o.estadoUnidad !== 'fuera_de_servicio') return false;
+      
+      // Separate Herrería/Edilicio from Taller:
+      const orderIsHerreria = isHerreriaOrder(o);
+      const orderIsEdilicio = isEdilicioOrder(o);
+
+      if (userSector === 'Herrería') {
+        return orderIsHerreria;
+      } else if (userSector === 'Edilicio') {
+        return orderIsEdilicio;
+      } else {
+        // Taller user: only match existing Taller orders (NOT Herrería or Edilicio)
+        return !orderIsHerreria && !orderIsEdilicio;
+      }
     });
   }
 
   if (existingOrder) {
     const orderCls = existingOrder.clasificacion || "Sin Clasificar";
-    showToast(`Abriendo orden en curso del interno ${interno} (${orderCls})...`, "warning");
+    showToast(`Abriendo orden en curso de Taller del interno ${interno} (${orderCls})...`, "warning");
     closePreOrderModal();
     editOrder(existingOrder.id);
   } else {
@@ -1390,7 +1407,9 @@ async function fetchCatalogs() {
     populateSelect('form-responsable', data.responsables, "Seleccionar Responsable...");
 
     // Extract unique internal numbers from rodados catalog and active orders
-    const rawInternos = (data.rodados || []).map(r => String(r.interno || '').trim()).filter(Boolean);
+    const rawInternos = (data.rodados || []).map(r => {
+      return String(r.interno || r.value || '').trim();
+    }).filter(Boolean);
     if (Array.isArray(activeOrders)) {
       activeOrders.forEach(o => {
         if (o.interno) rawInternos.push(String(o.interno).trim());
@@ -1407,10 +1426,23 @@ async function fetchCatalogs() {
       return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
     });
 
-    const internoOptions = uniqueInternos.map(int => ({ value: int, label: int }));
+    const internoOptions = uniqueInternos.map(int => {
+      const r = (data.rodados || []).find(r => r && String(r.interno || r.value || '').trim() === int);
+      let label = int;
+      if (r && r.modelo) {
+        label = `${int} - ${r.modelo}` + (r.equipo ? ` (${r.equipo})` : '');
+      }
+      return { value: int, label: label };
+    });
     cachedInternoOptions = internoOptions;
     populateSelect('form-interno', internoOptions, "Seleccionar Interno...");
     populateSelect('pre-form-interno', internoOptions, "Seleccionar Interno...");
+
+    // Populate Parte Taller datalist for internal selection
+    const ptDatalist = document.getElementById('pt-interno-list');
+    if (ptDatalist) {
+      ptDatalist.innerHTML = uniqueInternos.map(int => `<option value="${int}"></option>`).join('');
+    }
 
     // Convert select elements to searchable selects
     convertSelectToSearchable(document.getElementById('form-rodado'));
@@ -5643,6 +5675,29 @@ function updateClassificationSelectOptions() {
   });
 }
 
+function isHerreriaOrder(order) {
+  if (!order) return false;
+  const cls = String(order.clasificacion || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const rod = String(order.rodado || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const inter = String(order.interno || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+  if (cls.includes('herrer') || cls.includes('herrera')) return true;
+
+  const herreriaKeywords = [
+    'prensa', 'fabricacion', 'fabricacion', 'contenedor', 'roll-off', 'roll off', 'volquete', 'canasto', 'rep. contenedor', 'rep. caja', 'rep. volquete'
+  ];
+  for (const kw of herreriaKeywords) {
+    if (rod.includes(kw) || inter.includes(kw)) return true;
+  }
+  return false;
+}
+
+function isEdilicioOrder(order) {
+  if (!order) return false;
+  const cls = String(order.clasificacion || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  return cls.includes('edilic');
+}
+
 function getFilteredActiveOrders() {
   const currentUser = localStorage.getItem('currentUserUsername');
   const userSector = getSectorByUsername(currentUser);
@@ -5650,21 +5705,20 @@ function getFilteredActiveOrders() {
   if (!activeOrders || !Array.isArray(activeOrders)) return [];
 
   // Determine active sector filter
-  let sectorFilter = currentSelectedSector;
-  if (userSector !== 'Admin') {
+  let sectorFilter = currentSelectedSector || 'Taller';
+  if (userSector && userSector !== 'Admin') {
     sectorFilter = userSector;
   }
 
   return activeOrders.filter(o => {
-    const cls = o.clasificacion;
     if (sectorFilter === 'Herrería') {
-      return cls === 'Herrería';
+      return isHerreriaOrder(o);
     }
     if (sectorFilter === 'Edilicio') {
-      return cls === 'Edilicio';
+      return isEdilicioOrder(o);
     }
-    // Taller sees everything EXCEPT Herrería and Edilicio
-    return cls !== 'Herrería' && cls !== 'Edilicio';
+    // Taller tab: EXCLUDE all Herrería and Edilicio orders
+    return !isHerreriaOrder(o) && !isEdilicioOrder(o);
   });
 }
 
@@ -5675,21 +5729,20 @@ function getFilteredArchivedOrders() {
   if (!archivedOrders || !Array.isArray(archivedOrders)) return [];
 
   // Determine active sector filter
-  let sectorFilter = currentSelectedSector;
-  if (userSector !== 'Admin') {
+  let sectorFilter = currentSelectedSector || 'Taller';
+  if (userSector && userSector !== 'Admin') {
     sectorFilter = userSector;
   }
 
   return archivedOrders.filter(o => {
-    const cls = o.clasificacion;
     if (sectorFilter === 'Herrería') {
-      return cls === 'Herrería';
+      return isHerreriaOrder(o);
     }
     if (sectorFilter === 'Edilicio') {
-      return cls === 'Edilicio';
+      return isEdilicioOrder(o);
     }
-    // Taller sees everything EXCEPT Herrería and Edilicio
-    return cls !== 'Herrería' && cls !== 'Edilicio';
+    // Taller tab: EXCLUDE all Herrería and Edilicio orders
+    return !isHerreriaOrder(o) && !isEdilicioOrder(o);
   });
 }
 
@@ -7773,11 +7826,18 @@ function setupAllFieldsForSector() {
   const preInternoSelect = document.getElementById('pre-form-interno');
   const preInternoText = document.getElementById('pre-form-interno-text');
 
-  // Always show the select dropdown (ignore text alternative for pre-order modal)
-  if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'block';
-  if (preInternoTextGroup) preInternoTextGroup.style.display = 'none';
-  if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
-  if (preInternoText) preInternoText.removeAttribute('required');
+  // Show select dropdown for non-Herrería, and free text input for Herrería
+  if (isHerreria) {
+    if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'none';
+    if (preInternoTextGroup) preInternoTextGroup.style.display = 'block';
+    if (preInternoSelect) preInternoSelect.removeAttribute('required');
+    if (preInternoText) preInternoText.setAttribute('required', 'true');
+  } else {
+    if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'block';
+    if (preInternoTextGroup) preInternoTextGroup.style.display = 'none';
+    if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
+    if (preInternoText) preInternoText.removeAttribute('required');
+  }
 
   // 3. Main modal: Interno — for Herrería show text field (free type), for others show select
   const internoSelectGroup = document.getElementById('form-interno-group-select');

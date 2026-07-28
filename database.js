@@ -298,6 +298,43 @@ class LocalDB {
             changed = true;
           }
         }
+        
+        // AUTO-MERGE: Ensure all rodados from bundled db.json exist in active DB
+        const bundledPath = path.join(__dirname, 'db.json');
+        if (DB_PATH !== bundledPath && fs.existsSync(bundledPath)) {
+          try {
+            const bundledData = JSON.parse(fs.readFileSync(bundledPath, 'utf8'));
+            if (bundledData.catalogs && Array.isArray(bundledData.catalogs.rodados)) {
+              if (!data.catalogs) data.catalogs = {};
+              if (!Array.isArray(data.catalogs.rodados)) data.catalogs.rodados = [];
+              
+              const activeMap = new Map();
+              data.catalogs.rodados.forEach(ro => {
+                if (ro && ro.value) activeMap.set(String(ro.value).trim(), ro);
+              });
+              
+              let mergedCount = 0;
+              bundledData.catalogs.rodados.forEach(ro => {
+                if (ro && ro.value) {
+                  const key = String(ro.value).trim();
+                  if (!activeMap.has(key)) {
+                    data.catalogs.rodados.push(ro);
+                    activeMap.set(key, ro);
+                    mergedCount++;
+                  }
+                }
+              });
+              
+              if (mergedCount > 0) {
+                console.log(`[DB] Auto-merged ${mergedCount} missing rodados from bundled db.json into active DB.`);
+                changed = true;
+              }
+            }
+          } catch (mergeErr) {
+            console.error("[DB] Failed to auto-merge bundled rodados:", mergeErr.message);
+          }
+        }
+
         if (changed) {
           this.write(data);
         }
@@ -310,97 +347,128 @@ class LocalDB {
 
   // Read raw DB contents synchronously to prevent async race conditions in Node event loop
   read() {
-    try {
-      if (!fs.existsSync(DB_PATH)) {
-        return JSON.parse(JSON.stringify(DEFAULT_DB));
-      }
-      const content = fs.readFileSync(DB_PATH, 'utf8');
-      const parsed = JSON.parse(content);
-      if (!parsed || typeof parsed !== 'object') {
-        return JSON.parse(JSON.stringify(DEFAULT_DB));
-      }
-
-      let migrated = false;
-
-      // Seeding safeguard: If workOrders is empty in disk DB, seed from bundled db.json!
-      if (!Array.isArray(parsed.workOrders) || parsed.workOrders.length === 0) {
-        const bundledPath = path.join(__dirname, 'db.json');
-        if (DB_PATH !== bundledPath && fs.existsSync(bundledPath)) {
-          try {
-            const bundledData = JSON.parse(fs.readFileSync(bundledPath, 'utf8'));
-            if (Array.isArray(bundledData.workOrders) && bundledData.workOrders.length > 0) {
-              console.log(`[DB] Seeding empty workOrders array from bundled db.json (${bundledData.workOrders.length} orders).`);
-              parsed.workOrders = bundledData.workOrders;
-              if (bundledData.activeMechanics) parsed.activeMechanics = bundledData.activeMechanics;
-              if (bundledData.users) parsed.users = { ...bundledData.users, ...parsed.users };
-              migrated = true;
-            }
-          } catch (seedErr) {
-            console.error("Failed to seed workOrders from bundled db.json:", seedErr.message);
-          }
+    let content = '';
+    let parsed = null;
+    let attempts = 0;
+    while (attempts < 5) {
+      try {
+        if (!fs.existsSync(DB_PATH)) {
+          parsed = JSON.parse(JSON.stringify(DEFAULT_DB));
+          break;
         }
+        content = fs.readFileSync(DB_PATH, 'utf8');
+        parsed = JSON.parse(content);
+        break;
+      } catch (err) {
+        attempts++;
+        if (attempts >= 5) {
+          console.error(`Error parsing ${DB_PATH} after ${attempts} attempts:`, err.message);
+          break;
+        }
+        // Brief synchronous wait before retry
+        const start = Date.now();
+        while (Date.now() - start < 50) {}
       }
+    }
 
-      // Migration: Normalize email usernames and createdBy fields in memory
-      if (parsed.users) {
-        const cleanUsers = {};
-        for (const rawKey of Object.keys(parsed.users)) {
-          const normalizedKey = normalizeEmail(rawKey);
-          if (normalizedKey !== rawKey) {
+    if (!parsed || typeof parsed !== 'object') {
+      parsed = JSON.parse(JSON.stringify(DEFAULT_DB));
+    }
+
+    let migrated = false;
+
+    // Safeguard: If catalogs.rodados is empty/too small in disk DB, seed from prod_catalogs.json!
+    if (!parsed.catalogs || !Array.isArray(parsed.catalogs.rodados) || parsed.catalogs.rodados.length < 10) {
+      const prodPath = path.join(__dirname, 'prod_catalogs.json');
+      if (fs.existsSync(prodPath)) {
+        try {
+          const prodData = JSON.parse(fs.readFileSync(prodPath, 'utf8'));
+          if (prodData.rodados && prodData.rodados.length > 0) {
+            console.log(`[DB] Seeding empty catalogs from prod_catalogs.json (${prodData.rodados.length} rodados).`);
+            parsed.catalogs = prodData;
             migrated = true;
           }
-          const userObj = parsed.users[rawKey];
-          if (userObj) {
-            userObj.username = normalizedKey;
-            cleanUsers[normalizedKey] = userObj;
-          }
+        } catch (seedCatErr) {
+          console.error("Failed to seed catalogs from prod_catalogs.json:", seedCatErr.message);
         }
-        parsed.users = cleanUsers;
       }
+    }
 
-      if (parsed.settings && parsed.settings.username) {
-        const normalizedSettingUser = normalizeEmail(parsed.settings.username);
-        if (normalizedSettingUser !== parsed.settings.username) {
-          parsed.settings.username = normalizedSettingUser;
+    // Seeding safeguard: If workOrders is empty in disk DB, seed from bundled db.json!
+    if (!Array.isArray(parsed.workOrders) || parsed.workOrders.length === 0) {
+      const bundledPath = path.join(__dirname, 'db.json');
+      if (DB_PATH !== bundledPath && fs.existsSync(bundledPath)) {
+        try {
+          const bundledData = JSON.parse(fs.readFileSync(bundledPath, 'utf8'));
+          if (Array.isArray(bundledData.workOrders) && bundledData.workOrders.length > 0) {
+            console.log(`[DB] Seeding empty workOrders array from bundled db.json (${bundledData.workOrders.length} orders).`);
+            parsed.workOrders = bundledData.workOrders;
+            if (bundledData.activeMechanics) parsed.activeMechanics = bundledData.activeMechanics;
+            if (bundledData.users) parsed.users = { ...bundledData.users, ...parsed.users };
+            migrated = true;
+          }
+        } catch (seedErr) {
+          console.error("Failed to seed workOrders from bundled db.json:", seedErr.message);
+        }
+      }
+    }
+
+    // Migration: Normalize email usernames and createdBy fields in memory
+    if (parsed.users) {
+      const cleanUsers = {};
+      for (const rawKey of Object.keys(parsed.users)) {
+        const normalizedKey = normalizeEmail(rawKey);
+        if (normalizedKey !== rawKey) {
           migrated = true;
         }
-      }
-
-      if (Array.isArray(parsed.workOrders)) {
-        parsed.workOrders.forEach(order => {
-          if (order.createdBy) {
-            const normalizedCreatedBy = normalizeEmail(order.createdBy);
-            if (normalizedCreatedBy !== order.createdBy) {
-              order.createdBy = normalizedCreatedBy;
-              migrated = true;
-            }
-          }
-          if (order.syncError && (order.syncError.includes('paniol25') || order.syncError.includes('ppaniol'))) {
-            order.syncError = order.syncError.replace(/paniol25|ppaniol/gi, 'paniol');
-            migrated = true;
-          }
-          if (order.verifiedError && (order.verifiedError.includes('paniol25') || order.verifiedError.includes('ppaniol'))) {
-            order.verifiedError = order.verifiedError.replace(/paniol25|ppaniol/gi, 'paniol');
-            migrated = true;
-          }
-        });
-      }
-
-      // If any migration took place, write it back to disk immediately
-      if (migrated) {
-        console.log("Database migration: Normalized typo email addresses in users/settings/workOrders.");
-        try {
-          fs.writeFileSync(DB_PATH, JSON.stringify(parsed, null, 2), 'utf8');
-        } catch (writeErr) {
-          console.error("Failed to persist database migration to disk:", writeErr.message);
+        const userObj = parsed.users[rawKey];
+        if (userObj) {
+          userObj.username = normalizedKey;
+          cleanUsers[normalizedKey] = userObj;
         }
       }
-
-      return parsed;
-    } catch (e) {
-      console.error("Error parsing db.json, returning default structure:", e.message);
-      return JSON.parse(JSON.stringify(DEFAULT_DB));
+      parsed.users = cleanUsers;
     }
+
+    if (parsed.settings && parsed.settings.username) {
+      const normalizedSettingUser = normalizeEmail(parsed.settings.username);
+      if (normalizedSettingUser !== parsed.settings.username) {
+        parsed.settings.username = normalizedSettingUser;
+        migrated = true;
+      }
+    }
+
+    if (Array.isArray(parsed.workOrders)) {
+      parsed.workOrders.forEach(order => {
+        if (order.createdBy) {
+          const normalizedCreatedBy = normalizeEmail(order.createdBy);
+          if (normalizedCreatedBy !== order.createdBy) {
+            order.createdBy = normalizedCreatedBy;
+            migrated = true;
+          }
+        }
+        if (order.syncError && (order.syncError.includes('paniol25') || order.syncError.includes('ppaniol'))) {
+          order.syncError = order.syncError.replace(/paniol25|ppaniol/gi, 'paniol');
+          migrated = true;
+        }
+        if (order.verifiedError && (order.verifiedError.includes('paniol25') || order.verifiedError.includes('ppaniol'))) {
+          order.verifiedError = order.verifiedError.replace(/paniol25|ppaniol/gi, 'paniol');
+          migrated = true;
+        }
+      });
+    }
+
+    // If any migration took place, write it back to disk immediately
+    if (migrated) {
+      console.log("Database migration: Normalized typo email addresses in users/settings/workOrders.");
+      try {
+        this.write(parsed);
+      } catch (writeErr) {
+        console.error("Failed to persist database migration to disk:", writeErr.message);
+      }
+    }
+
+    return parsed;
   }
 
   // Write contents atomically/synchronously to prevent data corruption
@@ -411,10 +479,22 @@ class LocalDB {
         fs.mkdirSync(dir, { recursive: true });
       }
       const content = JSON.stringify(data, null, 2);
-      fs.writeFileSync(DB_PATH, content, 'utf8');
+      const tmpPath = DB_PATH + `.tmp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      fs.writeFileSync(tmpPath, content, 'utf8');
+      try {
+        fs.renameSync(tmpPath, DB_PATH);
+      } catch (renameErr) {
+        fs.copyFileSync(tmpPath, DB_PATH);
+        try { fs.unlinkSync(tmpPath); } catch (_) {}
+      }
     } catch (e) {
       console.error("Error writing to db.json:", e.message);
-      throw new Error(`Permisos insuficientes para escribir en ${DB_PATH} (${e.message}). Si estás usando Railway con un volumen persistente en /data, por favor añade la variable de entorno RAILWAY_RUN_UID = 0 en los ajustes de tu servicio para permitir acceso de escritura.`);
+      try {
+        // Direct write fallback if temp file fails
+        fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
+      } catch (directErr) {
+        throw new Error(`Permisos insuficientes para escribir en ${DB_PATH} (${e.message}).`);
+      }
     }
   }
 
@@ -591,9 +671,36 @@ class LocalDB {
     const db = this.read();
     
     // Sanitize incoming labels
-    const cleanRodados = (catalogs.rodados || []).map(ro => ({ ...ro, label: cleanEncoding(ro.label) }));
-    const cleanResponsables = (catalogs.responsables || []).map(r => ({ ...r, label: cleanEncoding(r.label) }));
-    const cleanIncomingEmps = (catalogs.empleados || []).map(e => ({ ...e, label: cleanEncoding(e.label) }));
+    let incomingRodados = (catalogs.rodados || []).map(ro => ({ ...ro, label: cleanEncoding(ro.label) }));
+    
+    // Merge rather than overwrite: keep all existing rodados, updating properties of existing ones if they match
+    let cleanRodados = [];
+    if (incomingRodados.length === 0 && db.catalogs && Array.isArray(db.catalogs.rodados) && db.catalogs.rodados.length > 0) {
+      console.log(`[DB] Incoming rodados array empty, preserving existing catalog (${db.catalogs.rodados.length} rodados).`);
+      cleanRodados = db.catalogs.rodados;
+    } else {
+      const rodadosMap = new Map();
+      const existingRodados = (db.catalogs && Array.isArray(db.catalogs.rodados)) ? db.catalogs.rodados : [];
+      
+      // Populate map with existing items first
+      existingRodados.forEach(ro => {
+        if (ro && ro.value) rodadosMap.set(String(ro.value).trim(), ro);
+      });
+      
+      // Merge/overwrite with incoming items
+      incomingRodados.forEach(ro => {
+        if (ro && ro.value) rodadosMap.set(String(ro.value).trim(), ro);
+      });
+      
+      cleanRodados = Array.from(rodadosMap.values());
+      console.log(`[DB] Merged incoming catalogs: went from ${existingRodados.length} to ${cleanRodados.length} total rodados.`);
+    }
+    const cleanResponsables = (catalogs.responsables && catalogs.responsables.length > 0) 
+      ? catalogs.responsables.map(r => ({ ...r, label: cleanEncoding(r.label) })) 
+      : ((db.catalogs && db.catalogs.responsables) || []);
+    const cleanIncomingEmps = (catalogs.empleados && catalogs.empleados.length > 0) 
+      ? catalogs.empleados.map(e => ({ ...e, label: cleanEncoding(e.label) }))
+      : ((db.catalogs && db.catalogs.empleados) || []);
     
     // Auto-merge custom mechanics into the synced catalog
     const customEmps = [
@@ -617,7 +724,7 @@ class LocalDB {
       rodados: cleanRodados,
       responsables: cleanResponsables,
       empleados: mergedEmps,
-      centrosCosto: catalogs.centrosCosto || []
+      centrosCosto: (catalogs.centrosCosto && catalogs.centrosCosto.length > 0) ? catalogs.centrosCosto : ((db.catalogs && db.catalogs.centrosCosto) || [])
     };
     this.write(db);
     return db.catalogs;
