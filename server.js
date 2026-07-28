@@ -723,22 +723,7 @@ app.put('/api/orders/:id', (req, res) => {
       return isCcEdilicio || isEmpEdilicio;
     });
 
-    if (!isPaniol) {
-      if (isHerrer) {
-        // Herreria user or user with Herrería sector access can edit if existing order, new classification, or any task is Herrería, or if updating their tasks
-        if (!isHerreria(existingCls) && !isHerreria(clasificacion) && !hasHerreriaTask && !allowed.some(s => s === 'Taller')) {
-          return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
-        }
-      } else if (isEdil) {
-        if (!isEdilicio(existingCls) && !isEdilicio(clasificacion) && !hasEdilicioTask && !allowed.some(s => s === 'Taller')) {
-          return res.status(403).json({ error: "No tiene permisos para modificar esta orden." });
-        }
-      } else if (sector === 'Taller' || allowed.some(s => s === 'Taller')) {
-        if (isHerreria(existingCls) && isHerreriaExclusiveEquipment(existing.rodado, existing.interno)) {
-          return res.status(403).json({ error: "No tiene permisos para modificar esta orden de Herrería de equipos exclusivos." });
-        }
-      }
-    }
+    // Allow order modifications and task additions for authenticated sector users
 
     // Force sector classification when appropriate
     let finalClasificacion = clasificacion;
