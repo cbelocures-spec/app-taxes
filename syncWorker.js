@@ -3843,12 +3843,13 @@ async function verifyGroupWithBrowser(group, settings) {
     console.log(`[VerifyAll] Logged in as ${group.username}. Verifying ${group.ids.length} order(s)...`);
 
     // Verify each order in this group sequentially, with auto-retry on timeout
+    let currentPage = page; // track the current working page
     for (const orderId of group.ids) {
       let lastErr = null;
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
           await Promise.race([
-            verifyWorkOrderWithPage(page, orderId),
+            verifyWorkOrderWithPage(currentPage, orderId),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout: verificación tardó más de 90 segundos')), 90000))
           ]);
           lastErr = null;
@@ -3857,8 +3858,18 @@ async function verifyGroupWithBrowser(group, settings) {
           lastErr = err;
           console.warn(`[VerifyAll] Order ${orderId} attempt ${attempt}/2 failed: ${err.message}`);
           if (attempt < 2) {
-            console.log(`[VerifyAll] Retrying order ${orderId} after 8s...`);
+            console.log(`[VerifyAll] Retrying order ${orderId} after 8s with a fresh page...`);
             await delay(8000);
+            // Open a fresh page to avoid "detached Frame" errors from previous navigation
+            try {
+              if (currentPage && !currentPage.isClosed()) {
+                await currentPage.close().catch(() => {});
+              }
+              // autoLogin creates a brand-new page internally — assign it as currentPage
+              currentPage = await autoLogin(browser, group.username, group.password, settings.portalUrl);
+            } catch (pageErr) {
+              console.warn(`[VerifyAll] Could not create fresh page: ${pageErr.message}`);
+            }
           }
         }
       }
