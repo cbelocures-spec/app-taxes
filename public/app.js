@@ -706,23 +706,18 @@ function promptDiagnosis(taskInfo = null) {
 async function submitPreOrderCheck() {
   const currentUser = localStorage.getItem('currentUserUsername');
   const userSector = getSectorByUsername(currentUser);
-  const preClasif = document.getElementById('pre-form-clasificacion') ? document.getElementById('pre-form-clasificacion').value : '';
-  const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || preClasif === 'Herrería');
 
   const preInternoSelect = document.getElementById('pre-form-interno');
-  const preInternoText = document.getElementById('pre-form-interno-text');
   
-  let interno = "";
-  if (isHerreria) {
-    interno = preInternoText ? preInternoText.value.trim() : "";
-  } else {
-    interno = preInternoSelect ? preInternoSelect.value.trim() : "";
-    if (!interno && preInternoSelect && preInternoSelect.closest) {
-      const wrapper = preInternoSelect.closest('.searchable-select-container');
-      const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
-      if (searchInput && searchInput.value.trim()) {
-        interno = searchInput.value.trim();
-      }
+  let interno = preInternoSelect ? preInternoSelect.value.trim() : "";
+  console.log("[submitPreOrderCheck] Initial interno value:", interno);
+  
+  // Fallback if they typed in search box but didn't click/confirm
+  if (!interno && preInternoSelect && preInternoSelect.closest) {
+    const wrapper = preInternoSelect.closest('.searchable-select-container');
+    const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
+    if (searchInput && searchInput.value.trim()) {
+      interno = searchInput.value.trim();
     }
   }
 
@@ -7878,25 +7873,18 @@ function setupAllFieldsForSector() {
   if (rodadoSelect) rodadoSelect.setAttribute('required', 'true');
   if (rodadoText) rodadoText.removeAttribute('required');
 
-  // 2. Pre-order modal: Interno
+  // 2. Pre-order modal ("Filtro de Unidad y Tipo"): Interno ALWAYS uses the searchable dropdown list
   const preInternoSelectGroup = document.getElementById('pre-form-interno-group-select');
   const preInternoTextGroup = document.getElementById('pre-form-interno-group-text');
   const preInternoSelect = document.getElementById('pre-form-interno');
   const preInternoText = document.getElementById('pre-form-interno-text');
 
-  if (isHerreria) {
-    if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'none';
-    if (preInternoTextGroup) preInternoTextGroup.style.display = 'block';
-    if (preInternoSelect) preInternoSelect.removeAttribute('required');
-    if (preInternoText) preInternoText.setAttribute('required', 'true');
-  } else {
-    if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'block';
-    if (preInternoTextGroup) preInternoTextGroup.style.display = 'none';
-    if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
-    if (preInternoText) preInternoText.removeAttribute('required');
-  }
+  if (preInternoSelectGroup) preInternoSelectGroup.style.display = 'block';
+  if (preInternoTextGroup) preInternoTextGroup.style.display = 'none';
+  if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
+  if (preInternoText) preInternoText.removeAttribute('required');
 
-  // 3. Main modal: Interno
+  // 3. Main modal ("Datos Generales"): Interno uses free text input box for Herrería
   const internoSelectGroup = document.getElementById('form-interno-group-select');
   const internoTextGroup = document.getElementById('form-interno-group-text');
   const internoSelect = document.getElementById('form-interno');
