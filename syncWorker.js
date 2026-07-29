@@ -98,6 +98,27 @@ function killZombieChromes() {
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
+// Helper to evaluate JS safely with automatic retries on detached Frame
+async function evaluateWithRetry(page, fn, ...args) {
+  let lastError = null;
+  for (let i = 0; i < 3; i++) {
+    try {
+      if (!page || page.isClosed()) throw new Error("Target page is closed");
+      return await page.evaluate(fn, ...args);
+    } catch (err) {
+      lastError = err;
+      if (err.message.includes('detached Frame') || err.message.includes('Execution context was destroyed') || err.message.includes('frame was detached')) {
+        console.warn(`[Puppeteer] Frame detached during evaluate (attempt ${i + 1}/3), waiting for frame to settle...`);
+        await delay(2000);
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw lastError;
+}
+
+
 async function launchBrowser() {
   // Free up PIDs and memory by killing any leftover chrome instances
   await killZombieChromes().catch(() => {});
@@ -3889,7 +3910,7 @@ async function verifyGroupWithBrowser(group, settings) {
     let currentPage = page; // track the current working page
     for (const orderId of group.ids) {
       let lastErr = null;
-      for (let attempt = 1; attempt <= 2; attempt++) {
+      for (let attempt = 1; attempt <= 4; attempt++) {
         try {
           await Promise.race([
             verifyWorkOrderWithPage(currentPage, orderId),
@@ -3899,8 +3920,8 @@ async function verifyGroupWithBrowser(group, settings) {
           break; // success — go to next order
         } catch (err) {
           lastErr = err;
-          console.warn(`[VerifyAll] Order ${orderId} attempt ${attempt}/2 failed: ${err.message}`);
-          if (attempt < 2) {
+          console.warn(`[VerifyAll] Order ${orderId} attempt ${attempt}/4 failed: ${err.message}`);
+          if (attempt < 4) {
             console.log(`[VerifyAll] Retrying order ${orderId} after 8s with a fresh page...`);
             await delay(8000);
             // Open a fresh page to avoid "detached Frame" errors from previous navigation
@@ -3923,7 +3944,7 @@ async function verifyGroupWithBrowser(group, settings) {
         db.updateWorkOrder(orderId, {
           verifiedStatus: 'error',
           verifiedCount: count,
-          verifiedError: `Error del agente (2 intentos): ${lastErr.message}`
+          verifiedError: `Error del agente (${attempt - 1} intentos): ${lastErr.message}`
         });
       }
       // Pause between orders to avoid 429 rate-limiting from Taxes.com.ar
