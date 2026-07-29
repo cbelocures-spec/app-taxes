@@ -3658,10 +3658,27 @@ function renderDashboard() {
     const subPrevEl = document.getElementById('stat-sub-prev');
     const syncRateEl = document.getElementById('stat-sync-rate');
 
-    const ptOutCountEl = document.getElementById('pt-out-count');
-    const ptRepCountEl = document.getElementById('pt-rep-count');
-    const fueraDeServicioNum = ptOutCountEl ? (parseInt(ptOutCountEl.textContent) || 0) : activeLocalOrders.length;
-    const enReparacionNum = ptRepCountEl ? (parseInt(ptRepCountEl.textContent) || 0) : activeLocalOrders.length;
+function isItemMatchingCurrentPtSector(item) {
+  const currentPtSector = (currentSelectedSector === 'Herrería') ? 'herreria' : 'taller';
+  if (!item || !item.sector) return true;
+  return item.sector === currentPtSector;
+}
+
+    let fueraDeServicioNum = 0;
+    let enReparacionNum = 0;
+
+    if (window._ptDisplayState) {
+      const ds = window._ptDisplayState;
+      fueraDeServicioNum = (ds.fuera_de_servicio || []).filter(isItemMatchingCurrentPtSector).length;
+      enReparacionNum = (ds.reparacion || []).filter(isItemMatchingCurrentPtSector).length;
+    } else {
+      const ptOutCountEl = document.getElementById('pt-out-count');
+      const ptRepCountEl = document.getElementById('pt-rep-count');
+      const outText = ptOutCountEl ? ptOutCountEl.textContent.trim() : '';
+      const repText = ptRepCountEl ? ptRepCountEl.textContent.trim() : '';
+      if (outText) fueraDeServicioNum = parseInt(outText) || 0;
+      if (repText) enReparacionNum = parseInt(repText) || 0;
+    }
 
     if (totalTallerEl) totalTallerEl.textContent = fueraDeServicioNum;
     
@@ -9068,6 +9085,10 @@ function renderParteTallerDashboard(state) {
   // Clone state for rendering to dynamically merge/inject live active tasks from Taxes
   const displayState = JSON.parse(JSON.stringify(state));
   adjustPtStateLists(displayState);
+  window._ptDisplayState = displayState;
+
+  // Immediately sync top dashboard cards with calculated parte taller display state
+  updateDashboardStats();
 
   const el = id => document.getElementById(id);
   const resumen = displayState.resumen || {};
