@@ -138,7 +138,7 @@ async function launchBrowser() {
   const launchOptions = {
     headless: process.env.PUPPETEER_HEADLESS === 'false' ? false : true, // Headless by default, visible if PUPPETEER_HEADLESS=false
     executablePath: execPath,
-    protocolTimeout: 30000, // Allow up to 30s for slow CDP/Runtime responses
+    protocolTimeout: 90000, // Allow up to 90s for slow CDP/Runtime responses
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -2391,7 +2391,7 @@ async function syncWorkOrder(orderId) {
     }
 
     // Fill searchable select fields (Rodado and Responsable)
-    const rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado);
+    let rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado);
     if (!rodadoFilled) {
       console.warn(`[Rodado] Primary rodado selection failed for "${order.rodado}". Attempting fallback with first catalog vehicle...`);
       const catalogs = db.getCatalogs();
