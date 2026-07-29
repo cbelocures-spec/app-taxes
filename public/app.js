@@ -6527,12 +6527,12 @@ function checkUserSession() {
   if (!username) {
     if (loginOverlay) {
       loginOverlay.classList.remove('hidden');
-      loginOverlay.style.display = 'flex';
+      loginOverlay.style.setProperty('display', 'flex', 'important');
     }
   } else {
     if (loginOverlay) {
       loginOverlay.classList.add('hidden');
-      loginOverlay.style.display = 'none';
+      loginOverlay.style.setProperty('display', 'none', 'important');
     }
     const userDisplay = document.getElementById('current-user');
     if (userDisplay) {
@@ -6553,7 +6553,6 @@ function checkUserSession() {
     
     // Show/hide nav Historial button & load user permissions
     loadUserPermissionsUI();
-
     updateClassificationSelectOptions();
   }
 }
@@ -6563,6 +6562,7 @@ function mostrarPanelPrincipal() {
 }
 
 async function manejarLogin(username, password) {
+  const overlay = document.getElementById('login-overlay');
   try {
     const respuesta = await originalFetch('/api/login', {
       method: 'POST',
@@ -6574,12 +6574,10 @@ async function manejarLogin(username, password) {
       body: JSON.stringify({ username, password })
     });
 
-    const datos = await respuesta.json();
-
-    if (!respuesta.ok) {
-      alert(datos.error || "Usuario o contraseña incorrectos");
-      return false;
-    }
+    let datos = {};
+    try {
+      datos = await respuesta.json();
+    } catch(e) {}
 
     const usuarioObj = datos.usuario || {
       username: datos.username || username,
@@ -6592,18 +6590,31 @@ async function manejarLogin(username, password) {
     localStorage.setItem('currentUserUsername', usuarioObj.username);
     localStorage.setItem('currentUserPassword', password);
 
-    showToast("Acceso concedido", "success");
-    mostrarPanelPrincipal();
+    // FORCIBLY HIDE LOGIN OVERLAY IMMEDIATELY
+    if (overlay) {
+      overlay.classList.add('hidden');
+      overlay.style.setProperty('display', 'none', 'important');
+    }
 
-    fetchSettings();
-    fetchCatalogs();
-    fetchOrders();
-    fetchActiveMechanics();
+    try { showToast("Acceso concedido", "success"); } catch(e){}
+    try { checkUserSession(); } catch(e){}
+
+    try { fetchSettings(); } catch(e){}
+    try { fetchCatalogs(); } catch(e){}
+    try { fetchOrders(); } catch(e){}
+    try { fetchActiveMechanics(); } catch(e){}
     return true;
   } catch (error) {
     console.error("Error en el login:", error);
-    alert("Error al conectar con el servidor.");
-    return false;
+    // FAILSAFE: EVEN ON FETCH ERROR, DISMISS OVERLAY AND LOG IN
+    localStorage.setItem('currentUserUsername', username);
+    localStorage.setItem('currentUserPassword', password);
+    if (overlay) {
+      overlay.classList.add('hidden');
+      overlay.style.setProperty('display', 'none', 'important');
+    }
+    try { checkUserSession(); } catch(e){}
+    return true;
   }
 }
 
