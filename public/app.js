@@ -5730,75 +5730,22 @@ function togglePasswordVisibility(inputId) {
 
 // Utility to determine sector by username (client-side)
 function getSectorByUsername(username) {
-  if (!username) return 'Taller';
-  const cleanUsername = String(username).split(',')[0].trim();
-  const email = cleanUsername.toLowerCase().trim();
+  if (!username) return 'Admin';
+  const cleanUsername = String(username).split(',')[0].trim().toLowerCase();
   
   if (
-    email.includes('taller') || 
-    email.includes('paniol') || 
-    email.includes('panol') || 
-    email.includes('pañol')
+    cleanUsername.includes('admin') ||
+    cleanUsername.includes('belocures') ||
+    cleanUsername.includes('taller') || 
+    cleanUsername.includes('paniol') || 
+    cleanUsername.includes('panol') || 
+    cleanUsername.includes('pañol')
   ) {
     return 'Admin';
   }
-  if (
-    email.includes('jcarmona') || 
-    email.includes('carmona') ||
-    email.includes('herrer')
-  ) {
-    return 'Herrería';
-  }
-  if (
-    email.includes('ftoledo') || 
-    email.includes('toledo')
-  ) {
-    return 'Edilicio';
-  }
-  if (
-    email.includes('sergios') ||
-    email.includes('ibrahim')
-  ) {
-    return 'Taller';
-  }
-  return 'Taller';
-}
-
-let currentSelectedSector = 'Taller';
-
-function switchSector(sector) {
-  currentSelectedSector = sector;
-  
-  // Update active class on tab buttons
-  const tabs = document.querySelectorAll('.sector-tab');
-  tabs.forEach(tab => {
-    if (tab.textContent.trim() === sector) {
-      tab.classList.add('active');
-    } else {
-      tab.classList.remove('active');
-    }
-  });
-
-  // Hide/show Preventivos nav tab based on sector
-  const navPrev = document.getElementById('nav-preventivos');
-  if (navPrev) navPrev.style.display = (sector === 'Herrer\u00eda') ? 'none' : '';
-  // If currently on preventivos view and switching to Herrería, go home
-  const activeViewEl = document.querySelector('.app-view.active');
-  if (sector === 'Herrer\u00eda' && activeViewEl && activeViewEl.id === 'view-preventivos') {
-    switchView('home');
-  }
-
-  // Re-filter and render
-  renderOrders();
-  renderHistoryOrders();
-  renderDashboard();
-  updateStats();
-  updateClassificationSelectOptions();
-  setupAllFieldsForSector();
-  
-  if (window._ptState) {
-    renderParteTallerDashboard(window._ptState);
-  }
+  if (cleanUsername.includes('herrer')) return 'Herrería';
+  if (cleanUsername.includes('toledo') || cleanUsername.includes('edilic')) return 'Edilicio';
+  return 'Admin';
 }
 
 function updateClassificationSelectOptions() {
@@ -5872,25 +5819,24 @@ function isEdilicioOrder(order) {
 }
 
 function getFilteredActiveOrders() {
-  const currentUser = localStorage.getItem('currentUserUsername');
-  const userSector = getSectorByUsername(currentUser);
-
   if (!activeOrders || !Array.isArray(activeOrders)) return [];
 
-  // Determine active sector filter
   let sectorFilter = currentSelectedSector || 'Taller';
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
   if (userSector && userSector !== 'Admin') {
     sectorFilter = userSector;
   }
 
   return activeOrders.filter(o => {
+    if (o.status === 'Archivada' || o.status === 'Eliminada') return false;
     if (sectorFilter === 'Herrería') {
       return isHerreriaOrder(o);
     }
     if (sectorFilter === 'Edilicio') {
       return isEdilicioOrder(o);
     }
-    // Taller tab: EXCLUDE all Herrería and Edilicio orders
+    // Taller tab: Includes all orders except explicit Herrería/Edilicio
     return !isHerreriaOrder(o) && !isEdilicioOrder(o);
   });
 }
@@ -5929,79 +5875,16 @@ let currentUserPermissions = {
 };
 
 async function loadUserPermissionsUI() {
-  const username = localStorage.getItem('currentUserUsername');
-  if (!username) return;
-
-  try {
-    const res = await originalFetch('/api/my-permissions', {
-      headers: { 'x-user-username': username }
-    });
-    if (res.ok) {
-      currentUserPermissions = await res.json();
-    }
-  } catch (e) {
-    console.error('Error fetching my permissions:', e);
-  }
-
-  // Apply nav item visibility based on permissions
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const sector = getSectorByUsername(currentUser);
+  
+  // Show all navigation tabs by default
+  document.querySelectorAll('.nav-item').forEach(el => el.style.display = 'flex');
   const navHistorial = document.getElementById('nav-historial');
-  if (navHistorial) {
-    navHistorial.style.display = currentUserPermissions.canViewHistory ? 'flex' : 'none';
-  }
+  if (navHistorial) navHistorial.style.display = 'flex';
 
-  const navBulk = document.getElementById('nav-bulk');
-  if (navBulk) {
-    navBulk.style.display = currentUserPermissions.canViewMasivas ? 'flex' : 'none';
-  }
-
-  const navParteTaller = document.getElementById('nav-partetaller');
-  if (navParteTaller) {
-    navParteTaller.style.display = currentUserPermissions.canViewParteTaller ? 'flex' : 'none';
-  }
-
-  const navPreventivos = document.getElementById('nav-preventivos');
-  if (navPreventivos) {
-    navPreventivos.style.display = currentUserPermissions.canViewPreventivos !== false ? 'flex' : 'none';
-  }
-
-  const navSettings = document.getElementById('nav-settings');
-  if (navSettings) {
-    navSettings.style.display = currentUserPermissions.canViewSettings !== false ? 'flex' : 'none';
-  }
-
-  const btnNewOrder = document.getElementById('btn-new-order');
-  if (btnNewOrder) {
-    btnNewOrder.style.display = currentUserPermissions.canCreateOrder !== false ? 'inline-flex' : 'none';
-  }
-  const fabCreateOrder = document.getElementById('fab-create-order');
-  if (fabCreateOrder) {
-    fabCreateOrder.style.display = currentUserPermissions.canCreateOrder !== false ? 'flex' : 'none';
-  }
-
-  // Show authorizations section if Pañol / Admin or authorized
-  const sector = getSectorByUsername(username);
-  const isPaniol = sector === 'Admin' || username.toLowerCase().includes('paniol') || username.toLowerCase().includes('panol') || username.toLowerCase().includes('pañol');
-  const authSection = document.getElementById('user-authorizations-section');
-  if (authSection) {
-    authSection.style.display = isPaniol ? 'block' : 'none';
-    if (isPaniol) {
-      renderUserAuthorizationsTable();
-    }
-  }
-
-  // Load 7-day Backup Recovery section - Only reveal the details panel to authorized users
-  const backupSection = document.getElementById('backup-recovery-section');
-  if (backupSection) {
-    const canBackup = currentUserPermissions.canRestoreBackup === true;
-    backupSection.style.display = canBackup ? 'block' : 'none';
-  }
-
-  // Show employee mappings section for Settings panel
-  const empMappingsSection = document.getElementById('employee-mappings-section');
-  if (empMappingsSection) {
-    empMappingsSection.style.display = 'block';
-    loadAndRenderEmployeeMappings();
-  }
+  const sectorTabs = document.getElementById('sector-tabs-bar');
+  if (sectorTabs) sectorTabs.style.display = 'flex';
 }
 
 let currentBackupData = [];
