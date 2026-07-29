@@ -3644,6 +3644,84 @@ function convertSelectToSearchable(selectEl) {
 // --- OPERATOR & ACTIVE TAREAS DASHBOARD ---
 let activeDashboardIntervals = {};
 
+function isItemMatchingCurrentPtSector(item) {
+  const currentPtSector = (currentSelectedSector === 'Herrería') ? 'herreria' : 'taller';
+  if (!item || !item.sector) return true;
+  return item.sector === currentPtSector;
+}
+
+function updateDashboardStats() {
+  const activeLocalOrders = getFilteredActiveOrders();
+
+  const totalTallerEl = document.getElementById('stat-total-taller');
+  const subTallerEl = document.getElementById('stat-sub-taller');
+  const activeOrdersEl = document.getElementById('stat-active-orders');
+  const subActiveEl = document.getElementById('stat-sub-active');
+  const overduePrevEl = document.getElementById('stat-overdue-prev');
+  const subPrevEl = document.getElementById('stat-sub-prev');
+  const syncRateEl = document.getElementById('stat-sync-rate');
+
+  let fueraDeServicioNum = 0;
+  let enReparacionNum = 0;
+
+  if (window._ptDisplayState) {
+    const ds = window._ptDisplayState;
+    fueraDeServicioNum = (ds.fuera_de_servicio || []).filter(isItemMatchingCurrentPtSector).length;
+    enReparacionNum = (ds.reparacion || []).filter(isItemMatchingCurrentPtSector).length;
+  } else {
+    const ptOutCountEl = document.getElementById('pt-out-count');
+    const ptRepCountEl = document.getElementById('pt-rep-count');
+    const outText = ptOutCountEl ? ptOutCountEl.textContent.trim() : '';
+    const repText = ptRepCountEl ? ptRepCountEl.textContent.trim() : '';
+    if (outText && parseInt(outText) > 0) fueraDeServicioNum = parseInt(outText);
+    if (repText && parseInt(repText) > 0) enReparacionNum = parseInt(repText);
+  }
+
+  // Fallback: If numbers evaluate to 0 but activeLocalOrders has items, use activeLocalOrders count so it NEVER falsely displays 0!
+  if (fueraDeServicioNum === 0 && activeLocalOrders.length > 0) {
+    fueraDeServicioNum = activeLocalOrders.length;
+  }
+  if (enReparacionNum === 0 && activeLocalOrders.length > 0) {
+    enReparacionNum = activeLocalOrders.length;
+  }
+
+  if (totalTallerEl) totalTallerEl.textContent = fueraDeServicioNum;
+  
+  let workingOrdersCount = 0;
+  activeLocalOrders.forEach(o => {
+    const isWorking = (o.tasks || []).some(t => t.timerStart !== null && t.timerStart > 0);
+    if (isWorking) workingOrdersCount++;
+  });
+
+  let preventiveAlertCount = 0;
+  if (prevCombustibleData && Array.isArray(prevCombustibleData) && prevCombustibleData.length > 0) {
+    preventiveAlertCount = prevCombustibleData.filter(item => {
+      const a5 = String(item.alerta5k || '').toLowerCase();
+      const a10 = String(item.alerta10k || '').toLowerCase();
+      return ['realizar', 'urgente', 'service'].some(w => a5.includes(w) || a10.includes(w));
+    }).length;
+  } else if (prevFlotaData && Array.isArray(prevFlotaData) && prevFlotaData.length > 0) {
+    preventiveAlertCount = prevFlotaData.filter(item => {
+      const alerta = String(item.alerta || '').toLowerCase();
+      return alerta.includes('realizar') || alerta.includes('urgente') || alerta.includes('service');
+    }).length;
+  } else {
+    preventiveAlertCount = activeLocalOrders.filter(o => o.clasificacion === 'Preventivo').length;
+  }
+  
+  if (subTallerEl) subTallerEl.textContent = `${workingOrdersCount} trabajando`;
+  if (activeOrdersEl) activeOrdersEl.textContent = enReparacionNum;
+  if (subActiveEl) subActiveEl.textContent = `${workingOrdersCount} unidades trabajando`;
+  if (overduePrevEl) overduePrevEl.textContent = preventiveAlertCount;
+  if (subPrevEl) subPrevEl.textContent = `${preventiveAlertCount} este mes`;
+  
+  if (syncRateEl) {
+    const syncedCount = activeLocalOrders.filter(o => o.taxesOrderNumber).length;
+    const rate = activeLocalOrders.length > 0 ? Math.round((syncedCount / activeLocalOrders.length) * 100) : 100;
+    syncRateEl.textContent = `${rate}%`;
+  }
+}
+
 function renderDashboard() {
   try {
     const gridWorking = document.getElementById('grid-working');
@@ -3663,79 +3741,7 @@ function renderDashboard() {
     const activeLocalOrders = getFilteredActiveOrders();
 
     // Update Stats Dashboard Cards dynamically
-    const totalTallerEl = document.getElementById('stat-total-taller');
-    const subTallerEl = document.getElementById('stat-sub-taller');
-    const activeOrdersEl = document.getElementById('stat-active-orders');
-    const subActiveEl = document.getElementById('stat-sub-active');
-    const overduePrevEl = document.getElementById('stat-overdue-prev');
-    const subPrevEl = document.getElementById('stat-sub-prev');
-    const syncRateEl = document.getElementById('stat-sync-rate');
-
-function isItemMatchingCurrentPtSector(item) {
-  const currentPtSector = (currentSelectedSector === 'Herrería') ? 'herreria' : 'taller';
-  if (!item || !item.sector) return true;
-  return item.sector === currentPtSector;
-}
-
-    let fueraDeServicioNum = 0;
-    let enReparacionNum = 0;
-
-    if (window._ptDisplayState) {
-      const ds = window._ptDisplayState;
-      fueraDeServicioNum = (ds.fuera_de_servicio || []).filter(isItemMatchingCurrentPtSector).length;
-      enReparacionNum = (ds.reparacion || []).filter(isItemMatchingCurrentPtSector).length;
-    } else {
-      const ptOutCountEl = document.getElementById('pt-out-count');
-      const ptRepCountEl = document.getElementById('pt-rep-count');
-      const outText = ptOutCountEl ? ptOutCountEl.textContent.trim() : '';
-      const repText = ptRepCountEl ? ptRepCountEl.textContent.trim() : '';
-      if (outText && parseInt(outText) > 0) fueraDeServicioNum = parseInt(outText);
-      if (repText && parseInt(repText) > 0) enReparacionNum = parseInt(repText);
-    }
-
-    // Fallback: If numbers evaluate to 0 but activeLocalOrders has items, use activeLocalOrders count so it NEVER falsely displays 0!
-    if (fueraDeServicioNum === 0 && activeLocalOrders.length > 0) {
-      fueraDeServicioNum = activeLocalOrders.length;
-    }
-    if (enReparacionNum === 0 && activeLocalOrders.length > 0) {
-      enReparacionNum = activeLocalOrders.length;
-    }
-
-    if (totalTallerEl) totalTallerEl.textContent = fueraDeServicioNum;
-    
-    let workingOrdersCount = 0;
-    activeLocalOrders.forEach(o => {
-      const isWorking = (o.tasks || []).some(t => t.timerStart !== null && t.timerStart > 0);
-      if (isWorking) workingOrdersCount++;
-    });
-
-    let preventiveAlertCount = 0;
-    if (prevCombustibleData && Array.isArray(prevCombustibleData) && prevCombustibleData.length > 0) {
-      preventiveAlertCount = prevCombustibleData.filter(item => {
-        const a5 = String(item.alerta5k || '').toLowerCase();
-        const a10 = String(item.alerta10k || '').toLowerCase();
-        return ['realizar', 'urgente', 'service'].some(w => a5.includes(w) || a10.includes(w));
-      }).length;
-    } else if (prevFlotaData && Array.isArray(prevFlotaData) && prevFlotaData.length > 0) {
-      preventiveAlertCount = prevFlotaData.filter(item => {
-        const alerta = String(item.alerta || '').toLowerCase();
-        return alerta.includes('realizar') || alerta.includes('urgente') || alerta.includes('service');
-      }).length;
-    } else {
-      preventiveAlertCount = activeLocalOrders.filter(o => o.clasificacion === 'Preventivo').length;
-    }
-    
-    if (subTallerEl) subTallerEl.textContent = `${workingOrdersCount} trabajando`;
-    if (activeOrdersEl) activeOrdersEl.textContent = enReparacionNum;
-    if (subActiveEl) subActiveEl.textContent = `${workingOrdersCount} unidades trabajando`;
-    if (overduePrevEl) overduePrevEl.textContent = preventiveAlertCount;
-    if (subPrevEl) subPrevEl.textContent = `${preventiveAlertCount} este mes`;
-    
-    if (syncRateEl) {
-      const syncedCount = activeLocalOrders.filter(o => o.taxesOrderNumber).length;
-      const rate = activeLocalOrders.length > 0 ? Math.round((syncedCount / activeLocalOrders.length) * 100) : 100;
-      syncRateEl.textContent = `${rate}%`;
-    }
+    updateDashboardStats();
     
     const workingTasks = [];
     const pausedTasks = [];
