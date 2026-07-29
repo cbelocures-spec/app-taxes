@@ -3658,7 +3658,12 @@ function renderDashboard() {
     const subPrevEl = document.getElementById('stat-sub-prev');
     const syncRateEl = document.getElementById('stat-sync-rate');
 
-    if (totalTallerEl) totalTallerEl.textContent = activeLocalOrders.length;
+    const ptOutCountEl = document.getElementById('pt-out-count');
+    const ptRepCountEl = document.getElementById('pt-rep-count');
+    const fueraDeServicioNum = ptOutCountEl ? (parseInt(ptOutCountEl.textContent) || 0) : activeLocalOrders.length;
+    const enReparacionNum = ptRepCountEl ? (parseInt(ptRepCountEl.textContent) || 0) : activeLocalOrders.length;
+
+    if (totalTallerEl) totalTallerEl.textContent = fueraDeServicioNum;
     
     let workingOrdersCount = 0;
     let preventiveCount = 0;
@@ -3669,7 +3674,7 @@ function renderDashboard() {
     });
     
     if (subTallerEl) subTallerEl.textContent = `${workingOrdersCount} trabajando`;
-    if (activeOrdersEl) activeOrdersEl.textContent = activeLocalOrders.length;
+    if (activeOrdersEl) activeOrdersEl.textContent = enReparacionNum;
     if (subActiveEl) subActiveEl.textContent = `${workingOrdersCount} unidades trabajando`;
     if (overduePrevEl) overduePrevEl.textContent = preventiveCount;
     if (subPrevEl) subPrevEl.textContent = `${preventiveCount} este mes`;
@@ -9274,6 +9279,7 @@ function renderParteTallerDashboard(state) {
   // 1. Fuera de servicio
   const fueraDeServicio = (displayState.fuera_de_servicio || []).filter(matchesPtSector).sort((a, b) => getDaysValue(b) - getDaysValue(a));
   if (el('pt-out-count')) el('pt-out-count').textContent = fueraDeServicio.length;
+  if (el('stat-total-taller')) el('stat-total-taller').textContent = fueraDeServicio.length;
   if (el('pt-fuera-tbody')) {
     if (fueraDeServicio.length === 0) {
       el('pt-fuera-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades fuera de servicio.</td></tr>';
@@ -9325,6 +9331,7 @@ function renderParteTallerDashboard(state) {
   // 2. En reparación
   const reparacion = (displayState.reparacion || []).filter(matchesPtSector).sort((a, b) => getDaysValue(b) - getDaysValue(a));
   if (el('pt-rep-count')) el('pt-rep-count').textContent = reparacion.length;
+  if (el('stat-active-orders')) el('stat-active-orders').textContent = reparacion.length;
   if (el('pt-reparacion-tbody')) {
     if (reparacion.length === 0) {
       el('pt-reparacion-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades en reparación.</td></tr>';
