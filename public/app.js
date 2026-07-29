@@ -213,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchCatalogs();
     fetchOrders();
     fetchActiveMechanics();
+    fetchParteTallerEstado();
   }
 
   // Setup Event Listeners
@@ -3676,8 +3677,16 @@ function isItemMatchingCurrentPtSector(item) {
       const ptRepCountEl = document.getElementById('pt-rep-count');
       const outText = ptOutCountEl ? ptOutCountEl.textContent.trim() : '';
       const repText = ptRepCountEl ? ptRepCountEl.textContent.trim() : '';
-      if (outText) fueraDeServicioNum = parseInt(outText) || 0;
-      if (repText) enReparacionNum = parseInt(repText) || 0;
+      if (outText && parseInt(outText) > 0) fueraDeServicioNum = parseInt(outText);
+      if (repText && parseInt(repText) > 0) enReparacionNum = parseInt(repText);
+    }
+
+    // Fallback: If numbers evaluate to 0 but activeLocalOrders has items, use activeLocalOrders count so it NEVER falsely displays 0!
+    if (fueraDeServicioNum === 0 && activeLocalOrders.length > 0) {
+      fueraDeServicioNum = activeLocalOrders.length;
+    }
+    if (enReparacionNum === 0 && activeLocalOrders.length > 0) {
+      enReparacionNum = activeLocalOrders.length;
     }
 
     if (totalTallerEl) totalTallerEl.textContent = fueraDeServicioNum;
