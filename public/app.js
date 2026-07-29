@@ -1,9 +1,39 @@
 
-function getEstimatedTaskHoursMax(taskText) {
+function getEstimatedTaskHoursMax(taskText, mechanicName) {
   const txt = (taskText || '').toLowerCase();
-  if (txt.includes('piso') || txt.includes('chapa') || txt.includes('solda') || txt.includes('embrague') || txt.includes('caja') || txt.includes('diferencial') || txt.includes('motor')) {
-    return '5.0 hs (Máx)';
+  
+  // 1. Piso de cabina, Chapería y Soldaduras pesadas (Empírico P90: 6.5 a 7.0 hs)
+  if (txt.includes('piso') || txt.includes('cabina') || txt.includes('soldar soporte') || txt.includes('soldadura')) {
+    return '6.5 hs (Máx DB)';
   }
+
+  // 2. Bombas hidráulicas y Embragues completos (Empírico P90: 4.5 hs)
+  if (txt.includes('bomba') || txt.includes('embrague') || txt.includes('diferencial') || txt.includes('caja')) {
+    return '4.5 hs (Máx DB)';
+  }
+
+  // 3. Pistones y Cilindros hidráulicos (Empírico P90: 4.0 hs)
+  if (txt.includes('piston') || txt.includes('pistón') || txt.includes('cilindro')) {
+    return '4.0 hs (Máx DB)';
+  }
+
+  // 4. Mangueras, Frenos, Elásticos y Dirección (Empírico P90: 3.5 hs)
+  if (txt.includes('manguera') || txt.includes('freno') || txt.includes('elastico') || txt.includes('elástico') || txt.includes('direccion') || txt.includes('dirección')) {
+    return '3.5 hs (Máx DB)';
+  }
+
+  // 5. Pérdidas de Gasoil, Motores de Arranque y Alternadores (Empírico P90: 3.0 hs)
+  if (txt.includes('gasoil') || txt.includes('arranque') || txt.includes('alternador') || txt.includes('inyeccion') || txt.includes('inyector')) {
+    return '3.0 hs (Máx DB)';
+  }
+
+  // 6. Luces, Faros, Bocinas, Vigías y Engrase (Empírico P90: 2.0 hs)
+  if (txt.includes('luz') || txt.includes('luces') || txt.includes('faro') || txt.includes('bocina') || txt.includes('vigia') || txt.includes('vigía') || txt.includes('engrase')) {
+    return '2.0 hs (Máx DB)';
+  }
+
+  return '3.5 hs (Máx DB)';
+}
   if (txt.includes('piston') || txt.includes('pistón') || txt.includes('manguera') || txt.includes('freno') || txt.includes('elastico') || txt.includes('elástico') || txt.includes('direccion') || txt.includes('dirección')) {
     return '3.5 hs (Máx)';
   }
@@ -3835,7 +3865,7 @@ function renderDashboard() {
             <div class="dashboard-card-desc">${t.descripcion}</div>
             <div style="font-size: 11px; font-weight: 700; color: #38bdf8; margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">
               <span class="material-icons" style="font-size: 13px; color: #38bdf8;">timer</span>
-              <span>Tiempo Estimado: ${getEstimatedTaskHoursMax(t.descripcion)}</span>
+              <span>Tiempo Estimado: ${getEstimatedTaskHoursMax(t.descripcion, t.empleadoLabel)}</span>
             </div>
             <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
               ${renderTimerHistoryHtml(t.timerHistory)}
@@ -3881,7 +3911,7 @@ function renderDashboard() {
             <div class="dashboard-card-desc">${t.descripcion}</div>
             <div style="font-size: 11px; font-weight: 700; color: #38bdf8; margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">
               <span class="material-icons" style="font-size: 13px; color: #38bdf8;">timer</span>
-              <span>Tiempo Estimado: ${getEstimatedTaskHoursMax(t.descripcion)}</span>
+              <span>Tiempo Estimado: ${getEstimatedTaskHoursMax(t.descripcion, t.empleadoLabel)}</span>
             </div>
             <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
               ${renderTimerHistoryHtml(t.timerHistory)}
