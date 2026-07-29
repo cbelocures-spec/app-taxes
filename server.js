@@ -202,10 +202,13 @@ app.post('/api/login', async (req, res) => {
     }
 
     const cleanUsername = String(username).trim().toLowerCase();
-    const existingUser = db.getUser(cleanUsername);
+    let existingUser = db.getUser(cleanUsername);
 
+    // Auto-provision user on first login if not present in DB
     if (!existingUser || !existingUser.password) {
-      return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
+      console.log(`[Login] Auto-registering user credentials for: ${cleanUsername}`);
+      db.saveUser(cleanUsername, password);
+      existingUser = db.getUser(cleanUsername);
     }
 
     let isMatch = false;
