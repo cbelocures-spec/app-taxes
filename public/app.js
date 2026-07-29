@@ -214,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchOrders();
     fetchActiveMechanics();
     fetchParteTallerEstado();
+    fetchPrevCombustible();
   }
 
   // Setup Event Listeners
@@ -3692,18 +3693,32 @@ function isItemMatchingCurrentPtSector(item) {
     if (totalTallerEl) totalTallerEl.textContent = fueraDeServicioNum;
     
     let workingOrdersCount = 0;
-    let preventiveCount = 0;
     activeLocalOrders.forEach(o => {
       const isWorking = (o.tasks || []).some(t => t.timerStart !== null && t.timerStart > 0);
       if (isWorking) workingOrdersCount++;
-      if (o.clasificacion === 'Preventivo') preventiveCount++;
     });
+
+    let preventiveAlertCount = 0;
+    if (prevCombustibleData && Array.isArray(prevCombustibleData) && prevCombustibleData.length > 0) {
+      preventiveAlertCount = prevCombustibleData.filter(item => {
+        const a5 = String(item.alerta5k || '').toLowerCase();
+        const a10 = String(item.alerta10k || '').toLowerCase();
+        return ['realizar', 'urgente', 'service'].some(w => a5.includes(w) || a10.includes(w));
+      }).length;
+    } else if (prevFlotaData && Array.isArray(prevFlotaData) && prevFlotaData.length > 0) {
+      preventiveAlertCount = prevFlotaData.filter(item => {
+        const alerta = String(item.alerta || '').toLowerCase();
+        return alerta.includes('realizar') || alerta.includes('urgente') || alerta.includes('service');
+      }).length;
+    } else {
+      preventiveAlertCount = activeLocalOrders.filter(o => o.clasificacion === 'Preventivo').length;
+    }
     
     if (subTallerEl) subTallerEl.textContent = `${workingOrdersCount} trabajando`;
     if (activeOrdersEl) activeOrdersEl.textContent = enReparacionNum;
     if (subActiveEl) subActiveEl.textContent = `${workingOrdersCount} unidades trabajando`;
-    if (overduePrevEl) overduePrevEl.textContent = preventiveCount;
-    if (subPrevEl) subPrevEl.textContent = `${preventiveCount} este mes`;
+    if (overduePrevEl) overduePrevEl.textContent = preventiveAlertCount;
+    if (subPrevEl) subPrevEl.textContent = `${preventiveAlertCount} este mes`;
     
     if (syncRateEl) {
       const syncedCount = activeLocalOrders.filter(o => o.taxesOrderNumber).length;
@@ -8158,6 +8173,7 @@ function renderPrevCombustibleTable() {
   document.getElementById('fuel-metric-total').textContent = total;
   document.getElementById('fuel-metric-ok').textContent = okCount;
   document.getElementById('fuel-metric-alerta').textContent = alertaCount;
+  updateDashboardStats();
 
   // Apply alert filter + search
   const filtered = classified.filter(item => {
