@@ -69,14 +69,14 @@
       <!-- PAÑOL/MANTENIMIENTO STATS DASHBOARD -->
       <div id="stats-dashboard-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 18px;">
         <div class="stat-card" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;">
-          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Unidades en Taller</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Unidades Fuera de Servicio</div>
           <div style="font-size: 24px; font-weight: 800; color: var(--primary); margin: 6px 0;" id="stat-total-taller">0</div>
-          <div style="font-size: 10px; color: var(--text-muted);" id="stat-sub-taller">0 sin iniciar</div>
+          <div style="font-size: 10px; color: var(--text-muted);" id="stat-sub-taller">0 trabajando</div>
         </div>
         <div class="stat-card" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;">
-          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Órdenes Activas</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Unidades en Reparación</div>
           <div style="font-size: 24px; font-weight: 800; color: #f59e0b; margin: 6px 0;" id="stat-active-orders">0</div>
-          <div style="font-size: 10px; color: var(--text-muted);" id="stat-sub-active">0 en proceso</div>
+          <div style="font-size: 10px; color: var(--text-muted);" id="stat-sub-active">0 unidades trabajando</div>
         </div>
         <div class="stat-card" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;">
           <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Preventivos Vencidos</div>
@@ -1905,6 +1905,6 @@
     }
   </style>
 
-  <script src="app.js?v=76"></script>
+  <script src="app.js?v=77"></script>
 </body>
 </html>

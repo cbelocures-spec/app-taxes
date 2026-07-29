@@ -3668,9 +3668,9 @@ function renderDashboard() {
       if (o.clasificacion === 'Preventivo') preventiveCount++;
     });
     
-    if (subTallerEl) subTallerEl.textContent = `${activeLocalOrders.length - workingOrdersCount} sin iniciar`;
+    if (subTallerEl) subTallerEl.textContent = `${workingOrdersCount} trabajando`;
     if (activeOrdersEl) activeOrdersEl.textContent = activeLocalOrders.length;
-    if (subActiveEl) subActiveEl.textContent = `${workingOrdersCount} en proceso`;
+    if (subActiveEl) subActiveEl.textContent = `${workingOrdersCount} unidades trabajando`;
     if (overduePrevEl) overduePrevEl.textContent = preventiveCount;
     if (subPrevEl) subPrevEl.textContent = `${preventiveCount} este mes`;
     
