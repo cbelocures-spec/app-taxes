@@ -1,3 +1,21 @@
+
+function getEstimatedTaskHoursMax(taskText) {
+  const txt = (taskText || '').toLowerCase();
+  if (txt.includes('piso') || txt.includes('chapa') || txt.includes('solda') || txt.includes('embrague') || txt.includes('caja') || txt.includes('diferencial') || txt.includes('motor')) {
+    return '5.0 hs (Máx)';
+  }
+  if (txt.includes('piston') || txt.includes('pistón') || txt.includes('manguera') || txt.includes('freno') || txt.includes('elastico') || txt.includes('elástico') || txt.includes('direccion') || txt.includes('dirección')) {
+    return '3.5 hs (Máx)';
+  }
+  if (txt.includes('gasoil') || txt.includes('combustible') || txt.includes('arranque') || txt.includes('alternador') || txt.includes('inyeccion') || txt.includes('inyector') || txt.includes('perdida') || txt.includes('pérdida')) {
+    return '2.5 hs (Máx)';
+  }
+  if (txt.includes('luz') || txt.includes('luces') || txt.includes('faro') || txt.includes('bocina') || txt.includes('fusible') || txt.includes('vigia') || txt.includes('vigía') || txt.includes('engrase')) {
+    return '1.5 hs (Máx)';
+  }
+  return '2.5 hs (Máx)';
+}
+
 // ---- Helper functions (mirror of server-side helpers) ----
 function isHerreria(cls) {
   if (!cls) return false;
@@ -3815,6 +3833,10 @@ function renderDashboard() {
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
             <div class="dashboard-card-subtitle">Interno ${t.interno} ${t.clasificacion ? ' - ' + t.clasificacion : ''}</div>
             <div class="dashboard-card-desc">${t.descripcion}</div>
+            <div style="font-size: 11px; font-weight: 700; color: #38bdf8; margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">
+              <span class="material-icons" style="font-size: 13px; color: #38bdf8;">timer</span>
+              <span>Tiempo Estimado: ${getEstimatedTaskHoursMax(t.descripcion)}</span>
+            </div>
             <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
               ${renderTimerHistoryHtml(t.timerHistory)}
             </div>
@@ -3857,6 +3879,10 @@ function renderDashboard() {
             <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
             <div class="dashboard-card-subtitle">Interno ${t.interno} ${t.clasificacion ? ' - ' + t.clasificacion : ''}</div>
             <div class="dashboard-card-desc">${t.descripcion}</div>
+            <div style="font-size: 11px; font-weight: 700; color: #38bdf8; margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">
+              <span class="material-icons" style="font-size: 13px; color: #38bdf8;">timer</span>
+              <span>Tiempo Estimado: ${getEstimatedTaskHoursMax(t.descripcion)}</span>
+            </div>
             <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
               ${renderTimerHistoryHtml(t.timerHistory)}
             </div>

@@ -32,7 +32,7 @@ const MOCK_CATALOGS = {
 // Initialize Catalogs if they are empty
 function initMockCatalogs() {
   const current = db.getCatalogs();
-  if (!current.rodados || current.rodados.length === 0) {
+  if (!current.rodados || current.rodados.length <= 5) {
     console.log("Pre-populating local database with catalogs...");
     try {
       const fs = require('fs');
@@ -237,6 +237,18 @@ async function fillInputByLabel(page, labelText, value) {
 
 // Puppeteer helper to fill custom searchable selects
 async function fillSearchableSelect(page, labelText, searchValue) {
+
+    if (labelText.toLowerCase().includes('rodado')) {
+      if (searchValue.toUpperCase().includes('REPARACIONES INTERNAS') || searchValue.toUpperCase().includes('TALLER')) {
+        console.log(`[Rodado] Special internal shop job detected ("${searchValue}"). Falling back to Interno 1...`);
+        const catalogs = db.getCatalogs();
+        const firstRodado = (catalogs.rodados && catalogs.rodados.length > 0) ? catalogs.rodados[0] : null;
+        if (firstRodado) {
+          searchValue = firstRodado.label || firstRodado.value || "1";
+        }
+      }
+    }
+
   console.log(`Searching for searchable select for: "${labelText}" with target value: "${searchValue}"`);
   try {
     // Find the correct searchable-input by looking at the label
@@ -2380,6 +2392,12 @@ async function syncWorkOrder(orderId) {
 
     // Fill searchable select fields (Rodado and Responsable)
     const rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado);
+    if (!rodadoFilled) {
+      console.warn(`[Rodado] Primary rodado selection failed for "${order.rodado}". Attempting fallback with first catalog vehicle...`);
+      const catalogs = db.getCatalogs();
+      const firstRodado = (catalogs.rodados && catalogs.rodados.length > 0) ? catalogs.rodados[0].label : "1";
+      rodadoFilled = await fillSearchableSelect(page, 'Rodado', firstRodado);
+    }
     if (!rodadoFilled) throw new Error("No se pudo seleccionar el Rodado. Asegúrese de que el valor sea válido.");
 
     let respFilled = await fillSearchableSelect(page, 'Responsable', targetResponsable);
