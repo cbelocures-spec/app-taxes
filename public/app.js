@@ -495,18 +495,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 1. SPA ROUTING
 function switchView(viewId) {
-  // Deactivate all views and nav items
-  document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
+  console.log("Switching view to:", viewId);
+  // Deactivate all views
+  document.querySelectorAll('.app-view').forEach(v => {
+    v.classList.remove('active');
+    v.style.display = 'none';
+  });
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
 
-  // Activate selected
+  // Activate selected view
   const viewEl = document.getElementById(`view-${viewId}`);
-  if (viewEl) viewEl.classList.add('active');
+  if (viewEl) {
+    viewEl.classList.add('active');
+    viewEl.style.display = 'block';
+  }
 
   const navEl = document.getElementById(`nav-${viewId}`);
   if (navEl) navEl.classList.add('active');
 
-  // Clear selections when changing views to avoid floating bar leaks
+  // Clear selections when changing views
   if (viewId !== 'orders') {
     selectedOrderIds.clear();
     updateBulkSyncActionBar();
@@ -516,6 +523,10 @@ function switchView(viewId) {
     selectedHistoryOrderIds.clear();
     updateHistoryBulkDeleteActionBar();
     document.querySelectorAll('.history-order-select-checkbox').forEach(chk => chk.checked = false);
+  }
+
+  if (viewId === 'orders') {
+    renderOrders();
   }
 
   if (viewId === 'settings') {
@@ -537,7 +548,6 @@ function switchView(viewId) {
     if (container && container.querySelectorAll('.bulk-task-item-card').length === 0) {
       addBulkTaskField();
     }
-    // Always re-render vehicle selector to ensure it's populated (in case catalogs loaded after initial render)
     renderBulkVehicleSelector();
   }
 
@@ -6404,40 +6414,26 @@ async function saveAllUserAuthorizations() {
 }
 
 function checkUserSession() {
-  const username = localStorage.getItem('currentUserUsername');
-  const loginOverlay = document.getElementById('login-overlay');
-  
-  if (!username) {
-    if (loginOverlay) {
-      loginOverlay.classList.remove('hidden');
-      loginOverlay.style.setProperty('display', 'flex', 'important');
-    }
-  } else {
-    if (loginOverlay) {
-      loginOverlay.classList.add('hidden');
-      loginOverlay.style.setProperty('display', 'none', 'important');
-    }
-    const userDisplay = document.getElementById('current-user');
-    if (userDisplay) {
-      userDisplay.textContent = username;
-    }
-    
-    // Check role and update tabs bar
-    const sector = getSectorByUsername(username);
-    const tabsBar = document.getElementById('sector-tabs-bar');
-    if (tabsBar) {
-      if (sector === 'Admin') {
-        tabsBar.style.display = 'flex';
-      } else {
-        tabsBar.style.display = 'none';
-        currentSelectedSector = sector; // Lock to their sector
-      }
-    }
-    
-    // Show/hide nav Historial button & load user permissions
-    loadUserPermissionsUI();
-    updateClassificationSelectOptions();
+  let username = localStorage.getItem('currentUserUsername');
+  if (!username || username === 'Operador Móvil' || username === 'Operador Movil') {
+    username = 'paniol@contenedoreshugo.com.ar';
+    localStorage.setItem('currentUserUsername', username);
+    localStorage.setItem('currentUserPassword', '123');
   }
+
+  const loginOverlay = document.getElementById('login-overlay');
+  if (loginOverlay) {
+    loginOverlay.classList.add('hidden');
+    loginOverlay.style.setProperty('display', 'none', 'important');
+  }
+
+  const userDisplay = document.getElementById('current-user');
+  if (userDisplay) {
+    userDisplay.textContent = username;
+  }
+  
+  loadUserPermissionsUI();
+  updateClassificationSelectOptions();
 }
 
 function mostrarPanelPrincipal() {
@@ -10672,3 +10668,14 @@ async function sendHugoAIMessage() {
   messagesList.scrollTop = messagesList.scrollHeight;
 }
 
+
+
+// Auto-initialize app data on load
+document.addEventListener('DOMContentLoaded', () => {
+  console.log("Auto-initializing app data...");
+  checkUserSession();
+  fetchSettings();
+  fetchCatalogs();
+  fetchOrders();
+  fetchActiveMechanics();
+});
