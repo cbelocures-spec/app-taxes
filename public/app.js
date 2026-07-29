@@ -132,6 +132,7 @@ let selectedOrderIds = new Set();
 let selectedHistoryOrderIds = new Set();
 let isCurrentUserSupervisor = false;
 let editModalHasRenderingError = false;
+let currentSelectedSector = 'Taller';
 
 const MECANICA_EMPLOYEES = [
   "CALOMINO DARIO",
