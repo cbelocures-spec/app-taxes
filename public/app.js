@@ -5716,7 +5716,9 @@ async function confirmVoiceOrder() {
 function togglePasswordVisibility(inputId) {
   const input = document.getElementById(inputId);
   if (!input) return;
-  const toggleIcon = input.nextElementSibling;
+  const container = input.parentElement || input.closest('.form-group');
+  const toggleIcon = container ? container.querySelector('.password-toggle') : input.nextElementSibling;
+  
   if (input.type === 'password') {
     input.type = 'text';
     if (toggleIcon) toggleIcon.textContent = 'visibility';
@@ -6523,9 +6525,15 @@ function checkUserSession() {
   const loginOverlay = document.getElementById('login-overlay');
   
   if (!username) {
-    if (loginOverlay) loginOverlay.classList.remove('hidden');
+    if (loginOverlay) {
+      loginOverlay.classList.remove('hidden');
+      loginOverlay.style.display = 'flex';
+    }
   } else {
-    if (loginOverlay) loginOverlay.classList.add('hidden');
+    if (loginOverlay) {
+      loginOverlay.classList.add('hidden');
+      loginOverlay.style.display = 'none';
+    }
     const userDisplay = document.getElementById('current-user');
     if (userDisplay) {
       userDisplay.textContent = username;
