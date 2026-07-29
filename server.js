@@ -368,8 +368,9 @@ app.post('/api/admin/upload-db', (req, res) => {
     if (dbData.catalogs) db.saveCatalogs(dbData.catalogs);
     
     const data = db.read();
-    if (Array.isArray(dbData.workOrders)) {
-      data.workOrders = dbData.workOrders;
+    const ordersArray = Array.isArray(dbData.workOrders) ? dbData.workOrders : (Array.isArray(dbData.orders) ? dbData.orders : null);
+    if (ordersArray) {
+      data.workOrders = ordersArray;
     }
     if (dbData.users) {
       data.users = { ...data.users, ...dbData.users };
@@ -379,7 +380,7 @@ app.post('/api/admin/upload-db', (req, res) => {
     }
     db.write(data);
     
-    console.log(`[DB Migration] Database uploaded successfully. Orders: ${dbData.workOrders ? dbData.workOrders.length : 0}, Rodados: ${dbData.catalogs && dbData.catalogs.rodados ? dbData.catalogs.rodados.length : 0}`);
+    console.log(`[DB Migration] Database uploaded successfully. Orders: ${ordersArray ? ordersArray.length : 0}, Rodados: ${dbData.catalogs && dbData.catalogs.rodados ? dbData.catalogs.rodados.length : 0}`);
     
     res.json({ success: true, message: "Base de datos migrada con éxito." });
   } catch (error) {
@@ -1051,13 +1052,16 @@ app.post('/api/orders/cleanup', (req, res) => {
       const isSynced = order.syncStatus === 'success';
       const isVerified = order.verifiedStatus === 'success';
 
+      // SAFEGUARD: Never delete any order that has active running timers or unfinished tasks
+      if (!allFinished || hasActiveOrPausedTimer) return;
+
       if (type === 'controlled') {
-        // Controlled cleanup: synced+verified orders can always be deleted regardless of timer/OOS state
+        // Controlled cleanup: synced+verified orders can always be deleted regardless of OOS state
         if (allFinished && isSynced && isVerified) {
           idsToDelete.push(order.id);
         }
       } else if (type === 'all-synced') {
-        if (isSynced) {
+        if (isSynced && allFinished) {
           idsToDelete.push(order.id);
         }
       } else {

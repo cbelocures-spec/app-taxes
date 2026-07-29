@@ -394,15 +394,24 @@ class LocalDB {
       }
     }
 
+    // Migration/Normalization safeguard: Ensure parsed.workOrders accepts parsed.orders if present
+    if ((!Array.isArray(parsed.workOrders) || parsed.workOrders.length === 0) && Array.isArray(parsed.orders) && parsed.orders.length > 0) {
+      parsed.workOrders = parsed.orders;
+      migrated = true;
+    }
+
     // Seeding safeguard: If workOrders is empty in disk DB, seed from bundled db.json!
     if (!Array.isArray(parsed.workOrders) || parsed.workOrders.length === 0) {
       const bundledPath = path.join(__dirname, 'db.json');
       if (DB_PATH !== bundledPath && fs.existsSync(bundledPath)) {
         try {
           const bundledData = JSON.parse(fs.readFileSync(bundledPath, 'utf8'));
-          if (Array.isArray(bundledData.workOrders) && bundledData.workOrders.length > 0) {
-            console.log(`[DB] Seeding empty workOrders array from bundled db.json (${bundledData.workOrders.length} orders).`);
-            parsed.workOrders = bundledData.workOrders;
+          const seedOrders = Array.isArray(bundledData.workOrders) && bundledData.workOrders.length > 0
+            ? bundledData.workOrders
+            : (Array.isArray(bundledData.orders) ? bundledData.orders : null);
+          if (seedOrders && seedOrders.length > 0) {
+            console.log(`[DB] Seeding empty workOrders array from bundled db.json (${seedOrders.length} orders).`);
+            parsed.workOrders = seedOrders;
             if (bundledData.activeMechanics) parsed.activeMechanics = bundledData.activeMechanics;
             if (bundledData.users) parsed.users = { ...bundledData.users, ...parsed.users };
             migrated = true;

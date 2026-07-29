@@ -34,17 +34,6 @@ function getEstimatedTaskHoursMax(taskText, mechanicName) {
 
   return '3.5 hs (Máx DB)';
 }
-  if (txt.includes('piston') || txt.includes('pistón') || txt.includes('manguera') || txt.includes('freno') || txt.includes('elastico') || txt.includes('elástico') || txt.includes('direccion') || txt.includes('dirección')) {
-    return '3.5 hs (Máx)';
-  }
-  if (txt.includes('gasoil') || txt.includes('combustible') || txt.includes('arranque') || txt.includes('alternador') || txt.includes('inyeccion') || txt.includes('inyector') || txt.includes('perdida') || txt.includes('pérdida')) {
-    return '2.5 hs (Máx)';
-  }
-  if (txt.includes('luz') || txt.includes('luces') || txt.includes('faro') || txt.includes('bocina') || txt.includes('fusible') || txt.includes('vigia') || txt.includes('vigía') || txt.includes('engrase')) {
-    return '1.5 hs (Máx)';
-  }
-  return '2.5 hs (Máx)';
-}
 
 // ---- Helper functions (mirror of server-side helpers) ----
 function isHerreria(cls) {
