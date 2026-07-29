@@ -13,6 +13,16 @@
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=33">
+  <script>
+    (function() {
+      try {
+        var u = localStorage.getItem('currentUserUsername');
+        if (u) {
+          document.write('<style>#login-overlay { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }</style>');
+        }
+      } catch(e) {}
+    })();
+  </script>
 </head>
 <body>
 
@@ -1905,6 +1915,6 @@
     }
   </style>
 
-  <script src="app.js?v=87"></script>
+  <script src="app.js?v=88"></script>
 </body>
 </html>

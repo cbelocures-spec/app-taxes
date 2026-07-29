@@ -70,6 +70,15 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 
 // Middleware
 app.use(cors());
+// Disable client/browser caching so deploys reflect immediately on mobile & PC
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  next();
+});
+
 app.use(express.json({ limit: '10mb' }));
 
 // If REDIRECT_TO is set, redirect ALL traffic to new server (for old account migration)
