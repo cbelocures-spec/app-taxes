@@ -2575,8 +2575,15 @@ function filterHistory() {
   renderOrders();
 }
 
-// 8. CREATE AND SUBMIT WORK ORDER
+let isSubmittingWorkOrder = false;
 async function submitWorkOrder() {
+  if (isSubmittingWorkOrder) return;
+  isSubmittingWorkOrder = true;
+
+  const submitBtn = document.querySelector('#modal-new-order button[type="submit"]') || document.querySelector('#modal-new-order .btn-primary');
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
   const rodadoEl = document.getElementById('form-rodado');
   const responsableEl = document.getElementById('form-responsable');
   const internoEl = document.getElementById('form-interno');
@@ -2704,7 +2711,6 @@ async function submitWorkOrder() {
   const url = currentEditingOrderId ? `/api/orders/${currentEditingOrderId}` : '/api/orders';
   const method = currentEditingOrderId ? 'PUT' : 'POST';
  
-  try {
     const res = await fetch(url, {
       method: method,
       headers: { 
@@ -2739,6 +2745,9 @@ async function submitWorkOrder() {
     const prefixMsg = currentEditingOrderId ? "Fallo al actualizar la orden" : "Fallo al crear la orden";
     showToast(`${prefixMsg}: ${error.message}`, "danger");
     console.error(error);
+  } finally {
+    isSubmittingWorkOrder = false;
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
@@ -3000,6 +3009,7 @@ async function resolveDatabaseConflicts() {
         // Clean up local storage and update database task
         clearLocalStorageTimerKeys(task.id);
 
+        addTimerEventToTask(task, 'Pausó');
         task.timerStart = null;
         task.horasEstimadas = newHours;
 
@@ -3008,7 +3018,8 @@ async function resolveDatabaseConflicts() {
             return {
               ...t,
               timerStart: null,
-              horasEstimadas: newHours
+              horasEstimadas: newHours,
+              timerHistory: task.timerHistory || []
             };
           }
           return t;

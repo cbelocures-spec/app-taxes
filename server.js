@@ -567,6 +567,31 @@ app.post('/api/orders', (req, res) => {
       finalClasificacion = 'Edilicio';
     }
 
+    // Deduplication check: if an active order with identical interno, rodado, classification, and task descriptions
+    // was created by the same user within the last 15 seconds, return that order instead of creating a duplicate!
+    const existingOrders = db.getWorkOrders ? db.getWorkOrders() : [];
+    const now = Date.now();
+    const taskDescs = (tasks || []).map(t => String(t.descripcion || '').trim()).join('|');
+    
+    const duplicateOrder = existingOrders.find(o => {
+      if (o.archived || o.deleted) return false;
+      const createdTime = parseInt(o.id) || 0;
+      if (now - createdTime > 15000) return false; // Only check last 15 seconds
+      
+      const sameUser = (o.createdBy === createdBy);
+      const sameInterno = String(o.interno || '').trim().toUpperCase() === String(interno || '').trim().toUpperCase();
+      const sameRodado = String(o.rodado || '').trim().toUpperCase() === String(rodado || '').trim().toUpperCase();
+      const sameClasif = String(o.clasificacion || '').trim().toUpperCase() === String(finalClasificacion || '').trim().toUpperCase();
+      const sameTasks = (o.tasks || []).map(t => String(t.descripcion || '').trim()).join('|') === taskDescs;
+
+      return sameUser && sameInterno && sameRodado && sameClasif && sameTasks;
+    });
+
+    if (duplicateOrder) {
+      console.log(`[POST /api/orders] Deduplicated rapid repeat request for order ID ${duplicateOrder.id}`);
+      return res.status(200).json(duplicateOrder);
+    }
+
     const newOrder = db.createWorkOrder({
       rodado,
       responsable,
