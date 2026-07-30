@@ -3928,7 +3928,8 @@ async function verifyGroupWithBrowser(group, settings) {
     let currentPage = page; // track the current working page
     for (const orderId of group.ids) {
       let lastErr = null;
-      for (let attempt = 1; attempt <= 4; attempt++) {
+      let attempt = 1;
+      for (attempt = 1; attempt <= 4; attempt++) {
         try {
           await Promise.race([
             verifyWorkOrderWithPage(currentPage, orderId),
@@ -3962,7 +3963,7 @@ async function verifyGroupWithBrowser(group, settings) {
         db.updateWorkOrder(orderId, {
           verifiedStatus: 'error',
           verifiedCount: count,
-          verifiedError: `Error del agente (${attempt - 1} intentos): ${lastErr.message}`
+          verifiedError: `Error del agente (${Math.min(attempt, 4)} intentos): ${lastErr.message}`
         });
       }
       // Pause between orders to avoid 429 rate-limiting from Taxes.com.ar
