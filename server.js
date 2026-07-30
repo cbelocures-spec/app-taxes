@@ -38,9 +38,9 @@ console.log = function(...args) {
 
 // Capturar errores inesperados en el servidor y activar agentes de auto-curación
 process.on('uncaughtException', (err) => {
-  // Ignore harmless EBUSY/ENOTEMPTY puppeteer temp profile cleanup errors on Windows
-  if (err.code === 'EBUSY' || err.code === 'ENOTEMPTY' || (err.message && err.message.includes('puppeteer_dev_chrome_profile'))) {
-    console.warn(`[Warning] Ignored Puppeteer cleanup error: ${err.message}`);
+  // Ignore harmless EBUSY/ENOTEMPTY/EADDRINUSE puppeteer temp profile cleanup errors
+  if (err.code === 'EADDRINUSE' || err.code === 'EBUSY' || err.code === 'ENOTEMPTY' || (err.message && err.message.includes('puppeteer_dev_chrome_profile'))) {
+    console.warn(`[Warning] Ignored non-fatal error: ${err.message}`);
     return;
   }
 
