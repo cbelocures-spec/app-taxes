@@ -1,0 +1,8 @@
+{
+  "app_url": "https://app-taxes-production-ec67.up.railway.app",
+  "taxes_url": "https://taxes.com.ar",
+  "taxes_cuit": "30-71192803-0",
+  "taxes_user": "paniol@contenedoreshugo.com.ar",
+  "taxes_pass": "Paniol2015",
+  "auto_interval_minutes": 15
+}
