@@ -1813,17 +1813,19 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Estado en Taller</label>
-          <select id="pt-unit-estado" style="width: 100%;" onchange="ptOnEstadoChange()">
-            <option value="transito">🚛 En Tránsito (trabajando / novedad en ruta)</option>
+          <label style="font-weight: 600; margin-bottom: 6px; display: block;">Estado en Taller</label>
+          <select id="pt-unit-estado" style="width: 100%; font-size: 14px; padding: 8px;" onchange="ptOnEstadoChange()">
+            <option value="transito" selected>🚚 En Tránsito (trabajando / novedad en ruta)</option>
             <option value="servicios_pendientes">📋 Servicios Pendientes (unidad operativa)</option>
             <option value="reparacion">🔧 En Reparación (unidad inactiva)</option>
             <option value="fuera_de_servicio">❌ Fuera de Servicio (unidad inactiva)</option>
           </select>
         </div>
-        <div class="form-group" id="pt-unit-destino-container" style="display:none;">
-          <label>Estado al Ingresar a Taller (cuando llegue la unidad)</label>
-          <select id="pt-unit-destino" style="width: 100%;">
+        <div class="form-group" id="pt-unit-destino-container" style="display: block; margin-top: 14px; background: rgba(56, 189, 248, 0.08); padding: 14px; border-radius: 8px; border: 1.5px dashed #38bdf8;">
+          <label style="color: #38bdf8; font-weight: bold; font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            <span class="material-icons" style="font-size: 18px;">roundabout_right</span> ¿A qué sector / estado irá al ingresar al taller?
+          </label>
+          <select id="pt-unit-destino" style="width: 100%; font-size: 14px; padding: 8px;">
             <option value="fuera_de_servicio">❌ Fuera de Servicio (unidad inactiva al llegar)</option>
             <option value="reparacion">🔧 En Reparación (unidad inactiva al llegar)</option>
             <option value="servicios_pendientes">📋 Servicios Pendientes (unidad operativa al llegar)</option>
