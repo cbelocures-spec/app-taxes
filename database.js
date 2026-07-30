@@ -532,6 +532,9 @@ class LocalDB {
   saveSettings(settings) {
     const db = this.read();
     const cleanSettings = { ...settings };
+    if (cleanSettings.password && (cleanSettings.password.includes("••") || cleanSettings.password.includes("•"))) {
+      delete cleanSettings.password; // Prevent overwriting real password with masked string
+    }
     if (cleanSettings.username) {
       cleanSettings.username = normalizeEmail(cleanSettings.username);
     }
