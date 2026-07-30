@@ -3125,13 +3125,13 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   console.log(`[HTTP] Escuchando en http://localhost:${PORT}`);
   console.log(`[HTTP] Red local:      http://${localIP}:${PORT}`);
 
-  // Start the Puppeteer background sync worker if enabled (only locally, never in Railway)
-  const isRailway = process.env.RAILWAY_ENVIRONMENT !== undefined;
+  // Start the Puppeteer background sync worker if enabled (only locally, never in Railway cloud)
+  const isRailway = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_STATIC_URL || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_SERVICE_ID);
   const enableWorker = (process.env.NODE_ENV !== 'production' || process.env.ENABLE_BACKGROUND_WORKER === 'true') && !isRailway;
   if (enableWorker && process.env.DISABLE_BACKGROUND_WORKER !== 'true') {
     worker.startWorker();
   } else {
-    console.log('[Worker] Puppeteer background worker is disabled.');
+    console.log('[Worker] Puppeteer background worker is disabled (Cloud/Railway mode). Sync handled by local server 192.168.50.4');
   }
 
 
