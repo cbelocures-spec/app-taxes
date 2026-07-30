@@ -383,10 +383,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Poll for orders sync status in real time (1.5s so changes between supervisors appear fast)
-  setInterval(fetchOrders, 1500);
-  setInterval(checkWorkerStatus, 5000);
-  setInterval(fetchSettingsPolling, 5000);
+  // Poll for orders sync status in real time (5s interval with change-detection guard for smooth performance)
+  setInterval(fetchOrders, 5000);
+  setInterval(checkWorkerStatus, 10000);
+  setInterval(fetchSettingsPolling, 10000);
 
   // Fetch novelties from Google Sheet on startup
   fetchNovelties();
@@ -2129,11 +2129,20 @@ function removeTaskField(cardId) {
 }
 
 // 7. GET AND RENDER WORK ORDERS
+let lastFetchedOrdersJson = '';
+
 async function fetchOrders() {
   try {
     const res = await fetch(`/api/orders?_=${Date.now()}`);
     if (!res.ok) throw new Error("Error fetching orders");
-    const data = await res.json();
+    const jsonText = await res.text();
+
+    if (jsonText === lastFetchedOrdersJson) {
+      return; // Skip heavy DOM re-rendering if orders data hasn't changed
+    }
+
+    lastFetchedOrdersJson = jsonText;
+    const data = JSON.parse(jsonText);
     
     activeOrders = data;
     await resolveDatabaseConflicts();
