@@ -2162,7 +2162,28 @@ app.post('/api/active-mechanics', (req, res) => {
 });
 
 // --- PREVENTIVOS PROXY ENDPOINTS ---
+let preventivosFlotaCache = null;
+let preventivosFlotaCacheTime = 0;
+
 app.get('/api/preventivos/flota', async (req, res) => {
+  const now = Date.now();
+  if (preventivosFlotaCache && (now - preventivosFlotaCacheTime < 5 * 60 * 1000) && !req.query.force) {
+    const overrides = db.getOdometerOverrides();
+    let data = preventivosFlotaCache;
+    if (Array.isArray(data) && Object.keys(overrides).length > 0) {
+      data = data.map(item => {
+        const key = String(item.interno || '').trim();
+        const ov = overrides[key];
+        if (!ov) return item;
+        const patched = { ...item };
+        if (ov.km !== undefined && !isNaN(ov.km)) patched.kmReales = ov.km;
+        if (ov.hs !== undefined && !isNaN(ov.hs)) patched.hsReales = ov.hs;
+        return patched;
+      });
+    }
+    return res.json(data);
+  }
+
   const settings = db.getSettings();
   const scriptUrl = settings.preventivoScriptUrl;
   if (!scriptUrl) {
@@ -2170,12 +2191,13 @@ app.get('/api/preventivos/flota', async (req, res) => {
   }
   try {
     const sep = scriptUrl.includes('?') ? '&' : '?';
-    const url = `${scriptUrl}${sep}accion=getFleetData&_t=${Date.now()}`;
-    const response = await fetch(url);
+    const url = `${scriptUrl}${sep}accion=getFleetData&_t=${now}`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
     if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
     let data = await response.json();
+    preventivosFlotaCache = data;
+    preventivosFlotaCacheTime = now;
 
-    // Apply local overrides (bypass Google Apps Script cache for manual corrections)
     const overrides = db.getOdometerOverrides();
     if (Array.isArray(data) && Object.keys(overrides).length > 0) {
       data = data.map(item => {
@@ -2192,6 +2214,9 @@ app.get('/api/preventivos/flota', async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error("Error fetching preventivos fleet:", error);
+    if (preventivosFlotaCache) {
+      return res.json(preventivosFlotaCache);
+    }
     res.status(500).json({ error: error.message });
   }
 });
