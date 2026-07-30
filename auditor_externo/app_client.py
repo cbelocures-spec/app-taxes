@@ -20,20 +20,22 @@ class AppClient:
         return {}
 
     def fetch_orders(self):
-        """Fetches archived (Historial) work orders from Railway backend API."""
-        try:
-            self.config = self._load_config()
-            self.base_url = self.config.get("app_url", "https://app-taxes-production-ec67.up.railway.app").rstrip("/")
-            url = f"{self.base_url}/api/orders/archived"
-            resp = requests.get(url, timeout=15)
-            if resp.status_code == 200:
-                return resp.json()
-            else:
-                print(f"[Client-Error] HTTP {resp.status_code} fetching orders from {url}")
-                return []
-        except Exception as e:
-            print(f"[Client-Exception] fetch_orders error: {e}")
-            return []
+        """Fetches archived (Historial) work orders from Railway backend API with automatic retries."""
+        self.config = self._load_config()
+        self.base_url = self.config.get("app_url", "https://app-taxes-production-ec67.up.railway.app").rstrip("/")
+        url = f"{self.base_url}/api/orders/archived"
+
+        for attempt in range(1, 4):
+            try:
+                resp = requests.get(url, timeout=15)
+                if resp.status_code == 200:
+                    return resp.json()
+                print(f"[Client-Warning] Attempt {attempt}/3: HTTP {resp.status_code} fetching orders from {url}")
+            except Exception as e:
+                print(f"[Client-Exception] Attempt {attempt}/3 error: {e}")
+            if attempt < 3:
+                time.sleep(2)
+        return []
 
     def trigger_resync(self, order_id):
         """Triggers resynchronization for a given order ID."""
