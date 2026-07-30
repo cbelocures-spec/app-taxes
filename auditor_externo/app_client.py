@@ -27,7 +27,7 @@ class AppClient:
 
         for attempt in range(1, 4):
             try:
-                resp = requests.get(url, timeout=15)
+                resp = requests.get(url, timeout=60)
                 if resp.status_code == 200:
                     return resp.json()
                 print(f"[Client-Warning] Attempt {attempt}/3: HTTP {resp.status_code} fetching orders from {url}")

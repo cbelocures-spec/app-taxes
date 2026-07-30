@@ -911,11 +911,18 @@ app.get('/api/orders/all', (req, res) => {
   }
 });
 
-// Get archived orders
+let cachedArchivedOrders = null;
+let lastArchivedFetchTime = 0;
+
+// Get archived orders (fast cached)
 app.get('/api/orders/archived', (req, res) => {
   try {
-    const archived = db.getArchivedOrders() || [];
-    res.json(archived);
+    const now = Date.now();
+    if (!cachedArchivedOrders || (now - lastArchivedFetchTime) > 5000) {
+      cachedArchivedOrders = db.getArchivedOrders() || [];
+      lastArchivedFetchTime = now;
+    }
+    res.json(cachedArchivedOrders);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
