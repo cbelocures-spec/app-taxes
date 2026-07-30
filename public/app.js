@@ -7701,6 +7701,42 @@ function loadPreventivoIntoBulkTasks(type) {
   updateBulkInsumosGrid();
 }
 
+function compressImageFile(file, maxDimension = 1600, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = function() {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedBase64);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 async function handlePlanillaOcrUpload(input) {
   const file = input.files[0];
   if (!file) return;
@@ -7710,42 +7746,40 @@ async function handlePlanillaOcrUpload(input) {
     overlay.style.display = 'flex';
   }
 
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    const base64 = e.target.result;
-    try {
-      const res = await fetch('/api/bulk/parse-planilla', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64 })
-      });
+  try {
+    // Compress photo on client-side before sending (reduces 15MB -> ~300KB, preventing browser freeze)
+    const base64 = await compressImageFile(file, 1600, 0.8);
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP error ${res.status}`);
-      }
+    const res = await fetch('/api/bulk/parse-planilla', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64 })
+    });
 
-      const results = await res.json();
-      console.log("[OCR Results]", results);
-
-      if (!Array.isArray(results) || results.length === 0) {
-        showToast("No se detectaron datos legibles de vehículos en la foto.", "warning");
-        return;
-      }
-
-      applyOcrResultsToForm(results);
-
-    } catch (err) {
-      console.error(err);
-      showToast(`Error al escanear la planilla: ${err.message}`, "danger");
-    } finally {
-      if (overlay) {
-        overlay.style.display = 'none';
-      }
-      input.value = ''; // clear input
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP error ${res.status}`);
     }
-  };
-  reader.readAsDataURL(file);
+
+    const results = await res.json();
+    console.log("[OCR Results]", results);
+
+    if (!Array.isArray(results) || results.length === 0) {
+      showToast("No se detectaron datos legibles de vehículos en la foto.", "warning");
+      return;
+    }
+
+    applyOcrResultsToForm(results);
+
+  } catch (err) {
+    console.error(err);
+    showToast(`Error al escanear la planilla: ${err.message}`, "danger");
+  } finally {
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+    input.value = ''; // clear input
+  }
 }
 
 function applyOcrResultsToForm(results) {
