@@ -873,15 +873,17 @@ async function autoLogin(browser, username, password, portalUrl) {
     console.log('[autoLogin] No CSRF meta tag found - proceeding without explicit token.');
   }
 
-  // Submit by clicking the submit button AND pressing Enter
-  console.log('[autoLogin] Submitting form with button click and Enter key...');
+  // Submit by clicking the submit button ONCE (avoid double-POST 419 error)
+  console.log('[autoLogin] Submitting form with single button click...');
   await page.evaluate(() => {
     const btn = document.querySelector('button[type="submit"], input[type="submit"], .btn-primary, form button, .btn');
     if (btn) {
       btn.click();
+    } else {
+      const form = document.querySelector('form.login-form') || document.querySelector('form');
+      if (form) form.submit();
     }
   });
-  await page.keyboard.press('Enter');
   await delay(1500);
 
 
@@ -3823,7 +3825,7 @@ async function startWorker() {
   while (isWorkerRunning) {
     try {
       const orders = db.getWorkOrders();
-      const pendingOrder = orders.find(o => !o.archived && o.syncStatus === 'pending');
+      const pendingOrder = orders.find(o => o.syncStatus === 'pending');
 
       if (pendingOrder) {
         console.log(`Found pending Work Order ID: ${pendingOrder.id}. Launching sync...`);
