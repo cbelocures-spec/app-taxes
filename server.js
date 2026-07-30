@@ -624,6 +624,7 @@ app.post('/api/orders', (req, res) => {
     // Trigger Google Sheets update asynchronously for any finalized tasks
     checkAndTriggerGoogleSheetUpdates(null, newOrder.tasks, responsable, interno);
     checkAndSendInsumosToSheet(null, newOrder.tasks, responsable, interno);
+    sendHistoricalOrderToGoogleSheet(newOrder, 'crear');
 
     // Trigger active tasks Google Sheets update
     triggerActiveTasksGoogleSheetSync();
@@ -1232,6 +1233,10 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
     }
 
     db.updateWorkOrder(req.params.id, updates);
+    const updatedOrder = db.getWorkOrderById(req.params.id);
+    if (updatedOrder && (updatedOrder.syncStatus === 'success' || updatedOrder.taxesOrderNumber)) {
+      sendHistoricalOrderToGoogleSheet(updatedOrder, 'confirmar');
+    }
     
     res.json({ success: true });
   } catch (error) {
@@ -2733,6 +2738,62 @@ app.get('/api/novelties', async (req, res) => {
     res.status(500).json({ error: "No se pudieron obtener las novedades del camión: " + error.message });
   }
 });
+
+const HISTORICAL_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxbCEe6CPyN02seTWd0VO6mYljxX5N27oT2I5QJS-ZtRn7_PTm-oxI54p5rN6RCU8anVA/exec";
+
+async function sendHistoricalOrderToGoogleSheet(order, step) {
+  if (!order) return;
+  try {
+    const catalogs = db.getCatalogs();
+    const task = (order.tasks && order.tasks[0]) ? order.tasks[0] : {};
+    
+    // Resolve employee name
+    const mechanicObj = (catalogs.empleados || []).find(e => String(e.value) === String(task.empleado));
+    const mechanicName = mechanicObj ? mechanicObj.label : (task.empleado || "");
+
+    const nowStr = new Date().toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
+
+    let payload = {};
+    if (step === 'crear') {
+      payload = {
+        accion: 'crear',
+        fecha: order.fechaEntrega || new Date().toLocaleDateString("es-AR"),
+        interno: String(order.interno || "—"),
+        ot: order.taxesOrderNumber || order.taxesOtId || "Procesando...",
+        centro_costo: order.centroCosto || "15",
+        categoria: order.clasificacion || order.tipoUnidad || "MECANICA",
+        empleado: mechanicName || "—",
+        horas: String(task.horasEstimadas || "0.01"),
+        descripcion: task.descripcion || order.incidente || "—",
+        status: order.syncStatus === 'success' ? 'Finalizada' : 'Pendiente',
+        hora_inicio: nowStr,
+        estado_sincro: (order.taxesOrderNumber || order.taxesOtId) ? 'OK Sincronizada' : 'Procesando...'
+      };
+    } else { // 'confirmar' / 'actualizar'
+      payload = {
+        accion: 'confirmar_ot',
+        interno: String(order.interno || "—"),
+        ot_numero: String(order.taxesOrderNumber || order.taxesOtId || "—"),
+        status: 'Finalizada',
+        hora_fin: nowStr,
+        estado_sincro: 'OK Sincronizada'
+      };
+    }
+
+    console.log(`[HistoricalSheet] Sending step "${step}" for OT/Interno "${order.interno}"...`);
+    fetch(HISTORICAL_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(res => res.text()).then(txt => {
+      console.log(`[HistoricalSheet] Step "${step}" Response:`, txt);
+    }).catch(err => {
+      console.error(`[HistoricalSheet] Step "${step}" Error:`, err.message);
+    });
+  } catch (err) {
+    console.error("Error in sendHistoricalOrderToGoogleSheet:", err);
+  }
+}
 
 async function checkAndTriggerGoogleSheetUpdates(existingOrder, updatedTasks, supervisor, orderInterno) {
   const settings = db.getSettings();
