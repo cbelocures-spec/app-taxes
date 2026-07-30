@@ -5856,15 +5856,34 @@ function isEdilicioOrder(order) {
   return cls.includes('edilic');
 }
 
+window.switchSector = function(sector) {
+  if (!sector) return;
+  currentSelectedSector = sector;
+  
+  // Update UI active class on tab buttons
+  const tabs = document.querySelectorAll('.sector-tab');
+  tabs.forEach(tab => {
+    const text = String(tab.textContent || '').trim();
+    if (text.toLowerCase() === sector.toLowerCase()) {
+      tab.classList.add('active');
+    } else {
+      tab.classList.remove('active');
+    }
+  });
+
+  // Re-render orders, dashboard, and stats according to the selected sector tab
+  if (typeof renderOrders === 'function') renderOrders();
+  if (typeof updateStats === 'function') updateStats();
+  if (typeof setupAllFieldsForSector === 'function') setupAllFieldsForSector();
+  if (typeof renderHistoryOrders === 'function') renderHistoryOrders();
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
 function getFilteredActiveOrders() {
   if (!activeOrders || !Array.isArray(activeOrders)) return [];
 
   let sectorFilter = currentSelectedSector || 'Taller';
-  const currentUser = localStorage.getItem('currentUserUsername');
-  const userSector = getSectorByUsername(currentUser);
-  if (userSector && userSector !== 'Admin') {
-    sectorFilter = userSector;
-  }
 
   return activeOrders.filter(o => {
     if (o.status === 'Archivada' || o.status === 'Eliminada') return false;
@@ -5880,16 +5899,9 @@ function getFilteredActiveOrders() {
 }
 
 function getFilteredArchivedOrders() {
-  const currentUser = localStorage.getItem('currentUserUsername');
-  const userSector = getSectorByUsername(currentUser);
-
   if (!archivedOrders || !Array.isArray(archivedOrders)) return [];
 
-  // Determine active sector filter
   let sectorFilter = currentSelectedSector || 'Taller';
-  if (userSector && userSector !== 'Admin') {
-    sectorFilter = userSector;
-  }
 
   return archivedOrders.filter(o => {
     if (sectorFilter === 'Herrería') {
