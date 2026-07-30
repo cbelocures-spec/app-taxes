@@ -176,8 +176,24 @@ const HERRERIA_EMPLOYEES = [
   "Romero, Juan Manuel",
   "Federico",
   "Luciano",
-  "Digno"
-];
+  ];
+
+function getSectorEmployees(sector) {
+  const isHerreria = (sector === 'Herrería');
+  const baseDefaults = isHerreria ? [...HERRERIA_EMPLOYEES, "Federico", "Luciano", "Digno"] : [...MECANICA_EMPLOYEES];
+  
+  const mapped = (currentEmployeeMappings && currentEmployeeMappings[sector]) ? currentEmployeeMappings[sector] : [];
+  mapped.forEach(m => {
+    if (m && m.appName && m.appName.trim()) {
+      const name = m.appName.trim();
+      if (!baseDefaults.some(b => b.toLowerCase() === name.toLowerCase())) {
+        baseDefaults.push(name);
+      }
+    }
+  });
+
+  return baseDefaults;
+}
 
 function populateDatalist(datalistId, options) {
   const el = document.getElementById(datalistId);
@@ -388,8 +404,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(checkWorkerStatus, 10000);
   setInterval(fetchSettingsPolling, 10000);
 
-  // Fetch novelties from Google Sheet on startup
+  // Fetch novelties and employee mappings on startup
   fetchNovelties();
+  if (typeof loadAndRenderEmployeeMappings === 'function') loadAndRenderEmployeeMappings();
 
   const preClasifEl = document.getElementById('pre-form-clasificacion');
   if (preClasifEl) preClasifEl.addEventListener('change', setupAllFieldsForSector);
@@ -1596,8 +1613,9 @@ function updateEmployeeDropdownForCard(card) {
     };
 
     if (isHerreriaCC) {
-      // Herrería filter
-      const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
+      // Herrería filter with dynamic mapped employees
+      const herreriaNames = getSectorEmployees('Herrería');
+      const herreriaNamesCleaned = new Set(herreriaNames.map(name => cleanName(name)));
       
       let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
         if (!emp || !emp.label) return false;
@@ -1611,10 +1629,8 @@ function updateEmployeeDropdownForCard(card) {
         return false;
       });
 
-      // Add Federico, Luciano, Digno if not present
-      const customHerreriaNames = ["Federico", "Luciano", "Digno"];
-      customHerreriaNames.forEach(name => {
-        const exists = matchedEmployees.some(emp => emp && emp.label && emp.label.toLowerCase().trim() === name.toLowerCase());
+      herreriaNames.forEach(name => {
+        const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
         if (!exists) {
           matchedEmployees.push({ value: name, label: name });
         }
@@ -1623,8 +1639,9 @@ function updateEmployeeDropdownForCard(card) {
       filteredEmployees = matchedEmployees;
 
     } else if (isMecanicaCC) { // MECANICA
-      const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
-      filteredEmployees = (cachedCatalogs.empleados || []).filter(emp => {
+      const mecanicaNames = getSectorEmployees('Taller');
+      const mecanicaNamesCleaned = new Set(mecanicaNames.map(name => cleanName(name)));
+      let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
         if (!emp || !emp.label) return false;
         const empCleaned = cleanName(emp.label);
         if (mecanicaNamesCleaned.has(empCleaned)) return true;
@@ -1635,6 +1652,15 @@ function updateEmployeeDropdownForCard(card) {
         }
         return false;
       });
+
+      mecanicaNames.forEach(name => {
+        const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
+        if (!exists) {
+          matchedEmployees.push({ value: name, label: name });
+        }
+      });
+
+      filteredEmployees = matchedEmployees;
     }
 
     // Populate options
@@ -3961,10 +3987,7 @@ function renderDashboard() {
 
     const currentUser = localStorage.getItem('currentUserUsername');
     const userSector = getSectorByUsername(currentUser);
-    let baseList = MECANICA_EMPLOYEES;
-    if (userSector === 'Herrería') {
-      baseList = HERRERIA_EMPLOYEES;
-    }
+    let baseList = userSector === 'Herrería' ? getSectorEmployees('Herrería') : getSectorEmployees('Taller');
     const activeBaseList = (activeMechanicsList && activeMechanicsList.length > 0 && userSector !== 'Herrería') ? activeMechanicsList : baseList;
 
     const freeMechanics = activeBaseList.filter(name => {
@@ -4341,7 +4364,7 @@ function openActiveMechanicsModal() {
 
   const currentUser = localStorage.getItem('currentUserUsername');
   const userSector = getSectorByUsername(currentUser);
-  let baseList = userSector === 'Herrería' ? [...HERRERIA_EMPLOYEES] : [...MECANICA_EMPLOYEES];
+  let baseList = userSector === 'Herrería' ? getSectorEmployees('Herrería') : getSectorEmployees('Taller');
 
   if (Array.isArray(activeMechanicsList)) {
     activeMechanicsList.forEach(m => {
@@ -4862,7 +4885,8 @@ function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
 
     if (isHerreriaCC) {
       // Herrería filter
-      const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
+      const herreriaNames = getSectorEmployees('Herrería');
+      const herreriaNamesCleaned = new Set(herreriaNames.map(name => cleanName(name)));
       
       let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
         if (!emp || !emp.label) return false;
@@ -4876,21 +4900,19 @@ function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
         return false;
       });
 
-      // Add Federico, Luciano, Digno if not present
-      const customHerreriaNames = ["Federico", "Luciano", "Digno"];
-      customHerreriaNames.forEach(name => {
-        const exists = matchedEmployees.some(emp => emp && emp.label && emp.label.toLowerCase().trim() === name.toLowerCase());
+      herreriaNames.forEach(name => {
+        const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
         if (!exists) {
           matchedEmployees.push({ value: name, label: name });
         }
       });
 
-      // Fallback to full list if filter returns too few results
-      filteredEmployees = matchedEmployees.length >= 3 ? matchedEmployees : (cachedCatalogs.empleados || []);
+      filteredEmployees = matchedEmployees.length >= 1 ? matchedEmployees : (cachedCatalogs.empleados || []);
 
     } else if (isMecanicaCC) { // MECANICA
-      const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
-      const mecFiltered = (cachedCatalogs.empleados || []).filter(emp => {
+      const mecanicaNames = getSectorEmployees('Taller');
+      const mecanicaNamesCleaned = new Set(mecanicaNames.map(name => cleanName(name)));
+      let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
         if (!emp || !emp.label) return false;
         const empCleaned = cleanName(emp.label);
         if (mecanicaNamesCleaned.has(empCleaned)) return true;
@@ -4901,8 +4923,15 @@ function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
         }
         return false;
       });
-      // Fallback to full list if filter returns too few results (catalog names may not match)
-      filteredEmployees = mecFiltered.length >= 3 ? mecFiltered : (cachedCatalogs.empleados || []);
+
+      mecanicaNames.forEach(name => {
+        const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
+        if (!exists) {
+          matchedEmployees.push({ value: name, label: name });
+        }
+      });
+
+      filteredEmployees = matchedEmployees.length >= 1 ? matchedEmployees : (cachedCatalogs.empleados || []);
     }
 
     // Populate options
