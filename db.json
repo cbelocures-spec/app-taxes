@@ -1,189 +1,44 @@
 {
-  "orders": [
+  "workOrders": [
     {
-      "id": "1783515942947",
-      "rodado": "4 2 Interno REP. CONTENEDOR METALICO 1 1/2 MTS",
+      "id": "1785149764743",
+      "rodado": "MERCEDES BENZ ATEGO Interno 61",
       "responsable": "AUTO",
-      "fechaEntrega": "2026-07-08",
-      "horario": "10:05",
-      "interno": "20981",
-      "clasificacion": "Herrería",
+      "fechaEntrega": "2026-07-27",
+      "horario": "07:55",
+      "interno": "61",
+      "clasificacion": "Herrer��a",
       "incidente": "",
-      "syncStatus": "syncing",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-08T14:27:21.693Z",
+      "syncStatus": "error",
+      "syncError": "Error de login para paniol@contenedoreshugo.com.ar: Taxes.com.ar restringió temporalmente las solicitudes automáticas por exceso de tráfico (Error 429 Too Many Requests). Espere 3 a 5 minutos e intente nuevamente.",
+      "syncDate": "2026-07-27T12:08:10.901Z",
+      "createdAt": "2026-07-28T09:57:18.203Z",
       "tasks": [
         {
-          "id": "1783519991211-0",
-          "centroCosto": "11",
-          "empleado": "602",
-          "horasEstimadas": 1,
-          "descripcion": "Reparar ruedas,cambiar piso ,reparar 3 laterales y enderezar tapas",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "11:13",
-              "timestamp": 1783519988784
-            }
-          ],
-          "synced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": null,
-      "estadoUnidad": "operativo",
-      "combustibleReset": null
-    },
-    {
-      "id": "1783509853947",
-      "rodado": "4 4 Interno REP. CONTENEDOR METALICO MEPLA",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-08",
-      "horario": "08:24",
-      "interno": "40095",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": "Sincronización interrumpida por reinicio del servidor.",
-      "syncDate": null,
-      "createdAt": "2026-07-08T12:41:33.396Z",
-      "tasks": [
-        {
-          "id": "1783509853947-0",
-          "centroCosto": "11",
-          "empleado": "376",
-          "horasEstimadas": 1,
-          "descripcion": "Reparar ruedas,tetones,fabricar y colocar tapas",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "08:23",
-              "timestamp": 1783509835321
-            }
-          ],
-          "synced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": null,
-      "estadoUnidad": "operativo",
-      "combustibleReset": null
-    },
-    {
-      "id": "1783509853962",
-      "rodado": "4 4 Interno REP. CONTENEDOR METALICO MEPLA",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-08",
-      "horario": "08:24",
-      "interno": "40095",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": "Sincronización interrumpida por reinicio del servidor.",
-      "syncDate": null,
-      "createdAt": "2026-07-08T12:06:34.575Z",
-      "tasks": [
-        {
-          "id": "1783509853962-0",
-          "centroCosto": "11",
-          "empleado": "376",
-          "horasEstimadas": 1,
-          "descripcion": "Reparar ruedas,tetones,fabricar y colocar tapas",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "08:23",
-              "timestamp": 1783509835321
-            }
-          ],
-          "synced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": null,
-      "estadoUnidad": "operativo",
-      "combustibleReset": null
-    },
-    {
-      "id": "1783506824211",
-      "rodado": "5 5 Interno FABRICACIÓN CAJA ROLL-OFF",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-08",
-      "horario": "07:33",
-      "interno": "221",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": "Sincronización interrumpida por reinicio del servidor.",
-      "syncDate": null,
-      "createdAt": "2026-07-08T10:56:35.474Z",
-      "tasks": [],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": null,
-      "estadoUnidad": "operativo",
-      "combustibleReset": null
-    },
-    {
-      "id": "1783436245875",
-      "rodado": "12 14 Interno IRINEO GRAL.",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "11:57",
-      "interno": "Volquete nuevo",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": "Sincronización interrumpida por reinicio del servidor.",
-      "syncDate": null,
-      "createdAt": "2026-07-07T14:57:25.875Z",
-      "tasks": [
-        {
-          "id": "1783436245875-0",
+          "id": "1785149764743-0",
           "centroCosto": "11",
           "empleado": "389",
-          "horasEstimadas": 1,
-          "descripcion": "Sacar cilindros",
+          "horasEstimadas": 4.07,
+          "descripcion": "Reparar chasis rajado y fabricar y colocar burlete",
           "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
           "timerStarted": false,
           "timerHistory": [
             {
-              "type": "Inició",
-              "formatted": "11:57",
-              "timestamp": 1783436239647
-            }
-          ],
-          "synced": false
-        },
-        {
-          "id": "1783436245875-1",
-          "centroCosto": "11",
-          "empleado": "316",
-          "horasEstimadas": 1,
-          "descripcion": "Sacar cilindros",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
+              "type": "Inici��",
+              "formatted": "07:56",
+              "timestamp": 1785149760583
+            },
             {
-              "type": "Inició",
-              "formatted": "11:57",
-              "timestamp": 1783436243195
+              "type": "Pausó",
+              "formatted": "12:02",
+              "timestamp": 1785164568516
+            },
+            {
+              "type": "Fin",
+              "formatted": "13:03",
+              "timestamp": 1785168228640
             }
           ],
           "synced": false
@@ -193,116 +48,37 @@
       "taxesOrderNumber": null,
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "autoSyncRetryCount": 1,
-      "lastAutoSyncAttempt": "2026-07-07T14:59:18.784Z"
-    },
-    {
-      "id": "1783430469551",
-      "rodado": "4 2 Interno REP. CONTENEDOR METALICO 1 1/2 MTS",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "10:21",
-      "interno": "Sin numero",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T13:21:09.551Z",
-      "tasks": [
-        {
-          "id": "1783430469551-0",
-          "centroCosto": "11",
-          "empleado": "602",
-          "horasEstimadas": 1,
-          "descripcion": "Reparar ruedas,tapas y parche delantero",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "10:21",
-              "timestamp": 1783430467391
-            }
-          ],
-          "synced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": null,
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 2,
-      "lastAutoSyncAttempt": "2026-07-07T13:24:49.180Z"
-    },
-    {
-      "id": "1783430364728",
-      "rodado": "4 2 Interno REP. CONTENEDOR METALICO 1 1/2 MTS",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "10:19",
-      "interno": "Sin numero",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": "Sincronización interrumpida por reinicio del servidor.",
-      "syncDate": "2026-07-07T13:26:06.908Z",
-      "createdAt": "2026-07-07T13:19:24.728Z",
-      "tasks": [
-        {
-          "id": "1783430364728-0",
-          "centroCosto": "11",
-          "empleado": "602",
-          "horasEstimadas": 1,
-          "descripcion": "Reparar ruedas,tapas y parche delantero",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "10:19",
-              "timestamp": 1783430362159
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25835",
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 15,
-      "lastAutoSyncAttempt": "2026-07-07T14:23:13.729Z",
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
+      "verifiedStatus": "idle",
       "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T13:26:22.861Z"
+      "verifiedCount": 1,
+      "archived": false,
+      "deletedAt": null,
+      "deleted": false,
+      "archivedAt": null,
+      "autoSyncRetryCount": 1002,
+      "lastAutoSyncAttempt": "2026-07-30T15:08:19.819Z",
+      "syncTriggeredBy": null
     },
     {
-      "id": "1783429548811",
-      "rodado": "4 2 Interno REP. CONTENEDOR METALICO 1 1/2 MTS",
+      "id": "1785168324298",
+      "rodado": "9 15 Interno REPARACIONES INTERNAS",
       "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "10:05",
-      "interno": "Sin numero",
+      "fechaEntrega": "2026-07-27",
+      "horario": "13:04",
+      "interno": "Equipo roll off",
       "clasificacion": "Herrería",
       "incidente": "",
       "syncStatus": "success",
       "syncError": null,
-      "syncDate": "2026-07-07T13:27:47.253Z",
-      "createdAt": "2026-07-07T13:05:48.811Z",
+      "syncDate": "2026-07-27T16:08:55.230Z",
+      "createdAt": "2026-07-28T09:57:18.726Z",
       "tasks": [
         {
-          "id": "1783429548811-0",
+          "id": "1785320312659-0",
           "centroCosto": "11",
-          "empleado": "Luciano",
-          "horasEstimadas": 1,
-          "descripcion": "Cambiar piso ,reparar ruedas ,tapas y parches laterales",
+          "empleado": "389",
+          "horasEstimadas": 2.39,
+          "descripcion": "Continúa reparación es de equipo",
           "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
@@ -310,8 +86,873 @@
           "timerHistory": [
             {
               "type": "Inició",
+              "formatted": "07:18",
+              "timestamp": 1785320309577
+            },
+            {
+              "type": "Pausó",
+              "formatted": "09:57",
+              "timestamp": 1785329829020
+            },
+            {
+              "type": "Fin",
+              "formatted": "15:21",
+              "timestamp": 1785349268253
+            }
+          ],
+          "synced": false,
+          "taxesRealizadaSynced": false
+        },
+        {
+          "id": "1785168324298-0",
+          "centroCosto": "11",
+          "empleado": "389",
+          "horasEstimadas": 1.59,
+          "descripcion": "Contina reparación equipo roll off",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "13:05",
+              "timestamp": 1785168320510
+            },
+            {
+              "type": "Pausó",
+              "formatted": "15:04",
+              "timestamp": 1785175485086
+            },
+            {
+              "type": "Fin",
+              "formatted": "16:53",
+              "timestamp": 1785182001953
+            }
+          ],
+          "synced": false,
+          "taxesRealizadaSynced": false
+        }
+      ],
+      "createdBy": "jcarmona@contenedoreshugo.com.ar",
+      "taxesOrderNumber": "27555",
+      "estadoUnidad": "fuera_de_servicio",
+      "combustibleReset": null,
+      "verifiedStatus": null,
+      "verifiedError": null,
+      "verifiedCount": 13,
+      "archived": false,
+      "deletedAt": null,
+      "deleted": false,
+      "archivedAt": null,
+      "autoSyncRetryCount": 1,
+      "lastVerifyAttempt": "2026-07-29T16:44:07.249Z",
+      "lastAutoSyncAttempt": "2026-07-29T13:00:58.819Z"
+    },
+    {
+      "id": "1782927483135",
+      "rodado": "2 18 Interno REP. VOLQUETE",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-07-01",
+      "horario": "14:38",
+      "interno": "REP. VOLQUETE",
+      "clasificacion": "Correctivo",
+      "incidente": "",
+      "syncStatus": "error",
+      "syncError": "No se encontró la OT 25536 en el listado para editar. Verificar número de OT en Taxes.",
+      "syncDate": null,
+      "createdAt": "2026-07-28T09:57:32.602Z",
+      "tasks": [
+        {
+          "id": "1782987120671-0",
+          "centroCosto": "11",
+          "empleado": "Federico",
+          "horasEstimadas": 8.51,
+          "descripcion": "Colocar 4 laterales,piso y barral",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": true,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "07:10",
+              "timestamp": 1782987042416
+            },
+            {
+              "type": "Pausó",
+              "formatted": "12:04",
+              "timestamp": 1783004689169
+            },
+            {
+              "type": "Reanudó",
+              "formatted": "13:00",
+              "timestamp": 1783008055700
+            },
+            {
+              "type": "Fin",
+              "formatted": "16:57",
+              "timestamp": 1783022243927
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": true
+        }
+      ],
+      "createdBy": "jcarmona@contenedoreshugo.com.ar",
+      "taxesOrderNumber": "25536",
+      "estadoUnidad": "operativo",
+      "combustibleReset": null,
+      "verifiedStatus": "idle",
+      "archived": false,
+      "deleted": false,
+      "deletedAt": null,
+      "archivedAt": null,
+      "autoSyncRetryCount": 1001,
+      "lastAutoSyncAttempt": "2026-07-30T15:09:41.984Z",
+      "verifiedError": null,
+      "syncTriggeredBy": "paniol@contenedoreshugo.com.ar"
+    },
+    {
+      "id": "1784884919356",
+      "rodado": "MERCEDES BENZ ATEGO 1725 Interno 155",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-07-23",
+      "horario": "06:21",
+      "interno": "155",
+      "clasificacion": "Correctivo",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-07-29T23:24:00.371Z",
+      "createdAt": "2026-07-28T09:57:36.559Z",
+      "tasks": [
+        {
+          "id": "1785403129590-0",
+          "centroCosto": "15",
+          "empleado": "365",
+          "horasEstimadas": 0,
+          "descripcion": "continuar rep. pisos cabina lado derecho",
+          "status": "Pendiente",
+          "insumos": "",
+          "timerStart": 1785405635687,
+          "timerStarted": true,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "07:00",
+              "timestamp": 1785405635687
+            }
+          ],
+          "synced": false,
+          "taxesRealizadaSynced": false
+        },
+        {
+          "id": "1785377481050-0",
+          "centroCosto": "15",
+          "empleado": "GODOY DAVID",
+          "horasEstimadas": 1.24,
+          "descripcion": "hacer pasadas para instalación de faros traseros.",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "23:10",
+              "timestamp": 1785377445837
+            },
+            {
+              "type": "Pausó",
+              "formatted": "00:15",
+              "timestamp": 1785381328647
+            },
+            {
+              "type": "Reanudó",
+              "formatted": "04:05",
+              "timestamp": 1785395129239
+            },
+            {
+              "type": "Fin",
+              "formatted": "04:24",
+              "timestamp": 1785396297313
+            }
+          ],
+          "synced": false,
+          "taxesRealizadaSynced": false
+        },
+        {
+          "id": "1785352099895-0",
+          "centroCosto": "15",
+          "empleado": "238",
+          "horasEstimadas": 6.5,
+          "descripcion": "Instalación de luces y faros trasero",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "14:28",
+              "timestamp": 1785346498546
+            },
+            {
+              "type": "Pausó",
+              "formatted": "19:12",
+              "timestamp": 1785362482546
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": true
+        },
+        {
+          "id": "1785346134021-0",
+          "centroCosto": "15",
+          "empleado": "259",
+          "horasEstimadas": 5,
+          "descripcion": "Reparar piso de cabina lado izq",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "14:28",
+              "timestamp": 1785346498546
+            },
+            {
+              "type": "Pausó",
+              "formatted": "19:12",
+              "timestamp": 1785362482546
+            },
+            {
+              "type": "Reanudó",
+              "formatted": "20:16",
+              "timestamp": 1785366985123
+            },
+            {
+              "type": "Fin",
+              "formatted": "20:49",
+              "timestamp": 1785368978148
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": false
+        },
+        {
+          "id": "1785322447331-0",
+          "centroCosto": "15",
+          "empleado": "365",
+          "horasEstimadas": 6.5,
+          "descripcion": "Revisar pisos de cabina - Diagnóstico: cambio de piso lado derecho se cambia la mitad ya que no se encuentra tan deteriorado",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "14:28",
+              "timestamp": 1785346498546
+            },
+            {
+              "type": "Pausó",
+              "formatted": "19:12",
+              "timestamp": 1785362482546
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": false
+        },
+        {
+          "id": "1785316914389-0",
+          "centroCosto": "15",
+          "empleado": "PEREZ FACUNDO",
+          "horasEstimadas": 6.5,
+          "descripcion": "Plotear equipo - Diagnóstico: plotejo equipo laterales bandas reflectivas",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inici��",
+              "formatted": "14:28",
+              "timestamp": 1785346498546
+            },
+            {
+              "type": "Pausó",
+              "formatted": "19:12",
+              "timestamp": 1785362482546
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": true
+        },
+        {
+          "id": "1785231694092-0",
+          "centroCosto": "15",
+          "empleado": "512",
+          "horasEstimadas": 6.5,
+          "descripcion": "Terminar de pintar equipó",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "14:28",
+              "timestamp": 1785346498546
+            },
+            {
+              "type": "Pausó",
+              "formatted": "19:12",
+              "timestamp": 1785362482546
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": false
+        },
+        {
+          "id": "1785143387958-0",
+          "centroCosto": "15",
+          "empleado": "512",
+          "horasEstimadas": 6.5,
+          "descripcion": "plotear cabina y terminado pintar de pala",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "14:28",
+              "timestamp": 1785346498546
+            },
+            {
+              "type": "Pausó",
+              "formatted": "19:12",
+              "timestamp": 1785362482546
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": true
+        },
+        {
+          "id": "1784971728228-0",
+          "centroCosto": "15",
+          "empleado": "512",
+          "horasEstimadas": 6.5,
+          "descripcion": "Lustrado de cabina para ploteo",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "14:28",
+              "timestamp": 1785346498546
+            },
+            {
+              "type": "Paus����",
+              "formatted": "19:12",
+              "timestamp": 1785362482546
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": true
+        },
+        {
+          "id": "1784885068941-0",
+          "centroCosto": "15",
+          "empleado": "365",
+          "horasEstimadas": 6.5,
+          "descripcion": "Reparar paraholpe",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "14:28",
+              "timestamp": 1785346498546
+            },
+            {
+              "type": "Pausó",
+              "formatted": "19:12",
+              "timestamp": 1785362482546
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": false
+        },
+        {
+          "id": "1784884919356-0",
+          "centroCosto": "15",
+          "empleado": "PEREZ FACUNDO",
+          "horasEstimadas": 6.5,
+          "descripcion": "Lustrar cabina y pintar equip",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "14:28",
+              "timestamp": 1785346498546
+            },
+            {
+              "type": "Pausó",
+              "formatted": "19:12",
+              "timestamp": 1785362482546
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": false
+        }
+      ],
+      "createdBy": "paniol@contenedoreshugo.com.ar",
+      "taxesOrderNumber": "26926",
+      "estadoUnidad": "fuera_de_servicio",
+      "combustibleReset": null,
+      "verifiedStatus": null,
+      "verifiedError": null,
+      "verifiedCount": 46,
+      "archived": false,
+      "deletedAt": null,
+      "deleted": false,
+      "archivedAt": null,
+      "lastVerifyAttempt": "2026-07-29T19:11:48.030Z",
+      "autoSyncRetryCount": 3,
+      "lastAutoSyncAttempt": "2026-07-30T09:21:16.769Z"
+    },
+    {
+      "id": "1785235151490",
+      "rodado": "MERCEDES BENZ ATEGO 1725 (AA454PC) Interno 156",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-07-28",
+      "horario": "07:38",
+      "interno": "156",
+      "clasificacion": "Correctivo",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-07-28T10:40:33.977Z",
+      "createdAt": "2026-07-28T10:39:46.346Z",
+      "tasks": [
+        {
+          "id": "1785235151490-0",
+          "centroCosto": "15",
+          "empleado": "552",
+          "horasEstimadas": 3.22,
+          "descripcion": "Hacer frenos delanteros - Diagnóstico: Colocar campanas y cintas nuevas engrasar rulemanes",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "07:39",
+              "timestamp": 1785235150626
+            },
+            {
+              "type": "Fin",
+              "formatted": "11:00",
+              "timestamp": 1785247257834
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": false
+        }
+      ],
+      "createdBy": "sergios@contenedoreshugo.com.ar",
+      "taxesOrderNumber": "27176",
+      "estadoUnidad": "fuera_de_servicio",
+      "combustibleReset": null,
+      "verifiedStatus": null,
+      "archived": false,
+      "deletedAt": null,
+      "deleted": false,
+      "verifiedError": null,
+      "verifiedCount": 13,
+      "archivedAt": null,
+      "lastVerifyAttempt": "2026-07-29T16:40:54.717Z"
+    },
+    {
+      "id": "1785240761941",
+      "rodado": "IVECO 240 E28 Interno 152",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-07-24",
+      "horario": "12:53",
+      "interno": "152",
+      "clasificacion": "Correctivo",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-07-28T12:16:09.372Z",
+      "createdAt": "2026-07-28T12:12:41.941Z",
+      "tasks": [
+        {
+          "id": "1785320923692-0",
+          "centroCosto": "15",
+          "empleado": "552",
+          "horasEstimadas": 0.21,
+          "descripcion": "liberar frenos para correr del sector chapista",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inici��",
+              "formatted": "07:28",
+              "timestamp": 1785320922461
+            },
+            {
+              "type": "Fin",
+              "formatted": "07:49",
+              "timestamp": 1785322169229
+            }
+          ],
+          "synced": false,
+          "taxesRealizadaSynced": false
+        },
+        {
+          "id": "1785255243587-0",
+          "centroCosto": "15",
+          "empleado": "259",
+          "horasEstimadas": 1.38,
+          "descripcion": "armado de estribos y guardabarro",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "13:14",
+              "timestamp": 1785255244921
+            },
+            {
+              "type": "Pausó",
+              "formatted": "14:52",
+              "timestamp": 1785261150091
+            },
+            {
+              "type": "Fin",
+              "formatted": "20:53",
+              "timestamp": 1785282811395
+            }
+          ],
+          "synced": false,
+          "taxesRealizadaSynced": false
+        },
+        {
+          "id": "1785231742513-0",
+          "centroCosto": "15",
+          "empleado": "365",
+          "horasEstimadas": 5.36,
+          "descripcion": "Seguir armando cabina",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "06:42",
+              "timestamp": 1785231741237
+            },
+            {
+              "type": "Pausó",
+              "formatted": "09:07",
+              "timestamp": 1785240435901
+            },
+            {
+              "type": "Reanudó",
+              "formatted": "09:11",
+              "timestamp": 1785240684000
+            },
+            {
+              "type": "Pausó",
+              "formatted": "12:01",
+              "timestamp": 1785250861671
+            },
+            {
+              "type": "Reanudó",
+              "formatted": "13:41",
+              "timestamp": 1785256880301
+            },
+            {
+              "type": "Fin",
+              "formatted": "14:02",
+              "timestamp": 1785258153693
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": false
+        },
+        {
+          "id": "1784999256957-0",
+          "centroCosto": "15",
+          "empleado": "259",
+          "horasEstimadas": 2.12,
+          "descripcion": "armado de cabina",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inici�����������������������������������������������������������������������������������������������������������������������������������",
+              "formatted": "14:07",
+              "timestamp": 1784999232761
+            },
+            {
+              "type": "Fin",
+              "formatted": "16:19",
+              "timestamp": 1785007180701
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": true
+        },
+        {
+          "id": "1784971793592-0",
+          "centroCosto": "15",
+          "empleado": "365",
+          "horasEstimadas": 3.36,
+          "descripcion": "Armado interior de cabina",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inici��",
+              "formatted": "06:29",
+              "timestamp": 1784971791433
+            },
+            {
+              "type": "Fin",
               "formatted": "10:05",
-              "timestamp": 1783429546397
+              "timestamp": 1784984722519
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": true
+        },
+        {
+          "id": "1784908449781-0",
+          "centroCosto": "15",
+          "empleado": "365",
+          "horasEstimadas": 0.56,
+          "descripcion": "Armar cabina",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inici�������������������",
+              "formatted": "13:04",
+              "timestamp": 1784909086808
+            },
+            {
+              "type": "Paus�����",
+              "formatted": "13:18",
+              "timestamp": 1784909923192
+            },
+            {
+              "type": "Reanud�������������������������������������������������������������������",
+              "formatted": "13:20",
+              "timestamp": 1784910004035
+            },
+            {
+              "type": "Paus���������",
+              "formatted": "13:20",
+              "timestamp": 1784910009158
+            },
+            {
+              "type": "Reanud������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������",
+              "formatted": "13:20",
+              "timestamp": 1784910017697
+            },
+            {
+              "type": "Paus������������������������",
+              "formatted": "13:20",
+              "timestamp": 1784910031333
+            },
+            {
+              "type": "Reanud����������������������������������",
+              "formatted": "13:20",
+              "timestamp": 1784910039628
+            },
+            {
+              "type": "Fin",
+              "formatted": "14:02",
+              "timestamp": 1784912530077
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": true
+        },
+        {
+          "id": "1784908449781-1",
+          "centroCosto": "15",
+          "empleado": "259",
+          "horasEstimadas": 5.03,
+          "descripcion": "Armar cabina",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "13:04",
+              "timestamp": 1784909092593
+            },
+            {
+              "type": "Paus����������������������������������������������������",
+              "formatted": "18:08",
+              "timestamp": 1784927294814
+            },
+            {
+              "type": "Fin",
+              "formatted": "20:42",
+              "timestamp": 1784936574737
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": true
+        }
+      ],
+      "createdBy": "paniol@contenedoreshugo.com.ar",
+      "taxesOrderNumber": "27186",
+      "estadoUnidad": "fuera_de_servicio",
+      "combustibleReset": null,
+      "archived": false,
+      "deleted": false,
+      "deletedAt": null,
+      "verifiedStatus": null,
+      "archivedAt": null,
+      "verifiedError": null,
+      "verifiedCount": 13,
+      "lastVerifyAttempt": "2026-07-29T16:39:18.777Z"
+    },
+    {
+      "id": "1785267037975",
+      "rodado": "IVECO 170 E22 (AB083PZ) Interno 154",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-07-28",
+      "horario": "16:30",
+      "interno": "154",
+      "clasificacion": "Correctivo",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-07-30T09:54:31.559Z",
+      "createdAt": "2026-07-28T19:30:37.975Z",
+      "tasks": [
+        {
+          "id": "1785267037975-0",
+          "centroCosto": "15",
+          "empleado": "348",
+          "horasEstimadas": 0.46,
+          "descripcion": "Reparar mano de equipo - Diagnóstico: sacar amngueras",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "16:30",
+              "timestamp": 1785267028910
+            },
+            {
+              "type": "Pausó",
+              "formatted": "17:16",
+              "timestamp": 1785269797856
+            },
+            {
+              "type": "Fin",
+              "formatted": "17:36",
+              "timestamp": 1785270987332
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": true
+        }
+      ],
+      "createdBy": null,
+      "taxesOrderNumber": "27895",
+      "estadoUnidad": "fuera_de_servicio",
+      "combustibleReset": null,
+      "verifiedStatus": null,
+      "archived": false,
+      "archivedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "syncTriggeredBy": null,
+      "autoSyncRetryCount": 2,
+      "lastAutoSyncAttempt": "2026-07-30T09:51:48.355Z",
+      "verifiedError": null,
+      "verifiedCount": 2
+    },
+    {
+      "id": "1785320191739",
+      "rodado": "9 15 Interno REPARACIONES INTERNAS",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-07-29",
+      "horario": "07:15",
+      "interno": "Ruedas roll off",
+      "clasificacion": "Herrería",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-07-29T10:20:09.272Z",
+      "createdAt": "2026-07-29T10:16:31.739Z",
+      "tasks": [
+        {
+          "id": "1785320191738-0",
+          "centroCosto": "11",
+          "empleado": "369",
+          "horasEstimadas": 8.44,
+          "descripcion": "Fabricar armar ruedas para caja roll off,fabricó Victor lizarraga",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "07:16",
+              "timestamp": 1785320188415
+            },
+            {
+              "type": "Pausó",
+              "formatted": "11:59",
+              "timestamp": 1785337198494
+            },
+            {
+              "type": "Reanudó",
+              "formatted": "13:01",
+              "timestamp": 1785340913259
+            },
+            {
+              "type": "Fin",
+              "formatted": "17:02",
+              "timestamp": 1785355333710
             }
           ],
           "synced": true,
@@ -319,35 +960,98 @@
         }
       ],
       "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25837",
-      "estadoUnidad": "operativo",
+      "taxesOrderNumber": "27554",
+      "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
-      "autoSyncRetryCount": 0,
-      "lastAutoSyncAttempt": "2026-07-07T13:21:05.048Z",
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
+      "archived": false,
+      "deleted": false,
+      "deletedAt": null,
+      "verifiedStatus": null,
+      "archivedAt": null,
       "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T13:28:01.380Z"
+      "verifiedCount": 15,
+      "lastVerifyAttempt": "2026-07-29T21:00:08.387Z"
     },
     {
-      "id": "1783429447561",
-      "rodado": "4 2 Interno REP. CONTENEDOR METALICO 1 1/2 MTS",
+      "id": "1785326675392",
+      "rodado": "9 15 Interno REPARACIONES INTERNAS",
       "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "10:04",
-      "interno": "20306",
+      "fechaEntrega": "2026-07-29",
+      "horario": "09:04",
+      "interno": "REPARACIONES INTERNAS",
       "clasificacion": "Herrería",
       "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
+      "syncStatus": "error",
+      "syncError": "Input.dispatchKeyEvent timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed.",
       "syncDate": null,
-      "createdAt": "2026-07-07T13:04:07.561Z",
+      "createdAt": "2026-07-29T12:04:35.392Z",
       "tasks": [
         {
-          "id": "1783429447561-0",
+          "id": "1785326675392-0",
+          "centroCosto": "11",
+          "empleado": "601",
+          "horasEstimadas": 4.33,
+          "descripcion": "Preparar tachos para chatarra",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "09:04",
+              "timestamp": 1785326662797
+            },
+            {
+              "type": "Pausó",
+              "formatted": "11:59",
+              "timestamp": 1785337195509
+            },
+            {
+              "type": "Reanudó",
+              "formatted": "13:01",
+              "timestamp": 1785340895577
+            },
+            {
+              "type": "Fin",
+              "formatted": "14:39",
+              "timestamp": 1785346747785
+            }
+          ],
+          "synced": false,
+          "taxesRealizadaSynced": false
+        }
+      ],
+      "createdBy": "jcarmona@contenedoreshugo.com.ar",
+      "taxesOrderNumber": null,
+      "estadoUnidad": "fuera_de_servicio",
+      "combustibleReset": null,
+      "verifiedStatus": "success",
+      "archived": false,
+      "archivedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "syncTriggeredBy": "paniol@contenedoreshugo.com.ar"
+    },
+    {
+      "id": "1785326820952",
+      "rodado": "4 1 Interno REP. CONTENEDOR METALICO 1 MTS",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-07-29",
+      "horario": "09:05",
+      "interno": "10113",
+      "clasificacion": "Herrería",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-07-29T13:26:45.402Z",
+      "createdAt": "2026-07-29T12:07:00.952Z",
+      "tasks": [
+        {
+          "id": "1785326820952-0",
           "centroCosto": "11",
           "empleado": "602",
-          "horasEstimadas": 1,
+          "horasEstimadas": 0.52,
           "descripcion": "Reparar ruedas y tapas",
           "status": "Finalizada",
           "insumos": "",
@@ -356,8 +1060,13 @@
           "timerHistory": [
             {
               "type": "Inició",
-              "formatted": "10:04",
-              "timestamp": 1783429445361
+              "formatted": "09:06",
+              "timestamp": 1785326817797
+            },
+            {
+              "type": "Fin",
+              "formatted": "09:59",
+              "timestamp": 1785329962781
             }
           ],
           "synced": false,
@@ -366,189 +1075,36 @@
       ],
       "createdBy": "jcarmona@contenedoreshugo.com.ar",
       "taxesOrderNumber": null,
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 3,
-      "lastAutoSyncAttempt": "2026-07-07T13:19:36.480Z"
-    },
-    {
-      "id": "1783428033969",
-      "rodado": "5 5 Interno FABRICACIÓN CAJA ROLL-OFF",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "09:40",
-      "interno": "224",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T12:40:33.969Z",
-      "tasks": [
-        {
-          "id": "1783428033969-0",
-          "centroCosto": "11",
-          "empleado": "535",
-          "horasEstimadas": 1,
-          "descripcion": "Armar pecho de caja",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "09:40",
-              "timestamp": 1783428028894
-            },
-            {
-              "type": "Fin",
-              "formatted": "10:55",
-              "timestamp": 1783432531474
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        },
-        {
-          "id": "1783428033969-1",
-          "centroCosto": "11",
-          "empleado": "283",
-          "horasEstimadas": 1,
-          "descripcion": "Armar pecho de caja",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "09:40",
-              "timestamp": 1783428008476
-            },
-            {
-              "type": "Fin",
-              "formatted": "10:55",
-              "timestamp": 1783432518355
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25839",
       "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
-      "autoSyncRetryCount": 7,
-      "lastAutoSyncAttempt": "2026-07-07T14:23:42.163Z",
       "verifiedStatus": "success",
-      "verifiedCount": 1,
+      "archived": false,
+      "archivedAt": null,
+      "deleted": false,
+      "deletedAt": null,
       "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T13:30:04.511Z"
+      "verifiedCount": 1
     },
     {
-      "id": "1783427380141",
-      "rodado": "MERCEDES BENZ ATRON 1720 Interno 79",
+      "id": "1785329832864",
+      "rodado": "MERCEDES BENZ ATEGO 1725 Interno 156",
       "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "09:29",
-      "interno": "79",
-      "clasificacion": "Auxilio",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T12:29:40.141Z",
-      "tasks": [
-        {
-          "id": "1783427380141-0",
-          "centroCosto": "15",
-          "empleado": "598",
-          "horasEstimadas": 1,
-          "descripcion": "SE DESARMO ELASTICO EJE TRASERO SE SALIO DE BALANCIN LLEVAR UNIDAD 74",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "09:29",
-              "timestamp": 1783427370507
-            },
-            {
-              "type": "Pausó",
-              "formatted": "05:16",
-              "timestamp": 1783498577826
-            },
-            {
-              "type": "Fin",
-              "formatted": "05:21",
-              "timestamp": 1783498914798
-            }
-          ],
-          "synced": false,
-          "taxesRealizadaSynced": false
-        },
-        {
-          "id": "1783427380141-1",
-          "centroCosto": "15",
-          "empleado": "528",
-          "horasEstimadas": 1,
-          "descripcion": "SE DESARMO ELASTICO EJE TRASERO SE SALIO DE BALANCIN",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "09:29",
-              "timestamp": 1783427358380
-            },
-            {
-              "type": "Pausó",
-              "formatted": "05:16",
-              "timestamp": 1783498578717
-            },
-            {
-              "type": "Fin",
-              "formatted": "05:22",
-              "timestamp": 1783498921699
-            }
-          ],
-          "synced": false,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "paniol@contenedoreshugo.com.ar",
-      "taxesOrderNumber": null,
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 1,
-      "lastAutoSyncAttempt": "2026-07-07T12:29:40.952Z"
-    },
-    {
-      "id": "1783427346772",
-      "rodado": "IVECO 170 E22 Interno 106",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "09:29",
-      "interno": "106",
+      "fechaEntrega": "2026-07-29",
+      "horario": "09:55",
+      "interno": "156",
       "clasificacion": "Herrería",
       "incidente": "",
       "syncStatus": "success",
       "syncError": null,
-      "syncDate": "2026-07-07T23:29:19.711Z",
-      "createdAt": "2026-07-07T12:29:06.772Z",
+      "syncDate": "2026-07-29T13:34:41.587Z",
+      "createdAt": "2026-07-29T12:57:12.864Z",
       "tasks": [
         {
-          "id": "1783427346772-0",
+          "id": "1785329832864-0",
           "centroCosto": "11",
           "empleado": "389",
-          "horasEstimadas": 1,
-          "descripcion": "Colocar travesaño de pluma",
+          "horasEstimadas": 3.51,
+          "descripcion": "Reparación de equipo,fabricar estribo nuevo ,modificar cola",
           "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
@@ -556,28 +1112,28 @@
           "timerHistory": [
             {
               "type": "Inició",
-              "formatted": "09:29",
-              "timestamp": 1783427343912
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        },
-        {
-          "id": "1783427346772-1",
-          "centroCosto": "11",
-          "empleado": "316",
-          "horasEstimadas": 1,
-          "descripcion": "Colocar travesaño de pluma",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
+              "formatted": "09:57",
+              "timestamp": 1785329829381
+            },
             {
-              "type": "Inició",
-              "formatted": "09:28",
-              "timestamp": 1783427324663
+              "type": "Pausó",
+              "formatted": "11:59",
+              "timestamp": 1785337192173
+            },
+            {
+              "type": "Reanudó",
+              "formatted": "13:01",
+              "timestamp": 1785340887725
+            },
+            {
+              "type": "Pausó",
+              "formatted": "14:49",
+              "timestamp": 1785347361592
+            },
+            {
+              "type": "Fin",
+              "formatted": "15:21",
+              "timestamp": 1785349273116
             }
           ],
           "synced": true,
@@ -585,36 +1141,38 @@
         }
       ],
       "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25857",
-      "estadoUnidad": "operativo",
+      "taxesOrderNumber": "27675",
+      "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
-      "autoSyncRetryCount": 0,
-      "lastAutoSyncAttempt": "2026-07-07T12:40:41.024Z",
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
+      "archived": false,
+      "deleted": false,
+      "deletedAt": null,
+      "verifiedStatus": null,
+      "archivedAt": null,
       "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T23:29:48.638Z"
+      "verifiedCount": 9,
+      "lastVerifyAttempt": "2026-07-29T20:58:32.245Z"
     },
     {
-      "id": "1783426977333",
-      "rodado": "4 2 Interno REP. CONTENEDOR METALICO 1 1/2 MTS",
+      "id": "1785330025352",
+      "rodado": "4 1 Interno REP. CONTENEDOR METALICO 1 MTS",
       "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "09:22",
-      "interno": "20976",
+      "fechaEntrega": "2026-07-29",
+      "horario": "09:59",
+      "interno": "10024",
       "clasificacion": "Herrería",
       "incidente": "",
-      "syncStatus": "success",
-      "syncError": null,
-      "syncDate": "2026-07-07T13:31:28.141Z",
-      "createdAt": "2026-07-07T12:22:57.333Z",
+      "syncStatus": "error",
+      "syncError": "No se pudo seleccionar el Rodado. Asegúrese de que el valor sea válido.",
+      "syncDate": null,
+      "createdAt": "2026-07-29T13:00:25.352Z",
       "tasks": [
         {
-          "id": "1783426977333-0",
+          "id": "1785330025352-0",
           "centroCosto": "11",
           "empleado": "602",
-          "horasEstimadas": 1,
-          "descripcion": "Terminar de reparar tacho",
+          "horasEstimadas": 6,
+          "descripcion": "Reparar ruedas,tapas y cambiar piso",
           "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
@@ -622,162 +1180,23 @@
           "timerHistory": [
             {
               "type": "Inició",
-              "formatted": "09:22",
-              "timestamp": 1783426974821
-            },
-            {
-              "type": "Fin",
-              "formatted": "10:03",
-              "timestamp": 1783429403954
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": true
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25840",
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 0,
-      "lastAutoSyncAttempt": "2026-07-07T13:03:32.896Z",
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
-      "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T13:31:42.851Z"
-    },
-    {
-      "id": "1783426432541",
-      "rodado": "FORD F100 Interno 1",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "09:13",
-      "interno": "1",
-      "clasificacion": "Correctivo",
-      "incidente": "",
-      "syncStatus": "syncing",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T12:13:52.541Z",
-      "tasks": [
-        {
-          "id": "1783426432541-0",
-          "centroCosto": "15",
-          "empleado": "552",
-          "horasEstimadas": 1,
-          "descripcion": "REVISION DE RODAMIENTOS Y  CINTAS DE FRENOS A RUEDAS ",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "09:13",
-              "timestamp": 1783426429461
+              "formatted": "10:00",
+              "timestamp": 1785330021775
             },
             {
               "type": "Pausó",
-              "formatted": "05:16",
-              "timestamp": 1783498579490
+              "formatted": "11:59",
+              "timestamp": 1785337191280
+            },
+            {
+              "type": "Reanudó",
+              "formatted": "13:01",
+              "timestamp": 1785340884282
             },
             {
               "type": "Fin",
-              "formatted": "05:22",
-              "timestamp": 1783498929530
-            }
-          ],
-          "synced": false,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "paniol@contenedoreshugo.com.ar",
-      "taxesOrderNumber": null,
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 1,
-      "lastAutoSyncAttempt": "2026-07-07T12:13:55.688Z"
-    },
-    {
-      "id": "1783426230696",
-      "rodado": "4 4 Interno REP. CONTENEDOR METALICO MEPLA",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "09:10",
-      "interno": "40039",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T12:10:30.696Z",
-      "tasks": [
-        {
-          "id": "1783426230696-0",
-          "centroCosto": "11",
-          "empleado": "376",
-          "horasEstimadas": 1,
-          "descripcion": "Cambiar ruedas ,tetones y enderezar tapas",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "09:10",
-              "timestamp": 1783426228320
-            }
-          ],
-          "synced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": null,
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 4,
-      "lastAutoSyncAttempt": "2026-07-07T12:23:01.030Z"
-    },
-    {
-      "id": "1783425826830",
-      "rodado": "5 5 Interno FABRICACIÓN CAJA ROLL-OFF",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "09:03",
-      "interno": "222",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T12:03:46.830Z",
-      "tasks": [
-        {
-          "id": "1783425938714-0",
-          "centroCosto": "11",
-          "empleado": "578",
-          "horasEstimadas": 1,
-          "descripcion": "Armar pecho de caja",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "09:05",
-              "timestamp": 1783425935473
-            },
-            {
-              "type": "Pausó",
-              "formatted": "09:06",
-              "timestamp": 1783426006378
-            },
-            {
-              "type": "Fin",
-              "formatted": "09:06",
-              "timestamp": 1783426014661
+              "formatted": "17:02",
+              "timestamp": 1785355329565
             }
           ],
           "synced": false,
@@ -788,69 +1207,156 @@
       "taxesOrderNumber": null,
       "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
-      "autoSyncRetryCount": 5,
-      "lastAutoSyncAttempt": "2026-07-07T12:10:40.982Z"
+      "archived": false,
+      "deleted": false,
+      "deletedAt": null,
+      "verifiedStatus": "success",
+      "archivedAt": null,
+      "syncTriggeredBy": "paniol@contenedoreshugo.com.ar"
     },
     {
-      "id": "1783421431406",
-      "rodado": "12 14 Interno IRINEO GRAL.",
+      "id": "1785332929082",
+      "rodado": "4 2 Interno REP. CONTENEDOR METALICO 1 1/2 MTS",
       "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "07:50",
-      "interno": "IRINEO GRAL.",
-      "clasificacion": "Correctivo",
+      "fechaEntrega": "2026-07-29",
+      "horario": "10:48",
+      "interno": "20999",
+      "clasificacion": "Herrería",
       "incidente": "",
       "syncStatus": "success",
       "syncError": null,
-      "syncDate": "2026-07-08T14:28:41.548Z",
-      "createdAt": "2026-07-07T10:50:31.406Z",
+      "syncDate": "2026-07-29T13:51:19.323Z",
+      "createdAt": "2026-07-29T13:48:49.082Z",
       "tasks": [
         {
-          "id": "1783426516596-0",
-          "centroCosto": "15",
-          "empleado": "512",
-          "horasEstimadas": 1,
-          "descripcion": "UNIDAD NUEVA VOLQUETE MASAILLAR CABINA ",
+          "id": "1785332929082-0",
+          "centroCosto": "11",
+          "empleado": "283",
+          "horasEstimadas": 3.11,
+          "descripcion": "Cambiar piso,reparar ruedas y enderezar tapas",
           "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
           "timerStarted": false,
           "timerHistory": [
             {
-              "type": "Inició",
-              "formatted": "09:15",
-              "timestamp": 1783426513845
+              "type": "Inici��",
+              "formatted": "10:48",
+              "timestamp": 1785332925609
             },
             {
               "type": "Pausó",
-              "formatted": "11:41",
-              "timestamp": 1783435290485
+              "formatted": "11:59",
+              "timestamp": 1785337189395
             },
             {
               "type": "Reanudó",
-              "formatted": "11:44",
-              "timestamp": 1783435470266
-            },
-            {
-              "type": "Pausó",
-              "formatted": "05:16",
-              "timestamp": 1783498580194
+              "formatted": "13:01",
+              "timestamp": 1785340870237
             },
             {
               "type": "Fin",
-              "formatted": "05:22",
-              "timestamp": 1783498941059
+              "formatted": "15:01",
+              "timestamp": 1785348089118
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": false
+        }
+      ],
+      "createdBy": "jcarmona@contenedoreshugo.com.ar",
+      "taxesOrderNumber": "27685",
+      "estadoUnidad": "fuera_de_servicio",
+      "combustibleReset": null,
+      "verifiedStatus": null,
+      "archived": false,
+      "archivedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "verifiedError": null,
+      "verifiedCount": 13,
+      "lastVerifyAttempt": "2026-07-29T20:57:55.747Z"
+    },
+    {
+      "id": "1785334094327",
+      "rodado": "MERCEDES BENZ ATEGO 1725 Interno 119",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-07-29",
+      "horario": "11:07",
+      "interno": "119",
+      "clasificacion": "Correctivo",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-07-30T01:14:08.049Z",
+      "createdAt": "2026-07-29T14:08:14.327Z",
+      "tasks": [
+        {
+          "id": "1785373695302-0",
+          "centroCosto": "15",
+          "empleado": "579",
+          "horasEstimadas": 6.58,
+          "descripcion": "Revisión inyectores. - Diagnóstico: cigueñal fundido viela numero 4.\ndesarme de perifericos.",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inici���",
+              "formatted": "22:07",
+              "timestamp": 1785373657999
+            },
+            {
+              "type": "Pausó",
+              "formatted": "03:09",
+              "timestamp": 1785391752213
+            },
+            {
+              "type": "Reanudó",
+              "formatted": "04:05",
+              "timestamp": 1785395120446
+            },
+            {
+              "type": "Fin",
+              "formatted": "06:01",
+              "timestamp": 1785402108530
+            }
+          ],
+          "synced": true,
+          "taxesRealizadaSynced": false
+        },
+        {
+          "id": "1785345086685-0",
+          "centroCosto": "15",
+          "empleado": "348",
+          "horasEstimadas": 2.12,
+          "descripcion": "llevar repuestos",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inici��",
+              "formatted": "14:11",
+              "timestamp": 1785345072606
+            },
+            {
+              "type": "Fin",
+              "formatted": "16:23",
+              "timestamp": 1785352995851
             }
           ],
           "synced": true,
           "taxesRealizadaSynced": true
         },
         {
-          "id": "1783421431406-0",
+          "id": "1785334094327-0",
           "centroCosto": "15",
-          "empleado": "512",
-          "horasEstimadas": 1,
-          "descripcion": "REVISION CAMBIO REFLECTIVOS ",
+          "empleado": "552",
+          "horasEstimadas": 5.14,
+          "descripcion": "No reacciona motor",
           "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
@@ -858,13 +1364,13 @@
           "timerHistory": [
             {
               "type": "Inició",
-              "formatted": "07:50",
-              "timestamp": 1783421426580
+              "formatted": "11:08",
+              "timestamp": 1785334092765
             },
             {
               "type": "Fin",
-              "formatted": "09:14",
-              "timestamp": 1783426461245
+              "formatted": "16:22",
+              "timestamp": 1785352924047
             }
           ],
           "synced": true,
@@ -872,36 +1378,40 @@
         }
       ],
       "createdBy": "paniol@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25890",
-      "estadoUnidad": "operativo",
+      "taxesOrderNumber": "27889",
+      "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
-      "autoSyncRetryCount": 0,
-      "lastAutoSyncAttempt": "2026-07-07T14:58:07.610Z",
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
+      "archived": false,
+      "deleted": false,
+      "deletedAt": null,
+      "verifiedStatus": null,
+      "archivedAt": null,
+      "syncTriggeredBy": "paniol@contenedoreshugo.com.ar",
+      "autoSyncRetryCount": 1,
+      "lastAutoSyncAttempt": "2026-07-30T01:09:53.382Z",
       "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-08T14:29:09.493Z"
+      "verifiedCount": 3
     },
     {
-      "id": "1783420951710",
-      "rodado": "MERCEDES BENZ ATEGO Interno 65",
+      "id": "1785341230952",
+      "rodado": "4 1 Interno REP. CONTENEDOR METALICO 1 MTS",
       "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "07:42",
-      "interno": "65",
-      "clasificacion": "Auxilio",
+      "fechaEntrega": "2026-07-29",
+      "horario": "13:06",
+      "interno": "10009",
+      "clasificacion": "Herrería",
       "incidente": "",
       "syncStatus": "success",
       "syncError": null,
-      "syncDate": "2026-07-08T12:42:40.521Z",
-      "createdAt": "2026-07-07T10:42:31.710Z",
+      "syncDate": "2026-07-29T16:17:00.547Z",
+      "createdAt": "2026-07-29T16:07:10.952Z",
       "tasks": [
         {
-          "id": "1783420951710-0",
-          "centroCosto": "15",
-          "empleado": "394",
-          "horasEstimadas": 1,
-          "descripcion": "SE APGO UNIDADA NO ARRANCA BURRO ARRANQUE GIRA PESADO - Diagnóstico: Bombín no funciona",
+          "id": "1785341230952-0",
+          "centroCosto": "11",
+          "empleado": "Digno",
+          "horasEstimadas": 1.06,
+          "descripcion": "Reparar ruedas,terminar de soldar y enderezar tapas",
           "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
@@ -909,75 +1419,56 @@
           "timerHistory": [
             {
               "type": "Inició",
-              "formatted": "07:42",
-              "timestamp": 1783420946942
+              "formatted": "13:07",
+              "timestamp": 1785341227680
+            },
+            {
+              "type": "Pausó",
+              "formatted": "14:13",
+              "timestamp": 1785345197432
             },
             {
               "type": "Fin",
-              "formatted": "10:14",
-              "timestamp": 1783430071524
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": true
-        }
-      ],
-      "createdBy": "paniol@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25874",
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 0,
-      "lastAutoSyncAttempt": "2026-07-07T13:14:56.424Z",
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
-      "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-08T12:42:54.756Z"
-    },
-    {
-      "id": "1783418743602",
-      "rodado": "IVECO 170 E22 Interno 109",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "07:05",
-      "interno": "109",
-      "clasificacion": "Correctivo",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T10:05:45.696Z",
-      "tasks": [
-        {
-          "id": "1783422587065-0",
-          "centroCosto": "15",
-          "empleado": "348",
-          "horasEstimadas": 1,
-          "descripcion": "COLOCAR BOMBA DE PRESION COMBUSTIBLE",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "08:09",
-              "timestamp": 1783422580165
-            },
-            {
-              "type": "Fin",
-              "formatted": "11:56",
-              "timestamp": 1783436180892
+              "formatted": "17:02",
+              "timestamp": 1785355338840
             }
           ],
           "synced": false,
           "taxesRealizadaSynced": false
-        },
+        }
+      ],
+      "createdBy": "jcarmona@contenedoreshugo.com.ar",
+      "taxesOrderNumber": null,
+      "estadoUnidad": "fuera_de_servicio",
+      "combustibleReset": null,
+      "archived": false,
+      "deleted": false,
+      "deletedAt": null,
+      "verifiedStatus": "success",
+      "archivedAt": null,
+      "verifiedError": null,
+      "verifiedCount": 1
+    },
+    {
+      "id": "1785344669817",
+      "rodado": "11 20 Interno VOLQUETE NICO",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-07-29",
+      "horario": "14:03",
+      "interno": "VOLQUETE NICO",
+      "clasificacion": "Correctivo",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-07-29T17:07:33.607Z",
+      "createdAt": "2026-07-29T17:04:29.817Z",
+      "tasks": [
         {
-          "id": "1783418743602-0",
+          "id": "1785344669817-0",
           "centroCosto": "15",
-          "empleado": "394",
-          "horasEstimadas": 1,
-          "descripcion": "Revisión cambio bomba alta presion",
+          "empleado": "253",
+          "horasEstimadas": 2.5,
+          "descripcion": "GGZ481 revisar perdida de aire",
           "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
@@ -985,116 +1476,157 @@
           "timerHistory": [
             {
               "type": "Inició",
-              "formatted": "07:05",
-              "timestamp": 1783418742332
+              "formatted": "14:03",
+              "timestamp": 1785345418546
             },
             {
               "type": "Pausó",
-              "formatted": "07:42",
-              "timestamp": 1783420946699
-            },
-            {
-              "type": "Reanudó",
-              "formatted": "11:03",
-              "timestamp": 1783433017188
-            },
-            {
-              "type": "Pausó",
-              "formatted": "05:16",
-              "timestamp": 1783498580801
-            },
-            {
-              "type": "Fin",
-              "formatted": "05:22",
-              "timestamp": 1783498944755
+              "formatted": "14:55",
+              "timestamp": 1785348586546
             }
           ],
           "synced": true,
           "taxesRealizadaSynced": false
         }
       ],
-      "createdBy": "paniol@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25828",
-      "estadoUnidad": "operativo",
+      "createdBy": null,
+      "taxesOrderNumber": "27779",
+      "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
-      "autoSyncRetryCount": 9,
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
+      "verifiedStatus": null,
+      "archived": false,
+      "archivedAt": null,
+      "deleted": false,
+      "deletedAt": null,
       "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T10:07:00.696Z",
-      "lastAutoSyncAttempt": "2026-07-08T12:12:13.587Z"
+      "verifiedCount": 9,
+      "lastVerifyAttempt": "2026-07-29T20:57:04.666Z"
     },
     {
-      "id": "1783418224222",
-      "rodado": "VOLKSWAGEN 13180 Interno 132",
+      "id": "1785345249582",
+      "rodado": "9 15 Interno REPARACIONES INTERNAS",
       "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:57",
-      "interno": "132",
-      "clasificacion": "Correctivo",
+      "fechaEntrega": "2026-07-29",
+      "horario": "14:13",
+      "interno": "Batea",
+      "clasificacion": "Herrería",
       "incidente": "",
       "syncStatus": "success",
       "syncError": null,
-      "syncDate": "2026-07-08T10:57:42.792Z",
-      "createdAt": "2026-07-07T09:57:04.222Z",
+      "syncDate": "2026-07-29T17:16:38.183Z",
+      "createdAt": "2026-07-29T17:14:09.582Z",
       "tasks": [
         {
-          "id": "1783418224222-0",
-          "centroCosto": "15",
-          "empleado": "326",
-          "horasEstimadas": 1,
-          "descripcion": "Hco dirección - Insumos: Hco Direccion: 1",
+          "id": "1785345249582-0",
+          "centroCosto": "11",
+          "empleado": "Digno",
+          "horasEstimadas": 2.48,
+          "descripcion": "Fabricar batea para hidraulico",
           "status": "Finalizada",
-          "insumos": "Hco Direccion: 1",
+          "insumos": "",
           "timerStart": null,
           "timerStarted": false,
           "timerHistory": [
             {
               "type": "Inició",
-              "formatted": "06:57",
-              "timestamp": 1783418222456
+              "formatted": "14:14",
+              "timestamp": 1785345246546
             },
             {
               "type": "Fin",
-              "formatted": "07:42",
-              "timestamp": 1783420965195
+              "formatted": "17:02",
+              "timestamp": 1785355325937
             }
           ],
           "synced": true,
-          "taxesRealizadaSynced": true
+          "taxesRealizadaSynced": false
         }
       ],
-      "createdBy": "paniol@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25873",
-      "estadoUnidad": "operativo",
+      "createdBy": "jcarmona@contenedoreshugo.com.ar",
+      "taxesOrderNumber": "27781",
+      "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
-      "autoSyncRetryCount": 0,
-      "lastAutoSyncAttempt": "2026-07-07T12:04:00.990Z",
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
+      "verifiedStatus": null,
+      "archived": false,
+      "archivedAt": null,
+      "deleted": false,
+      "deletedAt": null,
       "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-08T10:57:57.927Z"
+      "verifiedCount": 9,
+      "lastVerifyAttempt": "2026-07-29T20:56:31.145Z"
     },
     {
-      "id": "1783417488904",
+      "id": "1785345388624",
       "rodado": "9 15 Interno REPARACIONES INTERNAS",
       "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:44",
+      "fechaEntrega": "2026-07-29",
+      "horario": "14:15",
+      "interno": "REPARACIONES INTERNAS",
+      "clasificacion": "Herrería",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-07-29T17:25:22.502Z",
+      "createdAt": "2026-07-29T17:16:28.624Z",
+      "tasks": [
+        {
+          "id": "1785345388624-0",
+          "centroCosto": "11",
+          "empleado": "508",
+          "horasEstimadas": 2.46,
+          "descripcion": "Organizar palet de insumos",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "14:16",
+              "timestamp": 1785345370542
+            },
+            {
+              "type": "Fin",
+              "formatted": "17:02",
+              "timestamp": 1785355322698
+            }
+          ],
+          "synced": false,
+          "taxesRealizadaSynced": false
+        }
+      ],
+      "createdBy": "jcarmona@contenedoreshugo.com.ar",
+      "taxesOrderNumber": null,
+      "estadoUnidad": "fuera_de_servicio",
+      "combustibleReset": null,
+      "archived": false,
+      "deleted": false,
+      "deletedAt": null,
+      "verifiedStatus": "success",
+      "archivedAt": null,
+      "verifiedError": null,
+      "verifiedCount": 1
+    },
+    {
+      "id": "1785346794542",
+      "rodado": "9 15 Interno REPARACIONES INTERNAS",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-07-29",
+      "horario": "14:39",
       "interno": "Pintura",
       "clasificacion": "Herrería",
       "incidente": "",
-      "syncStatus": "pending",
+      "syncStatus": "success",
       "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T09:44:48.904Z",
+      "syncDate": "2026-07-29T17:45:57.958Z",
+      "createdAt": "2026-07-29T17:39:54.542Z",
       "tasks": [
         {
-          "id": "1783417488904-0",
+          "id": "1785346794542-0",
           "centroCosto": "11",
           "empleado": "601",
-          "horasEstimadas": 1,
-          "descripcion": "Pintar tachos",
+          "horasEstimadas": 2.22,
+          "descripcion": "Preparar y pintar caja roll off",
           "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
@@ -1102,69 +1634,13 @@
           "timerHistory": [
             {
               "type": "Inició",
-              "formatted": "06:44",
-              "timestamp": 1783417486495
-            }
-          ],
-          "synced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": null,
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 6,
-      "lastAutoSyncAttempt": "2026-07-07T10:39:56.059Z"
-    },
-    {
-      "id": "1783417409550",
-      "rodado": "5 5 Interno FABRICACIÓN CAJA ROLL-OFF",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:43",
-      "interno": "223",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T09:43:45.349Z",
-      "tasks": [
-        {
-          "id": "1783417409550-0",
-          "centroCosto": "11",
-          "empleado": "535",
-          "horasEstimadas": 1,
-          "descripcion": "Armar pecho",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
+              "formatted": "14:39",
+              "timestamp": 1785346791268
+            },
             {
-              "type": "Inició",
-              "formatted": "06:43",
-              "timestamp": 1783417404166
-            }
-          ],
-          "synced": false,
-          "taxesRealizadaSynced": false
-        },
-        {
-          "id": "1783417409550-1",
-          "centroCosto": "11",
-          "empleado": "283",
-          "horasEstimadas": 1,
-          "descripcion": "Armar pecho",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:43",
-              "timestamp": 1783417407361
+              "type": "Fin",
+              "formatted": "17:01",
+              "timestamp": 1785355319336
             }
           ],
           "synced": false,
@@ -1173,641 +1649,36 @@
       ],
       "createdBy": "jcarmona@contenedoreshugo.com.ar",
       "taxesOrderNumber": null,
-      "estadoUnidad": "operativo",
+      "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
-      "autoSyncRetryCount": 2,
-      "lastAutoSyncAttempt": "2026-07-07T12:41:11.092Z"
-    },
-    {
-      "id": "1783415959336",
-      "rodado": "MERCEDES BENZ ATEGO 1725 Interno 99",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:19",
-      "interno": "99",
-      "clasificacion": "Correctivo",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T09:19:19.336Z",
-      "tasks": [
-        {
-          "id": "1783419647929-0",
-          "centroCosto": "15",
-          "empleado": "552",
-          "horasEstimadas": 1,
-          "descripcion": "UNIDAD NO DESBLOQUE PULMON SUSP. PINCHADO",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "07:20",
-              "timestamp": 1783419632124
-            },
-            {
-              "type": "Fin",
-              "formatted": "09:09",
-              "timestamp": 1783426163656
-            }
-          ],
-          "synced": false,
-          "taxesRealizadaSynced": false
-        },
-        {
-          "id": "1783415959336-0",
-          "centroCosto": "15",
-          "empleado": "326",
-          "horasEstimadas": 1,
-          "descripcion": "Unidad fuelle susp. Pinchado - no desbloquea ",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:19",
-              "timestamp": 1783415956172
-            },
-            {
-              "type": "Reanudó",
-              "formatted": "07:19",
-              "timestamp": 1783419568018
-            },
-            {
-              "type": "Pausó",
-              "formatted": "05:16",
-              "timestamp": 1783498581402
-            },
-            {
-              "type": "Fin",
-              "formatted": "05:22",
-              "timestamp": 1783498949292
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "paniol@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25825",
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 9,
-      "lastAutoSyncAttempt": "2026-07-08T10:08:05.103Z",
       "verifiedStatus": "success",
-      "verifiedCount": 1,
+      "archived": false,
+      "archivedAt": null,
+      "deleted": false,
+      "deletedAt": null,
       "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T09:26:01.474Z"
+      "verifiedCount": 1
     },
     {
-      "id": "1783415888307",
-      "rodado": "9 15 Interno REPARACIONES INTERNAS",
+      "id": "1785349254036",
+      "rodado": "4 1 Interno REP. CONTENEDOR METALICO 1 MTS",
       "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:18",
-      "interno": "Pintar",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T09:18:08.307Z",
-      "tasks": [
-        {
-          "id": "1783415888307-0",
-          "centroCosto": "11",
-          "empleado": "601",
-          "horasEstimadas": 1,
-          "descripcion": "Pintar tachos",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:18",
-              "timestamp": 1783415885712
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25827",
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 5,
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
-      "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T09:32:53.190Z",
-      "lastAutoSyncAttempt": "2026-07-07T10:14:33.021Z"
-    },
-    {
-      "id": "1783415609192",
-      "rodado": "MERCEDES BENZ ATEGO Interno 74",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:13",
-      "interno": "74",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T09:13:29.192Z",
-      "tasks": [
-        {
-          "id": "1783415609192-0",
-          "centroCosto": "11",
-          "empleado": "316",
-          "horasEstimadas": 1,
-          "descripcion": "Reparar pala de camion",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:13",
-              "timestamp": 1783415590793
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        },
-        {
-          "id": "1783415609192-1",
-          "centroCosto": "11",
-          "empleado": "389",
-          "horasEstimadas": 1,
-          "descripcion": "Reparar pala de camion",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:13",
-              "timestamp": 1783415606827
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25826",
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 5,
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
-      "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T09:31:26.518Z",
-      "lastAutoSyncAttempt": "2026-07-07T12:37:31.059Z"
-    },
-    {
-      "id": "1783415556904",
-      "rodado": "MERCEDES BENZ ATEGO 2425 Interno 71",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:12",
-      "interno": "71",
-      "clasificacion": "Correctivo",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T09:12:36.904Z",
-      "tasks": [
-        {
-          "id": "1783436171089-0",
-          "centroCosto": "15",
-          "empleado": "DOMINIC DYLAN",
-          "horasEstimadas": 1,
-          "descripcion": "CONECTAR LUCES DEL",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "11:40",
-              "timestamp": 1783435258468
-            },
-            {
-              "type": "Pausó",
-              "formatted": "11:41",
-              "timestamp": 1783435266029
-            },
-            {
-              "type": "Reanudó",
-              "formatted": "11:41",
-              "timestamp": 1783435268813
-            },
-            {
-              "type": "Pausó",
-              "formatted": "11:41",
-              "timestamp": 1783435281389
-            },
-            {
-              "type": "Reanudó",
-              "formatted": "11:41",
-              "timestamp": 1783435303532
-            },
-            {
-              "type": "Pausó",
-              "formatted": "11:41",
-              "timestamp": 1783435304845
-            },
-            {
-              "type": "Reanudó",
-              "formatted": "11:42",
-              "timestamp": 1783435323740
-            },
-            {
-              "type": "Pausó",
-              "formatted": "05:16",
-              "timestamp": 1783498581838
-            },
-            {
-              "type": "Fin",
-              "formatted": "05:21",
-              "timestamp": 1783498902318
-            }
-          ],
-          "synced": false,
-          "taxesRealizadaSynced": false
-        },
-        {
-          "id": "1783416396639-0",
-          "centroCosto": "15",
-          "empleado": "512",
-          "horasEstimadas": 1,
-          "descripcion": "Buscar punteras - parrilla",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:26",
-              "timestamp": 1783416395155
-            },
-            {
-              "type": "Pausó",
-              "formatted": "07:50",
-              "timestamp": 1783421426326
-            },
-            {
-              "type": "Reanudó",
-              "formatted": "11:41",
-              "timestamp": 1783435290788
-            },
-            {
-              "type": "Fin",
-              "formatted": "05:21",
-              "timestamp": 1783498906788
-            }
-          ],
-          "synced": false,
-          "taxesRealizadaSynced": false
-        },
-        {
-          "id": "1783415556904-0",
-          "centroCosto": "15",
-          "empleado": "365",
-          "horasEstimadas": 1,
-          "descripcion": "Armar cabina - paragolpe- estribo",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:12",
-              "timestamp": 1783415554978
-            },
-            {
-              "type": "Pausó",
-              "formatted": "05:16",
-              "timestamp": 1783498582834
-            },
-            {
-              "type": "Fin",
-              "formatted": "05:21",
-              "timestamp": 1783498910473
-            }
-          ],
-          "synced": false,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "paniol@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25823",
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 9,
-      "lastAutoSyncAttempt": "2026-07-08T10:13:55.649Z",
-      "lastVerifyAttempt": "2026-07-07T09:13:51.619Z"
-    },
-    {
-      "id": "1783415534063",
-      "rodado": "5 5 Interno FABRICACIÓN CAJA ROLL-OFF",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:12",
-      "interno": "222",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T09:12:14.063Z",
-      "tasks": [
-        {
-          "id": "1783415534062-0",
-          "centroCosto": "11",
-          "empleado": "535",
-          "horasEstimadas": 1,
-          "descripcion": "Armar frente de caja",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:12",
-              "timestamp": 1783415531634
-            }
-          ],
-          "synced": false,
-          "taxesRealizadaSynced": false
-        },
-        {
-          "id": "1783415534063-1",
-          "centroCosto": "11",
-          "empleado": "283",
-          "horasEstimadas": 1,
-          "descripcion": "Armar frente de caja ",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:11",
-              "timestamp": 1783415513729
-            }
-          ],
-          "synced": false,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": null,
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 2,
-      "lastAutoSyncAttempt": "2026-07-07T09:59:48.077Z"
-    },
-    {
-      "id": "1783415453430",
-      "rodado": "4 2 Interno REP. CONTENEDOR METALICO 1 1/2 MTS",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:10",
-      "interno": "20718",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T09:10:53.430Z",
-      "tasks": [
-        {
-          "id": "1783415453430-0",
-          "centroCosto": "11",
-          "empleado": "602",
-          "horasEstimadas": 1,
-          "descripcion": "Reparar ruedas,tapas y enderezar frente",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:10",
-              "timestamp": 1783415451325
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25822",
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 5,
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
-      "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T09:13:00.701Z",
-      "lastAutoSyncAttempt": "2026-07-07T12:31:10.973Z"
-    },
-    {
-      "id": "1783415387025",
-      "rodado": "4 2 Interno REP. CONTENEDOR METALICO 1 1/2 MTS",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:09",
-      "interno": "20336",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T09:09:47.025Z",
-      "tasks": [
-        {
-          "id": "1783415387025-0",
-          "centroCosto": "11",
-          "empleado": "Luciano",
-          "horasEstimadas": 1,
-          "descripcion": "Terminar de acomodar tapas y enderezar tacho",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:09",
-              "timestamp": 1783415384292
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25821",
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 5,
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
-      "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T09:11:33.754Z",
-      "lastAutoSyncAttempt": "2026-07-07T13:14:11.405Z"
-    },
-    {
-      "id": "1783415299425",
-      "rodado": "4 2 Interno REP. CONTENEDOR METALICO 1 1/2 MTS",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:08",
-      "interno": "Sin numero",
-      "clasificacion": "Herrería",
+      "fechaEntrega": "2026-07-29",
+      "horario": "15:20",
+      "interno": "10049",
+      "clasificacion": "Herrer���a",
       "incidente": "",
       "syncStatus": "success",
       "syncError": null,
-      "syncDate": "2026-07-07T09:09:48.550Z",
-      "createdAt": "2026-07-07T09:08:19.425Z",
+      "syncDate": "2026-07-29T18:23:26.391Z",
+      "createdAt": "2026-07-29T18:20:54.036Z",
       "tasks": [
         {
-          "id": "1783415299425-0",
-          "centroCosto": "11",
-          "empleado": "223",
-          "horasEstimadas": 1,
-          "descripcion": "Ruedas,tapas y parches de frente",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:08",
-              "timestamp": 1783415297106
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25820",
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 0,
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
-      "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T09:10:04.585Z"
-    },
-    {
-      "id": "1783415200321",
-      "rodado": "5 5 Interno FABRICACIÓN CAJA ROLL-OFF",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:06",
-      "interno": "221",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "success",
-      "syncError": null,
-      "syncDate": "2026-07-07T09:08:06.618Z",
-      "createdAt": "2026-07-07T09:06:40.321Z",
-      "tasks": [
-        {
-          "id": "1783415200321-0",
-          "centroCosto": "11",
-          "empleado": "508",
-          "horasEstimadas": 1,
-          "descripcion": "Continúa ensamble de caja",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:06",
-              "timestamp": 1783415178695
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        },
-        {
-          "id": "1783415200321-1",
-          "centroCosto": "11",
-          "empleado": "Digno",
-          "horasEstimadas": 1,
-          "descripcion": "Continúa ensamble de caja",
-          "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "06:06",
-              "timestamp": 1783415197426
-            }
-          ],
-          "synced": true,
-          "taxesRealizadaSynced": false
-        }
-      ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25818",
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 0,
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
-      "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T09:08:35.434Z"
-    },
-    {
-      "id": "1783415113672",
-      "rodado": "2 18 Interno REP. VOLQUETE",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:05",
-      "interno": "Sin numero",
-      "clasificacion": "Herrería",
-      "incidente": "",
-      "syncStatus": "success",
-      "syncError": null,
-      "syncDate": "2026-07-07T09:06:25.966Z",
-      "createdAt": "2026-07-07T09:05:13.672Z",
-      "tasks": [
-        {
-          "id": "1783415113672-0",
+          "id": "1785349254036-0",
           "centroCosto": "11",
           "empleado": "Federico",
-          "horasEstimadas": 1,
-          "descripcion": "Colocar frente,repasar soldaduras y revisar barandas",
+          "horasEstimadas": 1.41,
+          "descripcion": "Reparar ruedas,tapas y parches laterales",
           "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
@@ -1815,8 +1686,13 @@
           "timerHistory": [
             {
               "type": "Inició",
-              "formatted": "06:05",
-              "timestamp": 1783415110420
+              "formatted": "15:20",
+              "timestamp": 1785349250451
+            },
+            {
+              "type": "Fin",
+              "formatted": "17:01",
+              "timestamp": 1785355316005
             }
           ],
           "synced": true,
@@ -1824,35 +1700,38 @@
         }
       ],
       "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25817",
-      "estadoUnidad": "operativo",
+      "taxesOrderNumber": "27789",
+      "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
-      "autoSyncRetryCount": 0,
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
+      "verifiedStatus": null,
+      "archived": false,
+      "archivedAt": null,
+      "deleted": false,
+      "deletedAt": null,
       "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T09:06:40.157Z"
+      "verifiedCount": 9,
+      "lastVerifyAttempt": "2026-07-29T20:55:06.488Z"
     },
     {
-      "id": "1783414975942",
-      "rodado": "9 15 Interno REPARACIONES INTERNAS",
+      "id": "1785350739373",
+      "rodado": "4 2 Interno REP. CONTENEDOR METALICO 1 1/2 MTS",
       "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:02",
-      "interno": "Ruedas",
+      "fechaEntrega": "2026-07-29",
+      "horario": "15:44",
+      "interno": "20218",
       "clasificacion": "Herrería",
       "incidente": "",
-      "syncStatus": "pending",
+      "syncStatus": "success",
       "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T09:02:55.942Z",
+      "syncDate": "2026-07-29T18:53:34.292Z",
+      "createdAt": "2026-07-29T18:45:39.373Z",
       "tasks": [
         {
-          "id": "1783414975942-0",
+          "id": "1785350739373-0",
           "centroCosto": "11",
-          "empleado": "601",
-          "horasEstimadas": 1,
-          "descripcion": "Reparar ruedas",
+          "empleado": "223",
+          "horasEstimadas": 1.16,
+          "descripcion": "Reparar ruedas,tapas",
           "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
@@ -1860,50 +1739,103 @@
           "timerHistory": [
             {
               "type": "Inició",
-              "formatted": "06:02",
-              "timestamp": 1783414973811
+              "formatted": "15:45",
+              "timestamp": 1785350735883
+            },
+            {
+              "type": "Fin",
+              "formatted": "17:01",
+              "timestamp": 1785355311446
+            }
+          ],
+          "synced": false,
+          "taxesRealizadaSynced": false
+        }
+      ],
+      "createdBy": "jcarmona@contenedoreshugo.com.ar",
+      "taxesOrderNumber": null,
+      "estadoUnidad": "fuera_de_servicio",
+      "combustibleReset": null,
+      "archived": false,
+      "deleted": false,
+      "deletedAt": null,
+      "verifiedStatus": "success",
+      "archivedAt": null,
+      "verifiedError": null,
+      "verifiedCount": 1
+    },
+    {
+      "id": "1784826064487",
+      "rodado": "11 20 Interno VOLQUETE NICO",
+      "responsable": "AUTO",
+      "fechaEntrega": "2026-07-23",
+      "horario": "14:01",
+      "interno": "VOLQUETE NICO",
+      "clasificacion": "Correctivo",
+      "incidente": "",
+      "syncStatus": "success",
+      "syncError": null,
+      "syncDate": "2026-07-23T17:04:15.515Z",
+      "createdAt": "2026-07-29T22:02:30.406Z",
+      "tasks": [
+        {
+          "id": "1784826064487-0",
+          "centroCosto": "15",
+          "empleado": "253",
+          "horasEstimadas": 2.5,
+          "descripcion": "GGZ481 no carga aire, revisar perdidas - Diagnóstico: perdidas de aire, cambiar gobernadora, acoples, valvula de comandos de equipo, cambiar manguera de aire en comandos",
+          "status": "Finalizada",
+          "insumos": "",
+          "timerStart": null,
+          "timerStarted": false,
+          "timerHistory": [
+            {
+              "type": "Inició",
+              "formatted": "14:03",
+              "timestamp": 1785345418546
             },
             {
               "type": "Pausó",
-              "formatted": "06:17",
-              "timestamp": 1783415848813
+              "formatted": "14:55",
+              "timestamp": 1785348586546
             }
           ],
           "synced": true,
           "taxesRealizadaSynced": false
         }
       ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25816",
-      "estadoUnidad": "operativo",
+      "createdBy": null,
+      "taxesOrderNumber": "26895",
+      "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
-      "autoSyncRetryCount": 5,
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
+      "verifiedStatus": null,
       "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T09:04:52.226Z",
-      "lastAutoSyncAttempt": "2026-07-07T10:10:42.945Z"
+      "verifiedCount": 5,
+      "archived": false,
+      "archivedAt": null,
+      "deleted": false,
+      "deletedAt": null
     },
     {
-      "id": "1783414915578",
-      "rodado": "4 4 Interno REP. CONTENEDOR METALICO MEPLA",
+      "id": "1784841732493",
+      "rodado": "IVECO 170 E22 Interno 122",
       "responsable": "AUTO",
-      "fechaEntrega": "2026-07-07",
-      "horario": "06:01",
-      "interno": "Sin numero",
-      "clasificacion": "Herrería",
+      "fechaEntrega": "2026-07-23",
+      "horario": "18:22",
+      "interno": "122",
+      "clasificacion": "Correctivo",
       "incidente": "",
-      "syncStatus": "pending",
+      "syncStatus": "success",
       "syncError": null,
-      "syncDate": null,
-      "createdAt": "2026-07-07T09:01:55.578Z",
+      "syncDate": "2026-07-23T21:24:49.074Z",
+      "createdAt": "2026-07-29T22:02:32.189Z",
       "tasks": [
         {
-          "id": "1783414915578-0",
-          "centroCosto": "11",
-          "empleado": "376",
-          "horasEstimadas": 1,
-          "descripcion": "Reparar ruedas,piso,parches laterales,tetones y tapas",
+          "id": "1784841732493-0",
+          "centroCosto": "15",
+          "empleado": "238",
+          "horasEstimadas": 0.38,
+          "descripcion": "revisar falla en caja - Diagnóstico: Se realizó revisión de cableado y fluidos de caja",
           "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
@@ -1911,57 +1843,37 @@
           "timerHistory": [
             {
               "type": "Inició",
-              "formatted": "06:01",
-              "timestamp": 1783414913359
+              "formatted": "18:22",
+              "timestamp": 1784841720173
+            },
+            {
+              "type": "Pausó",
+              "formatted": "18:59",
+              "timestamp": 1784843990230
+            },
+            {
+              "type": "Fin",
+              "formatted": "20:20",
+              "timestamp": 1784848824445
             }
           ],
           "synced": true,
           "taxesRealizadaSynced": false
         }
       ],
-      "createdBy": "jcarmona@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25815",
-      "estadoUnidad": "operativo",
+      "createdBy": null,
+      "taxesOrderNumber": "26906",
+      "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
-      "autoSyncRetryCount": 5,
-      "verifiedStatus": "success",
-      "verifiedCount": 1,
+      "verifiedStatus": null,
       "verifiedError": null,
-      "lastVerifyAttempt": "2026-07-07T09:03:25.405Z",
-      "lastAutoSyncAttempt": "2026-07-07T12:19:30.807Z"
-    },
-    {
-      "id": "1783300215444",
-      "rodado": "MERCEDES BENZ ATEGO 1725 Interno 69",
-      "responsable": "AUTO",
-      "fechaEntrega": "2026-07-05",
-      "horario": "22:10",
-      "interno": "69",
-      "clasificacion": "Correctivo",
-      "incidente": "",
-      "syncStatus": "pending",
-      "syncError": "Sincronización interrumpida por reinicio del servidor.",
-      "syncDate": null,
-      "createdAt": "2026-07-06T09:01:30.236Z",
-      "tasks": [],
-      "createdBy": "paniol@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "25781",
-      "estadoUnidad": "operativo",
-      "combustibleReset": null,
-      "autoSyncRetryCount": 0,
-      "lastVerifyAttempt": "2026-07-06T09:03:29.020Z"
+      "verifiedCount": 4,
+      "archived": false,
+      "archivedAt": null,
+      "deleted": false,
+      "deletedAt": null
     }
   ],
-  "users": {
-    "paniol@contenedoreshugo.com.ar": {
-      "password": "123",
-      "sector": "Admin"
-    },
-    "belocures": {
-      "password": "123",
-      "sector": "Admin"
-    }
-  },
   "catalogs": {
     "rodados": [
       {
@@ -2069,12 +1981,12 @@
         "equipo": "MINI PALA CARGADORA"
       },
       {
-        "value": "35",
-        "label": "MERCEDES BENZ 1720 Interno 35",
-        "interno": "35",
-        "modelo": "MERCEDES BENZ 1720",
-        "patente": "ELN128",
-        "equipo": "ROLL OFF 20 M3"
+        "value": "28",
+        "label": "BOBCAT S570 Interno 28",
+        "interno": "28",
+        "modelo": "BOBCAT S570",
+        "patente": "PALA28",
+        "equipo": "MINI PALA CARGADORA"
       },
       {
         "value": "38",
@@ -2162,7 +2074,7 @@
         "interno": "54",
         "modelo": "MERCEDES BENZ ATEGO",
         "patente": "IFB529",
-        "equipo": "COMPACTADOR"
+        "equipo": "ROLL OFF"
       },
       {
         "value": "56",
@@ -2205,12 +2117,12 @@
         "equipo": "COMPACTADOR 3 EJES"
       },
       {
-        "value": "63",
-        "label": "MERCEDES BENZ ATEGO 1725 Interno 63",
-        "interno": "63",
-        "modelo": "MERCEDES BENZ ATEGO 1725",
-        "patente": "LDH459",
-        "equipo": "COMPACTADOR 3 EJES"
+        "value": "62",
+        "label": "MERCEDES BENZ ATEGO 1729 (LDR689) Interno 62",
+        "interno": "62",
+        "modelo": "MERCEDES BENZ ATEGO 1729",
+        "patente": "LDR689",
+        "equipo": "CAMION"
       },
       {
         "value": "64",
@@ -2269,51 +2181,11 @@
         "equipo": "COMPACTADOR 3 EJES"
       },
       {
-        "value": "71",
-        "label": "MERCEDES BENZ ATEGO 2425 Interno 71",
-        "interno": "71",
-        "modelo": "MERCEDES BENZ ATEGO 2425",
-        "patente": "NKL878",
-        "equipo": "COMPACTADOR 3 EJES"
-      },
-      {
-        "value": "72",
-        "label": "MERCEDES BENZ ATEGO 1725 Interno 72",
-        "interno": "72",
-        "modelo": "MERCEDES BENZ ATEGO 1725",
-        "patente": "NRW714",
-        "equipo": "COMPACTADOR 3 EJES"
-      },
-      {
-        "value": "73",
-        "label": "MERCEDES BENZ ATEGO Interno 73",
-        "interno": "73",
-        "modelo": "MERCEDES BENZ ATEGO",
-        "patente": "NRW717",
-        "equipo": "COMPACTADOR 3 EJES"
-      },
-      {
-        "value": "74",
-        "label": "MERCEDES BENZ ATEGO Interno 74",
-        "interno": "74",
-        "modelo": "MERCEDES BENZ ATEGO",
-        "patente": "NVX357",
-        "equipo": "COMPACTADOR 3 EJES"
-      },
-      {
         "value": "75",
         "label": "MERCEDES BENZ ATEGO Interno 75",
         "interno": "75",
         "modelo": "MERCEDES BENZ ATEGO",
         "patente": "NVX356",
-        "equipo": "COMPACTADOR 3 EJES"
-      },
-      {
-        "value": "76",
-        "label": "MERCEDES BENZ ATRON 1720 Interno 76",
-        "interno": "76",
-        "modelo": "MERCEDES BENZ ATRON 1720",
-        "patente": "OMM782",
         "equipo": "COMPACTADOR 3 EJES"
       },
       {
@@ -2365,12 +2237,20 @@
         "equipo": "VOLQUETE"
       },
       {
-        "value": "86",
-        "label": "MERCEDES BENZ 1718 Interno 86",
-        "interno": "86",
-        "modelo": "MERCEDES BENZ 1718",
-        "patente": "BJQ959",
-        "equipo": "VOLQUETE"
+        "value": "83",
+        "label": "MERCEDES BENZ 1215 (AB628AA) Interno 83",
+        "interno": "83",
+        "modelo": "MERCEDES BENZ 1215",
+        "patente": "AB628AA",
+        "equipo": "CAMION"
+      },
+      {
+        "value": "84",
+        "label": "MERCEDES BENZ 1215 (AC831AN) Interno 84",
+        "interno": "84",
+        "modelo": "MERCEDES BENZ 1215",
+        "patente": "AC831AN",
+        "equipo": "CAMION"
       },
       {
         "value": "87",
@@ -2493,22 +2373,6 @@
         "equipo": "COMPACTADOR"
       },
       {
-        "value": "102",
-        "label": "VOLKSWAGEN 305-9,150 Interno 102",
-        "interno": "102",
-        "modelo": "VOLKSWAGEN 305-9,150",
-        "patente": "FAF658",
-        "equipo": "CHASIS CON PLANCHA"
-      },
-      {
-        "value": "103",
-        "label": "IVECO TECTOR 240 E Interno 103",
-        "interno": "103",
-        "modelo": "IVECO TECTOR 240 E",
-        "patente": "AF037YV",
-        "equipo": "ROLL OFF"
-      },
-      {
         "value": "104",
         "label": "MERCEDES BENZ ATEGO 1725-42 Interno 104",
         "interno": "104",
@@ -2523,30 +2387,6 @@
         "modelo": "IVECO 170 E22",
         "patente": "JXV488",
         "equipo": "ROLL OFF"
-      },
-      {
-        "value": "106",
-        "label": "IVECO 170 E22 Interno 106",
-        "interno": "106",
-        "modelo": "IVECO 170 E22",
-        "patente": "HXB871",
-        "equipo": "VOLQUETE"
-      },
-      {
-        "value": "107",
-        "label": "IVECO 170 E22 Interno 107",
-        "interno": "107",
-        "modelo": "IVECO 170 E22",
-        "patente": "FJL072",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "108",
-        "label": "IVECO 170 E28 Interno 108",
-        "interno": "108",
-        "modelo": "IVECO 170 E28",
-        "patente": "AF302NZ",
-        "equipo": "COMPACTADOR 3 EJES"
       },
       {
         "value": "109",
@@ -2573,124 +2413,316 @@
         "equipo": "COMPACTADOR 3 EJES"
       },
       {
-        "value": "112",
-        "label": "IVECO 170 E28 Interno 112",
-        "interno": "112",
+        "value": "127",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 127",
+        "interno": "127",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "AG643PG",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "128",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 128",
+        "interno": "128",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "KVX840",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "130",
+        "label": "VOLKSWAGEN BUS 15190 (HCL568) Interno 130",
+        "interno": "130",
+        "modelo": "VOLKSWAGEN BUS 15190",
+        "patente": "HCL568",
+        "equipo": "OMNIBUS"
+      },
+      {
+        "value": "131",
+        "label": "VOLKSWAGEN 13180 Interno 131",
+        "interno": "131",
+        "modelo": "VOLKSWAGEN 13180",
+        "patente": "HJD245",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "133",
+        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 133",
+        "interno": "133",
+        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
+        "patente": "AG787VM",
+        "equipo": "ROLL OFF 30 M3"
+      },
+      {
+        "value": "134",
+        "label": "IVECO 170 E28 Interno 134",
+        "interno": "134",
         "modelo": "IVECO 170 E28",
-        "patente": "AF513GO",
+        "patente": "AF430QT",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "135",
+        "label": "IVECO 170 E28 Interno 135",
+        "interno": "135",
+        "modelo": "IVECO 170 E28",
+        "patente": "AG916WU",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "136",
+        "label": "IVECO 170 E28 Interno 136",
+        "interno": "136",
+        "modelo": "IVECO 170 E28",
+        "patente": "AG916WV",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "137",
+        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 137",
+        "interno": "137",
+        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
+        "patente": "AH182UI",
+        "equipo": "ROLL OFF 30 M3"
+      },
+      {
+        "value": "138",
+        "label": "IVECO 170 E28 Interno 138",
+        "interno": "138",
+        "modelo": "IVECO 170 E28",
+        "patente": "AH380CZ",
         "equipo": "COMPACTADOR 3 EJES"
       },
       {
-        "value": "113",
-        "label": "MERCEDES BENZ 1114 Interno 113",
-        "interno": "113",
-        "modelo": "MERCEDES BENZ 1114",
-        "patente": "UXF466",
-        "equipo": "ROLL OFF"
+        "value": "139",
+        "label": "IVECO 170 E22 Interno 139",
+        "interno": "139",
+        "modelo": "IVECO 170 E22",
+        "patente": "NSM683",
+        "equipo": "COMPACTADOR 2 EJES"
       },
       {
-        "value": "114",
-        "label": "IVECO 170 E28 Interno 114",
-        "interno": "114",
+        "value": "140",
+        "label": "IVECO TECTOR 15-210 Interno 140",
+        "interno": "140",
+        "modelo": "IVECO TECTOR 15-210",
+        "patente": "AH875HT",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "141",
+        "label": "IVECO 170 E28 Interno 141",
+        "interno": "141",
         "modelo": "IVECO 170 E28",
-        "patente": "AF756NL",
-        "equipo": "ROLL OFF"
+        "patente": "AH380DA",
+        "equipo": "COMPACTADOR"
       },
       {
-        "value": "115",
-        "label": "IVECO 170 E24 Interno 115",
-        "interno": "115",
+        "value": "142",
+        "label": "IVECO 170 E28 Interno 142",
+        "interno": "142",
+        "modelo": "IVECO 170 E28",
+        "patente": "AH875EM",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "143",
+        "label": "VOLKSWAGEN 17-220 Interno 143",
+        "interno": "143",
+        "modelo": "VOLKSWAGEN 17-220",
+        "patente": "LQL160",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "144",
+        "label": "IVECO 170 E28 Interno 144",
+        "interno": "144",
+        "modelo": "IVECO 170 E28",
+        "patente": "AH540JR",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "145",
+        "label": "VOLKSWAGEN 13180 Interno 145",
+        "interno": "145",
+        "modelo": "VOLKSWAGEN 13180",
+        "patente": "AH963YV",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "146",
+        "label": "IVECO 170 E24 Interno 146",
+        "interno": "146",
         "modelo": "IVECO 170 E24",
-        "patente": "HDE827",
-        "equipo": "COMPACTADOR 2 EJES"
+        "patente": "MGY392",
+        "equipo": "CHASIS CON PLANCHA"
       },
       {
-        "value": "116",
-        "label": "SCANIA P270 Interno 116",
-        "interno": "116",
-        "modelo": "SCANIA P270",
-        "patente": "GTO176",
-        "equipo": "ROLL OFF"
-      },
-      {
-        "value": "117",
-        "label": "MERCEDES BENZ ATEGO 1725 Interno 117",
-        "interno": "117",
-        "modelo": "MERCEDES BENZ ATEGO 1725",
-        "patente": "KVX842",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "118",
-        "label": "MERCEDES BENZ ATEGO 1725 Interno 118",
-        "interno": "118",
-        "modelo": "MERCEDES BENZ ATEGO 1725",
-        "patente": "ICT511",
-        "equipo": "COMPACTADOR EJES"
-      },
-      {
-        "value": "119",
-        "label": "MERCEDES BENZ ATEGO 1725 Interno 119",
-        "interno": "119",
-        "modelo": "MERCEDES BENZ ATEGO 1725",
-        "patente": "KVX850",
-        "equipo": "COMPACTADOR EJES"
-      },
-      {
-        "value": "120",
-        "label": "IVECO 170 E22 Interno 120",
-        "interno": "120",
-        "modelo": "IVECO 170 E22",
-        "patente": "MZN101",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "121",
-        "label": "IVECO 170 E22 Interno 121",
-        "interno": "121",
-        "modelo": "IVECO 170 E22",
-        "patente": "MZN099",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "122",
-        "label": "IVECO 170 E22 Interno 122",
-        "interno": "122",
-        "modelo": "IVECO 170 E22",
-        "patente": "MZN063",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "123",
-        "label": "VOLKSWAGEN 13180 Interno 123",
-        "interno": "123",
-        "modelo": "VOLKSWAGEN 13180",
-        "patente": "KGD338",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "124",
-        "label": "VOLKSWAGEN 13180 Interno 124",
-        "interno": "124",
-        "modelo": "VOLKSWAGEN 13180",
-        "patente": "KDG777",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "23",
-        "label": "MERCEDES BENZ 2318 Interno 23",
-        "interno": "23",
-        "modelo": "MERCEDES BENZ 2318",
-        "patente": "DEE139",
-        "equipo": "ROLL OFF"
-      },
-      {
-        "value": "85",
-        "label": "MERCEDES BENZ 1720 Interno 85",
-        "interno": "85",
-        "modelo": "MERCEDES BENZ 1720",
-        "patente": "GXZ013",
+        "value": "147",
+        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 147",
+        "interno": "147",
+        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
+        "patente": "AI000GR",
         "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "148",
+        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 148",
+        "interno": "148",
+        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
+        "patente": "AI000GS",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "149",
+        "label": "IVECO VERTIS 1380V18 Interno 149",
+        "interno": "149",
+        "modelo": "IVECO VERTIS 1380V18",
+        "patente": "MAL538",
+        "equipo": "CHASIS CON PLANCHA"
+      },
+      {
+        "value": "150",
+        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 150",
+        "interno": "150",
+        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
+        "patente": "AI000HM",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "151",
+        "label": "IVECO 170 E28 Interno 151",
+        "interno": "151",
+        "modelo": "IVECO 170 E28",
+        "patente": "AD991FM",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "152",
+        "label": "IVECO 240 E28 Interno 152",
+        "interno": "152",
+        "modelo": "IVECO 240 E28",
+        "patente": "HMZ936",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "153",
+        "label": "IVECO 170 E22 (AA454PM) Interno 153",
+        "interno": "153",
+        "modelo": "IVECO 170 E22",
+        "patente": "AA454PM",
+        "equipo": "CAMION"
+      },
+      {
+        "value": "154",
+        "label": "IVECO 170 E22 (AB083PZ) Interno 154",
+        "interno": "154",
+        "modelo": "IVECO 170 E22",
+        "patente": "AB083PZ",
+        "equipo": "CAMION"
+      },
+      {
+        "value": "155",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 155",
+        "interno": "155",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "...",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "156",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 156",
+        "interno": "156",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "....",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "157",
+        "label": "IVECO 170 E28 Interno 157",
+        "interno": "157",
+        "modelo": "IVECO 170 E28",
+        "patente": "1111111",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "158",
+        "label": "IVECO 170 E28 Interno 158",
+        "interno": "158",
+        "modelo": "IVECO 170 E28",
+        "patente": "22222",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "159",
+        "label": "IVECO 170 E28 Interno 159",
+        "interno": "159",
+        "modelo": "IVECO 170 E28",
+        "patente": "3333333",
+        "equipo": "COMPACTADOR"
+      },
+      {
+        "value": "160",
+        "label": "IVECO 170 E22 (AA903AH) Interno 160",
+        "interno": "160",
+        "modelo": "IVECO 170 E22",
+        "patente": "AA903AH",
+        "equipo": "CAMION"
+      },
+      {
+        "value": "161",
+        "label": "IVECO 170 E22 (AA903AI) Interno 161",
+        "interno": "161",
+        "modelo": "IVECO 170 E22",
+        "patente": "AA903AI",
+        "equipo": "CAMION"
+      },
+      {
+        "value": "162",
+        "label": "VOLKSWAGEN TECTOR (AA903AJ) Interno 162",
+        "interno": "162",
+        "modelo": "VOLKSWAGEN TECTOR",
+        "patente": "AA903AJ",
+        "equipo": "CAMION"
+      },
+      {
+        "value": "163",
+        "label": "VOLKSWAGEN TECTOR (AA903AK) Interno 163",
+        "interno": "163",
+        "modelo": "VOLKSWAGEN TECTOR",
+        "patente": "AA903AK",
+        "equipo": "CAMION"
+      },
+      {
+        "value": "164",
+        "label": "VOLKSWAGEN TECTOR 17280 (AB213JV) Interno 164",
+        "interno": "164",
+        "modelo": "VOLKSWAGEN TECTOR 17280",
+        "patente": "AB213JV",
+        "equipo": "CAMION"
+      },
+      {
+        "value": "165",
+        "label": "VOLKSWAGEN TECTOR (AB213JW) Interno 165",
+        "interno": "165",
+        "modelo": "VOLKSWAGEN TECTOR",
+        "patente": "AB213JW",
+        "equipo": "CAMION"
+      },
+      {
+        "value": "353",
+        "label": "AUTOELEVADOR (AA220AA) Interno 353",
+        "interno": "353",
+        "modelo": "AUTOELEVADOR",
+        "patente": "AA220AA",
+        "equipo": "AUTOELEVADOR"
+      },
+      {
+        "value": "354",
+        "label": "AUTOELEVADOR (AA402MA) Interno 354",
+        "interno": "354",
+        "modelo": "AUTOELEVADOR",
+        "patente": "AA402MA",
+        "equipo": "AUTOELEVADOR"
       },
       {
         "value": "1000",
@@ -2741,46 +2773,6 @@
         "equipo": "SEDAN 4 PUERTAS"
       },
       {
-        "value": "3003",
-        "label": "VOLKSWAGEN GOL Interno 3003",
-        "interno": "3003",
-        "modelo": "VOLKSWAGEN GOL",
-        "patente": "OAI399",
-        "equipo": "SEDAN 4 PUERTAS"
-      },
-      {
-        "value": "3004",
-        "label": "TOYOTA SW4 Interno 3004",
-        "interno": "3004",
-        "modelo": "TOYOTA SW4",
-        "patente": "OJQ316",
-        "equipo": "CAMIONETA"
-      },
-      {
-        "value": "5000",
-        "label": "LEXUS NX 300 Interno 5000",
-        "interno": "5000",
-        "modelo": "LEXUS NX 300",
-        "patente": "AE022XI",
-        "equipo": "SEDAN 4 PUERTAS"
-      },
-      {
-        "value": "5001",
-        "label": "PEUGEOT 208 Interno 5001",
-        "interno": "5001",
-        "modelo": "PEUGEOT 208",
-        "patente": "AC520MR",
-        "equipo": "SEDAN 4 PUERTAS"
-      },
-      {
-        "value": "1001",
-        "label": "TANQUE SISTERNA TANQUE SISTERNA Interno 1001",
-        "interno": "1001",
-        "modelo": "TANQUE SISTERNA TANQUE SISTERNA",
-        "patente": "BACKUP01",
-        "equipo": "TANQUE SISTERNA"
-      },
-      {
         "value": "5002",
         "label": "TOYOTA SW4 Interno 5002",
         "interno": "5002",
@@ -2797,22 +2789,6 @@
         "equipo": "SEDAN 4 PUERTAS"
       },
       {
-        "value": "3005",
-        "label": "JEEP RENEGADE SPORT Interno 3005",
-        "interno": "3005",
-        "modelo": "JEEP RENEGADE SPORT",
-        "patente": "AG483IM",
-        "equipo": "CAMIONETA"
-      },
-      {
-        "value": "125",
-        "label": "MERCEDES BENZ ATEGO 1725 Interno 125",
-        "interno": "125",
-        "modelo": "MERCEDES BENZ ATEGO 1725",
-        "patente": "ICT512",
-        "equipo": "COMPACTADOR 3 EJES"
-      },
-      {
         "value": "5004",
         "label": "VOLKSWAGEN AMAROK Interno 5004",
         "interno": "5004",
@@ -2821,92 +2797,76 @@
         "equipo": "SEDAN 4 PUERTAS"
       },
       {
-        "value": "3006",
-        "label": "HIUNDAY H1 Interno 3006",
-        "interno": "3006",
-        "modelo": "HIUNDAY H1",
-        "patente": "AB522WD",
+        "value": "5005",
+        "label": "VOLKSWAGEN GOL (AC831AN) Interno 5005",
+        "interno": "5005",
+        "modelo": "VOLKSWAGEN GOL",
+        "patente": "AC831AN",
+        "equipo": "AUTO"
+      },
+      {
+        "value": "5007",
+        "label": "TANQUE CISTERNA (AA821MB) Interno 5007",
+        "interno": "5007",
+        "modelo": "TANQUE CISTERNA",
+        "patente": "AA821MB",
+        "equipo": "TANQUE CISTERNA"
+      },
+      {
+        "value": "5008",
+        "label": "FIAT STRADA (AA484MA) Interno 5008",
+        "interno": "5008",
+        "modelo": "FIAT STRADA",
+        "patente": "AA484MA",
         "equipo": "CAMIONETA"
       },
       {
-        "value": "29",
-        "label": "BOBCAT S570 Interno 29",
-        "interno": "29",
-        "modelo": "BOBCAT S570",
-        "patente": "1111JJJ",
-        "equipo": "MINI PALA CARGADORA"
-      },
-      {
-        "value": "28",
-        "label": "BOBCAT S570 Interno 28",
-        "interno": "28",
-        "modelo": "BOBCAT S570",
-        "patente": "PALA28",
-        "equipo": "MINI PALA CARGADORA"
-      },
-      {
-        "value": "127",
-        "label": "MERCEDES BENZ ATEGO 1725 Interno 127",
-        "interno": "127",
-        "modelo": "MERCEDES BENZ ATEGO 1725",
-        "patente": "AG643PG",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "128",
-        "label": "MERCEDES BENZ ATEGO 1725 Interno 128",
-        "interno": "128",
-        "modelo": "MERCEDES BENZ ATEGO 1725",
-        "patente": "KVX840",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "132",
-        "label": "VOLKSWAGEN 13180 Interno 132",
-        "interno": "132",
-        "modelo": "VOLKSWAGEN 13180",
-        "patente": "LLP358",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "126",
-        "label": "MERCEDES BENZ ATEGO 1725 Interno 126",
-        "interno": "126",
-        "modelo": "MERCEDES BENZ ATEGO 1725",
-        "patente": "IEQ745",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "12",
-        "label": "FIAT FIORINO Interno 12",
-        "interno": "12",
-        "modelo": "FIAT FIORINO",
-        "patente": "AC145XQ",
+        "value": "5009",
+        "label": "CHEVROLET MONTANA (AC328VX) Interno 5009",
+        "interno": "5009",
+        "modelo": "CHEVROLET MONTANA",
+        "patente": "AC328VX",
         "equipo": "CAMIONETA"
       },
       {
-        "value": "14",
-        "label": "FIAT CRONOS Interno 14",
-        "interno": "14",
-        "modelo": "FIAT CRONOS",
-        "patente": "AG729GA",
+        "value": "5010",
+        "label": "CHEVROLET TRACKER (AD360VM) Interno 5010",
+        "interno": "5010",
+        "modelo": "CHEVROLET TRACKER",
+        "patente": "AD360VM",
         "equipo": "CAMIONETA"
       },
       {
-        "value": "131",
-        "label": "VOLKSWAGEN 13180 Interno 131",
-        "interno": "131",
-        "modelo": "VOLKSWAGEN 13180",
-        "patente": "HJD245",
-        "equipo": "VOLQUETE"
+        "value": "5011",
+        "label": "RENAULT MASTER DCI 120 (AB213JX) Interno 5011",
+        "interno": "5011",
+        "modelo": "RENAULT MASTER DCI 120",
+        "patente": "AB213JX",
+        "equipo": "CAMIONETA"
       },
       {
-        "value": "133",
-        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 133",
-        "interno": "133",
-        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
-        "patente": "AG787VM",
-        "equipo": "ROLL OFF 30 M3"
+        "value": "5012",
+        "label": "VOLKSWAGEN AMAROK (AC831AM) Interno 5012",
+        "interno": "5012",
+        "modelo": "VOLKSWAGEN AMAROK",
+        "patente": "AC831AM",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "5013",
+        "label": "CHEVROLET MONTANA (AD803AU) Interno 5013",
+        "interno": "5013",
+        "modelo": "CHEVROLET MONTANA",
+        "patente": "AD803AU",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "5014",
+        "label": "VOLKSWAGEN AMAROK (AF844YI) Interno 5014",
+        "interno": "5014",
+        "modelo": "VOLKSWAGEN AMAROK",
+        "patente": "AF844YI",
+        "equipo": "CAMIONETA"
       },
       {
         "value": "A01",
@@ -2915,46 +2875,6 @@
         "modelo": "TOYOTA HILUX",
         "patente": "AG787UB",
         "equipo": "CAMIONETA"
-      },
-      {
-        "value": "134",
-        "label": "IVECO 170 E28 Interno 134",
-        "interno": "134",
-        "modelo": "IVECO 170 E28",
-        "patente": "AF430QT",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "9A",
-        "label": "HANGCHA S-30 CPCD25T8 Interno 9A",
-        "interno": "9A",
-        "modelo": "HANGCHA S-30 CPCD25T8",
-        "patente": "0129",
-        "equipo": "AUTOELEVADOR"
-      },
-      {
-        "value": "135",
-        "label": "IVECO 170 E28 Interno 135",
-        "interno": "135",
-        "modelo": "IVECO 170 E28",
-        "patente": "AG916WU",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "136",
-        "label": "IVECO 170 E28 Interno 136",
-        "interno": "136",
-        "modelo": "IVECO 170 E28",
-        "patente": "AG916WV",
-        "equipo": "COMPACTADOR"
-      },
-      {
-        "value": "137",
-        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 137",
-        "interno": "137",
-        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
-        "patente": "AH182UI",
-        "equipo": "ROLL OFF 30 M3"
       },
       {
         "value": "PRENSAS",
@@ -3085,14 +3005,6 @@
         "equipo": "ORDENAR / LIMPIEZA"
       },
       {
-        "value": "129",
-        "label": "MERCEDES BENZ ATEGO 1725 Interno 129",
-        "interno": "129",
-        "modelo": "MERCEDES BENZ ATEGO 1725",
-        "patente": "KVX858",
-        "equipo": "COMPACTADOR 3 EJES"
-      },
-      {
         "value": "AC01",
         "label": "OMBU ACOPLADO Interno AC01",
         "interno": "AC01",
@@ -3117,70 +3029,6 @@
         "equipo": "TRACTOR"
       },
       {
-        "value": "138",
-        "label": "IVECO 170 E28 Interno 138",
-        "interno": "138",
-        "modelo": "IVECO 170 E28",
-        "patente": "AH380CZ",
-        "equipo": "COMPACTADOR 3 EJES"
-      },
-      {
-        "value": "139",
-        "label": "IVECO 170 E22 Interno 139",
-        "interno": "139",
-        "modelo": "IVECO 170 E22",
-        "patente": "NSM683",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "140",
-        "label": "IVECO TECTOR 15-210 Interno 140",
-        "interno": "140",
-        "modelo": "IVECO TECTOR 15-210",
-        "patente": "AH875HT",
-        "equipo": "VOLQUETE"
-      },
-      {
-        "value": "141",
-        "label": "IVECO 170 E28 Interno 141",
-        "interno": "141",
-        "modelo": "IVECO 170 E28",
-        "patente": "AH380DA",
-        "equipo": "COMPACTADOR"
-      },
-      {
-        "value": "142",
-        "label": "IVECO 170 E28 Interno 142",
-        "interno": "142",
-        "modelo": "IVECO 170 E28",
-        "patente": "AH875EM",
-        "equipo": "COMPACTADOR"
-      },
-      {
-        "value": "144",
-        "label": "IVECO 170 E28 Interno 144",
-        "interno": "144",
-        "modelo": "IVECO 170 E28",
-        "patente": "AH540JR",
-        "equipo": "COMPACTADOR"
-      },
-      {
-        "value": "145",
-        "label": "VOLKSWAGEN 13180 Interno 145",
-        "interno": "145",
-        "modelo": "VOLKSWAGEN 13180",
-        "patente": "AH963YV",
-        "equipo": "COMPACTADOR"
-      },
-      {
-        "value": "143",
-        "label": "VOLKSWAGEN 17-220 Interno 143",
-        "interno": "143",
-        "modelo": "VOLKSWAGEN 17-220",
-        "patente": "LQL160",
-        "equipo": "COMPACTADOR"
-      },
-      {
         "value": "AMAROK",
         "label": "VOLKSWAGEN AMAROK Interno AMAROK",
         "interno": "AMAROK",
@@ -3195,62 +3043,6 @@
         "modelo": "OMBU ACOPLADO",
         "patente": "ACOPLADOPLAYO",
         "equipo": "ACOPLADO"
-      },
-      {
-        "value": "147",
-        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 147",
-        "interno": "147",
-        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
-        "patente": "AI000GR",
-        "equipo": "COMPACTADOR 3 EJES"
-      },
-      {
-        "value": "148",
-        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 148",
-        "interno": "148",
-        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
-        "patente": "AI000GS",
-        "equipo": "COMPACTADOR 2 EJES"
-      },
-      {
-        "value": "146",
-        "label": "IVECO 170 E24 Interno 146",
-        "interno": "146",
-        "modelo": "IVECO 170 E24",
-        "patente": "MGY392",
-        "equipo": "CHASIS CON PLANCHA"
-      },
-      {
-        "value": "149",
-        "label": "IVECO VERTIS 1380V18 Interno 149",
-        "interno": "149",
-        "modelo": "IVECO VERTIS 1380V18",
-        "patente": "MAL538",
-        "equipo": "CHASIS CON PLANCHA"
-      },
-      {
-        "value": "150",
-        "label": "VOLKSWAGEN 17.280/43 LR SC Interno 150",
-        "interno": "150",
-        "modelo": "VOLKSWAGEN 17.280/43 LR SC",
-        "patente": "AI000HM",
-        "equipo": "COMPACTADOR 3 EJES"
-      },
-      {
-        "value": "11",
-        "label": "HANGCHA S-30 CPCD25N Interno 11",
-        "interno": "11",
-        "modelo": "HANGCHA S-30 CPCD25N",
-        "patente": "7911",
-        "equipo": "AUTOELEVADOR"
-      },
-      {
-        "value": "151",
-        "label": "IVECO 170 E28 Interno 151",
-        "interno": "151",
-        "modelo": "IVECO 170 E28",
-        "patente": "AD991FM",
-        "equipo": "VOLQUETE"
       },
       {
         "value": "IRINEO GRAL.",
@@ -3285,12 +3077,68 @@
         "equipo": "REPARACIONES INTERNAS"
       },
       {
-        "value": "152",
-        "label": "IVECO 240 E28 Interno 152",
-        "interno": "152",
-        "modelo": "IVECO 240 E28",
-        "patente": "HMZ936",
-        "equipo": "ROLL OFF"
+        "value": "Av. Piedra 3550",
+        "label": "Mantenimiento Edilicio Interno Av. Piedra 3550",
+        "interno": "Av. Piedra 3550",
+        "modelo": "Mantenimiento Edilicio",
+        "patente": "mantenimiento",
+        "equipo": "Planta"
+      },
+      {
+        "value": "Av. Saraza 5677",
+        "label": "Mantenimiento Edilicio Interno Av. Saraza 5677",
+        "interno": "Av. Saraza 5677",
+        "modelo": "Mantenimiento Edilicio",
+        "patente": "MANTENIMIENTO2",
+        "equipo": "Planta"
+      },
+      {
+        "value": "Otros Inmuebles",
+        "label": "Mantenimiento Edilicio Interno Otros Inmuebles",
+        "interno": "Otros Inmuebles",
+        "modelo": "Mantenimiento Edilicio",
+        "patente": "Plaanta-4",
+        "equipo": "Planta"
+      },
+      {
+        "value": "Base Norte N°3",
+        "label": "Mantenimiento Edilicio Interno Base Norte N°3",
+        "interno": "Base Norte N°3",
+        "modelo": "Mantenimiento Edilicio",
+        "patente": "BaseN°3",
+        "equipo": "Planta"
+      },
+      {
+        "value": "9A",
+        "label": "HANGCHA S-30 CPCD25T8 Interno 9A",
+        "interno": "9A",
+        "modelo": "HANGCHA S-30 CPCD25T8",
+        "patente": "0129",
+        "equipo": "AUTOELEVADOR"
+      },
+      {
+        "value": "11",
+        "label": "HANGCHA S-30 CPCD25N Interno 11",
+        "interno": "11",
+        "modelo": "HANGCHA S-30 CPCD25N",
+        "patente": "7911",
+        "equipo": "AUTOELEVADOR"
+      },
+      {
+        "value": "12",
+        "label": "FIAT FIORINO Interno 12",
+        "interno": "12",
+        "modelo": "FIAT FIORINO",
+        "patente": "AC145XQ",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "14",
+        "label": "FIAT CRONOS Interno 14",
+        "interno": "14",
+        "modelo": "FIAT CRONOS",
+        "patente": "AG729GA",
+        "equipo": "CAMIONETA"
       },
       {
         "value": "15",
@@ -3299,6 +3147,326 @@
         "modelo": "FIAT STRADA",
         "patente": "AI024DU",
         "equipo": "CAMIONETA"
+      },
+      {
+        "value": "23",
+        "label": "MERCEDES BENZ 2318 Interno 23",
+        "interno": "23",
+        "modelo": "MERCEDES BENZ 2318",
+        "patente": "DEE139",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "29",
+        "label": "BOBCAT S570 Interno 29",
+        "interno": "29",
+        "modelo": "BOBCAT S570",
+        "patente": "1111JJJ",
+        "equipo": "MINI PALA CARGADORA"
+      },
+      {
+        "value": "35",
+        "label": "MERCEDES BENZ 1720 Interno 35",
+        "interno": "35",
+        "modelo": "MERCEDES BENZ 1720",
+        "patente": "ELN128",
+        "equipo": "ROLL OFF 20 M3"
+      },
+      {
+        "value": "63",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 63",
+        "interno": "63",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "LDH459",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "71",
+        "label": "MERCEDES BENZ ATEGO 2425 Interno 71",
+        "interno": "71",
+        "modelo": "MERCEDES BENZ ATEGO 2425",
+        "patente": "NKL878",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "72",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 72",
+        "interno": "72",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "NRW714",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "73",
+        "label": "MERCEDES BENZ ATEGO Interno 73",
+        "interno": "73",
+        "modelo": "MERCEDES BENZ ATEGO",
+        "patente": "NRW717",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "74",
+        "label": "MERCEDES BENZ ATEGO Interno 74",
+        "interno": "74",
+        "modelo": "MERCEDES BENZ ATEGO",
+        "patente": "NVX357",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "76",
+        "label": "MERCEDES BENZ ATRON 1720 Interno 76",
+        "interno": "76",
+        "modelo": "MERCEDES BENZ ATRON 1720",
+        "patente": "OMM782",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "85",
+        "label": "MERCEDES BENZ 1720 Interno 85",
+        "interno": "85",
+        "modelo": "MERCEDES BENZ 1720",
+        "patente": "GXZ013",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "86",
+        "label": "MERCEDES BENZ 1718 Interno 86",
+        "interno": "86",
+        "modelo": "MERCEDES BENZ 1718",
+        "patente": "BJQ959",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "102",
+        "label": "VOLKSWAGEN 305-9,150 Interno 102",
+        "interno": "102",
+        "modelo": "VOLKSWAGEN 305-9,150",
+        "patente": "FAF658",
+        "equipo": "CHASIS CON PLANCHA"
+      },
+      {
+        "value": "103",
+        "label": "IVECO TECTOR 240 E Interno 103",
+        "interno": "103",
+        "modelo": "IVECO TECTOR 240 E",
+        "patente": "AF037YV",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "106",
+        "label": "IVECO 170 E22 Interno 106",
+        "interno": "106",
+        "modelo": "IVECO 170 E22",
+        "patente": "HXB871",
+        "equipo": "VOLQUETE"
+      },
+      {
+        "value": "107",
+        "label": "IVECO 170 E22 Interno 107",
+        "interno": "107",
+        "modelo": "IVECO 170 E22",
+        "patente": "FJL072",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "108",
+        "label": "IVECO 170 E28 Interno 108",
+        "interno": "108",
+        "modelo": "IVECO 170 E28",
+        "patente": "AF302NZ",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "112",
+        "label": "IVECO 170 E28 Interno 112",
+        "interno": "112",
+        "modelo": "IVECO 170 E28",
+        "patente": "AF513GO",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "113",
+        "label": "MERCEDES BENZ 1114 Interno 113",
+        "interno": "113",
+        "modelo": "MERCEDES BENZ 1114",
+        "patente": "UXF466",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "114",
+        "label": "IVECO 170 E28 Interno 114",
+        "interno": "114",
+        "modelo": "IVECO 170 E28",
+        "patente": "AF756NL",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "115",
+        "label": "IVECO 170 E24 Interno 115",
+        "interno": "115",
+        "modelo": "IVECO 170 E24",
+        "patente": "HDE827",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "116",
+        "label": "SCANIA P270 Interno 116",
+        "interno": "116",
+        "modelo": "SCANIA P270",
+        "patente": "GTO176",
+        "equipo": "ROLL OFF"
+      },
+      {
+        "value": "117",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 117",
+        "interno": "117",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "KVX842",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "118",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 118",
+        "interno": "118",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "ICT511",
+        "equipo": "COMPACTADOR EJES"
+      },
+      {
+        "value": "119",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 119",
+        "interno": "119",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "KVX850",
+        "equipo": "COMPACTADOR EJES"
+      },
+      {
+        "value": "120",
+        "label": "IVECO 170 E22 Interno 120",
+        "interno": "120",
+        "modelo": "IVECO 170 E22",
+        "patente": "MZN101",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "121",
+        "label": "IVECO 170 E22 Interno 121",
+        "interno": "121",
+        "modelo": "IVECO 170 E22",
+        "patente": "MZN099",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "122",
+        "label": "IVECO 170 E22 Interno 122",
+        "interno": "122",
+        "modelo": "IVECO 170 E22",
+        "patente": "MZN063",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "123",
+        "label": "VOLKSWAGEN 13180 Interno 123",
+        "interno": "123",
+        "modelo": "VOLKSWAGEN 13180",
+        "patente": "KGD338",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "124",
+        "label": "VOLKSWAGEN 13180 Interno 124",
+        "interno": "124",
+        "modelo": "VOLKSWAGEN 13180",
+        "patente": "KDG777",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "125",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 125",
+        "interno": "125",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "ICT512",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "126",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 126",
+        "interno": "126",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "IEQ745",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "129",
+        "label": "MERCEDES BENZ ATEGO 1725 Interno 129",
+        "interno": "129",
+        "modelo": "MERCEDES BENZ ATEGO 1725",
+        "patente": "KVX858",
+        "equipo": "COMPACTADOR 3 EJES"
+      },
+      {
+        "value": "132",
+        "label": "VOLKSWAGEN 13180 Interno 132",
+        "interno": "132",
+        "modelo": "VOLKSWAGEN 13180",
+        "patente": "LLP358",
+        "equipo": "COMPACTADOR 2 EJES"
+      },
+      {
+        "value": "1001",
+        "label": "TANQUE SISTERNA TANQUE SISTERNA Interno 1001",
+        "interno": "1001",
+        "modelo": "TANQUE SISTERNA TANQUE SISTERNA",
+        "patente": "BACKUP01",
+        "equipo": "TANQUE SISTERNA"
+      },
+      {
+        "value": "3003",
+        "label": "VOLKSWAGEN GOL Interno 3003",
+        "interno": "3003",
+        "modelo": "VOLKSWAGEN GOL",
+        "patente": "OAI399",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "3004",
+        "label": "TOYOTA SW4 Interno 3004",
+        "interno": "3004",
+        "modelo": "TOYOTA SW4",
+        "patente": "OJQ316",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "3005",
+        "label": "JEEP RENEGADE SPORT Interno 3005",
+        "interno": "3005",
+        "modelo": "JEEP RENEGADE SPORT",
+        "patente": "AG483IM",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "3006",
+        "label": "HIUNDAY H1 Interno 3006",
+        "interno": "3006",
+        "modelo": "HIUNDAY H1",
+        "patente": "AB522WD",
+        "equipo": "CAMIONETA"
+      },
+      {
+        "value": "5000",
+        "label": "LEXUS NX 300 Interno 5000",
+        "interno": "5000",
+        "modelo": "LEXUS NX 300",
+        "patente": "AE022XI",
+        "equipo": "SEDAN 4 PUERTAS"
+      },
+      {
+        "value": "5001",
+        "label": "PEUGEOT 208 Interno 5001",
+        "interno": "5001",
+        "modelo": "PEUGEOT 208",
+        "patente": "AC520MR",
+        "equipo": "SEDAN 4 PUERTAS"
       }
     ],
     "responsables": [
@@ -3343,6 +3511,10 @@
         "label": "Agüero, Matías"
       },
       {
+        "value": "608",
+        "label": "AGUIRRE LEONARDO"
+      },
+      {
         "value": "305",
         "label": "Aguirre, Nestor Hugo"
       },
@@ -3357,10 +3529,6 @@
       {
         "value": "233",
         "label": "Albarracín, Ramón Antonio"
-      },
-      {
-        "value": "517",
-        "label": "ALBIRZU PABLO LEONARDO"
       },
       {
         "value": "254",
@@ -3567,6 +3735,10 @@
         "label": "Condori, Herbas Cristian"
       },
       {
+        "value": "607",
+        "label": "CORDOBA JORGE ANDRES"
+      },
+      {
         "value": "345",
         "label": "Coseres, Leandro Ezequiel"
       },
@@ -3688,7 +3860,7 @@
       },
       {
         "value": "323",
-        "label": "García, Yamandúú Liborio"
+        "label": "García, Yamandúúúúúúúúúúúúúúúúúúú Liborio"
       },
       {
         "value": "526",
@@ -4033,6 +4205,10 @@
       {
         "value": "245",
         "label": "Ontivero, Gabriel"
+      },
+      {
+        "value": "609",
+        "label": "OPEZZI ARMANDO"
       },
       {
         "value": "404",
@@ -4461,6 +4637,10 @@
         "label": "Agüero, Matías"
       },
       {
+        "value": "608",
+        "label": "AGUIRRE LEONARDO"
+      },
+      {
         "value": "305",
         "label": "Aguirre, Nestor Hugo"
       },
@@ -4475,10 +4655,6 @@
       {
         "value": "233",
         "label": "Albarracín, Ramón Antonio"
-      },
-      {
-        "value": "517",
-        "label": "ALBIRZU PABLO LEONARDO"
       },
       {
         "value": "254",
@@ -4685,6 +4861,10 @@
         "label": "Condori, Herbas Cristian"
       },
       {
+        "value": "607",
+        "label": "CORDOBA JORGE ANDRES"
+      },
+      {
         "value": "345",
         "label": "Coseres, Leandro Ezequiel"
       },
@@ -4806,7 +4986,7 @@
       },
       {
         "value": "323",
-        "label": "García, Yamandúú Liborio"
+        "label": "García, Yamandúúúúúúúúúúúúúúúúúúú Liborio"
       },
       {
         "value": "526",
@@ -5151,6 +5331,10 @@
       {
         "value": "245",
         "label": "Ontivero, Gabriel"
+      },
+      {
+        "value": "609",
+        "label": "OPEZZI ARMANDO"
       },
       {
         "value": "404",
@@ -5599,5 +5783,76 @@
         "label": "MDQ"
       }
     ]
+  },
+  "settings": {
+    "username": "paniol@contenedoreshugo.com.ar",
+    "password": "••••••••••••",
+    "portalUrl": "https://taxes.com.ar",
+    "googleScriptUrl": "https://script.google.com/macros/s/AKfycbxBIPF6-uoK2aFNfRCxDUS5AAFxLeToB7iMz3rdf_J4JjJBvsNbOv7aIdXBBnoxRZiC/exec",
+    "googleActiveTasksUrl": "https://script.google.com/macros/s/AKfycbxBIPF6-uoK2aFNfRCxDUS5AAFxLeToB7iMz3rdf_J4JjJBvsNbOv7aIdXBBnoxRZiC/exec",
+    "preventivoScriptUrl": "https://script.google.com/macros/s/AKfycbwuPIslBnq77dG5bhk19h2H2s9TlOeB6XrCpqCMDX-8dvO8uisNRdx7P43lyJtT1sZIgQ/exec",
+    "parteTallerScriptUrl": "https://script.google.com/macros/s/AKfycbyoHEhogBxWcSIdDtzzUIV9mhzO25TNAChgBlCCJbuHPIylXNpIpX8LKM6qc4DQjij8/exec",
+    "geminiApiKey": "",
+    "claudeApiKey": "",
+    "catalogSyncStatus": "idle",
+    "catalogSyncError": null,
+    "isSupervisor": true,
+    "employeeMappings": {
+      "Taller": [
+        {
+          "appName": "GODOY DAVID",
+          "taxesName": "Vera, Domingo Sergio"
+        },
+        {
+          "appName": "DOMINIC DYLAN",
+          "taxesName": "Vera, Domingo Sergio"
+        },
+        {
+          "appName": "PEREZ FACUNDO",
+          "taxesName": "Vera, Domingo Sergio"
+        },
+        {
+          "appName": "LOPEZ GUSTAVO",
+          "taxesName": "Vera, Domingo Sergio"
+        },
+        {
+          "appName": "CALOMINO DARIO",
+          "taxesName": "Vera, Domingo Sergio"
+        },
+        {
+          "appName": "MUSDALINO FRANCO",
+          "taxesName": "Vera, Domingo Sergio"
+        },
+        {
+          "appName": "RODRIGUEZ MARCELO",
+          "taxesName": "Vera, Domingo Sergio"
+        },
+        {
+          "appName": "Cuba Orosco, Kevín Genaro",
+          "taxesName": "Cuba Orosco, Kevín Genaro"
+        }
+      ],
+      "Herrería": [
+        {
+          "appName": "Federico",
+          "taxesName": "García, Yamandú Liborio"
+        },
+        {
+          "appName": "Victor Lizarraga",
+          "taxesName": "Carmona González, Juan Manuel"
+        },
+        {
+          "appName": "Digno",
+          "taxesName": "García, Yamandú Liborio"
+        },
+        {
+          "appName": "Franco Portillo",
+          "taxesName": "Carmona González, Juan Manuel"
+        }
+      ],
+      "Edilicio": []
+    },
+    "anthropicApiKey": "",
+    "openaiApiKey": ""
   }
 }
