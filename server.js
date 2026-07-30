@@ -2747,9 +2747,14 @@ async function sendHistoricalOrderToGoogleSheet(order, step) {
     const catalogs = db.getCatalogs();
     const task = (order.tasks && order.tasks[0]) ? order.tasks[0] : {};
     
-    // Resolve employee name
-    const mechanicObj = (catalogs.empleados || []).find(e => String(e.value) === String(task.empleado));
+    // Resolve employee name from catalog ID or label
+    const mechanicObj = (catalogs.empleados || []).find(e => String(e.value) === String(task.empleado) || e.label === task.empleado);
     const mechanicName = mechanicObj ? mechanicObj.label : (task.empleado || "");
+
+    // Resolve Centro de Costo name from catalog ID or label
+    const ccVal = String(order.centroCosto || task.centroCosto || "15");
+    const ccObj = (catalogs.centrosCosto || []).find(c => String(c.value) === ccVal || c.label === ccVal);
+    const ccName = ccObj ? ccObj.label : (order.clasificacion || "MECANICA");
 
     const nowStr = new Date().toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
 
@@ -2760,7 +2765,7 @@ async function sendHistoricalOrderToGoogleSheet(order, step) {
         fecha: order.fechaEntrega || new Date().toLocaleDateString("es-AR"),
         interno: String(order.interno || "—"),
         ot: order.taxesOrderNumber || order.taxesOtId || "Procesando...",
-        centro_costo: order.centroCosto || "15",
+        centro_costo: ccName,
         categoria: order.clasificacion || order.tipoUnidad || "MECANICA",
         empleado: mechanicName || "—",
         horas: String(task.horasEstimadas || "0.01"),
