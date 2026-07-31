@@ -2320,10 +2320,16 @@ async function syncWorkOrder(orderId) {
     
     await delay(1000); // Small extra buffer to be absolutely sure Vue is ready
 
-    // PRE-CREATION SAFEGUARD: Check if an OT already exists in Taxes for this Interno before creating a new one!
+    // PRE-CREATION SAFEGUARD: Check if an OT already exists in Taxes for this Interno ON TODAY'S DATE before creating a new one!
     if (order.interno) {
-      console.log(`[Pre-Check Safeguard] Searching OT list table for pre-existing OT for Interno ${order.interno}...`);
-      const existingOtOnPage = await page.evaluate((targetInterno) => {
+      const targetDateObj = order.createdAt ? new Date(order.createdAt) : new Date();
+      const dd = String(targetDateObj.getDate()).padStart(2, '0');
+      const mm = String(targetDateObj.getMonth() + 1).padStart(2, '0');
+      const yyyy = targetDateObj.getFullYear();
+      const todayDateStr = `${dd}/${mm}/${yyyy}`;
+
+      console.log(`[Pre-Check Safeguard] Searching OT list table for pre-existing OT for Interno ${order.interno} on date ${todayDateStr}...`);
+      const existingOtOnPage = await page.evaluate((targetInterno, targetDateStr) => {
         const clean = s => (s || '').toString().trim();
         const tables = Array.from(document.querySelectorAll('table'));
         for (const table of tables) {
@@ -2331,19 +2337,24 @@ async function syncWorkOrder(orderId) {
           for (const row of rows) {
             const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
             if (cells.length >= 3) {
+              const rowDate = cells[0] || '';
               const rowInterno = cells[1] || cells[0] || '';
               const rowOt = cells[2] || cells[1] || '';
-              if (rowInterno === clean(targetInterno) && rowOt.length >= 3 && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
+
+              const isSameInterno = clean(rowInterno) === clean(targetInterno);
+              const isSameDate = !targetDateStr || rowDate.includes(targetDateStr) || targetDateStr.includes(rowDate);
+
+              if (isSameInterno && isSameDate && rowOt.length >= 3 && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
                 return rowOt.replace(/\D/g, '');
               }
             }
           }
         }
         return null;
-      }, order.interno);
+      }, order.interno, todayDateStr);
 
       if (existingOtOnPage) {
-        console.log(`[Pre-Check Safeguard] Found pre-existing OT #${existingOtOnPage} for Interno ${order.interno} in Taxes! Linking and switching to reconciliation...`);
+        console.log(`[Pre-Check Safeguard] Found pre-existing OT #${existingOtOnPage} for Interno ${order.interno} on date ${todayDateStr} in Taxes! Linking and switching to reconciliation...`);
         db.updateWorkOrder(orderId, { taxesOrderNumber: existingOtOnPage });
         await browser.close(); releaseBrowserLock();
         return await syncWorkOrder(orderId);
