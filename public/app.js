@@ -2875,14 +2875,34 @@ async function submitWorkOrder() {
         }
       }
 
+      let existingTaskObj = null;
+      if (currentEditingOrderId && Array.isArray(activeOrders)) {
+        const orderObj = activeOrders.find(o => o.id === currentEditingOrderId);
+        if (orderObj && Array.isArray(orderObj.tasks)) {
+          existingTaskObj = orderObj.tasks.find(et => et && et.id === taskId);
+        }
+      }
+
+      let finalInsumosVal = insumos;
+      if (!finalInsumosVal && existingTaskObj && existingTaskObj.insumos) {
+        finalInsumosVal = existingTaskObj.insumos;
+      }
+
+      let finalDiagVal = (existingTaskObj && existingTaskObj.diagnostico) ? existingTaskObj.diagnostico : '';
+      let finalDescVal = desc;
+      if ((!finalDescVal || finalDescVal.trim() === '') && existingTaskObj && existingTaskObj.descripcion) {
+        finalDescVal = existingTaskObj.descripcion;
+      }
+
       tasks.push({
         id: taskId,
         centroCosto: cc,
         empleado: emp,
         horasEstimadas: parsedHours,
         status: status,
-        descripcion: desc,
-        insumos: insumos,
+        descripcion: finalDescVal,
+        insumos: finalInsumosVal,
+        diagnostico: finalDiagVal,
         timerStart: timerStartVal,
         timerStarted: card.dataset.timerStarted === 'true',
         timerHistory: timerHistoryVal
