@@ -2131,11 +2131,27 @@ async function syncWorkOrder(orderId) {
           }, ci);
           if (hoursId) {
             const sel = `#${hoursId}`;
+            await page.evaluate((s, val) => {
+              const el = document.querySelector(s);
+              if (el) {
+                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+                if (nativeSetter && nativeSetter.set) {
+                  nativeSetter.set.call(el, val);
+                } else {
+                  el.value = val;
+                }
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+              }
+            }, sel, expectedHours);
+
             await page.focus(sel).catch(() => {});
             await page.click(sel, { clickCount: 3 }).catch(() => {});
             await page.keyboard.press('Backspace').catch(() => {});
-            await page.type(sel, expectedHours, { delay: 50 });
+            await page.type(sel, expectedHours, { delay: 50 }).catch(() => {});
             await page.keyboard.press('Tab').catch(() => {});
+
             await page.evaluate((s) => {
               const el = document.querySelector(s);
               if (el) {
