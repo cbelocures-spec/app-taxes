@@ -2919,7 +2919,9 @@ async function submitWorkOrder() {
       incidente: incidenteEl ? incidenteEl.value : '',
       tasks: tasks,
       estadoUnidad: currentEditingOrderId ? (activeOrders.find(o => o.id === currentEditingOrderId)?.estadoUnidad || 'fuera_de_servicio') : 'fuera_de_servicio',
-      combustibleReset: currentCombustibleReset
+      combustibleReset: currentCombustibleReset,
+      archived: false,
+      syncStatus: 'pending'
     };
    
     const url = currentEditingOrderId ? `/api/orders/${currentEditingOrderId}` : '/api/orders';

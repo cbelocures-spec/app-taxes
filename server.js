@@ -837,8 +837,11 @@ app.put('/api/orders/:id', (req, res) => {
     // STRICT RULE: Must have an assigned Taxes OT number to be archived into Historial!
     const hasTaxesOt = (existing.taxesOrderNumber || req.body.taxesOrderNumber) && String(existing.taxesOrderNumber || req.body.taxesOrderNumber).trim() !== '';
     const explicitUnarchive = (req.body.archived === false);
-    const autoArchive = hasTaxesOt && allTasksCompleted && !isOutOfService && !explicitUnarchive;
-    const isArchived = explicitUnarchive ? false : ((req.body.archived === true && hasTaxesOt) || autoArchive);
+    const targetSyncStatus = req.body.syncStatus || ((existing.syncStatus === 'success' && incomingTasks.length === 0) ? existing.syncStatus : "pending");
+    const isPendingSync = (targetSyncStatus === 'pending' || targetSyncStatus === 'syncing');
+
+    const autoArchive = hasTaxesOt && allTasksCompleted && !isOutOfService && !explicitUnarchive && !isPendingSync;
+    const isArchived = explicitUnarchive ? false : (isPendingSync ? false : ((req.body.archived === true && hasTaxesOt) || autoArchive));
 
     const updated = db.updateWorkOrder(req.params.id, {
       rodado,
@@ -849,7 +852,7 @@ app.put('/api/orders/:id', (req, res) => {
       clasificacion: finalClasificacion,
       incidente,
       createdBy,
-      syncStatus: (existing.syncStatus === 'success' && incomingTasks.length === 0) ? existing.syncStatus : "pending",
+      syncStatus: targetSyncStatus,
       syncError: null,
       syncDate: null,
       estadoUnidad: targetEstadoUnidad,
