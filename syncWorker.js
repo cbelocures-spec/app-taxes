@@ -85,14 +85,10 @@ function releaseBrowserLock() {
 
 const { exec } = require('child_process');
 
-function killZombieChromes() {
+function cleanupZombieBrowsers() {
   return new Promise((resolve) => {
-    if (process.platform === 'win32') return resolve();
-    console.log('[Puppeteer] Cleaning up potential zombie chrome processes on server...');
-    exec('pkill -9 -f chrome || true', (err) => {
-      if (err) console.warn('[Puppeteer] Zombie cleanup warning: ' + err.message);
-      resolve();
-    });
+    // Avoid aggressive pkill that kills active puppeteer sessions
+    return resolve();
   });
 }
 
