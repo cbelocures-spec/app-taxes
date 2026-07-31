@@ -3959,6 +3959,22 @@ async function startWorker() {
     console.error("Error resetting stuck orders on startup:", err);
   }
 
+  // Reset any orders stuck in verifiedStatus 'checking' on startup. Nothing else clears this
+  // flag: if the process restarts (crash, deploy) while a manual "Controlar" verification is
+  // in flight, the in-memory promise dies with it and the DB is left showing "CONTROLANDO..."
+  // forever, since the code path that would set 'success'/'error' never gets to run.
+  try {
+    const orders = db.getWorkOrders();
+    for (const o of orders) {
+      if (o.verifiedStatus === 'checking') {
+        console.log(`Resetting stuck verifiedStatus for order ID: ${o.id} to 'error' on worker startup.`);
+        db.updateWorkOrder(o.id, { verifiedStatus: 'error', verifiedError: 'Control interrumpido por reinicio del servidor.' });
+      }
+    }
+  } catch (err) {
+    console.error("Error resetting stuck verification status on startup:", err);
+  }
+
  // Auto-fix settings for tasks that failed verification (wrong hours/status in Taxes)
   const MAX_AUTO_VERIFY_RETRIES = 5;
   const AUTO_VERIFY_COOLDOWN_MS = 2 * 60 * 1000; // wait 2 min between auto retries per order
