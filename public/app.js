@@ -2516,7 +2516,16 @@ function createOrderCardHtml(order) {
   if (order.syncStatus === 'pending') {
     statusBadge = `<span class="badge-status pending"><span class="material-icons">hourglass_empty</span> Pendiente</span>`;
   } else if (order.syncStatus === 'syncing') {
-    statusBadge = `<span class="badge-status syncing"><span class="material-icons spinner">autorenew</span> Sincronizando</span>`;
+    if (order.taxesOrderNumber) {
+      statusBadge = `
+        <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px;">
+          <span class="material-icons spinner">autorenew</span> 
+          <span>Sincronizando O.T.: ${order.taxesOrderNumber}</span>
+        </span>
+      `;
+    } else {
+      statusBadge = `<span class="badge-status syncing"><span class="material-icons spinner">autorenew</span> Sincronizando</span>`;
+    }
   } else if (order.syncStatus === 'success') {
     const otText = order.taxesOrderNumber ? ` O.T.: ${order.taxesOrderNumber}` : '';
     statusBadge = `

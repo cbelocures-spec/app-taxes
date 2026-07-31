@@ -513,6 +513,19 @@ app.get('/api/orders', (req, res) => {
 
     const orders = db.getWorkOrders();
     
+    // Auto-heal stuck syncing status if lock time exceeds 45s
+    orders.forEach(o => {
+      if (o.syncStatus === 'syncing' && o.syncLockTime) {
+        const elapsed = Date.now() - new Date(o.syncLockTime).getTime();
+        if (elapsed > 45000) {
+          console.log(`[Auto-Heal] Order ${o.id} stuck in syncing for ${Math.round(elapsed/1000)}s. Resetting status...`);
+          const targetStatus = (o.taxesOrderNumber && String(o.taxesOrderNumber).trim() !== '') ? 'success' : 'pending';
+          o.syncStatus = targetStatus;
+          db.updateWorkOrder(o.id, { syncStatus: targetStatus });
+        }
+      }
+    });
+
     // Filter orders based on user's authorized sectors
     const filtered = orders.filter(o => {
       const cls = o.clasificacion;
