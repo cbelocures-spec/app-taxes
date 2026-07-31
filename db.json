@@ -448,7 +448,7 @@
           "empleado": "512",
           "horasEstimadas": 6.5,
           "descripcion": "Lustrado de cabina para ploteo",
-          "status": "Pendiente",
+          "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
           "timerStarted": false,
@@ -473,7 +473,7 @@
           "empleado": "365",
           "horasEstimadas": 6.5,
           "descripcion": "Reparar paraholpe",
-          "status": "Pendiente",
+          "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
           "timerStarted": false,
@@ -498,7 +498,7 @@
           "empleado": "PEREZ FACUNDO",
           "horasEstimadas": 6.5,
           "descripcion": "Lustrar cabina y pintar equip",
-          "status": "Pendiente",
+          "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
           "timerStarted": false,
@@ -516,6 +516,36 @@
           ],
           "synced": true,
           "taxesRealizadaSynced": false
+        },
+        {
+          "id": "task-155-target-1-1785494091680",
+          "centroCosto": "15",
+          "empleado": "OJEDA FERNANDEZ JOSE ENRIQUE",
+          "horasEstimadas": 3.5,
+          "status": "Pendiente",
+          "descripcion": "desarme rueda derecha trasera revision rulemanes campana y cinta",
+          "timerStart": null,
+          "timerStarted": false
+        },
+        {
+          "id": "task-155-target-2-1785494091680",
+          "centroCosto": "15",
+          "empleado": "PEREZ FACUNDO",
+          "horasEstimadas": 6.5,
+          "status": "Pendiente",
+          "descripcion": "pintar pisos con antioxidaaantes",
+          "timerStart": null,
+          "timerStarted": false
+        },
+        {
+          "id": "task-155-target-3-1785494091680",
+          "centroCosto": "15",
+          "empleado": "Rocha, Ariel Maximiliano",
+          "horasEstimadas": 6.5,
+          "status": "Pendiente",
+          "descripcion": "termina de pisos revision puertas y cabina",
+          "timerStart": null,
+          "timerStarted": false
         }
       ],
       "createdBy": "paniol@contenedoreshugo.com.ar",
@@ -1297,7 +1327,7 @@
           "empleado": "579",
           "horasEstimadas": 6.58,
           "descripcion": "Revisión inyectores. - Diagnóstico: cigueñal fundido viela numero 4.\ndesarme de perifericos.",
-          "status": "Pendiente",
+          "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
           "timerStarted": false,
@@ -1332,7 +1362,7 @@
           "empleado": "348",
           "horasEstimadas": 2.12,
           "descripcion": "llevar repuestos",
-          "status": "Pendiente",
+          "status": "Finalizada",
           "insumos": "",
           "timerStart": null,
           "timerStarted": false,
@@ -1375,6 +1405,26 @@
           ],
           "synced": true,
           "taxesRealizadaSynced": true
+        },
+        {
+          "id": "task-119-target-1-1785494091681",
+          "centroCosto": "15",
+          "empleado": "Morel, Luis Maximiliano",
+          "horasEstimadas": 4.5,
+          "status": "Pendiente",
+          "descripcion": "armado motor y todo el pereferico turbo multiple bomba agua y aceite etc",
+          "timerStart": null,
+          "timerStarted": false
+        },
+        {
+          "id": "task-119-target-2-1785494091681",
+          "centroCosto": "15",
+          "empleado": "Canaviri Fernandez, Jesús",
+          "horasEstimadas": 4.5,
+          "status": "Pendiente",
+          "descripcion": "armado motor y todo el pereferico turbo multiple bomba agua y aceite etc",
+          "timerStart": null,
+          "timerStarted": false
         }
       ],
       "createdBy": "paniol@contenedoreshugo.com.ar",
