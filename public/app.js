@@ -524,64 +524,77 @@ document.addEventListener('DOMContentLoaded', () => {
 // 1. SPA ROUTING
 function switchView(viewId) {
   console.log("Switching view to:", viewId);
-  // Deactivate all views
-  document.querySelectorAll('.app-view').forEach(v => {
-    v.classList.remove('active');
-    v.style.display = 'none';
-  });
-  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  try {
+    // Deactivate all views
+    document.querySelectorAll('.app-view').forEach(v => {
+      v.classList.remove('active');
+      v.style.display = 'none';
+    });
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
 
-  // Activate selected view
-  const viewEl = document.getElementById(`view-${viewId}`);
-  if (viewEl) {
-    viewEl.classList.add('active');
-    viewEl.style.display = 'block';
-  }
+    // Activate selected view
+    const viewEl = document.getElementById(`view-${viewId}`);
+    if (viewEl) {
+      viewEl.classList.add('active');
+      viewEl.style.display = 'block';
+    }
 
-  const navEl = document.getElementById(`nav-${viewId}`);
-  if (navEl) navEl.classList.add('active');
+    const navEl = document.getElementById(`nav-${viewId}`);
+    if (navEl) navEl.classList.add('active');
 
-  // Clear selections when changing views
-  if (viewId !== 'orders') {
-    selectedOrderIds.clear();
-    updateBulkSyncActionBar();
-    document.querySelectorAll('.order-select-checkbox').forEach(chk => chk.checked = false);
-  }
-  if (viewId !== 'history') {
-    selectedHistoryOrderIds.clear();
-    updateHistoryBulkDeleteActionBar();
-    document.querySelectorAll('.history-order-select-checkbox').forEach(chk => chk.checked = false);
-  }
+    // Clear selections when changing views
+    if (viewId !== 'orders') {
+      try {
+        selectedOrderIds.clear();
+        updateBulkSyncActionBar();
+        document.querySelectorAll('.order-select-checkbox').forEach(chk => chk.checked = false);
+      } catch (e) {}
+    }
+    if (viewId !== 'history') {
+      try {
+        selectedHistoryOrderIds.clear();
+        updateHistoryBulkDeleteActionBar();
+        document.querySelectorAll('.history-order-select-checkbox').forEach(chk => chk.checked = false);
+      } catch (e) {}
+    }
 
-  if (viewId === 'orders') {
-    renderOrders();
-  }
+    if (viewId === 'orders') {
+      try { renderOrders(); } catch(e) { console.error("renderOrders error:", e); }
+    }
 
-  if (viewId === 'settings') {
-    renderEmployeeHoursSummary();
-    const empMappingsSection = document.getElementById('employee-mappings-section');
-    if (empMappingsSection) {
-      empMappingsSection.style.display = 'block';
-      if (typeof loadAndRenderEmployeeMappings === 'function') {
-        loadAndRenderEmployeeMappings();
+    if (viewId === 'settings') {
+      try { renderEmployeeHoursSummary(); } catch(e) {}
+      const empMappingsSection = document.getElementById('employee-mappings-section');
+      if (empMappingsSection) {
+        empMappingsSection.style.display = 'block';
+        if (typeof loadAndRenderEmployeeMappings === 'function') {
+          try { loadAndRenderEmployeeMappings(); } catch(e) {}
+        }
+      }
+      if (typeof loadUserPermissionsUI === 'function') {
+        try { loadUserPermissionsUI(); } catch(e) {}
       }
     }
-    if (typeof loadUserPermissionsUI === 'function') {
-      loadUserPermissionsUI();
-    }
-  }
 
-  if (viewId === 'bulk') {
-    const container = document.getElementById('bulk-tasks-container');
-    if (container && container.querySelectorAll('.bulk-task-item-card').length === 0) {
-      addBulkTaskField();
+    if (viewId === 'bulk') {
+      try {
+        const container = document.getElementById('bulk-tasks-container');
+        if (container && container.querySelectorAll('.bulk-task-item-card').length === 0) {
+          addBulkTaskField();
+        }
+        renderBulkVehicleSelector();
+      } catch(e) {}
     }
-    renderBulkVehicleSelector();
-  }
 
-  if (viewId === 'preventivos') {
-    fetchPreventivoFlota();
+    if (viewId === 'preventivos') {
+      try { fetchPreventivoFlota(); } catch(e) {}
+    }
+  } catch (err) {
+    console.error("[switchView Error]:", err);
   }
+}
+
+window.switchView = switchView;
 
   if (viewId === 'partetaller') {
     fetchParteTallerEstado();
