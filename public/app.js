@@ -3839,7 +3839,11 @@ function renderDashboard() {
             ? cachedCatalogs.empleados.find(e => e.value === task.empleado)
             : null;
           const empLabel = (empOpt ? empOpt.label : task.empleado) || 'Desconocido';
-          const isTimerRunning = task.timerStart !== null && task.timerStart > 0;
+          const timerKey = `timer_start_${task.id}`;
+          const localTimerStart = localStorage.getItem(timerKey);
+          const isTimerRunning = (task.timerStart !== null && task.timerStart > 0) || 
+                                 (localTimerStart !== null && parseInt(localTimerStart) > 0) || 
+                                 task.timerStarted === true || task.timerStarted === 'true';
 
           const taskInfo = {
             orderId: order.id,
@@ -3852,7 +3856,7 @@ function renderDashboard() {
             centroCosto: task.centroCosto || '',
             horasEstimadas: parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0,
             descripcion: task.descripcion || '(Sin descripción)',
-            timerStart: task.timerStart,
+            timerStart: isTimerRunning ? (task.timerStart || (localTimerStart ? parseInt(localTimerStart) : Date.now())) : null,
             isTimerRunning: isTimerRunning,
             timerHistory: task.timerHistory || [],
             taxesOrderNumber: order.taxesOrderNumber || null
