@@ -1962,44 +1962,13 @@ async function syncWorkOrder(orderId) {
 
       // Now that formCards.length === order.tasks.length, compute the final mapping accurately
       const cardToAppMap = [];
-      const finalUsedAppIndices = new Set();
-
-      // Pass 1: Map existing cards that match an app task by employee or description
-      for (let ci = 0; ci < formCards.length; ci++) {
-        const card = formCards[ci];
-        let bestAppIdx = -1;
-        for (let ai = 0; ai < order.tasks.length; ai++) {
-          if (finalUsedAppIndices.has(ai)) continue;
-          const appTask = order.tasks[ai];
-          const { employeeLabel } = resolveAndMapEmployee(appTask);
-          const empOk = cleanStr(card.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(card.employee));
-          const descOk = cleanStr(card.description).includes(cleanStr(appTask.descripcion)) || cleanStr(appTask.descripcion).includes(cleanStr(card.description));
-          if (empOk || descOk) {
-            bestAppIdx = ai;
-            break;
-          }
-        }
-        if (bestAppIdx !== -1) {
-          cardToAppMap[ci] = bestAppIdx;
-          finalUsedAppIndices.add(bestAppIdx);
-        }
-      }
-
-      // Pass 2: Map remaining empty/new cards to remaining app tasks
-      for (let ci = 0; ci < formCards.length; ci++) {
-        if (cardToAppMap[ci] !== undefined) continue;
-        for (let ai = 0; ai < order.tasks.length; ai++) {
-          if (!finalUsedAppIndices.has(ai)) {
-            cardToAppMap[ci] = ai;
-            finalUsedAppIndices.add(ai);
-            break;
-          }
-        }
+      for (let i = 0; i < formCards.length; i++) {
+        cardToAppMap[i] = i; // Positional 1-to-1 mapping guarantees task 0 -> card 0
       }
 
       console.log(`[Reconcile] Final Card to App Map:`, JSON.stringify(cardToAppMap));
 
-      // 6. Update each remaining card with correct hours and realizada
+      // 6. Update each remaining card with correct employee, description, hours, and realizada state
       for (let ci = 0; ci < formCards.length; ci++) {
         const appIdx = cardToAppMap[ci];
         if (appIdx === undefined || appIdx === null || appIdx < 0) continue;
@@ -2012,7 +1981,6 @@ async function syncWorkOrder(orderId) {
         const ccLabel = ccObj ? ccObj.label : appTask.centroCosto;
         console.log(`[Reconcile] Card #${ci} Centro de Costo: "${ccLabel}" (ID: ${appTask.centroCosto})`);
         await page.evaluate((idx, taskCC) => {
-          // Find CC select by proximity inside target card container
           const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
           const targetHoursInput = horasInputs[idx];
           if (!targetHoursInput) return;
@@ -2046,10 +2014,8 @@ async function syncWorkOrder(orderId) {
         }, ci, ccLabel);
         await delay(1000);
 
-        // 2. Fill Employee if empty, placeholder, mismatch, or hidden input lacks value
+        // 2. Fill/Fix Employee if empty, placeholder, or mismatch
         const { employeeLabel } = resolveAndMapEmployee(appTask);
-        
-        // Query the hidden input value directly from the DOM to ensure a real binding exists
         const hiddenEmpValue = await page.evaluate((idx) => {
           const inp = document.querySelector(`input[name="syj_empleado_id_tarea_${idx}"], input[name$="empleado_id_tarea_${idx}"], input[name*="empleado_id_tarea_${idx}"]`);
           return inp ? inp.value : '';
@@ -2058,18 +2024,18 @@ async function syncWorkOrder(orderId) {
         const isEmpEmptyOrPlaceholder = formCards[ci].employee === '' || 
                                        formCards[ci].employee.toLowerCase().includes('seleccionar') || 
                                        formCards[ci].employee.toLowerCase().includes('buscar') ||
-                                       !hiddenEmpValue; // If DOM input is empty, treat employee as not selected
+                                       !hiddenEmpValue;
         const isEmpMismatch = !cleanStr(formCards[ci].employee).includes(cleanStr(employeeLabel)) && 
                               !cleanStr(employeeLabel).includes(cleanStr(formCards[ci].employee));
                               
         if (isEmpEmptyOrPlaceholder || isEmpMismatch) {
-          console.log(`[Reconcile] Card #${ci} needs employee. Current: "${formCards[ci].employee}". Target: "${employeeLabel}" (hidden value: "${hiddenEmpValue}")...`);
+          console.log(`[Reconcile] Card #${ci} employee update required. Current: "${formCards[ci].employee}". Target: "${employeeLabel}"...`);
           const empFilled = await fillTaskEmployeeSearchableSelect(page, ci, employeeLabel);
           console.log(`[Reconcile] Card #${ci} employee select result: ${empFilled}`);
           await delay(2000);
         }
 
-        // 3. Fill/Fix Description if empty or doesn't match what the app has
+        // 3. Fill/Fix Description if empty or doesn't match
         const { finalDescription } = resolveAndMapEmployee(appTask);
         const localDescBase = (appTask.descripcion || '').replace(/[.,\s]/g, '').toLowerCase();
         const taxesDescBase = extractBaseDescription(formCards[ci].description);
@@ -2106,7 +2072,7 @@ async function syncWorkOrder(orderId) {
           }
         }
 
-        // horasEstimadas is already decimal hours from the timer — use directly, no H.MM conversion.
+        // 4. Fill/Fix Hours
         let expectedHoursNum = parseFloat(String(appTask.horasEstimadas || '0').replace(',', '.')) || 0;
         if (expectedHoursNum === 0 && appTask.timerHistory && Array.isArray(appTask.timerHistory) && appTask.timerHistory.length >= 1) {
           let totalMs = 0;
@@ -2122,16 +2088,12 @@ async function syncWorkOrder(orderId) {
           });
           if (totalMs > 0) {
             expectedHoursNum = Math.round((totalMs / 3600000) * 100) / 100;
-            console.log(`[Reconcile] Card #${ci} Using timer-derived hours: ${expectedHoursNum}h`);
           }
         }
-        const expectedHours = expectedHoursNum.toFixed(2); // Keep period decimal separator for number input value
-        const expectedHoursNum2 = parseFloat(expectedHoursNum.toFixed(2)); // numeric version for comparisons
+        const expectedHours = expectedHoursNum.toFixed(2);
+        const expectedHoursNum2 = parseFloat(expectedHoursNum.toFixed(2));
         const actualHours = parseFloat(formCards[ci].hours.replace(',', '.')) || 0;
         const hoursOk = (actualHours === 0 && expectedHoursNum2 > 0) ? false : (Math.abs(expectedHoursNum2 - actualHours) <= 0.05);
-        const realizadaNeeded = appTask.status === 'Finalizada' && !formCards[ci].realizada;
-
-        console.log(`[Reconcile] Card #${ci}: hours exp=${expectedHours} actual=${actualHours} ok=${hoursOk} | realizada needed=${realizadaNeeded}`);
 
         if (!hoursOk) {
           console.log(`[Reconcile] Fixing hours for card #${ci} to "${expectedHours}"...`);
@@ -2148,7 +2110,7 @@ async function syncWorkOrder(orderId) {
             await page.click(sel, { clickCount: 3 }).catch(() => {});
             await page.keyboard.press('Backspace').catch(() => {});
             await page.type(sel, expectedHours, { delay: 50 });
-            await page.keyboard.press('Tab').catch(() => {}); // Force Vue blur to persist the value
+            await page.keyboard.press('Tab').catch(() => {});
             await page.evaluate((s) => {
               const el = document.querySelector(s);
               if (el) {
@@ -2162,20 +2124,24 @@ async function syncWorkOrder(orderId) {
           appTask.needsHoursUpdate = false;
         }
 
-        if (realizadaNeeded) {
-          console.log(`[Reconcile] Toggling Realizada for card #${ci}...`);
-          await page.evaluate((idx) => {
+        // 5. Fill/Fix REALIZADA state (SI/NO toggle) to strictly match app task status
+        const shouldBeRealizada = (appTask.status === 'Finalizada' || appTask.realizada === true);
+        const currentRealizada = formCards[ci].realizada;
+
+        if (shouldBeRealizada !== currentRealizada) {
+          console.log(`[Reconcile] Toggling Realizada for card #${ci} (current=${currentRealizada}, target=${shouldBeRealizada})...`);
+          await page.evaluate((idx, targetState) => {
             const switches = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
             const sw = switches[idx];
             if (!sw) return;
             const cb = sw.querySelector('input[type="checkbox"]');
-            if (cb && !cb.checked) {
+            if (cb && cb.checked !== targetState) {
               const lbl = sw.querySelector('label, .custom-control-label');
               if (lbl) lbl.click(); else cb.click();
             }
-          }, ci);
-          await delay(3500); // 3.5s delay to show toggled Realizada switch in slow motion
-          appTask.taxesRealizadaSynced = true;
+          }, ci, shouldBeRealizada);
+          await delay(2500);
+          appTask.taxesRealizadaSynced = shouldBeRealizada;
         }
 
         appTask.synced = true;
