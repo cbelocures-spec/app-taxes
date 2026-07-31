@@ -228,7 +228,7 @@
       "createdAt": "2026-07-28T09:57:36.559Z",
       "tasks": [
         {
-          "id": "t155-1",
+          "id": "t155-1-active",
           "centroCosto": "15",
           "empleado": "OJEDA FERNANDEZ JOSE ENRIQUE",
           "horasEstimadas": 3.5,
@@ -245,7 +245,7 @@
           ]
         },
         {
-          "id": "t155-2",
+          "id": "t155-2-active",
           "centroCosto": "15",
           "empleado": "PEREZ FACUNDO",
           "horasEstimadas": 6.5,
@@ -262,7 +262,7 @@
           ]
         },
         {
-          "id": "t155-3",
+          "id": "t155-3-active",
           "centroCosto": "15",
           "empleado": "Rocha, Ariel Maximiliano",
           "horasEstimadas": 6.5,
@@ -1053,7 +1053,7 @@
       "createdAt": "2026-07-29T14:08:14.327Z",
       "tasks": [
         {
-          "id": "t119-1",
+          "id": "t119-1-active",
           "centroCosto": "15",
           "empleado": "Morel, Luis Maximiliano",
           "horasEstimadas": 4.5,
@@ -1070,7 +1070,7 @@
           ]
         },
         {
-          "id": "t119-2",
+          "id": "t119-2-active",
           "centroCosto": "15",
           "empleado": "Canaviri Fernandez, Jesús",
           "horasEstimadas": 4.5,
