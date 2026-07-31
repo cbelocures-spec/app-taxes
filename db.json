@@ -234,8 +234,15 @@
           "horasEstimadas": 3.5,
           "status": "Pendiente",
           "descripcion": "desarme rueda derecha trasera revision rulemanes campana y cinta",
-          "timerStart": null,
-          "timerStarted": false
+          "timerStart": 1785488400000,
+          "timerStarted": true,
+          "timerHistory": [
+            {
+              "event": "Inició",
+              "timestamp": 1785488400000,
+              "timeString": "06:00"
+            }
+          ]
         },
         {
           "id": "t155-2",
@@ -244,8 +251,15 @@
           "horasEstimadas": 6.5,
           "status": "Pendiente",
           "descripcion": "pintar pisos con antioxidaaantes",
-          "timerStart": null,
-          "timerStarted": false
+          "timerStart": 1785488400000,
+          "timerStarted": true,
+          "timerHistory": [
+            {
+              "event": "Inició",
+              "timestamp": 1785488400000,
+              "timeString": "06:00"
+            }
+          ]
         },
         {
           "id": "t155-3",
@@ -254,8 +268,15 @@
           "horasEstimadas": 6.5,
           "status": "Pendiente",
           "descripcion": "termina de pisos revision puertas y cabina",
-          "timerStart": null,
-          "timerStarted": false
+          "timerStart": 1785488400000,
+          "timerStarted": true,
+          "timerHistory": [
+            {
+              "event": "Inició",
+              "timestamp": 1785488400000,
+              "timeString": "06:00"
+            }
+          ]
         }
       ],
       "createdBy": "paniol@contenedoreshugo.com.ar",
@@ -1038,8 +1059,15 @@
           "horasEstimadas": 4.5,
           "status": "Pendiente",
           "descripcion": "armado motor y todo el pereferico turbo multiple bomba agua y aceite etc",
-          "timerStart": null,
-          "timerStarted": false
+          "timerStart": 1785488400000,
+          "timerStarted": true,
+          "timerHistory": [
+            {
+              "event": "Inició",
+              "timestamp": 1785488400000,
+              "timeString": "06:00"
+            }
+          ]
         },
         {
           "id": "t119-2",
@@ -1048,8 +1076,15 @@
           "horasEstimadas": 4.5,
           "status": "Pendiente",
           "descripcion": "armado motor y todo el pereferico turbo multiple bomba agua y aceite etc",
-          "timerStart": null,
-          "timerStarted": false
+          "timerStart": 1785488400000,
+          "timerStarted": true,
+          "timerHistory": [
+            {
+              "event": "Inició",
+              "timestamp": 1785488400000,
+              "timeString": "06:00"
+            }
+          ]
         }
       ],
       "createdBy": "paniol@contenedoreshugo.com.ar",
