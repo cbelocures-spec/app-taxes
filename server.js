@@ -621,23 +621,27 @@ app.post('/api/orders', (req, res) => {
       combustibleReset
     });
 
-    // Trigger Google Sheets update asynchronously for any finalized tasks
-    checkAndTriggerGoogleSheetUpdates(null, newOrder.tasks, responsable, interno);
-    checkAndSendInsumosToSheet(null, newOrder.tasks, responsable, interno);
-    sendHistoricalOrderToGoogleSheet(newOrder, 'crear');
-
-    // Trigger active tasks Google Sheets update
-    triggerActiveTasksGoogleSheetSync();
-
-    // Trigger fuel service reset if all tasks are completed
-    const allTasksCompleted = (newOrder.tasks || []).length > 0 && (newOrder.tasks || []).every(t => t.status === "Finalizada");
-    if (allTasksCompleted && newOrder.combustibleReset && !newOrder.combustibleReset.triggered) {
-      newOrder.combustibleReset.triggered = true;
-      db.updateWorkOrder(newOrder.id, { combustibleReset: newOrder.combustibleReset });
-      triggerFuelServiceReset(newOrder);
-    }
-
+    // Respond immediately to the frontend so UI never freezes or hangs
     res.status(201).json(newOrder);
+
+    // Run all background webhooks asynchronously after response
+    setImmediate(() => {
+      try {
+        checkAndTriggerGoogleSheetUpdates(null, newOrder.tasks, responsable, interno);
+        checkAndSendInsumosToSheet(null, newOrder.tasks, responsable, interno);
+        sendHistoricalOrderToGoogleSheet(newOrder, 'crear');
+        triggerActiveTasksGoogleSheetSync();
+
+        const allTasksCompleted = (newOrder.tasks || []).length > 0 && (newOrder.tasks || []).every(t => t.status === "Finalizada");
+        if (allTasksCompleted && newOrder.combustibleReset && !newOrder.combustibleReset.triggered) {
+          newOrder.combustibleReset.triggered = true;
+          db.updateWorkOrder(newOrder.id, { combustibleReset: newOrder.combustibleReset });
+          triggerFuelServiceReset(newOrder);
+        }
+      } catch (err) {
+        console.error("Background webhook error on order creation:", err.message);
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -828,21 +832,26 @@ app.put('/api/orders/:id', (req, res) => {
       })
     });
 
-    // Trigger Google Sheets update asynchronously for any newly finalized tasks
-    checkAndTriggerGoogleSheetUpdates(existing, updated.tasks, responsable, interno);
-    checkAndSendInsumosToSheet(existing, updated.tasks, responsable, interno);
-
-    // Trigger active tasks Google Sheets update
-    triggerActiveTasksGoogleSheetSync();
-
-    // Trigger fuel service reset if all tasks are completed
-    if (allTasksCompleted && updated.combustibleReset && !updated.combustibleReset.triggered) {
-      updated.combustibleReset.triggered = true;
-      db.updateWorkOrder(updated.id, { combustibleReset: updated.combustibleReset });
-      triggerFuelServiceReset(updated);
-    }
-
+    // Respond immediately to the frontend so UI modal never hangs
     res.json(updated);
+
+    // Run background webhooks asynchronously after response
+    setImmediate(() => {
+      try {
+        checkAndTriggerGoogleSheetUpdates(existing, updated.tasks, responsable, interno);
+        checkAndSendInsumosToSheet(existing, updated.tasks, responsable, interno);
+        sendHistoricalOrderToGoogleSheet(updated, 'confirmar');
+        triggerActiveTasksGoogleSheetSync();
+
+        if (allTasksCompleted && updated.combustibleReset && !updated.combustibleReset.triggered) {
+          updated.combustibleReset.triggered = true;
+          db.updateWorkOrder(updated.id, { combustibleReset: updated.combustibleReset });
+          triggerFuelServiceReset(updated);
+        }
+      } catch (err) {
+        console.error("Background webhook error on order update:", err.message);
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
