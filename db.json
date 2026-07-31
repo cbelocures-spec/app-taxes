@@ -9,8 +9,8 @@
       "interno": "61",
       "clasificacion": "Herrer��a",
       "incidente": "",
-      "syncStatus": "error",
-      "syncError": "Error de login para paniol@contenedoreshugo.com.ar: Taxes.com.ar restringió temporalmente las solicitudes automáticas por exceso de tráfico (Error 429 Too Many Requests). Espere 3 a 5 minutos e intente nuevamente.",
+      "syncStatus": "pending",
+      "syncError": null,
       "syncDate": "2026-07-27T12:08:10.901Z",
       "createdAt": "2026-07-28T09:57:18.203Z",
       "tasks": [
@@ -158,8 +158,8 @@
       "interno": "REP. VOLQUETE",
       "clasificacion": "Correctivo",
       "incidente": "",
-      "syncStatus": "error",
-      "syncError": "No se encontró la OT 25536 en el listado para editar. Verificar número de OT en Taxes.",
+      "syncStatus": "pending",
+      "syncError": null,
       "syncDate": null,
       "createdAt": "2026-07-28T09:57:32.602Z",
       "tasks": [
@@ -981,8 +981,8 @@
       "interno": "REPARACIONES INTERNAS",
       "clasificacion": "Herrería",
       "incidente": "",
-      "syncStatus": "error",
-      "syncError": "Input.dispatchKeyEvent timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed.",
+      "syncStatus": "pending",
+      "syncError": null,
       "syncDate": null,
       "createdAt": "2026-07-29T12:04:35.392Z",
       "tasks": [
@@ -1162,8 +1162,8 @@
       "interno": "10024",
       "clasificacion": "Herrería",
       "incidente": "",
-      "syncStatus": "error",
-      "syncError": "No se pudo seleccionar el Rodado. Asegúrese de que el valor sea válido.",
+      "syncStatus": "pending",
+      "syncError": null,
       "syncDate": null,
       "createdAt": "2026-07-29T13:00:25.352Z",
       "tasks": [

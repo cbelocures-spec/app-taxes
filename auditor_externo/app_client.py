@@ -20,10 +20,10 @@ class AppClient:
         return {}
 
     def fetch_orders(self):
-        """Fetches archived (Historial) work orders from Railway backend API with automatic retries."""
+        """Fetches all work orders (active + archived) from backend API with automatic retries."""
         self.config = self._load_config()
         self.base_url = self.config.get("app_url", "https://app-taxes-production-ec67.up.railway.app").rstrip("/")
-        url = f"{self.base_url}/api/orders/archived"
+        url = f"{self.base_url}/api/orders/all"
 
         for attempt in range(1, 4):
             try:
