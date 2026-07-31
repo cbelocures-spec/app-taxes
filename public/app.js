@@ -10174,15 +10174,32 @@ async function savePtUnit() {
         const today = new Date().toISOString().split('T')[0];
         const incidentDesc = novedadFormatted.split('\n').map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()).filter(Boolean).join(', ');
 
+        const autoSectorHerreria = (getSectorByUsername(currentUser) === 'Herrería');
+        const defaultCc = autoSectorHerreria ? '11' : '15';
+        const defaultEmp = (cachedCatalogs.empleados && cachedCatalogs.empleados[0]) ? String(cachedCatalogs.empleados[0].value) : '426';
+
+        const autoTasks = novedadFormatted.split('\n').map((line, idx) => {
+          const cleanDesc = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
+          if (!cleanDesc) return null;
+          return {
+            id: `pt-task-${Date.now()}-${idx}`,
+            centroCosto: defaultCc,
+            empleado: defaultEmp,
+            horasEstimadas: 1.0,
+            status: 'Pendiente',
+            descripcion: cleanDesc
+          };
+        }).filter(Boolean);
+
         const orderPayload = {
           rodado: rodadoLabel,
           responsable: "AUTO",
           interno: internoVal,
-          clasificacion: "Correctivo",
+          clasificacion: autoSectorHerreria ? "Herrería" : "Correctivo",
           fechaEntrega: today,
           horario: "12:00",
-          incidente: incidentDesc,
-          tasks: [],
+          incidente: incidentDesc || "Revisión en taller",
+          tasks: autoTasks.length > 0 ? autoTasks : [{ id: `pt-task-${Date.now()}-0`, centroCosto: defaultCc, empleado: defaultEmp, horasEstimadas: 1.0, status: 'Pendiente', descripcion: incidentDesc || 'Diagnóstico y reparación' }],
           estadoUnidad: (estado === 'fuera_de_servicio' ? 'fuera_de_servicio' : 'operativo')
         };
 
