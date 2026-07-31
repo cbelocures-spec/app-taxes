@@ -982,7 +982,10 @@ function closeNewOrderModal() {
 }
 
 function editOrder(orderId) {
-  const order = activeOrders.find(o => o.id === orderId);
+  let order = activeOrders.find(o => o.id === orderId);
+  if (!order && typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders)) {
+    order = archivedOrders.find(o => o.id === orderId);
+  }
   if (!order) return;
 
   currentEditingOrderId = orderId;

@@ -823,7 +823,9 @@ app.put('/api/orders/:id', (req, res) => {
     
     // STRICT RULE: Must have an assigned Taxes OT number to be archived into Historial!
     const hasTaxesOt = (existing.taxesOrderNumber || req.body.taxesOrderNumber) && String(existing.taxesOrderNumber || req.body.taxesOrderNumber).trim() !== '';
-    const autoArchive = hasTaxesOt && allTasksCompleted && !isOutOfService;
+    const explicitUnarchive = (req.body.archived === false);
+    const autoArchive = hasTaxesOt && allTasksCompleted && !isOutOfService && !explicitUnarchive;
+    const isArchived = explicitUnarchive ? false : ((req.body.archived === true && hasTaxesOt) || autoArchive);
 
     const updated = db.updateWorkOrder(req.params.id, {
       rodado,
@@ -840,8 +842,8 @@ app.put('/api/orders/:id', (req, res) => {
       estadoUnidad: targetEstadoUnidad,
       combustibleReset: combustibleReset !== undefined ? combustibleReset : existing.combustibleReset,
       tasks: finalTasksToSave,
-      archived: (req.body.archived === true && hasTaxesOt) || autoArchive,
-      archivedAt: (autoArchive || (req.body.archived === true && hasTaxesOt)) ? (existing.archivedAt || new Date().toISOString()) : (req.body.archived === false ? null : existing.archivedAt)
+      archived: isArchived,
+      archivedAt: isArchived ? (existing.archivedAt || new Date().toISOString()) : null
     });
 
     // Respond immediately to the frontend so UI modal never hangs
@@ -1046,6 +1048,7 @@ app.patch('/api/orders/:id/unarchive', (req, res) => {
     db.updateWorkOrder(req.params.id, {
       archived: false,
       archivedAt: null,
+      unarchivedManually: true,
       syncStatus: "local",
       syncError: null,
       autoSyncRetryCount: 999,

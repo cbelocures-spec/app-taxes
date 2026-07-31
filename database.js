@@ -705,9 +705,11 @@ class LocalDB {
         const hasOtNumber = order.taxesOrderNumber && String(order.taxesOrderNumber).trim() !== '';
         const tasks = order.tasks || [];
         const isCompleted = tasks.length > 0 && tasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada'));
+        const isSyncSuccess = order.syncStatus === 'success';
+        const isManuallyUnarchived = order.unarchivedManually === true;
         
-        // STRICT RULE: Must have an assigned Taxes OT number AND all tasks finished to move to Historial!
-        if (hasOtNumber && isCompleted) {
+        // STRICT RULE: Must have an assigned Taxes OT number AND all tasks finished AND syncStatus success AND NOT manually unarchived!
+        if (hasOtNumber && isCompleted && isSyncSuccess && !isManuallyUnarchived) {
           order.archived = true;
           order.archivedAt = order.archivedAt || new Date().toISOString();
           count++;
