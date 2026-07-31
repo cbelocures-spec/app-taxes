@@ -1408,24 +1408,26 @@ async function scrapeCatalogs(triggerUsername = null) {
   }
 }
 
-// Helper to extract base description by stripping system suffixes (diagnostico, realizado, insumos)
-function extractBaseDescription(desc) {
+// Helper to extract pure base user description by stripping any previously appended system suffixes
+function extractPureUserDescription(desc) {
   if (!desc) return '';
-  let cleanDesc = desc;
-  
-  // 1. Remove [Insumos: ...]
-  cleanDesc = cleanDesc.replace(/\[Insumos:[^\]]*\]/gi, '');
-  
-  // 2. Remove Realizó/Realizo suffix
-  cleanDesc = cleanDesc.replace(/\.?\s*Realizó:\s*[^\n\r]*/gi, '');
-  cleanDesc = cleanDesc.replace(/\.?\s*Realizo:\s*[^\n\r]*/gi, '');
-  
-  // 3. Remove Diagnóstico suffix
-  cleanDesc = cleanDesc.replace(/\.?\s*-\s*Diagnóstico:\s*[^\n\r]*/gi, '');
-  cleanDesc = cleanDesc.replace(/\.?\s*Diagnóstico:\s*[^\n\r]*/gi, '');
-  
-  // Clean whitespace and punctuation to make compare robust
-  return cleanDesc.replace(/[.,\s]/g, '').toLowerCase();
+  let clean = desc;
+  // Remove [Insumos: ...] blocks
+  clean = clean.replace(/\[Insumos:[^\]]*\]/gi, '');
+  // Remove - Insumos: ... or . Insumos: ... blocks
+  clean = clean.replace(/(\s*-\s*|\s*\.\s*)Insumos:\s*[^\n\r]*/gi, '');
+  // Remove Realizó: ... blocks
+  clean = clean.replace(/(\s*-\s*|\s*\.\s*)Realizó:\s*[^\n\r]*/gi, '');
+  clean = clean.replace(/(\s*-\s*|\s*\.\s*)Realizo:\s*[^\n\r]*/gi, '');
+  // Remove Diagnóstico: ... blocks
+  clean = clean.replace(/(\s*-\s*|\s*\.\s*)Diagnóstico:\s*[^\n\r]*/gi, '');
+  clean = clean.replace(/(\s*-\s*|\s*\.\s*)Diagnostico:\s*[^\n\r]*/gi, '');
+  return clean.trim();
+}
+
+// Helper to extract base description for comparisons
+function extractBaseDescription(desc) {
+  return extractPureUserDescription(desc).replace(/[.,\s]/g, '').toLowerCase();
 }
 
 // Helper to resolve employee name and handle custom fallbacks (like mapping to Vera)
@@ -1434,8 +1436,6 @@ function resolveAndMapEmployee(task) {
   const employeeObj = employeeCatalog.find(e => e.value === task.empleado);
   let employeeLabel = employeeObj ? employeeObj.label : task.empleado;
 
-  // --- Dynamic employee mapping from Settings ---
-  // Falls back to hardcoded defaults if pañol hasn't saved a custom table yet.
   const settings = db.getSettings();
   const savedMappings = settings.employeeMappings;
 
@@ -1462,53 +1462,41 @@ function resolveAndMapEmployee(task) {
     ? savedMappings
     : FALLBACK_MAPPINGS;
 
-  // Flatten all sectors into a single lookup list
   const allMappings = [
     ...(effectiveMappings.Taller   || []),
     ...(effectiveMappings.Herrería || []),
     ...(effectiveMappings.Edilicio || [])
   ];
 
-  let finalDescription = task.descripcion || '';
+  // ALWAYS start from pure user base description to prevent double-concatenation on resync!
+  let baseDesc = extractPureUserDescription(task.descripcion);
 
   const matchedEntry = allMappings.find(entry =>
     entry.appName && entry.appName.trim().toLowerCase() === employeeLabel.trim().toLowerCase()
   );
 
+  let finalDescription = baseDesc;
+
   if (matchedEntry && matchedEntry.taxesName && matchedEntry.taxesName.trim()) {
     const isSameName = matchedEntry.appName.trim().toLowerCase() === matchedEntry.taxesName.trim().toLowerCase();
     if (!isSameName) {
-      // Employee is NOT in Taxes under their own name → use proxy
       console.log(`Mapping employee "${employeeLabel}" → "${matchedEntry.taxesName}" (proxy)`);
-      const suffix = `. Realizó: ${matchedEntry.appName.trim()}`;
-      if (!finalDescription.includes(suffix)) {
-        finalDescription = `${finalDescription}${suffix}`;
-      }
+      finalDescription = `${finalDescription}. Realizó: ${matchedEntry.appName.trim()}`;
       employeeLabel = matchedEntry.taxesName.trim();
     } else {
-      // Employee IS in Taxes under their own name → use as-is, but still append suffix
       console.log(`Mapping employee "${employeeLabel}" → same name in Taxes`);
-      const suffix = `. Realizó: ${matchedEntry.appName.trim()}`;
-      if (!finalDescription.includes(suffix)) {
-        finalDescription = `${finalDescription}${suffix}`;
-      }
+      finalDescription = `${finalDescription}. Realizó: ${matchedEntry.appName.trim()}`;
     }
   }
 
-  // Append diagnostico/diagnostic if present and not already concatenated
+  // Append diagnostico/diagnostic if present
   if (task.diagnostico && task.diagnostico.trim()) {
-    const diagSuffix = `. Diagnóstico: ${task.diagnostico.trim()}`;
-    if (!finalDescription.includes(diagSuffix) && !finalDescription.includes(task.diagnostico.trim())) {
-      finalDescription = `${finalDescription}${diagSuffix}`;
-    }
+    finalDescription = `${finalDescription}. Diagnóstico: ${task.diagnostico.trim()}`;
   }
 
-  // Append insumos/supplies if present and not already concatenated
+  // Append insumos/supplies if present
   if (task.insumos && task.insumos.trim()) {
-    const insumosSuffix = ` [Insumos: ${task.insumos.trim()}]`;
-    if (!finalDescription.includes(insumosSuffix) && !finalDescription.includes(task.insumos.trim())) {
-      finalDescription = `${finalDescription}${insumosSuffix}`;
-    }
+    finalDescription = `${finalDescription} [Insumos: ${task.insumos.trim()}]`;
   }
 
   return { employeeLabel, finalDescription };
