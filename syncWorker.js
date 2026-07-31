@@ -2048,20 +2048,32 @@ async function syncWorkOrder(orderId) {
           }, ci);
           if (descId) {
             const sel = `#${descId}`;
-            await page.focus(sel).catch(() => {});
-            await page.click(sel).catch(() => {});
-            await page.keyboard.down('Control');
-            await page.keyboard.press('A');
-            await page.keyboard.up('Control');
-            await page.keyboard.press('Backspace');
-            await page.type(sel, finalDescription, { delay: 50 });
+            // 1. Erase textarea completely via DOM evaluate
             await page.evaluate((s) => {
               const el = document.querySelector(s);
               if (el) {
+                el.value = '';
                 el.dispatchEvent(new Event('input', { bubbles: true }));
                 el.dispatchEvent(new Event('change', { bubbles: true }));
               }
             }, sel);
+            // 2. Select all and backspace as keyboard fallback
+            await page.focus(sel).catch(() => {});
+            await page.click(sel, { clickCount: 3 }).catch(() => {});
+            await page.keyboard.down('Control');
+            await page.keyboard.press('A');
+            await page.keyboard.up('Control');
+            await page.keyboard.press('Backspace');
+            // 3. Set exact target string via DOM and dispatch events
+            await page.evaluate((s, val) => {
+              const el = document.querySelector(s);
+              if (el) {
+                el.value = val;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.dispatchEvent(new Event('blur', { bubbles: true }));
+              }
+            }, sel, finalDescription);
             await delay(1000);
           }
         }
@@ -3380,20 +3392,32 @@ async function verifyWorkOrderWithPage(page, orderId) {
             });
             if (descId) {
               const sel = `#${descId}`;
-              await page.focus(sel).catch(() => {});
-              await page.click(sel).catch(() => {});
-              await page.keyboard.down('Control');
-              await page.keyboard.press('A');
-              await page.keyboard.up('Control');
-              await page.keyboard.press('Backspace');
-              await page.type(sel, finalDescription, { delay: 50 });
+              // 1. Erase textarea completely via DOM evaluate
               await page.evaluate((s) => {
                 const el = document.querySelector(s);
                 if (el) {
+                  el.value = '';
                   el.dispatchEvent(new Event('input', { bubbles: true }));
                   el.dispatchEvent(new Event('change', { bubbles: true }));
                 }
               }, sel);
+              // 2. Select all and backspace as keyboard fallback
+              await page.focus(sel).catch(() => {});
+              await page.click(sel, { clickCount: 3 }).catch(() => {});
+              await page.keyboard.down('Control');
+              await page.keyboard.press('A');
+              await page.keyboard.up('Control');
+              await page.keyboard.press('Backspace');
+              // 3. Set exact target string via DOM and dispatch events
+              await page.evaluate((s, val) => {
+                const el = document.querySelector(s);
+                if (el) {
+                  el.value = val;
+                  el.dispatchEvent(new Event('input', { bubbles: true }));
+                  el.dispatchEvent(new Event('change', { bubbles: true }));
+                  el.dispatchEvent(new Event('blur', { bubbles: true }));
+                }
+              }, sel, finalDescription);
               await delay(1500);
               madeChanges = true;
             }
