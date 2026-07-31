@@ -1495,11 +1495,19 @@ function resolveAndMapEmployee(task) {
     }
   }
 
+  // Append diagnostico/diagnostic if present and not already concatenated
+  if (task.diagnostico && task.diagnostico.trim()) {
+    const diagSuffix = `. Diagnóstico: ${task.diagnostico.trim()}`;
+    if (!finalDescription.includes(diagSuffix) && !finalDescription.includes(task.diagnostico.trim())) {
+      finalDescription = `${finalDescription}${diagSuffix}`;
+    }
+  }
+
   // Append insumos/supplies if present and not already concatenated
   if (task.insumos && task.insumos.trim()) {
-    const insumosSuffix = `[Insumos: ${task.insumos.trim()}]`;
-    if (!finalDescription.includes(insumosSuffix)) {
-      finalDescription = `${finalDescription}\n${insumosSuffix}`;
+    const insumosSuffix = ` [Insumos: ${task.insumos.trim()}]`;
+    if (!finalDescription.includes(insumosSuffix) && !finalDescription.includes(task.insumos.trim())) {
+      finalDescription = `${finalDescription}${insumosSuffix}`;
     }
   }
 
@@ -2035,16 +2043,14 @@ async function syncWorkOrder(orderId) {
           await delay(2000);
         }
 
-        // 3. Fill/Fix Description if empty or doesn't match
+        // 3. Fill/Fix Description if empty or doesn't match finalDescription (including diagnostico and insumos)
         const { finalDescription } = resolveAndMapEmployee(appTask);
-        const localDescBase = (appTask.descripcion || '').replace(/[.,\s]/g, '').toLowerCase();
-        const taxesDescBase = extractBaseDescription(formCards[ci].description);
-        const descMismatch = formCards[ci].description === '' ||
-          (localDescBase !== taxesDescBase &&
-           !cleanStr(formCards[ci].description).includes(cleanStr(finalDescription)) &&
-           !cleanStr(finalDescription).includes(cleanStr(formCards[ci].description)));
+        const cleanDescTaxes = (formCards[ci].description || '').trim();
+        const cleanDescTarget = (finalDescription || '').trim();
+        const descMismatch = (cleanDescTaxes !== cleanDescTarget);
+
         if (descMismatch) {
-          console.log(`[Reconcile] Card #${ci} description mismatch (Taxes: "${formCards[ci].description}"). Writing: "${finalDescription}"...`);
+          console.log(`[Reconcile] Card #${ci} description update required (Taxes: "${cleanDescTaxes}" → Target: "${cleanDescTarget}"). Writing...`);
           const descId = await page.evaluate((idx) => {
             const textareas = Array.from(document.querySelectorAll('textarea[id^="descripcion_"], textarea[placeholder*="Describe las actividades"]'));
             const el = textareas[idx];
