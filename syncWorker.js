@@ -2320,6 +2320,36 @@ async function syncWorkOrder(orderId) {
     
     await delay(1000); // Small extra buffer to be absolutely sure Vue is ready
 
+    // PRE-CREATION SAFEGUARD: Check if an OT already exists in Taxes for this Interno before creating a new one!
+    if (order.interno) {
+      console.log(`[Pre-Check Safeguard] Searching OT list table for pre-existing OT for Interno ${order.interno}...`);
+      const existingOtOnPage = await page.evaluate((targetInterno) => {
+        const clean = s => (s || '').toString().trim();
+        const tables = Array.from(document.querySelectorAll('table'));
+        for (const table of tables) {
+          const rows = Array.from(table.querySelectorAll('tbody tr'));
+          for (const row of rows) {
+            const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
+            if (cells.length >= 3) {
+              const rowInterno = cells[1] || cells[0] || '';
+              const rowOt = cells[2] || cells[1] || '';
+              if (rowInterno === clean(targetInterno) && rowOt.length >= 3 && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
+                return rowOt.replace(/\D/g, '');
+              }
+            }
+          }
+        }
+        return null;
+      }, order.interno);
+
+      if (existingOtOnPage) {
+        console.log(`[Pre-Check Safeguard] Found pre-existing OT #${existingOtOnPage} for Interno ${order.interno} in Taxes! Linking and switching to reconciliation...`);
+        db.updateWorkOrder(orderId, { taxesOrderNumber: existingOtOnPage });
+        await browser.close(); releaseBrowserLock();
+        return await syncWorkOrder(orderId);
+      }
+    }
+
     console.log("Clicking NUEVO button to open create form modal...");
     const nuevoClicked = await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('button, a'));
