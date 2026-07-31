@@ -38,30 +38,11 @@ console.log = function(...args) {
 
 // Capturar errores inesperados en el servidor y activar agentes de auto-curación
 process.on('uncaughtException', (err) => {
-  // Ignore harmless EBUSY/ENOTEMPTY/EADDRINUSE puppeteer temp profile cleanup errors
-  if (err.code === 'EADDRINUSE' || err.code === 'EBUSY' || err.code === 'ENOTEMPTY' || (err.message && err.message.includes('puppeteer_dev_chrome_profile'))) {
-    console.warn(`[Warning] Ignored non-fatal error: ${err.message}`);
-    return;
-  }
+  console.error(`[Warning] Uncaught Exception logged (server kept alive): ${err.message}`, err.stack);
+});
 
-  const errorLogPath = path.join(__dirname, 'last_error.log');
-  const errorDetails = `Fecha: ${new Date().toISOString()}\nError: ${err.message}\nStack:\n${err.stack}\n`;
-  try {
-    fs.writeFileSync(errorLogPath, errorDetails);
-  } catch (fsErr) {
-    console.error("Failed to write error log:", fsErr);
-  }
-  console.error("❌ Servidor caído. Guardando log y activando Agentes IA...");
-
-  const pyCmd = process.platform === 'win32' ? 'python auto_healer.py' : 'python3 auto_healer.py';
-  exec(pyCmd, (pyErr, stdout, stderr) => {
-    if (pyErr) {
-      console.error("⚠️ Falló la ejecución de los agentes de autoreparación:", pyErr);
-      process.exit(1);
-    }
-    console.log("✅ Agentes de Autoreparación ejecutados:", stdout);
-    process.exit(0);
-  });
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Warning] Unhandled Promise Rejection (server kept alive):', reason);
 });
 
 const app = express();
@@ -689,14 +670,27 @@ app.post('/api/orders/bulk', (req, res) => {
         estadoUnidad: estadoUnidad || 'fuera_de_servicio'
       });
 
-      checkAndTriggerGoogleSheetUpdates(null, newOrder.tasks, responsable, interno);
       createdOrders.push(newOrder);
     }
 
-    // Trigger active tasks Google Sheets update once
-    triggerActiveTasksGoogleSheetSync();
-
+    // Respond INSTANTLY (sub-100ms) to the user UI
     res.status(201).json({ success: true, count: createdOrders.length, orders: createdOrders });
+
+    // Run Google Sheets webhooks asynchronously in background
+    setImmediate(() => {
+      try {
+        for (const newOrder of createdOrders) {
+          try {
+            const rwAgent = require('./railway_sync_agent');
+            rwAgent.pushOrderToRailway(newOrder);
+          } catch (rwErr) {}
+          checkAndTriggerGoogleSheetUpdates(null, newOrder.tasks, newOrder.responsable, newOrder.interno);
+        }
+        triggerActiveTasksGoogleSheetSync();
+      } catch (err) {
+        console.error("Background webhook error on bulk order creation:", err.message);
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -782,8 +776,6 @@ app.put('/api/orders/:id', (req, res) => {
     }
 
     const createdBy = existing.createdBy || requester;
-    const allTasksCompleted = (tasks || []).length > 0 && (tasks || []).every(t => t.status === "Finalizada");
-
     const incomingTasks = Array.isArray(tasks) ? tasks : [];
     const deletedIds = new Set(Array.isArray(req.body.deletedTaskIds) ? req.body.deletedTaskIds : []);
 
@@ -825,6 +817,14 @@ app.put('/api/orders/:id', (req, res) => {
 
     const finalTasksToSave = Array.from(mergedTasksMap.values());
 
+    const targetEstadoUnidad = estadoUnidad !== undefined ? estadoUnidad : existing.estadoUnidad;
+    const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
+    const allTasksCompleted = finalTasksToSave.length > 0 && finalTasksToSave.every(t => t && (t.status === "Finalizada" || t.status === "Completada"));
+    
+    // STRICT RULE: Must have an assigned Taxes OT number to be archived into Historial!
+    const hasTaxesOt = (existing.taxesOrderNumber || req.body.taxesOrderNumber) && String(existing.taxesOrderNumber || req.body.taxesOrderNumber).trim() !== '';
+    const autoArchive = hasTaxesOt && allTasksCompleted && !isOutOfService;
+
     const updated = db.updateWorkOrder(req.params.id, {
       rodado,
       responsable,
@@ -837,17 +837,26 @@ app.put('/api/orders/:id', (req, res) => {
       syncStatus: (existing.syncStatus === 'success' && incomingTasks.length === 0) ? existing.syncStatus : "pending",
       syncError: null,
       syncDate: null,
-      estadoUnidad: estadoUnidad !== undefined ? estadoUnidad : existing.estadoUnidad,
+      estadoUnidad: targetEstadoUnidad,
       combustibleReset: combustibleReset !== undefined ? combustibleReset : existing.combustibleReset,
-      tasks: finalTasksToSave
+      tasks: finalTasksToSave,
+      archived: (req.body.archived === true && hasTaxesOt) || autoArchive,
+      archivedAt: (autoArchive || (req.body.archived === true && hasTaxesOt)) ? (existing.archivedAt || new Date().toISOString()) : (req.body.archived === false ? null : existing.archivedAt)
     });
 
     // Respond immediately to the frontend so UI modal never hangs
     res.json(updated);
 
-    // Run background webhooks asynchronously after response
+    // Run background webhooks and instant Railway push asynchronously after response
     setImmediate(() => {
       try {
+        try {
+          const rwAgent = require('./railway_sync_agent');
+          rwAgent.pushOrderToRailway(updated);
+        } catch (rwErr) {
+          // Ignore if on Railway cloud
+        }
+
         checkAndTriggerGoogleSheetUpdates(existing, updated.tasks, responsable, interno);
         checkAndSendInsumosToSheet(existing, updated.tasks, responsable, interno);
         sendHistoricalOrderToGoogleSheet(updated, 'confirmar');
@@ -934,9 +943,13 @@ app.get('/api/orders/all', (req, res) => {
 let cachedArchivedOrders = null;
 let lastArchivedFetchTime = 0;
 
-// Get archived orders (fast cached)
+// Get archived orders (fast cached & supports page/limit pagination for 500+ orders)
 app.get('/api/orders/archived', (req, res) => {
   try {
+    if (req.query.page || req.query.limit) {
+      const paginated = db.getArchivedOrdersPaginated(req.query.page, req.query.limit);
+      return res.json(paginated);
+    }
     const now = Date.now();
     if (!cachedArchivedOrders || (now - lastArchivedFetchTime) > 5000) {
       cachedArchivedOrders = db.getArchivedOrders() || [];
@@ -1136,10 +1149,19 @@ app.post('/api/orders/retry/:id', async (req, res) => {
     }
 
     // Reset status to pending so worker picks it up immediately
-    // Also record who triggered the retry so the worker uses their credentials
     db.updateWorkOrder(order.id, { syncStatus: "pending", syncError: null, syncTriggeredBy: requester || null });
     
     res.json({ success: true, message: "Sincronización encolada para reintento." });
+
+    // Trigger worker immediately in background on local server
+    setImmediate(() => {
+      try {
+        const worker = require('./syncWorker');
+        worker.syncWorkOrder(order.id).catch(err => console.error('[RetrySync] Worker error:', err.message));
+      } catch (err) {
+        console.error('[RetrySync] Trigger error:', err.message);
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1184,9 +1206,7 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
       return res.json({ success: true });
     }
 
-    // Normalize status strings coming from external agents, which may use
-    // different wording (e.g. "synced"/"ok") than the canonical values the
-    // app's UI recognizes ("success"/"error"/etc.), so the badges always render.
+    // Normalize status strings coming from external agents
     const normalizeSyncStatus = (val) => {
       if (!val) return val;
       const v = String(val).toLowerCase();
@@ -1196,6 +1216,7 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
       if (['syncing', 'sincronizando'].includes(v)) return 'syncing';
       return val;
     };
+
     const normalizeVerifiedStatus = (val) => {
       if (!val) return val;
       const v = String(val).toLowerCase();
@@ -1214,9 +1235,15 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
       verifiedCount
     };
 
+    if (req.body.rodado) updates.rodado = req.body.rodado;
+    if (req.body.interno) updates.interno = req.body.interno;
+    if (req.body.responsable) updates.responsable = req.body.responsable;
+    if (req.body.clasificacion) updates.clasificacion = req.body.clasificacion;
+    if (req.body.incidente !== undefined) updates.incidente = req.body.incidente;
+    if (req.body.estadoUnidad) updates.estadoUnidad = req.body.estadoUnidad;
+    if (req.body.hasOwnProperty('archived')) updates.archived = req.body.archived === true;
+
     // CRITICAL: Only update 'tasks' if it was explicitly sent in the body.
-    // An intermediate call (e.g. setting status to 'syncing') must NOT overwrite
-    // the tasks array with undefined — that was the root cause of tasks disappearing.
     if (req.body.hasOwnProperty('tasks') && Array.isArray(tasks) && tasks.length > 0) {
       updates.tasks = tasks;
     }
@@ -1225,8 +1252,6 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
       updates.taxesOrderNumber = taxesOrderNumber;
     }
 
-    // Auto-archive when verification is successful AND all tasks are finished.
-    // Orders with tasks still in progress MUST remain active on the main screen with their Taxes OT number.
     const isVerified = updates.verifiedStatus === 'success' || (updates.verifiedStatus === undefined && existing.verifiedStatus === 'success');
     const targetEstadoUnidad = req.body.estadoUnidad !== undefined ? req.body.estadoUnidad : existing.estadoUnidad;
     const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
@@ -3242,25 +3267,25 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   console.log(`[HTTP] Escuchando en http://localhost:${PORT}`);
   console.log(`[HTTP] Red local:      http://${localIP}:${PORT}`);
 
-  // Start the Puppeteer background sync worker if enabled (only locally, never in Railway cloud)
+  // Start Puppeteer worker and Railway sync agent when running on local Debian server
   const isRailway = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_STATIC_URL || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_SERVICE_ID);
-  const enableWorker = (process.env.NODE_ENV !== 'production' || process.env.ENABLE_BACKGROUND_WORKER === 'true') && !isRailway;
-  if (enableWorker && process.env.DISABLE_BACKGROUND_WORKER !== 'true') {
-    worker.startWorker();
-  } else {
-    console.log('[Worker] Puppeteer background worker is disabled (Cloud/Railway mode). Sync handled by local server 192.168.50.4');
-  }
-
-
-  // Start Railway sync agent if running locally to bridge the Railway cloud database
-  // (Only runs locally, never in the cloud/production)
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isRailway) {
+    if (process.env.DISABLE_BACKGROUND_WORKER !== 'true') {
+      try {
+        worker.startWorker();
+      } catch (wErr) {
+        console.error('[Worker] Could not start Puppeteer worker:', wErr.message);
+      }
+    }
     try {
       const agent = require('./railway_sync_agent');
       agent.startAgent();
+      console.log('[RailwayAgent] Agent started for bidirectional sync between Debian & Railway.');
     } catch (agentErr) {
       console.error('[RailwayAgent] Could not start Railway sync agent:', agentErr.message);
     }
+  } else {
+    console.log('[Worker/Agent] Disabled on Railway cloud instance.');
   }
 
 

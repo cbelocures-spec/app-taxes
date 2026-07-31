@@ -36,10 +36,6 @@
       <span class="header-middle-title">Gestión de Mantenimiento</span>
       <small class="header-middle-user" id="current-user">Operador Móvil</small>
     </div>    <div class="header-actions" style="display: flex; align-items: center; gap: 6px;">
-      <button type="button" class="btn btn-secondary btn-sm" onclick="openActiveMechanicsModal()" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; cursor: pointer;" title="Agregar o quitar empleados de la lista activa del turno">
-        <span class="material-icons" style="font-size: 16px; color: #10b981;">people</span>
-        <span>Agregar / Sacar Empleado</span>
-      </button>
       <span class="material-icons logout-btn" id="header-logout-btn" onclick="logoutUser()" title="Cerrar Sesión" style="margin-right: 4px;" translate="no">logout</span>
       <span class="material-icons refresh-btn" id="header-refresh-btn" onclick="location.reload()" title="Refrescar Pantalla" translate="no">refresh</span>
       <span class="material-icons sync-indicator idle" id="global-sync-icon" translate="no">sync</span>
@@ -149,10 +145,6 @@
       <div class="view-header">
         <h2>Órdenes de Trabajo</h2>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <button class="btn btn-secondary btn-sm" onclick="openActiveMechanicsModal()" style="display: flex; align-items: center; gap: 4px;" title="Agregar o quitar empleados de la lista activa del turno">
-            <span class="material-icons" style="font-size: 16px;">people</span>
-            <span>Agregar / Sacar Empleado</span>
-          </button>
           <select class="btn btn-secondary btn-sm" id="cleanup-selector" onchange="if(this.value) { runCleanupOption(this.value); this.value=''; }" style="font-weight: 500; cursor: pointer; outline: none; height: 32px; display: inline-flex; align-items: center; padding: 0 8px; margin: 0;" title="Acciones de limpieza de órdenes">
             <option value="" disabled selected>Limpiar Órdenes...</option>
             <option value="controlled">Limpiar Sincronizadas y Controladas</option>
@@ -385,6 +377,14 @@
               Probar
             </button>
           </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+          <label style="font-weight: 600; color: var(--text-main);">Gestión de Personal del Turno</label>
+          <button type="button" class="btn btn-secondary" onclick="openActiveMechanicsModal()" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; font-weight: 600; cursor: pointer; border-radius: 8px; margin-top: 6px;" title="Agregar o quitar empleados de la lista activa del turno">
+            <span class="material-icons" style="font-size: 20px; color: #10b981;">people</span>
+            <span>Agregar / Sacar Empleado</span>
+          </button>
         </div>
         <div class="form-group">
           <label for="set-preventivo-script-url">URL de Script de Preventivos (Google Sheet)</label>

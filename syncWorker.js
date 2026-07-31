@@ -32,7 +32,7 @@ const MOCK_CATALOGS = {
 // Initialize Catalogs if they are empty
 function initMockCatalogs() {
   const current = db.getCatalogs();
-  if (!current.rodados || current.rodados.length <= 5) {
+  if (!current.rodados || current.rodados.length === 0) {
     console.log("Pre-populating local database with catalogs...");
     try {
       const fs = require('fs');
@@ -49,7 +49,6 @@ function initMockCatalogs() {
     } catch (e) {
       console.warn("Failed to load prod_catalogs.json, using fallback MOCK_CATALOGS:", e.message);
     }
-    db.saveCatalogs(MOCK_CATALOGS);
   }
 }
 
@@ -115,26 +114,55 @@ async function evaluateWithRetry(page, fn, ...args) {
 }
 
 
+async function killZombieChromes() {
+  const { exec } = require('child_process');
+  return new Promise((resolve) => {
+    if (process.platform === 'win32') {
+      exec('taskkill /F /IM chrome.exe /T', () => resolve());
+    } else {
+      exec('pkill -9 -f chrome || pkill -9 -f chromium || true', () => resolve());
+    }
+  });
+}
+
 async function launchBrowser() {
   // Free up PIDs and memory by killing any leftover chrome instances
   await killZombieChromes().catch(() => {});
 
   let execPath = process.env.PUPPETEER_EXECUTABLE_PATH || null;
-  if (!execPath && process.platform === 'win32') {
-    const fs = require('fs');
-    const stdPath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-    const x86Path = 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe';
-    if (fs.existsSync(stdPath)) {
-      execPath = stdPath;
-    } else if (fs.existsSync(x86Path)) {
-      execPath = x86Path;
+  const fs = require('fs');
+
+  if (!execPath) {
+    if (process.platform === 'win32') {
+      const stdPath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+      const x86Path = 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe';
+      if (fs.existsSync(stdPath)) {
+        execPath = stdPath;
+      } else if (fs.existsSync(x86Path)) {
+        execPath = x86Path;
+      }
+    } else {
+      const linuxPaths = [
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/google-chrome'
+      ];
+      for (const p of linuxPaths) {
+        if (fs.existsSync(p)) {
+          execPath = p;
+          break;
+        }
+      }
     }
   }
 
+  console.log(`[Puppeteer] Launching browser executable: ${execPath || 'bundled default'}`);
+
   const launchOptions = {
-    headless: process.env.PUPPETEER_HEADLESS === 'false' ? false : true, // Headless by default, visible if PUPPETEER_HEADLESS=false
-    executablePath: execPath,
-    protocolTimeout: 90000, // Allow up to 90s for slow CDP/Runtime responses
+    headless: process.env.PUPPETEER_HEADLESS === 'false' ? false : true,
+    executablePath: execPath || undefined,
+    protocolTimeout: 90000,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',

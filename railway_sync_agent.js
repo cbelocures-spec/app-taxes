@@ -4,7 +4,7 @@ const https = require('https');
 
 const HOST = 'app-taxes-production-ec67.up.railway.app';
 const USERNAME = 'paniol@contenedoreshugo.com.ar';
-const POLL_INTERVAL_MS = 20000; // 20 seconds
+const POLL_INTERVAL_MS = 3000; // 3 seconds real-time sync
 
 // Promise-based API call using https.request (HTTP/1.1) — avoids HTTP/2 routing issues
 // with Railway's edge network that cause persistent 404 "Application not found" errors
@@ -100,16 +100,21 @@ async function checkAndSync() {
       }
     }
 
-    // ── 1. Sync catalogs to Railway if Railway has empty catalogs
+    // ── 1. Sync catalogs and activeMechanics to Railway if Railway has empty catalogs
     try {
       const rawCat = await apiCall('GET', '/api/catalogs', null);
       const remoteCat = JSON.parse(rawCat);
-      if (!remoteCat.rodados || remoteCat.rodados.length === 0) {
+      if (!remoteCat.rodados || remoteCat.rodados.length < 10) {
         const localCat = db.getCatalogs();
         if (localCat && localCat.rodados && localCat.rodados.length > 0) {
-          console.log(`[RailwayAgent] Railway catalogs empty. Uploading ${localCat.rodados.length} local rodados to Railway...`);
+          console.log(`[RailwayAgent] Railway catalogs empty or incomplete. Uploading ${localCat.rodados.length} local rodados to Railway...`);
           await apiCall('POST', '/api/catalogs/update', localCat).catch(() => {});
         }
+      }
+      // Also push active mechanics list if missing
+      const localMechanics = db.getActiveMechanics ? db.getActiveMechanics() : null;
+      if (localMechanics && Array.isArray(localMechanics) && localMechanics.length > 0) {
+        await apiCall('POST', '/api/settings', { activeMechanics: localMechanics }).catch(() => {});
       }
     } catch (catErr) {
       // Non-fatal — continue
@@ -163,6 +168,37 @@ async function checkAndSync() {
           const preserveLocalVerify = (existing.verifiedStatus === 'success' || existing.verifiedStatus === 'error') &&
                                       (target.verifiedStatus === 'pending');
 
+          // Merge tasks intelligently: preserve all tasks from both local and remote
+          let mergedTasks = target.tasks || [];
+          if (existing && Array.isArray(existing.tasks)) {
+            const localMap = new Map((existing.tasks || []).map(t => [t.id || (t.empleado + '-' + t.descripcion), t]));
+            const remoteMap = new Map((target.tasks || []).map(t => [t.id || (t.empleado + '-' + t.descripcion), t]));
+
+            const allTaskIds = new Set([...localMap.keys(), ...remoteMap.keys()]);
+            mergedTasks = Array.from(allTaskIds).map(id => {
+              const localTask = localMap.get(id);
+              const remoteTask = remoteMap.get(id);
+              if (!localTask) return remoteTask;
+              if (!remoteTask) return localTask;
+
+              const isLocalFinished = localTask.status === 'Finalizada';
+              const isRemoteFinished = remoteTask.status === 'Finalizada';
+              const hasLocalTimer = localTask.timerStart !== null && localTask.timerStart > 0;
+              const hasRemoteTimer = remoteTask.timerStart !== null && remoteTask.timerStart > 0;
+
+              return {
+                ...remoteTask,
+                ...localTask,
+                status: (isLocalFinished || isRemoteFinished) ? 'Finalizada' : (localTask.status || remoteTask.status),
+                timerStart: hasRemoteTimer ? remoteTask.timerStart : (hasLocalTimer ? localTask.timerStart : null),
+                timerStarted: hasRemoteTimer ? true : (hasLocalTimer ? true : false),
+                timerHistory: (Array.isArray(remoteTask.timerHistory) && remoteTask.timerHistory.length > 0)
+                  ? remoteTask.timerHistory
+                  : (Array.isArray(localTask.timerHistory) ? localTask.timerHistory : [])
+              };
+            });
+          }
+
           db.updateWorkOrder(target.id, {
             rodado: target.rodado,
             responsable: target.responsable,
@@ -174,7 +210,7 @@ async function checkAndSync() {
             syncStatus: preserveLocalSync ? existing.syncStatus : target.syncStatus,
             syncError: preserveLocalSync ? existing.syncError : target.syncError,
             syncDate: preserveLocalSync ? existing.syncDate : target.syncDate,
-            tasks: target.tasks,
+            tasks: mergedTasks,
             estadoUnidad: target.estadoUnidad,
             combustibleReset: target.combustibleReset,
             taxesOrderNumber: target.taxesOrderNumber,
@@ -191,14 +227,12 @@ async function checkAndSync() {
       }
     }
 
-    // ── 4. Push local orders to Railway if missing or if local status differs
-    //        (This is how AutoFix results propagate back to Railway)
+    // ── 4. Push local orders to Railway if missing or if local status/tasks differ
     try {
       const allLocal = db.read().workOrders || [];
       for (const localOrd of allLocal) {
         const rwMatch = orders.find(o => o.id === localOrd.id);
 
-        // If this order is soft-deleted locally, push the deletion to Railway and skip further sync
         if (localOrd.deleted === true) {
           if (!rwMatch || rwMatch.deleted !== true) {
             console.log(`[RailwayAgent] Propagating soft-delete for order ${localOrd.interno} (${localOrd.id}) to Railway...`);
@@ -207,15 +241,17 @@ async function checkAndSync() {
               deletedAt: localOrd.deletedAt || new Date().toISOString()
             }).catch(e => console.warn(`[RailwayAgent] Delete push failed for ${localOrd.id}:`, e.message));
           }
-          continue; // Skip further processing for deleted orders
+          continue;
         }
 
+        const tasksChanged = rwMatch && JSON.stringify(localOrd.tasks) !== JSON.stringify(rwMatch.tasks);
         const statusDiffers = rwMatch && (
           localOrd.syncStatus !== rwMatch.syncStatus ||
           localOrd.verifiedStatus !== rwMatch.verifiedStatus ||
           localOrd.taxesOrderNumber !== rwMatch.taxesOrderNumber ||
           localOrd.archived !== rwMatch.archived ||
-          !!localOrd.deleted !== !!rwMatch.deleted
+          !!localOrd.deleted !== !!rwMatch.deleted ||
+          tasksChanged
         );
 
         if (!rwMatch || statusDiffers) {
@@ -336,8 +372,40 @@ async function checkAndSync() {
   isAgentRunning = false;
 }
 
+async function pushOrderToRailway(localOrd) {
+  if (!localOrd || !localOrd.id) return;
+  try {
+    console.log(`[RailwayAgent] INSTANT PUSH: Sending order ${localOrd.interno} (${localOrd.id}) to Railway...`);
+    await apiCall('POST', `/api/orders/local-sync-result/${localOrd.id}`, {
+      rodado: localOrd.rodado,
+      responsable: localOrd.responsable,
+      fechaEntrega: localOrd.fechaEntrega,
+      horario: localOrd.horario,
+      interno: localOrd.interno,
+      clasificacion: localOrd.clasificacion,
+      incidente: localOrd.incidente,
+      syncStatus: localOrd.syncStatus || 'success',
+      syncError: localOrd.syncError || null,
+      syncDate: localOrd.syncDate || null,
+      tasks: localOrd.tasks || [],
+      estadoUnidad: localOrd.estadoUnidad || 'operativo',
+      combustibleReset: localOrd.combustibleReset || null,
+      taxesOrderNumber: localOrd.taxesOrderNumber || null,
+      verifiedStatus: localOrd.verifiedStatus || 'pending',
+      verifiedError: localOrd.verifiedError || null,
+      verifiedCount: localOrd.verifiedCount || 0,
+      archived: !!localOrd.archived,
+      deleted: !!localOrd.deleted,
+      deletedAt: localOrd.deletedAt || null
+    });
+    console.log(`[RailwayAgent] INSTANT PUSH SUCCESS for ${localOrd.interno} (${localOrd.id})!`);
+  } catch (e) {
+    console.warn(`[RailwayAgent] Instant push failed for ${localOrd.id}:`, e.message);
+  }
+}
+
 function startAgent() {
-  console.log('[RailwayAgent] Agent started. Polling Railway every 20 seconds...');
+  console.log('[RailwayAgent] Agent started. Polling Railway every 3 seconds...');
   setInterval(checkAndSync, POLL_INTERVAL_MS);
   // Initial check
   checkAndSync();
@@ -347,4 +415,4 @@ if (require.main === module) {
   startAgent();
 }
 
-module.exports = { startAgent };
+module.exports = { startAgent, pushOrderToRailway };

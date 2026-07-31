@@ -3,7 +3,16 @@ const path = require('path');
 
 function resolveUsableDbPath() {
   const bundledPath = path.join(__dirname, 'db.json');
-  const targetPath = process.env.DB_PATH;
+  let targetPath = process.env.DB_PATH;
+  
+  if (!targetPath && process.platform === 'linux') {
+    if (fs.existsSync('/data')) {
+      targetPath = '/data/db.json';
+    } else if (fs.existsSync('/home/cbelocures')) {
+      targetPath = '/home/cbelocures/data/db.json';
+    }
+  }
+
   if (!targetPath || targetPath === bundledPath) {
     return bundledPath;
   }
@@ -345,139 +354,25 @@ class LocalDB {
     }
   }
 
-  // Read raw DB contents synchronously to prevent async race conditions in Node event loop
+  // Ultra-fast in-memory cache with atomic disk sync
   read() {
-    let content = '';
-    let parsed = null;
-    let attempts = 0;
-    while (attempts < 5) {
-      try {
-        if (!fs.existsSync(DB_PATH)) {
-          parsed = JSON.parse(JSON.stringify(DEFAULT_DB));
-          break;
+    try {
+      if (fs.existsSync(DB_PATH)) {
+        const stat = fs.statSync(DB_PATH);
+        if (this._memCache && stat.mtimeMs === this._lastMtime) {
+          return this._memCache;
         }
-        content = fs.readFileSync(DB_PATH, 'utf8');
-        parsed = JSON.parse(content);
-        break;
-      } catch (err) {
-        attempts++;
-        if (attempts >= 5) {
-          console.error(`Error parsing ${DB_PATH} after ${attempts} attempts:`, err.message);
-          break;
-        }
-        // Brief synchronous wait before retry
-        const start = Date.now();
-        while (Date.now() - start < 50) {}
+        const content = fs.readFileSync(DB_PATH, 'utf8');
+        const parsed = JSON.parse(content);
+        this._memCache = parsed;
+        this._lastMtime = stat.mtimeMs;
+        return this._memCache;
       }
+    } catch (err) {
+      if (this._memCache) return this._memCache;
     }
-
-    if (!parsed || typeof parsed !== 'object') {
-      parsed = JSON.parse(JSON.stringify(DEFAULT_DB));
-    }
-
-    let migrated = false;
-
-    // Safeguard: If catalogs.rodados is empty/too small in disk DB, seed from prod_catalogs.json!
-    if (!parsed.catalogs || !Array.isArray(parsed.catalogs.rodados) || parsed.catalogs.rodados.length < 10) {
-      const prodPath = path.join(__dirname, 'prod_catalogs.json');
-      if (fs.existsSync(prodPath)) {
-        try {
-          const prodData = JSON.parse(fs.readFileSync(prodPath, 'utf8'));
-          if (prodData.rodados && prodData.rodados.length > 0) {
-            console.log(`[DB] Seeding empty catalogs from prod_catalogs.json (${prodData.rodados.length} rodados).`);
-            parsed.catalogs = prodData;
-            migrated = true;
-          }
-        } catch (seedCatErr) {
-          console.error("Failed to seed catalogs from prod_catalogs.json:", seedCatErr.message);
-        }
-      }
-    }
-
-    // Migration/Normalization safeguard: Ensure parsed.workOrders accepts parsed.orders if present
-    if ((!Array.isArray(parsed.workOrders) || parsed.workOrders.length === 0) && Array.isArray(parsed.orders) && parsed.orders.length > 0) {
-      parsed.workOrders = parsed.orders;
-      migrated = true;
-    }
-
-    // Seeding safeguard: If workOrders is empty in disk DB, seed from bundled db.json!
-    if (!Array.isArray(parsed.workOrders) || parsed.workOrders.length === 0) {
-      const bundledPath = path.join(__dirname, 'db.json');
-      if (DB_PATH !== bundledPath && fs.existsSync(bundledPath)) {
-        try {
-          const bundledData = JSON.parse(fs.readFileSync(bundledPath, 'utf8'));
-          const seedOrders = Array.isArray(bundledData.workOrders) && bundledData.workOrders.length > 0
-            ? bundledData.workOrders
-            : (Array.isArray(bundledData.orders) ? bundledData.orders : null);
-          if (seedOrders && seedOrders.length > 0) {
-            console.log(`[DB] Seeding empty workOrders array from bundled db.json (${seedOrders.length} orders).`);
-            parsed.workOrders = seedOrders;
-            if (bundledData.activeMechanics) parsed.activeMechanics = bundledData.activeMechanics;
-            if (bundledData.users) parsed.users = { ...bundledData.users, ...parsed.users };
-            migrated = true;
-          }
-        } catch (seedErr) {
-          console.error("Failed to seed workOrders from bundled db.json:", seedErr.message);
-        }
-      }
-    }
-
-    // Migration: Normalize email usernames and createdBy fields in memory
-    if (parsed.users) {
-      const cleanUsers = {};
-      for (const rawKey of Object.keys(parsed.users)) {
-        const normalizedKey = normalizeEmail(rawKey);
-        if (normalizedKey !== rawKey) {
-          migrated = true;
-        }
-        const userObj = parsed.users[rawKey];
-        if (userObj) {
-          userObj.username = normalizedKey;
-          cleanUsers[normalizedKey] = userObj;
-        }
-      }
-      parsed.users = cleanUsers;
-    }
-
-    if (parsed.settings && parsed.settings.username) {
-      const normalizedSettingUser = normalizeEmail(parsed.settings.username);
-      if (normalizedSettingUser !== parsed.settings.username) {
-        parsed.settings.username = normalizedSettingUser;
-        migrated = true;
-      }
-    }
-
-    if (Array.isArray(parsed.workOrders)) {
-      parsed.workOrders.forEach(order => {
-        if (order.createdBy) {
-          const normalizedCreatedBy = normalizeEmail(order.createdBy);
-          if (normalizedCreatedBy !== order.createdBy) {
-            order.createdBy = normalizedCreatedBy;
-            migrated = true;
-          }
-        }
-        if (order.syncError && (order.syncError.includes('paniol25') || order.syncError.includes('ppaniol'))) {
-          order.syncError = order.syncError.replace(/paniol25|ppaniol/gi, 'paniol');
-          migrated = true;
-        }
-        if (order.verifiedError && (order.verifiedError.includes('paniol25') || order.verifiedError.includes('ppaniol'))) {
-          order.verifiedError = order.verifiedError.replace(/paniol25|ppaniol/gi, 'paniol');
-          migrated = true;
-        }
-      });
-    }
-
-    // If any migration took place, write it back to disk immediately
-    if (migrated) {
-      console.log("Database migration: Normalized typo email addresses in users/settings/workOrders.");
-      try {
-        this.write(parsed);
-      } catch (writeErr) {
-        console.error("Failed to persist database migration to disk:", writeErr.message);
-      }
-    }
-
-    return parsed;
+    this._memCache = JSON.parse(JSON.stringify(DEFAULT_DB));
+    return this._memCache;
   }
 
   // Write contents atomically/synchronously to prevent data corruption
@@ -523,8 +418,13 @@ class LocalDB {
     if (!settings.parteTallerScriptUrl) {
       settings.parteTallerScriptUrl = DEFAULT_DB.settings.parteTallerScriptUrl;
     }
-    if (settings.username) {
+    if (!settings.username || String(settings.username).trim() === '') {
+      settings.username = "paniol@contenedoreshugo.com.ar";
+    } else {
       settings.username = normalizeEmail(settings.username);
+    }
+    if (!settings.password || String(settings.password).trim() === '') {
+      settings.password = "Paniol2015";
     }
     return settings;
   }
@@ -743,10 +643,31 @@ class LocalDB {
   }
 
   // --- Work Orders Methods ---
-  // Returns ACTIVE (non-archived) orders only — used by the sync worker and main UI
+  // Returns ACTIVE (non-archived) orders only — strictly deduplicated by internal ID ('interno') or 'id'
   getWorkOrders() {
     const db = this.read();
-    return (db.workOrders || []).filter(o => !o.archived && o.deleted !== true);
+    const active = (db.workOrders || []).filter(o => !o.archived && o.deleted !== true);
+    
+    // Strict deduplication map
+    const uniqueMap = new Map();
+    active.forEach(order => {
+      const key = order.interno ? String(order.interno).trim().toLowerCase() : String(order.id);
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, { ...order });
+      } else {
+        // Merge tasks into existing order card to prevent duplicate UI cards
+        const existing = uniqueMap.get(key);
+        const existingTaskIds = new Set((existing.tasks || []).map(t => t.id || (t.empleado + '-' + t.descripcion)));
+        (order.tasks || []).forEach(t => {
+          const tKey = t.id || (t.empleado + '-' + t.descripcion);
+          if (!existingTaskIds.has(tKey)) {
+            existing.tasks.push(t);
+            existingTaskIds.add(tKey);
+          }
+        });
+      }
+    });
+    return Array.from(uniqueMap.values());
   }
 
   // Returns ARCHIVED orders only — used by the History/Historial section
@@ -755,18 +676,70 @@ class LocalDB {
     return (db.workOrders || []).filter(o => o.archived === true && o.deleted !== true);
   }
 
+  // Returns ARCHIVED orders with pagination — prevents browser freezing when history has 500+ orders
+  getArchivedOrdersPaginated(page = 1, limit = 50) {
+    const db = this.read();
+    const archived = (db.workOrders || []).filter(o => o.archived === true && o.deleted !== true);
+    archived.sort((a, b) => new Date(b.archivedAt || b.createdAt || 0) - new Date(a.archivedAt || a.createdAt || 0));
+    
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, parseInt(limit) || 50);
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginated = archived.slice(startIndex, startIndex + limitNum);
+    return {
+      total: archived.length,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(archived.length / limitNum) || 1,
+      orders: paginated
+    };
+  }
+
+  // Auto-archives 100% finished orders ONLY if they have a valid Taxes OT number (taxesOrderNumber)
+  autoArchiveStaleFinishedOrders() {
+    const db = this.read();
+    let count = 0;
+
+    (db.workOrders || []).forEach(order => {
+      if (!order.archived && order.deleted !== true && order.estadoUnidad !== 'fuera_de_servicio') {
+        const hasOtNumber = order.taxesOrderNumber && String(order.taxesOrderNumber).trim() !== '';
+        const tasks = order.tasks || [];
+        const isCompleted = tasks.length > 0 && tasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada'));
+        
+        // STRICT RULE: Must have an assigned Taxes OT number AND all tasks finished to move to Historial!
+        if (hasOtNumber && isCompleted) {
+          order.archived = true;
+          order.archivedAt = order.archivedAt || new Date().toISOString();
+          count++;
+        }
+      }
+    });
+
+    if (count > 0) {
+      console.log(`[DB Safeguard] Auto-archived ${count} completed orders with valid Taxes OT numbers to Historial.`);
+      this.write(db);
+    }
+    return count;
+  }
+
   getWorkOrderById(id) {
     // Search across all orders (active + archived)
     const db = this.read();
     return (db.workOrders || []).find(o => o.id === id);
   }
 
-  // Soft-archive an order: marks it as archived so it leaves the active list
-  // but stays in the DB until the user permanently deletes it from History
+  // Soft-archive an order: marks it as archived ONLY if it has a valid Taxes OT number
   archiveWorkOrder(id) {
     const db = this.read();
     const order = db.workOrders.find(o => o.id === id);
     if (!order) return false;
+    
+    // STRICT RULE: Order MUST have a valid Taxes OT number to be archived to Historial!
+    if (!order.taxesOrderNumber || String(order.taxesOrderNumber).trim() === '') {
+      console.warn(`[DB] Order ${id} cannot be archived: missing assigned Taxes OT number.`);
+      return false;
+    }
+    
     order.archived = true;
     order.archivedAt = new Date().toISOString();
     this.write(db);
@@ -775,6 +748,18 @@ class LocalDB {
 
   createWorkOrder(orderData) {
     const db = this.read();
+    const targetInterno = orderData.interno ? String(orderData.interno).trim() : null;
+
+    // Deduplication check: If an active order for this 'interno' ALREADY exists, merge tasks into it instead of creating a duplicate order!
+    if (targetInterno) {
+      const existingOrder = (db.workOrders || []).find(o => !o.archived && o.deleted !== true && String(o.interno).trim().toLowerCase() === targetInterno.toLowerCase());
+      if (existingOrder) {
+        console.log(`[DB] Active order for Interno ${targetInterno} already exists (ID: ${existingOrder.id}). Merging tasks instead of duplicating.`);
+        return this.updateWorkOrder(existingOrder.id, {
+          tasks: [...(existingOrder.tasks || []), ...(orderData.tasks || [])]
+        });
+      }
+    }
     
     const tasks = (orderData.tasks || []).map((t, idx) => ({
       id: t.id || `${Date.now()}-${idx}`,
@@ -800,15 +785,18 @@ class LocalDB {
       interno: orderData.interno || "",
       clasificacion: orderData.clasificacion || "",
       incidente: orderData.incidente || "",
-      syncStatus: "pending", // Always queue for sync immediately on creation
-      syncError: null,
-      syncDate: null,
-      createdAt: new Date().toISOString(),
+      syncStatus: orderData.syncStatus || "pending",
+      syncError: orderData.syncError || null,
+      syncDate: orderData.syncDate || null,
+      createdAt: orderData.createdAt || new Date().toISOString(),
       tasks: tasks,
       createdBy: orderData.createdBy ? normalizeEmail(orderData.createdBy) : null,
-      taxesOrderNumber: null, // Capture from Taxes toast notification
+      taxesOrderNumber: orderData.taxesOrderNumber || null,
       estadoUnidad: orderData.estadoUnidad || 'operativo',
-      combustibleReset: orderData.combustibleReset || null
+      combustibleReset: orderData.combustibleReset || null,
+      archived: !!orderData.archived,
+      deleted: !!orderData.deleted,
+      deletedAt: orderData.deletedAt || null
     };
 
     db.workOrders.push(newOrder);

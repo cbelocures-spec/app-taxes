@@ -202,13 +202,17 @@ function populateDatalist(datalistId, options) {
 }
 
 function findRodadoForInterno(intVal) {
-  const cleanInt = String(intVal || '').trim();
+  const cleanInt = String(intVal || '').trim().toUpperCase();
   if (!cleanInt) return null;
-  return (cachedCatalogs.rodados || []).find(r => 
-    String(r.interno || '').trim() === cleanInt ||
-    String(r.value || '').trim() === cleanInt ||
-    String(r.label || '').toUpperCase().includes(`INTERNO ${cleanInt}`)
-  );
+  return (cachedCatalogs.rodados || []).find(r => {
+    const rInt = String(r.interno || '').trim().toUpperCase();
+    const rVal = String(r.value || '').trim().toUpperCase();
+    const rLbl = String(r.label || '').trim().toUpperCase();
+    return (rInt && rInt === cleanInt) ||
+           (rVal && rVal === cleanInt) ||
+           (rLbl && rLbl.includes(cleanInt)) ||
+           (rInt && cleanInt.includes(rInt));
+  });
 }
 
 function findRodadoOption(selectEl, cleanInterno, rodadoOpt) {
@@ -216,30 +220,38 @@ function findRodadoOption(selectEl, cleanInterno, rodadoOpt) {
   const options = Array.from(selectEl.options || []);
   if (options.length === 0) return null;
 
-  const intStr = String(cleanInterno || '').trim();
+  const intStr = String(cleanInterno || '').trim().toUpperCase();
+  if (!intStr) return null;
 
   // 1. Match by rodadoOpt.value
   if (rodadoOpt && rodadoOpt.value) {
-    const optMatch = options.find(opt => String(opt.value).trim() === String(rodadoOpt.value).trim());
+    const optMatch = options.find(opt => String(opt.value).trim().toUpperCase() === String(rodadoOpt.value).trim().toUpperCase());
     if (optMatch) return optMatch;
   }
 
-  // 2. Match by intStr as option value
-  if (intStr) {
-    const optMatchVal = options.find(opt => String(opt.value).trim() === intStr);
-    if (optMatchVal) return optMatchVal;
-  }
+  // 2. Exact match by intStr as option value or option text
+  const exactMatch = options.find(opt => 
+    String(opt.value).trim().toUpperCase() === intStr ||
+    String(opt.text).trim().toUpperCase() === intStr
+  );
+  if (exactMatch) return exactMatch;
 
-  // 3. Match by text containing "INTERNO <intStr>"
-  if (intStr) {
-    const optMatchText = options.find(opt => {
-      const txt = String(opt.text || '').toUpperCase();
-      return txt.includes(`INTERNO ${intStr}`) ||
-             txt.includes(`INTERNO: ${intStr}`) ||
-             txt.startsWith(`${intStr} -`) ||
-             txt.startsWith(`${intStr} `);
+  // 3. Match by option text containing intStr or intStr containing option text
+  const matchText = options.find(opt => {
+    const txt = String(opt.text || '').toUpperCase().trim();
+    if (!txt || txt.startsWith('SELECCIONAR')) return false;
+    return txt.includes(intStr) || intStr.includes(txt) || txt.includes(`INTERNO ${intStr}`) || txt.includes(`INTERNO: ${intStr}`);
+  });
+  if (matchText) return matchText;
+
+  // 4. Match by catalog rodado label containing intStr
+  if (rodadoOpt && rodadoOpt.label) {
+    const catalogLabel = String(rodadoOpt.label).toUpperCase().trim();
+    const matchCat = options.find(opt => {
+      const txt = String(opt.text || '').toUpperCase().trim();
+      return txt && !txt.startsWith('SELECCIONAR') && (txt.includes(catalogLabel) || catalogLabel.includes(txt));
     });
-    if (optMatchText) return optMatchText;
+    if (matchCat) return matchCat;
   }
 
   return null;
@@ -399,9 +411,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Poll for orders sync status in real time (5s interval with change-detection guard for smooth performance)
-  setInterval(fetchOrders, 5000);
-  setInterval(checkWorkerStatus, 10000);
+  // Poll for orders sync status in real time (2s interval for instant multi-device coordination)
+  setInterval(fetchOrders, 2000);
+  setInterval(checkWorkerStatus, 5000);
   setInterval(fetchSettingsPolling, 10000);
 
   // Fetch novelties and employee mappings on startup
@@ -428,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           showNoveltiesForInterno("");
         } else {
-          // Taller / Admin / Edilicio: auto-populate Interno from rodado catalog data!
+          // Taller / Admin / Edilicio: auto-populate Interno from rodado catalog data if available!
           const rodadoVal = rodadoSelect.value;
           const rodadoOpt = (cachedCatalogs.rodados || []).find(r => String(r.value) === String(rodadoVal));
           if (rodadoOpt && rodadoOpt.interno) {
@@ -444,11 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
               internoInput.rebuildSearchable();
             }
             showNoveltiesForInterno(rodadoOpt.interno);
-          } else {
-            internoInput.value = "";
-            if (internoInput.rebuildSearchable) {
-              internoInput.rebuildSearchable();
-            }
+          } else if (!internoInput.value) {
             showNoveltiesForInterno("");
           }
         }
@@ -468,7 +476,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const rodadoSelect = document.getElementById('form-rodado');
         if (rodadoSelect) {
           const rodadoOpt = findRodadoForInterno(val);
-          const matchedOpt = findRodadoOption(rodadoSelect, val, rodadoOpt);
+          let matchedOpt = findRodadoOption(rodadoSelect, val, rodadoOpt);
+          
+          if (!matchedOpt && val) {
+            // Auto-create & select option for Rodado if no catalog match exists so Rodado is NEVER left blank!
+            let optionExists = Array.from(rodadoSelect.options).find(opt => String(opt.value).trim().toUpperCase() === val.toUpperCase());
+            if (!optionExists) {
+              optionExists = document.createElement('option');
+              optionExists.value = val;
+              optionExists.textContent = val;
+              rodadoSelect.appendChild(optionExists);
+            }
+            matchedOpt = optionExists;
+          }
+
           if (matchedOpt && rodadoSelect.value !== matchedOpt.value) {
             rodadoSelect.value = matchedOpt.value;
             if (rodadoSelect.rebuildSearchable) {
@@ -1667,12 +1688,31 @@ function updateEmployeeDropdownForCard(card) {
     let empOptions = `<option value="">Seleccionar Empleado...</option>`;
     filteredEmployees.forEach(opt => {
       if (!opt) return;
-      const optVal = opt.value || "";
-      const optLabel = opt.label || opt.value || "";
-      const isSelected = optVal === currentValue;
+      const optVal = String(opt.value || "");
+      const optLabel = String(opt.label || opt.value || "");
+      const isSelected = optVal === String(currentValue) || 
+                         optLabel === String(currentValue) || 
+                         (typeof cleanName === 'function' && cleanName(optLabel) === cleanName(String(currentValue)));
       empOptions += `<option value="${optVal}" ${isSelected ? "selected" : ""}>${optLabel}</option>`;
     });
     empSelect.innerHTML = empOptions;
+
+    // Ensure option is selected or auto-created if custom
+    const matchedOpt = filteredEmployees.find(opt => opt && (
+      String(opt.value) === String(currentValue) || 
+      String(opt.label) === String(currentValue) || 
+      (typeof cleanName === 'function' && cleanName(opt.label) === cleanName(String(currentValue)))
+    ));
+    if (matchedOpt) {
+      empSelect.value = matchedOpt.value;
+    } else if (currentValue && String(currentValue).trim() !== '') {
+      const customOpt = document.createElement('option');
+      customOpt.value = currentValue;
+      customOpt.textContent = currentValue;
+      customOpt.selected = true;
+      empSelect.appendChild(customOpt);
+      empSelect.value = currentValue;
+    }
 
     // Rebuild the searchable select UI dropdown options
     if (empSelect.rebuildSearchable) {
@@ -1948,13 +1988,32 @@ function addTaskField(taskData = null) {
       let empOptions = `<option value="">Seleccionar Empleado...</option>`;
       filteredEmployees.forEach(opt => {
         if (!opt) return;
-        const optVal = opt.value || "";
-        const optLabel = opt.label || opt.value || "";
-        const isSelected = optVal === taskData.empleado;
+        const optVal = String(opt.value || "");
+        const optLabel = String(opt.label || opt.value || "");
+        const targetEmp = String(taskData.empleado || "");
+        const isSelected = optVal === targetEmp || 
+                           optLabel === targetEmp || 
+                           (typeof cleanName === 'function' && cleanName(optLabel) === cleanName(targetEmp));
         empOptions += `<option value="${optVal}" ${isSelected ? "selected" : ""}>${optLabel}</option>`;
       });
       empSelect.innerHTML = empOptions;
-      empSelect.value = taskData.empleado;
+
+      const targetEmpStr = String(taskData.empleado || "");
+      const matchedTaskEmp = filteredEmployees.find(opt => opt && (
+        String(opt.value) === targetEmpStr || 
+        String(opt.label) === targetEmpStr || 
+        (typeof cleanName === 'function' && cleanName(opt.label) === cleanName(targetEmpStr))
+      ));
+      if (matchedTaskEmp) {
+        empSelect.value = matchedTaskEmp.value;
+      } else if (targetEmpStr.trim() !== '') {
+        const customOpt = document.createElement('option');
+        customOpt.value = targetEmpStr;
+        customOpt.textContent = targetEmpStr;
+        customOpt.selected = true;
+        empSelect.appendChild(customOpt);
+        empSelect.value = targetEmpStr;
+      }
     } else {
       // Fresh task: defaults to MECANICA (value "15") so filter immediately
       updateEmployeeDropdownForCard(cardElement);
@@ -2170,6 +2229,22 @@ async function fetchOrders() {
     lastFetchedOrdersJson = jsonText;
     const data = JSON.parse(jsonText);
     
+    // Clean up active client-side timers for tasks that finished on another device
+    (data || []).forEach(order => {
+      (order.tasks || []).forEach(t => {
+        if (t && (t.status === 'Finalizada' || t.status === 'Completada' || !t.timerStarted)) {
+          if (activeIntervalTimers && activeIntervalTimers[t.id]) {
+            clearInterval(activeIntervalTimers[t.id]);
+            delete activeIntervalTimers[t.id];
+          }
+          if (activeDashboardIntervals && activeDashboardIntervals[t.id]) {
+            clearInterval(activeDashboardIntervals[t.id]);
+            delete activeDashboardIntervals[t.id];
+          }
+        }
+      });
+    });
+
     activeOrders = data;
     await resolveDatabaseConflicts();
     renderOrders();
@@ -2643,22 +2718,7 @@ function createQueueCardHtml(order) {
         </span>
         <span style="font-weight:600; color: var(--${statusColor === 'pending' ? 'secondary' : statusColor})">${desc}</span>
       </div>
-      <div style="display:flex; justify-content: flex-end; margin-top:6px;">
-        ${actionBtn}
-      </div>
-    </div>
-  `;
-}
-
-function filterOrders() {
-  renderOrders();
-}
-
-function filterHistory() {
-  renderOrders();
-}
-
-let isSubmittingWorkOrder = false;
+      <div style="display:flex; justify-content: flex-end; marlet isSubmittingWorkOrder = false;
 async function submitWorkOrder() {
   if (isSubmittingWorkOrder) return;
   isSubmittingWorkOrder = true;
@@ -2667,133 +2727,153 @@ async function submitWorkOrder() {
   if (submitBtn) submitBtn.disabled = true;
 
   try {
-  const rodadoEl = document.getElementById('form-rodado');
-  const responsableEl = document.getElementById('form-responsable');
-  const internoEl = document.getElementById('form-interno');
-  const clasificacionEl = document.getElementById('form-clasificacion');
-  const fechaEl = document.getElementById('form-fecha');
-  const horaEl = document.getElementById('form-hora');
-  const incidenteEl = document.getElementById('form-incidente');
+    const rodadoEl = document.getElementById('form-rodado');
+    const responsableEl = document.getElementById('form-responsable');
+    const internoEl = document.getElementById('form-interno');
+    const clasificacionEl = document.getElementById('form-clasificacion');
+    const fechaEl = document.getElementById('form-fecha');
+    const horaEl = document.getElementById('form-hora');
+    const incidenteEl = document.getElementById('form-incidente');
 
-  // Auto-set current date and time on submission ONLY if empty (allows selecting past dates like yesterday)
-  if (!currentEditingOrderId && !fechaEl.value) {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    fechaEl.value = `${yyyy}-${mm}-${dd}`;
-    
-    const hh = String(today.getHours()).padStart(2, '0');
-    const min = String(today.getMinutes()).padStart(2, '0');
-    horaEl.value = `${hh}:${min}`;
-  }
- 
-  const userSector = getSectorByUsername(localStorage.getItem('currentUserUsername'));
-  const formClasif = clasificacionEl ? clasificacionEl.value : '';
-  const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || formClasif === 'Herrería');
-  const rodadoVal = rodadoEl.value;
-
-  const internoTextEl = document.getElementById('form-interno-text');
-  let internoVal = "";
-  if (isHerreria) {
-    internoVal = internoTextEl ? internoTextEl.value.trim() : "";
-  } else {
-    internoVal = internoEl ? internoEl.value.trim() : "";
-    if (!internoVal && internoEl && internoEl.closest) {
-      const wrapper = internoEl.closest('.searchable-select-container');
-      const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
-      if (searchInput && searchInput.value.trim()) {
-        internoVal = searchInput.value.trim();
-      }
-    }
-  }
-
-  // Manual validations for touch optimization
-  if (!rodadoVal) return showToast("Por favor, selecciona un Rodado.", "danger");
-  if (!internoVal) return showToast("Por favor, selecciona el Interno de Unidad.", "danger");
-  if (!clasificacionEl.value) return showToast("Por favor, selecciona una Clasificación.", "danger");
-
-  const rodadoLabel = rodadoEl.options[rodadoEl.selectedIndex]?.text || rodadoVal;
- 
-  // Collect tasks
-  const tasks = [];
-  const container = document.getElementById('modal-tasks-list');
-  const taskCards = container.querySelectorAll('.task-item-card');
- 
-  let tasksValid = true;
-  taskCards.forEach(card => {
-    const cc = card.querySelector('.task-cc').value;
-    const emp = card.querySelector('.task-emp').value;
-    const hours = card.querySelector('.task-hours').value;
-    const status = card.querySelector('.task-status').value;
-    const desc = card.querySelector('.task-desc').value;
-    const insumosInput = card.querySelector('.task-insumos');
-    const insumos = insumosInput ? insumosInput.value.trim() : '';
- 
-    if (!cc || !emp) {
-      tasksValid = false;
+    if (!rodadoEl || !clasificacionEl) {
+      showToast("Error en el formulario. Por favor recargue la página.", "danger");
       return;
     }
- 
-    // Preserve task ID if we are editing
-    const isTempId = card.id.startsWith('task-card-');
-    const taskId = isTempId ? null : card.id;
 
-    // Collect timer state
-    const timerKey = `timer_start_${card.id}`;
-    const timerStartVal = localStorage.getItem(timerKey) ? parseInt(localStorage.getItem(timerKey)) : null;
-    const timerHistoryVal = JSON.parse(card.dataset.timerHistory || '[]');
- 
-    tasks.push({
-      id: taskId,
-      centroCosto: cc,
-      empleado: emp,
-      horasEstimadas: hours,
-      status: status,
-      descripcion: desc,
-      insumos: insumos,
-      timerStart: timerStartVal,
-      timerStarted: card.dataset.timerStarted === 'true',
-      timerHistory: timerHistoryVal
-    });
-  });
- 
-  if (!tasksValid) {
-    return showToast("Completa el Centro de Costo y Operario de todas las tareas.", "danger");
-  }
-
-  // Block submission if there was a rendering error in the modal
-  if (window.editModalHasRenderingError) {
-    return showToast("No se puede guardar porque ocurrió un error al cargar las tareas. Por favor recargue la página.", "danger");
-  }
-
-  // Double check: if we are editing an order that originally had tasks, but now we collect 0 tasks
-  if (currentEditingOrderId) {
-    const originalOrder = activeOrders.find(o => o.id === currentEditingOrderId);
-    if (originalOrder && Array.isArray(originalOrder.tasks) && originalOrder.tasks.length > 0 && tasks.length === 0) {
-      const confirmDelete = confirm("ATENCIÓN: La orden original tenía tareas, pero ahora se guardará con 0 tareas (se borrarán permanentemente). ¿Está seguro de que desea continuar?");
-      if (!confirmDelete) {
-        return;
+    // Auto-set current date and time on submission ONLY if empty (allows selecting past dates like yesterday)
+    if (!currentEditingOrderId && fechaEl && !fechaEl.value) {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      fechaEl.value = `${yyyy}-${mm}-${dd}`;
+      
+      if (horaEl) {
+        const hh = String(today.getHours()).padStart(2, '0');
+        const min = String(today.getMinutes()).padStart(2, '0');
+        horaEl.value = `${hh}:${min}`;
       }
     }
-  }
- 
-  const payload = {
-    rodado: rodadoLabel,
-    responsable: "AUTO", // Always send AUTO so the worker resolves it from the logged-in user
-    interno: internoVal,
-    clasificacion: clasificacionEl.value,
-    fechaEntrega: fechaEl.value,
-    horario: horaEl.value,
-    incidente: incidenteEl.value,
-    tasks: tasks,
-    estadoUnidad: currentEditingOrderId ? (activeOrders.find(o => o.id === currentEditingOrderId)?.estadoUnidad || 'fuera_de_servicio') : 'fuera_de_servicio',
-    combustibleReset: currentCombustibleReset
-  };
- 
-  const url = currentEditingOrderId ? `/api/orders/${currentEditingOrderId}` : '/api/orders';
-  const method = currentEditingOrderId ? 'PUT' : 'POST';
- 
+   
+    const userSector = getSectorByUsername(localStorage.getItem('currentUserUsername'));
+    const formClasif = clasificacionEl ? clasificacionEl.value : '';
+    const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || formClasif === 'Herrería');
+    const rodadoVal = rodadoEl ? rodadoEl.value : '';
+
+    const internoTextEl = document.getElementById('form-interno-text');
+    let internoVal = "";
+    if (isHerreria) {
+      internoVal = internoTextEl ? internoTextEl.value.trim() : "";
+    } else {
+      internoVal = internoEl ? internoEl.value.trim() : "";
+      if (!internoVal && internoEl && internoEl.closest) {
+        const wrapper = internoEl.closest('.searchable-select-container');
+        const searchInput = wrapper ? wrapper.querySelector('.searchable-select-search-input') : null;
+        if (searchInput && searchInput.value.trim()) {
+          internoVal = searchInput.value.trim();
+        }
+      }
+    }
+
+    // Manual validations for touch optimization
+    if (!rodadoVal) return showToast("Por favor, selecciona un Rodado.", "danger");
+    if (!internoVal) return showToast("Por favor, selecciona el Interno de Unidad.", "danger");
+    if (!clasificacionEl.value) return showToast("Por favor, selecciona una Clasificación.", "danger");
+
+    const rodadoLabel = (rodadoEl && rodadoEl.options && rodadoEl.selectedIndex >= 0) ? (rodadoEl.options[rodadoEl.selectedIndex].text || rodadoVal) : rodadoVal;
+   
+    // Collect tasks safely
+    const tasks = [];
+    const container = document.getElementById('modal-tasks-list');
+    const taskCards = container ? container.querySelectorAll('.task-item-card') : [];
+   
+    if (taskCards.length === 0) {
+      return showToast("Por favor, agrega al menos una tarea a la orden.", "danger");
+    }
+
+    let tasksValid = true;
+    taskCards.forEach(card => {
+      const ccEl = card.querySelector('.task-cc');
+      const empEl = card.querySelector('.task-emp');
+      const hoursEl = card.querySelector('.task-hours');
+      const statusEl = card.querySelector('.task-status');
+      const descEl = card.querySelector('.task-desc');
+      const insumosEl = card.querySelector('.task-insumos');
+
+      const cc = ccEl ? ccEl.value : '';
+      const emp = empEl ? empEl.value : '';
+      const hoursRaw = hoursEl ? hoursEl.value : '0.01';
+      const status = statusEl ? statusEl.value : 'Pendiente';
+      const desc = descEl ? descEl.value : '';
+      const insumos = insumosEl ? insumosEl.value.trim() : '';
+
+      if (!cc || !emp) {
+        tasksValid = false;
+        return;
+      }
+
+      // Preserve task ID if we are editing
+      const isTempId = card.id.startsWith('task-card-');
+      const taskId = isTempId ? null : card.id;
+
+      // Collect timer state
+      const timerKey = `timer_start_${card.id}`;
+      const timerStartVal = localStorage.getItem(timerKey) ? parseInt(localStorage.getItem(timerKey)) : null;
+      let timerHistoryVal = [];
+      try {
+        timerHistoryVal = JSON.parse(card.dataset.timerHistory || '[]');
+      } catch (e) {}
+
+      tasks.push({
+        id: taskId,
+        centroCosto: cc,
+        empleado: emp,
+        horasEstimadas: parseFloat(String(hoursRaw).replace(',', '.')) || 0,
+        status: status,
+        descripcion: desc,
+        insumos: insumos,
+        timerStart: timerStartVal,
+        timerStarted: card.dataset.timerStarted === 'true',
+        timerHistory: timerHistoryVal
+      });
+    });
+   
+    if (!tasksValid) {
+      return showToast("Completa el Centro de Costo y Operario de todas las tareas.", "danger");
+    }
+
+    // Block submission if there was a rendering error in the modal
+    if (window.editModalHasRenderingError) {
+      return showToast("No se puede guardar porque ocurrió un error al cargar las tareas. Por favor recargue la página.", "danger");
+    }
+
+    // Double check: if we are editing an order that originally had tasks, but now we collect 0 tasks
+    if (currentEditingOrderId) {
+      const originalOrder = activeOrders.find(o => o.id === currentEditingOrderId);
+      if (originalOrder && Array.isArray(originalOrder.tasks) && originalOrder.tasks.length > 0 && tasks.length === 0) {
+        const confirmDelete = confirm("ATENCIÓN: La orden original tenía tareas, pero ahora se guardará con 0 tareas (se borrarán permanentemente). ¿Está seguro de que desea continuar?");
+        if (!confirmDelete) {
+          return;
+        }
+      }
+    }
+   
+    const payload = {
+      rodado: rodadoLabel,
+      responsable: "AUTO",
+      interno: internoVal,
+      clasificacion: clasificacionEl.value,
+      fechaEntrega: fechaEl ? fechaEl.value : '',
+      horario: horaEl ? horaEl.value : '',
+      incidente: incidenteEl ? incidenteEl.value : '',
+      tasks: tasks,
+      estadoUnidad: currentEditingOrderId ? (activeOrders.find(o => o.id === currentEditingOrderId)?.estadoUnidad || 'fuera_de_servicio') : 'fuera_de_servicio',
+      combustibleReset: currentCombustibleReset
+    };
+   
+    const url = currentEditingOrderId ? `/api/orders/${currentEditingOrderId}` : '/api/orders';
+    const method = currentEditingOrderId ? 'PUT' : 'POST';
+   
     const res = await fetch(url, {
       method: method,
       headers: { 
@@ -2802,7 +2882,7 @@ async function submitWorkOrder() {
       },
       body: JSON.stringify(payload)
     });
- 
+   
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || (currentEditingOrderId ? "Error al actualizar la orden" : "Error al crear la orden"));
@@ -2810,7 +2890,8 @@ async function submitWorkOrder() {
     
     // Clean up task timers from localStorage for finished tasks
     taskCards.forEach(card => {
-      if (card.querySelector('.task-status').value === 'Finalizada') {
+      const statusEl = card.querySelector('.task-status');
+      if (statusEl && statusEl.value === 'Finalizada') {
         clearLocalStorageTimerKeys(card.id);
         if (activeIntervalTimers[card.id]) {
           clearInterval(activeIntervalTimers[card.id]);
@@ -2823,7 +2904,7 @@ async function submitWorkOrder() {
     showToast(msg, "success");
     closeNewOrderModal();
     await fetchOrders();
-    switchView('home'); // Go to dashboard (Inicio) to see the tasks and stopwatch
+    switchView('home');
   } catch (error) {
     const prefixMsg = currentEditingOrderId ? "Fallo al actualizar la orden" : "Fallo al crear la orden";
     showToast(`${prefixMsg}: ${error.message}`, "danger");
@@ -2833,6 +2914,9 @@ async function submitWorkOrder() {
     if (submitBtn) submitBtn.disabled = false;
   }
 }
+
+window.submitWorkOrder = submitWorkOrder;
+window.updateHoursReadable = updateHoursReadable;
 
 // 9. SYNC ACTIONS (RETRY & DELETE)
 async function retrySync(orderId) {
@@ -3352,9 +3436,34 @@ function minutesToHmm(totalMinutes) {
 }
 
 function calculateTotalElapsedSeconds(timerHistory, timerStart) {
+  const now = Date.now();
+  
+  if (timerStart !== null && timerStart !== undefined && parseInt(timerStart) > 0) {
+    const startMs = parseInt(timerStart);
+    let historyMs = 0;
+    
+    if (Array.isArray(timerHistory) && timerHistory.length > 0) {
+      const sorted = [...timerHistory].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      let segStart = null;
+      sorted.forEach(ev => {
+        const type = String(ev.type || ev.event || '').trim().toLowerCase();
+        if ((type.startsWith('inici') || type.startsWith('reanud')) && ev.timestamp < startMs) {
+          segStart = ev.timestamp;
+        } else if ((type.startsWith('paus') || type.startsWith('fin')) && segStart !== null && ev.timestamp <= startMs) {
+          historyMs += (ev.timestamp - segStart);
+          segStart = null;
+        }
+      });
+    }
+    
+    const activeMs = Math.max(0, now - startMs);
+    const totalMs = historyMs + Math.min(activeMs, 43200000);
+    return Math.max(0, Math.floor(totalMs / 1000));
+  }
+
   let totalMs = 0;
   if (Array.isArray(timerHistory) && timerHistory.length > 0) {
-    const sorted = [...timerHistory].sort((a, b) => a.timestamp - b.timestamp);
+    const sorted = [...timerHistory].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     let currentStart = null;
     sorted.forEach(event => {
       const type = String(event.type || event.event || '').trim().toLowerCase();
@@ -3367,10 +3476,9 @@ function calculateTotalElapsedSeconds(timerHistory, timerStart) {
         }
       }
     });
-  }
-  if (timerStart !== null && timerStart > 0) {
-    const elapsedMs = Date.now() - timerStart;
-    totalMs += Math.min(elapsedMs, 43200000); // Cap active timer to max 12 hours (43,200,000 ms)
+    if (currentStart !== null) {
+      totalMs += (now - currentStart);
+    }
   }
   return Math.max(0, Math.floor(totalMs / 1000));
 }
@@ -3831,6 +3939,7 @@ function renderDashboard() {
 
     const workingEmployeeLabels = new Set();
     const pausedEmployeeLabels = new Set();
+    const seenTaskKeys = new Set();
 
     activeLocalOrders.forEach(order => {
       (order.tasks || []).forEach(task => {
@@ -3839,11 +3948,31 @@ function renderDashboard() {
             ? cachedCatalogs.empleados.find(e => e.value === task.empleado)
             : null;
           const empLabel = (empOpt ? empOpt.label : task.empleado) || 'Desconocido';
+
+          const cleanDesc = (task.descripcion || '').trim().toLowerCase();
+          const cleanEmp = String(empLabel).trim().toLowerCase();
+          const taskUniqueKey = `${order.interno || ''}_${cleanEmp}_${cleanDesc}`;
+
+          if (seenTaskKeys.has(taskUniqueKey)) {
+            return; // Skip duplicate task cards
+          }
+
           const timerKey = `timer_start_${task.id}`;
           const localTimerStart = localStorage.getItem(timerKey);
-          const isTimerRunning = (task.timerStart !== null && task.timerStart > 0) || 
-                                 (localTimerStart !== null && parseInt(localTimerStart) > 0) || 
-                                 task.timerStarted === true || task.timerStarted === 'true';
+          
+          let resolvedTimerStart = null;
+          if (task.timerStart !== null && task.timerStart > 0) {
+            resolvedTimerStart = task.timerStart;
+            localStorage.setItem(timerKey, String(task.timerStart));
+          } else if (localTimerStart !== null && parseInt(localTimerStart) > 0) {
+            resolvedTimerStart = parseInt(localTimerStart);
+          }
+
+          const isTimerRunning = resolvedTimerStart !== null || task.timerStarted === true || task.timerStarted === 'true';
+          if (isTimerRunning && !resolvedTimerStart) {
+            resolvedTimerStart = Date.now();
+            localStorage.setItem(timerKey, String(resolvedTimerStart));
+          }
 
           const taskInfo = {
             orderId: order.id,
@@ -3856,11 +3985,13 @@ function renderDashboard() {
             centroCosto: task.centroCosto || '',
             horasEstimadas: parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0,
             descripcion: task.descripcion || '(Sin descripción)',
-            timerStart: isTimerRunning ? (task.timerStart || (localTimerStart ? parseInt(localTimerStart) : Date.now())) : null,
+            timerStart: isTimerRunning ? resolvedTimerStart : null,
             isTimerRunning: isTimerRunning,
             timerHistory: task.timerHistory || [],
             taxesOrderNumber: order.taxesOrderNumber || null
           };
+
+          seenTaskKeys.add(taskUniqueKey);
 
           if (isTimerRunning) {
             workingTasks.push(taskInfo);
@@ -4175,9 +4306,13 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
 
   // Then persist to server in background
   try {
+    const currentUsername = localStorage.getItem('currentUserUsername') || 'paniol@contenedoreshugo.com.ar';
     const res = await fetch(`/api/orders/${orderId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-user-username': currentUsername
+      },
       body: JSON.stringify({
         rodado: order.rodado,
         responsable: order.responsable,
@@ -4315,9 +4450,13 @@ async function markDashboardTaskFinished(orderId, taskId) {
 
   // Then persist to server in background
   try {
+    const currentUsername = localStorage.getItem('currentUserUsername') || 'paniol@contenedoreshugo.com.ar';
     const res = await fetch(`/api/orders/${orderId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-user-username': currentUsername
+      },
       body: JSON.stringify({
         rodado: order.rodado,
         responsable: order.responsable,
