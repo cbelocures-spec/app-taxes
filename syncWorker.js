@@ -2215,7 +2215,25 @@ async function syncWorkOrder(orderId) {
         appTask.needsHoursUpdate = false;
       }
 
-      db.updateWorkOrder(orderId, { tasks: order.tasks });
+      // Merge only the sync bookkeeping flags (synced/taxesRealizadaSynced) onto the CURRENT
+      // task data instead of blindly overwriting with `order.tasks` (a snapshot taken minutes
+      // ago, before the browser automation ran). This sync can take a long time; if the user
+      // edited the order in the app meanwhile (e.g. adding diagnóstico/insumos or fixing hours),
+      // a blind overwrite here would silently erase that edit by reverting to the stale snapshot.
+      {
+        const freshOrder = db.getWorkOrderById(orderId);
+        if (freshOrder && Array.isArray(freshOrder.tasks)) {
+          const syncedById = new Map(order.tasks.map(t => [t.id, t]));
+          const mergedTasks = freshOrder.tasks.map(freshTask => {
+            const synced = syncedById.get(freshTask.id);
+            if (!synced) return freshTask;
+            return { ...freshTask, synced: synced.synced, taxesRealizadaSynced: synced.taxesRealizadaSynced };
+          });
+          db.updateWorkOrder(orderId, { tasks: mergedTasks });
+        } else {
+          db.updateWorkOrder(orderId, { tasks: order.tasks });
+        }
+      }
 
       // Fix date inputs before saving:
       // Force all date inputs to have valid formats.
