@@ -4108,7 +4108,9 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
   const task = order.tasks.find(t => t.id === taskId);
   if (!task) return;
 
-  const isRunning = task.timerStart !== null && task.timerStart > 0;
+  const timerKey = `timer_start_${taskId}`;
+  const localStart = localStorage.getItem(timerKey);
+  const isRunning = (task.timerStart !== null && task.timerStart > 0) || (localStart !== null && parseInt(localStart) > 0);
 
   if (!isRunning) {
     // --- START TIMER ---
@@ -4140,15 +4142,17 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
     }
 
     task.timerStart = Date.now();
-    localStorage.setItem(`timer_start_${taskId}`, task.timerStart);
+    localStorage.setItem(timerKey, task.timerStart);
     showToast("Cronómetro iniciado", "info");
   } else {
     // --- PAUSE TIMER ---
-    const elapsedMs = Date.now() - task.timerStart;
+    const startTime = (task.timerStart !== null && task.timerStart > 0) ? task.timerStart : (localStart ? parseInt(localStart) : Date.now());
+    const elapsedMs = Date.now() - startTime;
     const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
     const addedHoursHmm = minutesToHmm(elapsedMinutes);
 
     task.timerStart = null;
+    task.timerStarted = false;
     addTimerEventToTask(task, 'Pausó');
 
     const totalMinutes = Math.round(calculateTotalElapsedSeconds(task.timerHistory, null) / 60);
