@@ -589,21 +589,20 @@ function switchView(viewId) {
     if (viewId === 'preventivos') {
       try { fetchPreventivoFlota(); } catch(e) {}
     }
+
+    if (viewId === 'partetaller') {
+      try { fetchParteTallerEstado(); } catch(e) {}
+    }
+
+    if (viewId === 'historial') {
+      try { fetchArchivedOrders(); } catch(e) {}
+    }
   } catch (err) {
     console.error("[switchView Error]:", err);
   }
 }
 
 window.switchView = switchView;
-
-  if (viewId === 'partetaller') {
-    fetchParteTallerEstado();
-  }
-
-  if (viewId === 'historial') {
-    fetchArchivedOrders();
-  }
-}
 
 // 2. MODAL CONTROLLERS
 function openPreOrderModal() {
@@ -2731,7 +2730,22 @@ function createQueueCardHtml(order) {
         </span>
         <span style="font-weight:600; color: var(--${statusColor === 'pending' ? 'secondary' : statusColor})">${desc}</span>
       </div>
-      <div style="display:flex; justify-content: flex-end; marlet isSubmittingWorkOrder = false;
+      <div style="display:flex; justify-content: flex-end; margin-top:6px;">
+        ${actionBtn}
+      </div>
+    </div>
+  `;
+}
+
+function filterOrders() {
+  renderOrders();
+}
+
+function filterHistory() {
+  renderOrders();
+}
+
+let isSubmittingWorkOrder = false;
 async function submitWorkOrder() {
   if (isSubmittingWorkOrder) return;
   isSubmittingWorkOrder = true;
