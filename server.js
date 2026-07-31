@@ -784,12 +784,46 @@ app.put('/api/orders/:id', (req, res) => {
     const createdBy = existing.createdBy || requester;
     const allTasksCompleted = (tasks || []).length > 0 && (tasks || []).every(t => t.status === "Finalizada");
 
-    // SAFETY: if the incoming tasks array is empty but the order already has tasks,
-    // preserve the existing tasks. This prevents accidental deletion of tasks
-    // when a timer-only update sends a partial payload.
-    const tasksToSave = (tasks && tasks.length > 0)
-      ? tasks
-      : (existing.tasks && existing.tasks.length > 0 ? existing.tasks : []);
+    const incomingTasks = Array.isArray(tasks) ? tasks : [];
+    const deletedIds = new Set(Array.isArray(req.body.deletedTaskIds) ? req.body.deletedTaskIds : []);
+
+    const mergedTasksMap = new Map();
+    // 1. Preserve existing tasks
+    (existing.tasks || []).forEach(et => {
+      if (et && et.id && !deletedIds.has(et.id)) {
+        mergedTasksMap.set(et.id, { ...et });
+      }
+    });
+
+    // 2. Overwrite or append incoming tasks
+    incomingTasks.forEach((t, idx) => {
+      if (!t) return;
+      const tId = t.id || `${Date.now()}-${idx}`;
+      const existingTask = mergedTasksMap.get(tId) || (existing.tasks ? existing.tasks.find(et => et.id === tId) : null);
+      
+      let synced = existingTask ? (existingTask.synced === true) : false;
+      let taxesRealizadaSynced = existingTask ? (existingTask.taxesRealizadaSynced === true) : false;
+      if (t.status === "Finalizada" && (!existingTask || existingTask.status !== "Finalizada")) {
+        taxesRealizadaSynced = false;
+      }
+
+      mergedTasksMap.set(tId, {
+        id: tId,
+        centroCosto: t.centroCosto !== undefined ? t.centroCosto : (existingTask ? existingTask.centroCosto : ""),
+        empleado: t.empleado !== undefined ? t.empleado : (existingTask ? existingTask.empleado : ""),
+        horasEstimadas: t.horasEstimadas !== undefined ? parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0 : (existingTask ? existingTask.horasEstimadas : 0),
+        descripcion: t.descripcion !== undefined ? t.descripcion : (existingTask ? existingTask.descripcion : ""),
+        status: t.status !== undefined ? t.status : (existingTask ? existingTask.status : "Pendiente"),
+        insumos: t.insumos !== undefined ? t.insumos : (existingTask ? existingTask.insumos || "" : ""),
+        timerStart: t.timerStart !== undefined ? t.timerStart : (existingTask ? existingTask.timerStart : null),
+        timerStarted: t.timerStarted !== undefined ? (t.timerStarted === true || t.timerStarted === 'true') : (existingTask ? existingTask.timerStarted : false),
+        timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : (existingTask ? existingTask.timerHistory || [] : []),
+        synced: synced,
+        taxesRealizadaSynced: taxesRealizadaSynced
+      });
+    });
+
+    const finalTasksToSave = Array.from(mergedTasksMap.values());
 
     const updated = db.updateWorkOrder(req.params.id, {
       rodado,
@@ -800,36 +834,12 @@ app.put('/api/orders/:id', (req, res) => {
       clasificacion: finalClasificacion,
       incidente,
       createdBy,
-      syncStatus: "pending", // Force queue for sync on any update
+      syncStatus: (existing.syncStatus === 'success' && incomingTasks.length === 0) ? existing.syncStatus : "pending",
       syncError: null,
       syncDate: null,
       estadoUnidad: estadoUnidad !== undefined ? estadoUnidad : existing.estadoUnidad,
       combustibleReset: combustibleReset !== undefined ? combustibleReset : existing.combustibleReset,
-      tasks: tasksToSave.map((t, idx) => {
-        const existingTask = existing.tasks ? existing.tasks.find(et => et.id === t.id) : null;
-        let synced = existingTask ? (existingTask.synced === true) : false;
-        let taxesRealizadaSynced = existingTask ? (existingTask.taxesRealizadaSynced === true) : false;
-        
-        // If status changed to Finalizada, reset the updated flag so we sync the update to Taxes
-        if (t.status === "Finalizada" && (!existingTask || existingTask.status !== "Finalizada")) {
-          taxesRealizadaSynced = false;
-        }
-
-        return {
-          id: t.id || `${Date.now()}-${idx}`,
-          centroCosto: t.centroCosto || "",
-          empleado: t.empleado || "",
-          horasEstimadas: parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0,
-          descripcion: t.descripcion || "",
-          status: t.status || "Pendiente",
-          insumos: t.insumos !== undefined ? t.insumos : (existingTask ? existingTask.insumos || "" : ""),
-          timerStart: t.timerStart || null,
-          timerStarted: t.timerStarted === true || t.timerStarted === 'true',
-          timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : (existingTask ? existingTask.timerHistory || [] : []),
-          synced: synced,
-          taxesRealizadaSynced: taxesRealizadaSynced
-        };
-      })
+      tasks: finalTasksToSave
     });
 
     // Respond immediately to the frontend so UI modal never hangs
