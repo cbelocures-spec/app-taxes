@@ -2043,30 +2043,40 @@ async function syncWorkOrder(orderId) {
         if (descMismatch) {
           console.log(`[Reconcile] Card #${ci} description update required (Taxes: "${cleanDescTaxes}" → Target: "${cleanDescTarget}"). Writing...`);
           const descId = await page.evaluate((idx) => {
-            const textareas = Array.from(document.querySelectorAll('textarea[id^="descripcion_"], textarea[placeholder*="Describe las actividades"]'));
-            const el = textareas[idx];
+            const textareas = Array.from(document.querySelectorAll('textarea, textarea[name*="descripcion"], textarea[id*="descripcion"], textarea[placeholder*="Describe"], input[name*="descripcion"]'));
+            const el = textareas[idx] || textareas[0];
             if (!el) return null;
             if (!el.id) el.id = `rc-desc-${idx}-${Date.now()}`;
             return el.id;
           }, ci);
+
           if (descId) {
             const sel = `#${descId}`;
-            // 1. Erase textarea completely via DOM evaluate
+            console.log(`[Reconcile] Erasing and rewriting description textarea (${sel}) with: "${finalDescription}"`);
+            
+            await page.focus(sel).catch(() => {});
+            await page.click(sel, { clickCount: 3 }).catch(() => {});
+
+            // 1. Force DOM flush & clear
             await page.evaluate((s) => {
               const el = document.querySelector(s);
               if (el) {
                 el.value = '';
+                if (el.textContent !== undefined) el.textContent = '';
+                if (el.innerText !== undefined) el.innerText = '';
                 el.dispatchEvent(new Event('input', { bubbles: true }));
                 el.dispatchEvent(new Event('change', { bubbles: true }));
               }
             }, sel);
-            // 2. Select all and backspace as keyboard fallback
-            await page.focus(sel).catch(() => {});
-            await page.click(sel, { clickCount: 3 }).catch(() => {});
+
+            // 2. Keyboard Control+A + Backspace + Delete
             await page.keyboard.down('Control');
             await page.keyboard.press('A');
             await page.keyboard.up('Control');
             await page.keyboard.press('Backspace');
+            await page.keyboard.press('Delete');
+            await delay(200);
+
             // 3. Set exact target string via DOM and dispatch events
             await page.evaluate((s, val) => {
               const el = document.querySelector(s);
@@ -2077,7 +2087,13 @@ async function syncWorkOrder(orderId) {
                 el.dispatchEvent(new Event('blur', { bubbles: true }));
               }
             }, sel, finalDescription);
+
+            // 4. Trigger typing space + backspace to ensure Vue v-model updates binding
+            await page.type(sel, ' ', { delay: 30 }).catch(() => {});
+            await page.keyboard.press('Backspace').catch(() => {});
             await delay(1000);
+          } else {
+            console.warn(`[Reconcile] COULD NOT FIND description element for card #${ci}!`);
           }
         }
 
