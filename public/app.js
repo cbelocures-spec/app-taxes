@@ -5836,18 +5836,8 @@ function updateClassificationSelectOptions() {
 function isHerreriaOrder(order) {
   if (!order) return false;
   const cls = String(order.clasificacion || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const rod = String(order.rodado || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const inter = String(order.interno || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-
-  if (cls.includes('herrer') || cls.includes('herrera')) return true;
-
-  const herreriaKeywords = [
-    'prensa', 'fabricacion', 'fabricacion', 'contenedor', 'roll-off', 'roll off', 'volquete', 'canasto', 'rep. contenedor', 'rep. caja', 'rep. volquete'
-  ];
-  for (const kw of herreriaKeywords) {
-    if (rod.includes(kw) || inter.includes(kw)) return true;
-  }
-  return false;
+  const sec = String(order.sector || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  return cls.includes('herrer') || sec.includes('herrer');
 }
 
 function isEdilicioOrder(order) {
