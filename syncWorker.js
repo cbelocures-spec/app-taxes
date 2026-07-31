@@ -1508,14 +1508,18 @@ function resolveAndMapEmployee(task) {
 
 // 2. SYNCHRONIZE SINGLE WORK ORDER
 async function syncWorkOrder(orderId) {
-  const order = db.getWorkOrderById(orderId);
+  let order = db.getWorkOrderById(orderId);
   if (!order) return { success: false, message: "Order not found" };
 
+  if (order.syncStatus === 'syncing' && order.syncLockTime && (Date.now() - new Date(order.syncLockTime).getTime() < 120000)) {
+    console.log(`[SyncLock] Order ID ${orderId} is ALREADY active in another sync process. Skipping duplicate run.`);
+    return { success: false, message: "Order is already syncing" };
+  }
+
+  // Mark as syncing IMMEDIATELY before browser lock to block rapid duplicate calls
+  db.updateWorkOrder(orderId, { syncStatus: "syncing", syncError: null, syncLockTime: new Date().toISOString() });
+
   const settings = db.getSettings();
-  
-  // SIEMPRE usar credenciales globales de Ajustes (paniol@).
-  // Cualquier supervisor puede sincronizar cualquier OT con las credenciales centrales.
-  // Las credenciales del creador de la OT se ignoran.
   const username = settings.username;
   const password = settings.password;
 
@@ -1528,8 +1532,17 @@ async function syncWorkOrder(orderId) {
   }
 
   await acquireBrowserLock(`syncWorkOrder(${orderId})`);
-  console.log(`\n=== Starting Background Sync for OT #${order.interno} (ID: ${order.id}) using user: ${username} ===`);
-  db.updateWorkOrder(orderId, { syncStatus: "syncing", syncError: null });
+
+  // RE-READ FRESH ORDER STATE AFTER ACQUIRING BROWSER LOCK
+  // This ensures if a previous run created the OT number while we were waiting in queue,
+  // we immediately detect taxesOrderNumber and NEVER create a duplicate OT!
+  order = db.getWorkOrderById(orderId);
+  if (!order) {
+    releaseBrowserLock();
+    return { success: false, message: "Order not found after lock" };
+  }
+
+  console.log(`\n=== Starting Background Sync for OT #${order.interno} (ID: ${order.id}) [taxesOrderNumber: ${order.taxesOrderNumber || 'NEW'}] ===`);
 
   let browser = null;
 
