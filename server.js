@@ -911,8 +911,11 @@ app.patch('/api/orders/:id/tasks/:taskId', (req, res) => {
     }
 
     const updatedTasks = [...order.tasks];
-    updatedTasks[taskIdx] = { ...updatedTasks[taskIdx], ...updates };
-    db.updateWorkOrder(req.params.id, { tasks: updatedTasks });
+    updatedTasks[taskIdx] = { ...updatedTasks[taskIdx], ...updates, synced: false };
+    // Re-queue for Taxes sync: without this, an order already marked as synced never gets
+    // picked up again by the background worker, so hours/description edited from here
+    // (e.g. the dashboard quick-hours field) silently never reach Taxes.
+    db.updateWorkOrder(req.params.id, { tasks: updatedTasks, syncStatus: 'pending', syncError: null });
     checkAndSendInsumosToSheet(order, updatedTasks, order.responsable, order.interno);
 
     console.log(`[PATCH task] Order ${req.params.id} / Task ${req.params.taskId} updated:`, updates);

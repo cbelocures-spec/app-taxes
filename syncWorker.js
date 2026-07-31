@@ -1835,50 +1835,61 @@ async function syncWorkOrder(orderId) {
         console.log(`[Reconcile] After adding missing tasks: ${formCards.length} cards now in form`);
       }
 
+      // Match cards <-> tasks by employee+description (strict pass, then loose pass).
+      // Returns { cardMatch, taskMatch } where cardMatch[ci] = matched task index (or -1) and
+      // taskMatch[ai] = matched card index (or -1). Re-run whenever the DOM card order may not
+      // correspond to order.tasks index order (e.g. after Taxes renders cards in a different
+      // order than they were created, or after we've deleted/added cards).
+      const matchCardsToTasks = (cards, tasks) => {
+        const cardMatch = new Array(cards.length).fill(-1);
+        const taskMatch = new Array(tasks.length).fill(-1);
+
+        // Strict pass: both employee and description agree
+        for (let ai = 0; ai < tasks.length; ai++) {
+          const appTask = tasks[ai];
+          const { employeeLabel } = resolveAndMapEmployee(appTask);
+          for (let ci = 0; ci < cards.length; ci++) {
+            if (cardMatch[ci] !== -1) continue;
+            const card = cards[ci];
+            const empOk = cleanStr(card.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(card.employee));
+            const descOk = cleanStr(card.description).includes(cleanStr(appTask.descripcion)) || cleanStr(appTask.descripcion).includes(cleanStr(card.description));
+            if (empOk && descOk) {
+              cardMatch[ci] = ai;
+              taskMatch[ai] = ci;
+              break;
+            }
+          }
+        }
+
+        // Loose pass: either employee or description agree
+        for (let ai = 0; ai < tasks.length; ai++) {
+          if (taskMatch[ai] !== -1) continue;
+          const appTask = tasks[ai];
+          const { employeeLabel } = resolveAndMapEmployee(appTask);
+          for (let ci = 0; ci < cards.length; ci++) {
+            if (cardMatch[ci] !== -1) continue;
+            const card = cards[ci];
+            const empOk = cleanStr(card.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(card.employee));
+            const descOk = cleanStr(card.description).includes(cleanStr(appTask.descripcion)) || cleanStr(appTask.descripcion).includes(cleanStr(card.description));
+            if (empOk || descOk) {
+              cardMatch[ci] = ai;
+              taskMatch[ai] = ci;
+              break;
+            }
+          }
+        }
+
+        return { cardMatch, taskMatch };
+      };
+
       // 5. DELETE duplicate/extra cards
       //    Strategy: determine which cards match local tasks to keep them, then delete unmatched ones.
-      const matchedCardIndices = new Set();
-      const matchedAppIndices = new Set();
-
-      // First pass: strict match (both employee and description)
-      for (let ai = 0; ai < order.tasks.length; ai++) {
-        const appTask = order.tasks[ai];
-        const { employeeLabel } = resolveAndMapEmployee(appTask);
-        for (let ci = 0; ci < formCards.length; ci++) {
-          if (matchedCardIndices.has(ci)) continue;
-          const card = formCards[ci];
-          const empOk = cleanStr(card.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(card.employee));
-          const descOk = cleanStr(card.description).includes(cleanStr(appTask.descripcion)) || cleanStr(appTask.descripcion).includes(cleanStr(card.description));
-          if (empOk && descOk) {
-            matchedCardIndices.add(ci);
-            matchedAppIndices.add(ai);
-            break;
-          }
-        }
-      }
-
-      // Second pass: loose match (either employee or description)
-      for (let ai = 0; ai < order.tasks.length; ai++) {
-        if (matchedAppIndices.has(ai)) continue;
-        const appTask = order.tasks[ai];
-        const { employeeLabel } = resolveAndMapEmployee(appTask);
-        for (let ci = 0; ci < formCards.length; ci++) {
-          if (matchedCardIndices.has(ci)) continue;
-          const card = formCards[ci];
-          const empOk = cleanStr(card.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(card.employee));
-          const descOk = cleanStr(card.description).includes(cleanStr(appTask.descripcion)) || cleanStr(appTask.descripcion).includes(cleanStr(card.description));
-          if (empOk || descOk) {
-            matchedCardIndices.add(ci);
-            matchedAppIndices.add(ai);
-            break;
-          }
-        }
-      }
+      const { cardMatch: initialCardMatch } = matchCardsToTasks(formCards, order.tasks);
 
       // Unmatched form cards are marked for deletion
       const toDeleteIndices = [];
       for (let ci = 0; ci < formCards.length; ci++) {
-        if (!matchedCardIndices.has(ci)) toDeleteIndices.push(ci);
+        if (initialCardMatch[ci] === -1) toDeleteIndices.push(ci);
       }
 
       if (toDeleteIndices.length > 0) {
@@ -1959,10 +1970,25 @@ async function syncWorkOrder(orderId) {
         console.log(`[Reconcile] After adding missing tasks: ${formCards.length} cards now in form`);
       }
 
-      // Now that formCards.length === order.tasks.length, compute the final mapping accurately
-      const cardToAppMap = [];
-      for (let i = 0; i < formCards.length; i++) {
-        cardToAppMap[i] = i; // Positional 1-to-1 mapping guarantees task 0 -> card 0
+      // Now that formCards.length === order.tasks.length, compute the final mapping accurately.
+      // Re-match against the FINAL card set instead of assuming position i == task i: Taxes may
+      // render cards in a different order than order.tasks, and blindly using identity mapping
+      // here silently wrote each task's hours/description into the wrong card (e.g. task #1's
+      // hours ending up on card #2), which looked "synced" but left stale/incorrect values.
+      const { cardMatch: finalCardMatch, taskMatch: finalTaskMatch } = matchCardsToTasks(formCards, order.tasks);
+      const cardToAppMap = [...finalCardMatch];
+
+      // Any card still unmatched (e.g. a freshly added blank card) gets assigned to whichever
+      // app task doesn't have a matched card yet, in order.
+      const unmatchedTasks = [];
+      for (let ai = 0; ai < order.tasks.length; ai++) {
+        if (finalTaskMatch[ai] === -1) unmatchedTasks.push(ai);
+      }
+      let unmatchedCursor = 0;
+      for (let ci = 0; ci < cardToAppMap.length; ci++) {
+        if (cardToAppMap[ci] === -1 && unmatchedCursor < unmatchedTasks.length) {
+          cardToAppMap[ci] = unmatchedTasks[unmatchedCursor++];
+        }
       }
 
       console.log(`[Reconcile] Final Card to App Map:`, JSON.stringify(cardToAppMap));
