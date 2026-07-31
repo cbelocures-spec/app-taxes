@@ -228,7 +228,7 @@
       "createdAt": "2026-07-28T09:57:36.559Z",
       "tasks": [
         {
-          "id": "t155-1-active",
+          "id": "t155-active-1",
           "centroCosto": "15",
           "empleado": "OJEDA FERNANDEZ JOSE ENRIQUE",
           "horasEstimadas": 3.5,
@@ -239,13 +239,14 @@
           "timerHistory": [
             {
               "event": "Inició",
+              "type": "Inició",
               "timestamp": 1785488400000,
               "timeString": "06:00"
             }
           ]
         },
         {
-          "id": "t155-2-active",
+          "id": "t155-active-2",
           "centroCosto": "15",
           "empleado": "PEREZ FACUNDO",
           "horasEstimadas": 6.5,
@@ -256,13 +257,14 @@
           "timerHistory": [
             {
               "event": "Inició",
+              "type": "Inició",
               "timestamp": 1785488400000,
               "timeString": "06:00"
             }
           ]
         },
         {
-          "id": "t155-3-active",
+          "id": "t155-active-3",
           "centroCosto": "15",
           "empleado": "Rocha, Ariel Maximiliano",
           "horasEstimadas": 6.5,
@@ -273,6 +275,7 @@
           "timerHistory": [
             {
               "event": "Inició",
+              "type": "Inició",
               "timestamp": 1785488400000,
               "timeString": "06:00"
             }
@@ -1053,7 +1056,7 @@
       "createdAt": "2026-07-29T14:08:14.327Z",
       "tasks": [
         {
-          "id": "t119-1-active",
+          "id": "t119-active-1",
           "centroCosto": "15",
           "empleado": "Morel, Luis Maximiliano",
           "horasEstimadas": 4.5,
@@ -1064,13 +1067,14 @@
           "timerHistory": [
             {
               "event": "Inició",
+              "type": "Inició",
               "timestamp": 1785488400000,
               "timeString": "06:00"
             }
           ]
         },
         {
-          "id": "t119-2-active",
+          "id": "t119-active-2",
           "centroCosto": "15",
           "empleado": "Canaviri Fernandez, Jesús",
           "horasEstimadas": 4.5,
@@ -1081,6 +1085,7 @@
           "timerHistory": [
             {
               "event": "Inició",
+              "type": "Inició",
               "timestamp": 1785488400000,
               "timeString": "06:00"
             }

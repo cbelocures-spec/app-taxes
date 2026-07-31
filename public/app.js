@@ -3357,7 +3357,7 @@ function calculateTotalElapsedSeconds(timerHistory, timerStart) {
     const sorted = [...timerHistory].sort((a, b) => a.timestamp - b.timestamp);
     let currentStart = null;
     sorted.forEach(event => {
-      const type = String(event.type || '').trim().toLowerCase();
+      const type = String(event.type || event.event || '').trim().toLowerCase();
       if (type.startsWith('inici') || type.startsWith('reanud')) {
         currentStart = event.timestamp;
       } else if (type.startsWith('paus') || type.startsWith('fin')) {
