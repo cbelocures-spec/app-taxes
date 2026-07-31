@@ -1468,35 +1468,38 @@ function resolveAndMapEmployee(task) {
     ...(effectiveMappings.Edilicio || [])
   ];
 
-  // ALWAYS start from pure user base description to prevent double-concatenation on resync!
-  let baseDesc = extractPureUserDescription(task.descripcion);
+  let finalDescription = (task.descripcion || '').trim();
+  const cleanDescLower = finalDescription.toLowerCase();
 
   const matchedEntry = allMappings.find(entry =>
     entry.appName && entry.appName.trim().toLowerCase() === employeeLabel.trim().toLowerCase()
   );
 
-  let finalDescription = baseDesc;
-
   if (matchedEntry && matchedEntry.taxesName && matchedEntry.taxesName.trim()) {
     const isSameName = matchedEntry.appName.trim().toLowerCase() === matchedEntry.taxesName.trim().toLowerCase();
+    const proxySuffix = `Realizó: ${matchedEntry.appName.trim()}`;
+    if (!cleanDescLower.includes(proxySuffix.toLowerCase())) {
+      finalDescription = `${finalDescription}. ${proxySuffix}`;
+    }
     if (!isSameName) {
-      console.log(`Mapping employee "${employeeLabel}" → "${matchedEntry.taxesName}" (proxy)`);
-      finalDescription = `${finalDescription}. Realizó: ${matchedEntry.appName.trim()}`;
       employeeLabel = matchedEntry.taxesName.trim();
-    } else {
-      console.log(`Mapping employee "${employeeLabel}" → same name in Taxes`);
-      finalDescription = `${finalDescription}. Realizó: ${matchedEntry.appName.trim()}`;
     }
   }
 
-  // Append diagnostico/diagnostic if present
+  // Append diagnostico/diagnostic if present and not already in description
   if (task.diagnostico && task.diagnostico.trim()) {
-    finalDescription = `${finalDescription}. Diagnóstico: ${task.diagnostico.trim()}`;
+    const diagStr = task.diagnostico.trim();
+    if (!cleanDescLower.includes(diagStr.toLowerCase()) && !cleanDescLower.includes('diagnóstico') && !cleanDescLower.includes('diagnostico')) {
+      finalDescription = `${finalDescription}. Diagnóstico: ${diagStr}`;
+    }
   }
 
-  // Append insumos/supplies if present
+  // Append insumos/supplies if present and not already in description
   if (task.insumos && task.insumos.trim()) {
-    finalDescription = `${finalDescription} [Insumos: ${task.insumos.trim()}]`;
+    const insumosStr = task.insumos.trim();
+    if (!cleanDescLower.includes(insumosStr.toLowerCase()) && !cleanDescLower.includes('insumos')) {
+      finalDescription = `${finalDescription} [Insumos: ${insumosStr}]`;
+    }
   }
 
   return { employeeLabel, finalDescription };
