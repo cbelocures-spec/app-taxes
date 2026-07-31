@@ -2854,11 +2854,23 @@ async function submitWorkOrder() {
         timerHistoryVal = JSON.parse(card.dataset.timerHistory || '[]');
       } catch (e) {}
 
+      const parsedHours = parseFloat(String(hoursRaw).replace(',', '.')) || 0;
+      if (parsedHours > 0 && Array.isArray(timerHistoryVal) && timerHistoryVal.length > 0) {
+        const currentTimerSecs = calculateTotalElapsedSeconds(timerHistoryVal, null);
+        const currentTimerHrs = Math.round((currentTimerSecs / 3600) * 100) / 100;
+        if (Math.abs(currentTimerHrs - parsedHours) > 0.05) {
+          timerHistoryVal = [
+            { type: 'Inicio', timestamp: Date.now() - Math.round(parsedHours * 3600 * 1000) },
+            { type: 'Fin', timestamp: Date.now() }
+          ];
+        }
+      }
+
       tasks.push({
         id: taskId,
         centroCosto: cc,
         empleado: emp,
-        horasEstimadas: parseFloat(String(hoursRaw).replace(',', '.')) || 0,
+        horasEstimadas: parsedHours,
         status: status,
         descripcion: desc,
         insumos: insumos,
