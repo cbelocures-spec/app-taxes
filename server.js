@@ -3066,7 +3066,22 @@ async function checkAndSendInsumosToSheet(existingOrder, updatedTasks, superviso
     }
 
     if (existingOrder && existingOrder.id) {
-      db.updateWorkOrder(existingOrder.id, { tasks: tasks });
+      // This function awaits a Google Sheets webhook per insumo (can take several seconds), so
+      // `tasks` here can be stale by the time we get here. Merge only sentInsumos (by task id)
+      // onto the CURRENT order instead of overwriting the whole tasks array wholesale — otherwise
+      // any edit the user made to this order while these webhook calls were in flight (e.g. adding
+      // diagnóstico/insumos) gets silently reverted.
+      const freshOrder = db.getWorkOrderById(existingOrder.id);
+      if (freshOrder && Array.isArray(freshOrder.tasks)) {
+        const sentInsumosById = new Map(tasks.map(t => [t.id, t.sentInsumos]));
+        const mergedTasks = freshOrder.tasks.map(freshTask => {
+          const sentInsumos = sentInsumosById.get(freshTask.id);
+          return sentInsumos ? { ...freshTask, sentInsumos } : freshTask;
+        });
+        db.updateWorkOrder(existingOrder.id, { tasks: mergedTasks });
+      } else {
+        db.updateWorkOrder(existingOrder.id, { tasks: tasks });
+      }
     }
   } catch (error) {
     console.error("Error in checkAndSendInsumosToSheet:", error);
