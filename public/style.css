@@ -197,7 +197,7 @@ body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 16px;
-  padding-right: 24px; /* extra clearance so cards don't sit flush against the scrollbar thumb */
+  padding-right: 22px; /* extra clearance so cards don't sit flush against the scrollbar thumb */
   padding-bottom: 120px; /* Extra bottom padding so last items aren't cut off by fixed bottom nav */
 }
 
@@ -3001,20 +3001,19 @@ body {
    Kept thin/standard width on purpose — the truck image is just a small
    badge inside it via background-size:contain, not stretched to fill it. */
 ::-webkit-scrollbar {
-  width: 14px;
-  height: 14px;
+  width: 24px;
+  height: 24px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--secondary-light);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background-color: var(--primary-light);
+  background-color: transparent;
   background-image: url('assets/scrollbar-truck.ico');
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 20px auto;
-  border-radius: 6px;
-  border: 1px solid var(--border-color);
+  background-size: 24px auto;
+  border: none;
   min-height: 30px;
 }
 ::-webkit-scrollbar-thumb:hover {
