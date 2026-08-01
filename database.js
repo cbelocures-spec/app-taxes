@@ -757,8 +757,17 @@ class LocalDB {
       const existingOrder = (db.workOrders || []).find(o => !o.archived && o.deleted !== true && String(o.interno).trim().toLowerCase() === targetInterno.toLowerCase());
       if (existingOrder) {
         console.log(`[DB] Active order for Interno ${targetInterno} already exists (ID: ${existingOrder.id}). Merging tasks instead of duplicating.`);
+        const existingIds = new Set((existingOrder.tasks || []).map(t => t.id).filter(Boolean));
+        const newTasksWithIds = (orderData.tasks || []).map((t, idx) => {
+          let id = t.id;
+          if (!id || existingIds.has(id)) {
+            id = `${Date.now()}-${idx}`;
+          }
+          existingIds.add(id);
+          return { ...t, id };
+        });
         return this.updateWorkOrder(existingOrder.id, {
-          tasks: [...(existingOrder.tasks || []), ...(orderData.tasks || [])]
+          tasks: [...(existingOrder.tasks || []), ...newTasksWithIds]
         });
       }
     }
