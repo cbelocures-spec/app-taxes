@@ -1017,6 +1017,20 @@ app.post('/api/orders/:id/force-resync', (req, res) => {
   }
 });
 
+// Delete a single task from an order
+app.delete('/api/orders/:id/tasks/:taskId', (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const updatedTasks = (order.tasks || []).filter(t => t.id !== req.params.taskId);
+    db.updateWorkOrder(req.params.id, { tasks: updatedTasks });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[DELETE task] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Delete a work order (local only)
 app.delete('/api/orders/:id', (req, res) => {
 

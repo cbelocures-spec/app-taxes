@@ -2280,6 +2280,67 @@ async function fetchTaskHistory() {
   }
 }
 
+let selectedTaskHistoryKeys = new Set();
+
+function taskHistoryKey(orderId, taskId) { return `${orderId}::${taskId}`; }
+
+function toggleTaskHistorySelection(orderId, taskId, checked) {
+  const key = taskHistoryKey(orderId, taskId);
+  if (checked) selectedTaskHistoryKeys.add(key); else selectedTaskHistoryKeys.delete(key);
+  updateTaskHistoryBulkBar();
+}
+
+function toggleSelectAllTaskHistory(checked) {
+  selectedTaskHistoryKeys.clear();
+  if (checked) {
+    taskHistoryCache.forEach(t => selectedTaskHistoryKeys.add(taskHistoryKey(t.orderId, t.taskId)));
+  }
+  renderTaskHistory();
+  updateTaskHistoryBulkBar();
+}
+
+function updateTaskHistoryBulkBar() {
+  const bar = document.getElementById('task-history-bulk-bar');
+  const count = document.getElementById('task-history-bulk-count');
+  if (!bar) return;
+  const n = selectedTaskHistoryKeys.size;
+  bar.style.display = n > 0 ? 'flex' : 'none';
+  if (count) count.textContent = `${n} seleccionada${n === 1 ? '' : 's'}`;
+}
+
+async function bulkCloseTaskHistoryLocks() {
+  if (!confirm(`¿Cerrar el candado de ${selectedTaskHistoryKeys.size} tarea(s)?`)) return;
+  for (const key of selectedTaskHistoryKeys) {
+    const [orderId, taskId] = key.split('::');
+    await fetch(`/api/orders/${orderId}/tasks/${taskId}/lock`, { method: 'PATCH' }).catch(() => {});
+  }
+  showToast('Candados cerrados', 'success');
+  selectedTaskHistoryKeys.clear();
+  await fetchTaskHistory();
+}
+
+async function bulkForceResyncTaskHistory() {
+  if (!confirm(`¿Mandar ${selectedTaskHistoryKeys.size} orden(es) de vuelta a Órdenes para resincronizar?`)) return;
+  const orderIds = new Set([...selectedTaskHistoryKeys].map(k => k.split('::')[0]));
+  for (const orderId of orderIds) {
+    await fetch(`/api/orders/${orderId}/force-resync`, { method: 'POST' }).catch(() => {});
+  }
+  showToast('Órdenes enviadas a resincronizar', 'success');
+  selectedTaskHistoryKeys.clear();
+  await fetchTaskHistory();
+}
+
+async function bulkDeleteTaskHistory() {
+  if (!confirm(`¿Borrar ${selectedTaskHistoryKeys.size} tarea(s)? Esta acción no se puede deshacer.`)) return;
+  for (const key of selectedTaskHistoryKeys) {
+    const [orderId, taskId] = key.split('::');
+    await fetch(`/api/orders/${orderId}/tasks/${taskId}`, { method: 'DELETE' }).catch(() => {});
+  }
+  showToast('Tareas borradas', 'success');
+  selectedTaskHistoryKeys.clear();
+  await fetchTaskHistory();
+}
+
 async function closeTaskHistoryLock(orderId, taskId) {
   if (!confirm('¿Confirmar que esta tarea está bien en Taxes y cerrar el candado?')) return;
   try {
@@ -2320,13 +2381,17 @@ function renderTaskHistory() {
 
   if (filtered.length === 0) {
     container.innerHTML = `<div class="empty-state"><span class="material-icons">assignment_turned_in</span><p>No hay tareas finalizadas pendientes de verificar.</p></div>`;
+    updateTaskHistoryBulkBar();
     return;
   }
 
   container.innerHTML = filtered.map(t => `
     <div class="card" style="padding:12px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;">
-        <strong>${t.rodado || '(sin rodado)'} — Interno ${t.interno || '-'}</strong>
+        <div style="display:flex;align-items:center;">
+          <input type="checkbox" ${selectedTaskHistoryKeys.has(`${t.orderId}::${t.taskId}`) ? 'checked' : ''} onchange="toggleTaskHistorySelection('${t.orderId}','${t.taskId}', this.checked)" style="width:16px;height:16px;cursor:pointer;margin-right:8px;">
+          <strong>${t.rodado || '(sin rodado)'} — Interno ${t.interno || '-'}</strong>
+        </div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="color:var(--text-muted);font-size:12px;">${t.fechaEntrega || ''} ${t.taxesOrderNumber ? '· OT ' + t.taxesOrderNumber : ''}</span>
           <button type="button" class="btn btn-secondary btn-xs" onclick="forceResyncFromHistory('${t.orderId}')" title="Mandar la orden de vuelta a Órdenes para resincronizar">
@@ -2340,6 +2405,8 @@ function renderTaskHistory() {
       ${t.insumos ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Insumos: ${t.insumos}</div>` : ''}
     </div>
   `).join('');
+
+  updateTaskHistoryBulkBar();
 }
 
 function toggleInsumoRow(checkbox) {
