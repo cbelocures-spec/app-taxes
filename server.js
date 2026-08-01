@@ -3315,12 +3315,16 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
         console.error('[Worker] Could not start Puppeteer worker:', wErr.message);
       }
     }
-    try {
-      const agent = require('./railway_sync_agent');
-      agent.startAgent();
-      console.log('[RailwayAgent] Agent started for bidirectional sync between Debian & Railway.');
-    } catch (agentErr) {
-      console.error('[RailwayAgent] Could not start Railway sync agent:', agentErr.message);
+    if (process.env.DISABLE_RAILWAY_SYNC_AGENT !== 'true') {
+      try {
+        const agent = require('./railway_sync_agent');
+        agent.startAgent();
+        console.log('[RailwayAgent] Agent started for bidirectional sync between Debian & Railway.');
+      } catch (agentErr) {
+        console.error('[RailwayAgent] Could not start Railway sync agent:', agentErr.message);
+      }
+    } else {
+      console.log('[RailwayAgent] Disabled via DISABLE_RAILWAY_SYNC_AGENT=true.');
     }
   } else {
     console.log('[Worker/Agent] Disabled on Railway cloud instance.');
