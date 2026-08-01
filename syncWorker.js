@@ -3915,7 +3915,17 @@ async function verifyWorkOrderWithPage(page, orderId) {
           await clearEmployeeFilterAndResearch();
           tableTasks = await readTableTasks();
 
-          console.log(`[Verify] Task #${idx+1} is 100% correct in Taxes. Locking task verification.`);
+          console.log(`[Verify] Task #${idx+1} is 100% correct in Taxes (found via employee search). Locking task verification.`);
+          const currentOrder = db.getWorkOrderById(orderId);
+          if (currentOrder && currentOrder.tasks) {
+            const updatedTasks = currentOrder.tasks.map(taskItem =>
+              taskItem.id === t.id ? { ...taskItem, verifiedLocked: true } : taskItem
+            );
+            db.updateWorkOrder(orderId, { tasks: updatedTasks });
+          }
+        } else {
+          // Task was fine on the first broad search, no narrowing needed — lock it here too.
+          console.log(`[Verify] Task #${idx+1} is 100% correct in Taxes (found on first search). Locking task verification.`);
           const currentOrder = db.getWorkOrderById(orderId);
           if (currentOrder && currentOrder.tasks) {
             const updatedTasks = currentOrder.tasks.map(taskItem =>
