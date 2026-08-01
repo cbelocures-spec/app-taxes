@@ -3501,6 +3501,10 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     for (let idx = 0; idx < order.tasks.length; idx++) {
       const t = order.tasks[idx];
+      if (t.verifiedLocked === true) {
+        console.log(`[Verify] Task #${idx+1}: candado cerrado, se salta la verificación.`);
+        continue;
+      }
       const { employeeLabel, finalDescription } = resolveAndMapEmployee(t);
       // Compute expected hours using the same logic as syncWorkOrder:
       // horasEstimadas is already decimal hours from the timer — use directly, no conversion.
@@ -3910,6 +3914,15 @@ async function verifyWorkOrderWithPage(page, orderId) {
           // before the next task in this loop searches again.
           await clearEmployeeFilterAndResearch();
           tableTasks = await readTableTasks();
+
+          console.log(`[Verify] Task #${idx+1} is 100% correct in Taxes. Locking task verification.`);
+          const currentOrder = db.getWorkOrderById(orderId);
+          if (currentOrder && currentOrder.tasks) {
+            const updatedTasks = currentOrder.tasks.map(taskItem =>
+              taskItem.id === t.id ? { ...taskItem, verifiedLocked: true } : taskItem
+            );
+            db.updateWorkOrder(orderId, { tasks: updatedTasks });
+          }
         }
       }
     }
@@ -3926,6 +3939,10 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
       for (let idx = 0; idx < order.tasks.length; idx++) {
         const t = order.tasks[idx];
+        if (t.verifiedLocked === true) {
+          console.log(`[Verify] Task #${idx+1}: candado cerrado, se salta la verificación.`);
+          continue;
+        }
         const { employeeLabel, finalDescription } = resolveAndMapEmployee(t);
         const expectedHours = parseFloat(String(t.horasEstimadas || '0').replace(',', '.')) || 0;
         const expectedHoursStr = expectedHours.toFixed(2);
@@ -3985,6 +4002,16 @@ async function verifyWorkOrderWithPage(page, orderId) {
           }
           if (!descOkFinal) {
             errors.push(`Tarea #${idx + 1} (${employeeLabel}): Descripción no coincidió tras guardar.`);
+          }
+          if (hoursOk && descOkFinal) {
+            console.log(`[Verify] Task #${idx+1} double-check OK after save. Locking task verification.`);
+            const currentOrder = db.getWorkOrderById(orderId);
+            if (currentOrder && currentOrder.tasks) {
+              const updatedTasks = currentOrder.tasks.map(taskItem =>
+                taskItem.id === t.id ? { ...taskItem, verifiedLocked: true } : taskItem
+              );
+              db.updateWorkOrder(orderId, { tasks: updatedTasks });
+            }
           }
         }
       }

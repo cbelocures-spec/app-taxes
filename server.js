@@ -926,6 +926,25 @@ app.patch('/api/orders/:id/tasks/:taskId', (req, res) => {
   }
 });
 
+// Unlock task verification lock manually so it can be re-verified on next control run
+app.patch('/api/orders/:id/tasks/:taskId/unlock', (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const taskIdx = (order.tasks || []).findIndex(t => t.id === req.params.taskId);
+    if (taskIdx === -1) return res.status(404).json({ error: 'Task not found' });
+
+    const updatedTasks = [...order.tasks];
+    updatedTasks[taskIdx] = { ...updatedTasks[taskIdx], verifiedLocked: false };
+    db.updateWorkOrder(req.params.id, { tasks: updatedTasks });
+
+    res.json({ success: true, task: updatedTasks[taskIdx] });
+  } catch (err) {
+    console.error('[PATCH task unlock] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Delete a work order (local only)
 app.delete('/api/orders/:id', (req, res) => {
 

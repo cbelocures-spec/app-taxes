@@ -1881,6 +1881,11 @@ function addTaskField(taskData = null) {
       <div class="task-item-card ${isNew ? 'new-task' : ''}" id="${taskId}" data-timer-started="${timerStarted}" data-timer-history='${timerHistoryJson}'>
         <div class="task-item-header">
           <span class="task-item-title">Tarea #${taskIndex + 1}</span>
+          ${taskData && taskData.verifiedLocked ? `
+            <span class="material-icons task-lock-icon" style="cursor:pointer; color: var(--success); font-size: 18px;" title="Ya verificado en Taxes. Click para forzar re-control." onclick="unlockTaskVerification('${taskData.id}', '${taskId}')">lock</span>
+          ` : `
+            <span class="material-icons task-lock-icon" style="color: var(--text-muted); font-size: 18px;" title="Pendiente de verificar en el próximo control.">lock_open</span>
+          `}
           <button type="button" class="task-delete-btn" onclick="removeTaskField('${taskId}')">
             <span class="material-icons">delete</span>
           </button>
@@ -2229,6 +2234,26 @@ function addTaskField(taskData = null) {
     console.error("Error rendering task field:", err, taskData);
     editModalHasRenderingError = true;
     showToast("Error de renderizado al cargar una tarea. Por favor, recargue la página.", "danger");
+  }
+}
+
+async function unlockTaskVerification(taskDbId, cardId) {
+  if (!currentEditingOrderId || !taskDbId) {
+    showToast('Guardá la orden primero antes de poder abrir el candado.', 'warning');
+    return;
+  }
+  if (!confirm('¿Forzar que esta tarea se vuelva a controlar contra Taxes la próxima vez?')) return;
+  try {
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const res = await fetch(`/api/orders/${currentEditingOrderId}/tasks/${taskDbId}/unlock`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-user-username': currentUsername }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    showToast('Candado abierto — se va a re-controlar en el próximo control.', 'success');
+    fetchOrders();
+  } catch (err) {
+    showToast('Error al abrir el candado: ' + err.message, 'danger');
   }
 }
 
