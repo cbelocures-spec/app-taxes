@@ -409,6 +409,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 insumoEl.value = result.insumos;
               }
             }
+
+            const allModalTaskCards = Array.from(document.querySelectorAll('#modal-tasks-list .task-item-card'));
+            const stillHasPending = allModalTaskCards.some(otherCard => {
+              if (otherCard === card) return false;
+              const statusSel = otherCard.querySelector('.task-status');
+              return statusSel && statusSel.value !== 'Finalizada';
+            });
+
+            if (!stillHasPending && internoVal) {
+              openPtUnitModalForInterno(internoVal, currentEditingOrderId);
+            }
           });
         }
       }
@@ -697,18 +708,6 @@ function updateDiagInsumosBadge() {
   }
 }
 
-function updateDiagStatusLabel(isOperativo) {
-  const label = document.getElementById('diag-status-label');
-  if (!label) return;
-  if (isOperativo) {
-    label.textContent = 'Operativo';
-    label.style.color = '#22c55e';
-  } else {
-    label.textContent = 'Fuera de Servicio';
-    label.style.color = '#ef4444';
-  }
-}
-
 function promptDiagnosis(taskInfo = null) {
   return new Promise((resolve) => {
     const modal = document.getElementById('diagnosis-modal');
@@ -785,17 +784,6 @@ function promptDiagnosis(taskInfo = null) {
       updateDiagInsumosBadge();
     }
 
-    // Set up unit status toggle switch
-    const statusSwitch = document.getElementById('diag-status-switch');
-    let isOperativo = true;
-    if (taskInfo && taskInfo.estadoUnidad) {
-      isOperativo = (taskInfo.estadoUnidad === 'operativo');
-    }
-    if (statusSwitch) {
-      statusSwitch.checked = isOperativo;
-      updateDiagStatusLabel(isOperativo);
-    }
-
     modal.classList.add('open');
 
     // Clear any previous event listeners by cloning buttons
@@ -826,13 +814,11 @@ function promptDiagnosis(taskInfo = null) {
         }
       });
       const insumosVal = lineas.join(' | ');
-      const newUnitStatus = statusSwitch && statusSwitch.checked ? 'operativo' : 'fuera_de_servicio';
 
       closeModal();
       resolve({
         diagnosis: val || null,
-        insumos: insumosVal || null,
-        estadoUnidad: newUnitStatus
+        insumos: insumosVal || null
       });
     });
 
@@ -841,6 +827,26 @@ function promptDiagnosis(taskInfo = null) {
       resolve(null);
     });
   });
+}
+
+function openPtUnitModalForInterno(interno, sourceOrderId) {
+  window._ptLinkedOrderId = sourceOrderId || null; // usado por savePtUnit para sincronizar el estado de vuelta a la orden
+  if (!window._ptState) {
+    openPtAddUnitModal();
+    document.getElementById('pt-unit-interno').value = interno;
+    return;
+  }
+  const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
+  for (const listName of lists) {
+    const list = window._ptState[listName] || [];
+    if (list.some(u => String(u.interno).trim() === String(interno).trim())) {
+      openPtEditUnitModal(interno, listName);
+      return;
+    }
+  }
+  // No está registrada en Parte Taller todavía — abrir en modo agregar
+  openPtAddUnitModal();
+  document.getElementById('pt-unit-interno').value = interno;
 }
 
 
@@ -4761,22 +4767,6 @@ async function markDashboardTaskFinished(orderId, taskId) {
 
   task.status = "Finalizada";
 
-  // Check if there are other pending tasks in this order
-  const hasOtherPendingTasks = (order.tasks || []).some(t => t.id !== taskId && t.status !== 'Finalizada');
-
-  if (result) {
-    if (result.estadoUnidad === 'operativo') {
-      if (!hasOtherPendingTasks) {
-        order.estadoUnidad = 'operativo';
-      } else {
-        order.estadoUnidad = 'fuera_de_servicio';
-        showToast("La unidad sigue Fuera de Servicio porque hay otras tareas pendientes.", "warning");
-      }
-    } else {
-      order.estadoUnidad = 'fuera_de_servicio';
-    }
-  }
-
   // Kill the dashboard interval for this task immediately
   if (activeDashboardIntervals[taskId]) {
     clearInterval(activeDashboardIntervals[taskId]);
@@ -4817,6 +4807,11 @@ async function markDashboardTaskFinished(orderId, taskId) {
       throw new Error(errData.error || "Error al comunicarse con el servidor");
     }
     fetchOrders();
+
+    const stillHasPendingTasks = (order.tasks || []).some(t => t.id !== taskId && t.status !== 'Finalizada');
+    if (!stillHasPendingTasks) {
+      openPtUnitModalForInterno(order.interno, orderId);
+    }
     
     if (allCompleted) {
       showToast("¡Todas las tareas finalizadas! Puedes subir la orden a Taxes manualmente desde el listado de órdenes.", "success");
@@ -10842,6 +10837,41 @@ async function savePtUnit() {
 
     closePtUnitModal();
     fetchParteTallerEstado();
+
+    if (window._ptLinkedOrderId) {
+      const linkedId = window._ptLinkedOrderId;
+      window._ptLinkedOrderId = null;
+      const targetOrder = (typeof activeOrders !== 'undefined' && Array.isArray(activeOrders)) ? activeOrders.find(o => o.id === linkedId) : null;
+      const nuevoEstadoOrden = (estado === 'servicios_pendientes' || estado === 'transito') ? 'operativo' : 'fuera_de_servicio';
+      
+      if (targetOrder) {
+        try {
+          await fetch(`/api/orders/${linkedId}`, {
+            method: 'PUT',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-user-username': localStorage.getItem('currentUserUsername') || ''
+            },
+            body: JSON.stringify({
+              ...targetOrder,
+              estadoUnidad: nuevoEstadoOrden
+            })
+          }).catch(() => {});
+        } catch (e) {}
+      } else {
+        try {
+          await fetch(`/api/orders/${linkedId}`, {
+            method: 'PUT',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-user-username': localStorage.getItem('currentUserUsername') || ''
+            },
+            body: JSON.stringify({ estadoUnidad: nuevoEstadoOrden })
+          }).catch(() => {});
+        } catch (e) {}
+      }
+    }
+
     if (typeof fetchOrders === 'function') fetchOrders();
   } catch (err) {
     console.error(err);
