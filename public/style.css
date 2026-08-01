@@ -3011,8 +3011,8 @@ body {
   background-color: transparent;
   background-image: url('assets/scrollbar-truck.ico');
   background-repeat: no-repeat;
-  background-position: center;
-  background-size: 24px auto;
+  background-position: 2px center; /* nudged left so it isn't glued to the screen edge */
+  background-size: 30px auto;
   border: none;
   min-height: 30px;
 }
