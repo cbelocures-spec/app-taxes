@@ -2406,7 +2406,12 @@ async function syncWorkOrder(orderId) {
       });
 
       console.log(`[Reconcile] Running verification for OT #${order.interno}...`);
-      await verifyWorkOrderWithPage(page, orderId);
+      try {
+        await verifyWorkOrderWithPage(page, orderId);
+      } catch (verifyErr) {
+        console.error(`[Post-Sync Verify] Falló la verificación automática para orden ${orderId}:`, verifyErr.message);
+        db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedError: `Auto-control falló: ${verifyErr.message}` });
+      }
 
       await browser.close(); releaseBrowserLock();
       try { db.purgeSyncedOrders(5); } catch(pe) { console.error('[Purge] Error:', pe.message); }
@@ -3138,7 +3143,12 @@ async function syncWorkOrder(orderId) {
     });
 
     console.log(`Running post-sync verification for brand new OT #${order.interno}...`);
-    await verifyWorkOrderWithPage(page, orderId);
+    try {
+      await verifyWorkOrderWithPage(page, orderId);
+    } catch (verifyErr) {
+      console.error(`[Post-Sync Verify] Falló la verificación automática para orden ${orderId}:`, verifyErr.message);
+      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedError: `Auto-control falló: ${verifyErr.message}` });
+    }
 
     await browser.close(); releaseBrowserLock();
     return { success: true, message: `Orden ${order.interno} sincronizada correctamente.` };

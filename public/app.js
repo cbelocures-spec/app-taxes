@@ -1095,7 +1095,21 @@ function editOrder(orderId) {
       internoSelect.rebuildSearchable();
     }
   }
-  document.getElementById('form-clasificacion').value = order.clasificacion;
+
+  const clasifSelect = document.getElementById('form-clasificacion');
+  if (clasifSelect) {
+    clasifSelect.value = order.clasificacion || '';
+    if (order.clasificacion && !clasifSelect.value) {
+      const cleanVal = order.clasificacion.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      const matchedOpt = Array.from(clasifSelect.options).find(opt => {
+        const cleanOpt = (opt.value || opt.textContent || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        return cleanOpt === cleanVal;
+      });
+      if (matchedOpt) {
+        clasifSelect.value = matchedOpt.value;
+      }
+    }
+  }
   setupAllFieldsForSector();
   document.getElementById('form-incidente').value = order.incidente;
   document.getElementById('form-fecha').value = order.fechaEntrega;
