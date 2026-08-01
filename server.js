@@ -3305,16 +3305,23 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   console.log(`[HTTP] Escuchando en http://localhost:${PORT}`);
   console.log(`[HTTP] Red local:      http://${localIP}:${PORT}`);
 
-  // Start Puppeteer worker and Railway sync agent when running on local Debian server
   const isRailway = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_STATIC_URL || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_SERVICE_ID);
-  if (!isRailway) {
-    if (process.env.DISABLE_BACKGROUND_WORKER !== 'true') {
-      try {
-        worker.startWorker();
-      } catch (wErr) {
-        console.error('[Worker] Could not start Puppeteer worker:', wErr.message);
-      }
+
+  // Start the Puppeteer sync worker regardless of where this process runs. Railway is fully
+  // capable of running Puppeteer/Chromium itself (confirmed working via manual retry) — relying
+  // solely on a separate Debian instance to run this loop left every order stuck in "Pendiente"
+  // whenever that Debian instance wasn't also bridging data back to Railway via the sync agent.
+  if (process.env.DISABLE_BACKGROUND_WORKER !== 'true') {
+    try {
+      worker.startWorker();
+    } catch (wErr) {
+      console.error('[Worker] Could not start Puppeteer worker:', wErr.message);
     }
+  }
+
+  // The Debian<->Railway bidirectional sync agent only makes sense on the Debian instance
+  // (it exists purely to mirror Debian's local DB with Railway's) — never start it on Railway.
+  if (!isRailway) {
     if (process.env.DISABLE_RAILWAY_SYNC_AGENT !== 'true') {
       try {
         const agent = require('./railway_sync_agent');
@@ -3327,7 +3334,7 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
       console.log('[RailwayAgent] Disabled via DISABLE_RAILWAY_SYNC_AGENT=true.');
     }
   } else {
-    console.log('[Worker/Agent] Disabled on Railway cloud instance.');
+    console.log('[RailwayAgent] Not applicable on Railway cloud instance (agent only bridges Debian -> Railway).');
   }
 
 
