@@ -62,6 +62,7 @@ let isScraping = false;
 // ("Target closed" / "detached Frame" errors), so every entry point that launches
 // a browser must acquire this lock first and release it when done.
 let browserBusy = false;
+const abandonedSyncOrderIds = new Set();
 async function acquireBrowserLock(context) {
   let waited = false;
   let waitedMs = 0;
@@ -2340,12 +2341,18 @@ async function syncWorkOrder(orderId) {
             });
         });
       }
- 
       if (isFormStillOpen) {
         const errMsg = validationErrors.length > 0
           ? `Errores de validación en la web de Taxes al guardar edición: ${validationErrors.join(" | ")}`
           : "El formulario de edición de OT no se guardó correctamente (sigue abierto tras hacer click en Guardar y no reportó errores visibles).";
         throw new Error(errMsg);
+      }
+
+      if (abandonedSyncOrderIds.has(orderId)) {
+        console.log(`[SyncWorker] Orden ${orderId} fue abandonada por timeout — ignorando resultado tardío, no se toca el lock ni la base.`);
+        abandonedSyncOrderIds.delete(orderId);
+        if (browser) try { await browser.close(); } catch (_) {}
+        return { success: false, message: 'Abandoned due to timeout' };
       }
 
       db.updateWorkOrder(orderId, {
@@ -2999,6 +3006,13 @@ async function syncWorkOrder(orderId) {
       };
     });
 
+    if (abandonedSyncOrderIds.has(orderId)) {
+      console.log(`[SyncWorker] Orden ${orderId} fue abandonada por timeout — ignorando resultado tardío, no se toca el lock ni la base.`);
+      abandonedSyncOrderIds.delete(orderId);
+      if (browser) try { await browser.close(); } catch (_) {}
+      return { success: false, message: 'Abandoned due to timeout' };
+    }
+
     db.updateWorkOrder(orderId, {
       syncStatus: "success",
       syncDate: new Date().toISOString(),
@@ -3016,6 +3030,12 @@ async function syncWorkOrder(orderId) {
 
   } catch (error) {
     console.error(`Sync failed for OT #${order.interno}:`, error);
+    if (abandonedSyncOrderIds.has(orderId)) {
+      console.log(`[SyncWorker] Orden ${orderId} fue abandonada por timeout — ignorando resultado tardío, no se toca el lock ni la base.`);
+      abandonedSyncOrderIds.delete(orderId);
+      if (browser) try { await browser.close(); } catch (_) {}
+      return { success: false, message: 'Abandoned due to timeout' };
+    }
     if (browser) {
       try {
         const pages = await browser.pages();
@@ -3945,6 +3965,7 @@ async function syncWorkOrderWithTimeout(orderId) {
     ]);
   } catch (err) {
     console.error(`[SyncWorker Timeout Safety] Fallo o timeout en sincronización de orden ID ${orderId}:`, err.message);
+    abandonedSyncOrderIds.add(orderId);
     try {
       db.updateWorkOrder(orderId, {
         syncStatus: 'error',
