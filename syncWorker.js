@@ -4024,7 +4024,11 @@ async function verifyWorkOrderWithPage(page, orderId) {
       // If order is in Historial (archived) and verified 100% correct in Taxes (REALIZ = SI, matched):
       // Record audit log entry and AUTO-DELETE from app!
       // Auto-deletion disabled by request: keep order in app without deleting
-      const shouldArchive = order.archived === true || order.status === 'Archivada';
+      const hasTaxesOt = !!(order.taxesOrderNumber && String(order.taxesOrderNumber).trim() !== '');
+      const allTasksCompleted = (order.tasks || []).length > 0 && order.tasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada'));
+      const isOutOfService = order.estadoUnidad === 'fuera_de_servicio';
+      const isPendingSync = (order.syncStatus === 'pending' || order.syncStatus === 'syncing');
+      const shouldArchive = order.archived === true || (hasTaxesOt && allTasksCompleted && !isOutOfService && !isPendingSync);
       const updatePayload = {
         verifiedStatus: 'success',
         verifiedCount: count,
