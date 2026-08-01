@@ -238,7 +238,7 @@ app.post('/api/login', async (req, res) => {
       console.log(`[Login] Secondary user ${cleanUsername} logged in.`);
     }
 
-    worker.scrapeCatalogs(cleanUsername).then(result => {
+    worker.scrapeCatalogsWithTimeout(cleanUsername).then(result => {
       console.log(`[Login] Catalog sync for ${cleanUsername}:`, result.message);
     }).catch(e => {
       console.error(`[Login] Catalog sync error for ${cleanUsername}:`, e.message);
@@ -321,7 +321,7 @@ app.post('/api/sync-taxes', verificarPermisoSincronizacion, async (req, res) => 
   try {
     const username = req.headers['x-user-username'] || db.getSettings().username;
     if (username) {
-      worker.scrapeCatalogs(username).catch(console.error);
+      worker.scrapeCatalogsWithTimeout(username).catch(console.error);
     }
     res.json({ mensaje: "Sincronización con Taxes iniciada por el agente.", success: true });
   } catch (err) {
@@ -1347,7 +1347,7 @@ app.post('/api/orders/verify/:id', async (req, res) => {
     db.updateWorkOrder(orderId, { verifiedStatus: "checking" });
 
     // Call verifyWorkOrder in background
-    worker.verifyWorkOrder(orderId).then(result => {
+    worker.verifyWorkOrderWithTimeout(orderId).then(result => {
       console.log(`Background verification completed for order ${orderId}:`, result);
     }).catch(err => {
       console.error(`Background verification failed for order ${orderId}:`, err);
@@ -2197,7 +2197,7 @@ app.post('/api/catalogs/sync', async (req, res) => {
   try {
     const username = req.headers['x-user-username'] || null;
     // Run catalog scraping asynchronously so response is fast
-    worker.scrapeCatalogs(username).then(result => {
+    worker.scrapeCatalogsWithTimeout(username).then(result => {
       console.log("Async Catalog sync complete:", result);
     }).catch(e => {
       console.error("Async Catalog sync error:", e);

@@ -55,6 +55,7 @@ function initMockCatalogs() {
 // Background Worker state
 let isWorkerRunning = false;
 let isScraping = false;
+let scrapeCatalogsAbandoned = false;
 
 // Global lock so only ONE Puppeteer browser runs at a time across the whole app.
 // Running two Chromium instances at once on a resource-limited server (like a
@@ -997,6 +998,10 @@ async function scrapeCatalogs(triggerUsername = null) {
   }
 
   if (!username || !password) {
+    if (scrapeCatalogsAbandoned) {
+      console.log(`[ScrapeCatalogs] Ejecución abandonada por timeout — ignorando resultado tardío.`);
+      return { success: false, message: 'Abandoned due to timeout' };
+    }
     isScraping = false; releaseBrowserLock();
     db.saveSettings({ catalogSyncStatus: "error", catalogSyncError: "Faltan configurar las credenciales de Taxes." });
     return { success: false, message: "Faltan configurar las credenciales de Taxes." };
@@ -1382,11 +1387,21 @@ async function scrapeCatalogs(triggerUsername = null) {
     db.saveCatalogs(finalCatalogs);
     db.saveSettings({ catalogSyncStatus: "success", catalogSyncError: null });
     console.log(`Catalog scraping completed! Rodados: ${rodados.length}, Empleados: ${mergedEmpleados.length}, Centros: ${mergedCentros.length}`);
+    if (scrapeCatalogsAbandoned) {
+      console.log(`[ScrapeCatalogs] Ejecución abandonada por timeout — ignorando resultado tardío.`);
+      if (browser) try { await browser.close(); } catch (_) {}
+      return { success: false, message: 'Abandoned due to timeout' };
+    }
     isScraping = false; releaseBrowserLock();
     await browser.close();
     return { success: true, message: `Catálogos actualizados: ${rodados.length} rodados, ${mergedEmpleados.length} empleados, ${mergedCentros.length} centros de costo.` };
   } catch (error) {
     console.error("Error scraping catalogs:", error);
+    if (scrapeCatalogsAbandoned) {
+      console.log(`[ScrapeCatalogs] Ejecución abandonada por timeout — ignorando resultado tardío.`);
+      if (browser) try { await browser.close(); } catch (_) {}
+      return { success: false, message: 'Abandoned due to timeout' };
+    }
     db.saveSettings({ catalogSyncStatus: "error", catalogSyncError: error.message });
     if (browser) {
       try {
@@ -1406,6 +1421,34 @@ async function scrapeCatalogs(triggerUsername = null) {
     isScraping = false; releaseBrowserLock();
     if (browser) await browser.close();
     return { success: false, message: `Error al extraer catálogos: ${error.message}` };
+  }
+}
+
+// Helper wrapper to execute scrapeCatalogs with a 5-minute global safety timeout
+async function scrapeCatalogsWithTimeout(triggerUsername = null) {
+  let timeoutId;
+  scrapeCatalogsAbandoned = false;
+  try {
+    return await Promise.race([
+      scrapeCatalogs(triggerUsername),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Timeout: extracción de catálogos tardó más de 5 minutos')), 5 * 60 * 1000);
+      })
+    ]);
+  } catch (err) {
+    console.error(`[ScrapeCatalogs Timeout Safety] Fallo o timeout:`, err.message);
+    scrapeCatalogsAbandoned = true;
+    isScraping = false;
+    releaseBrowserLock();
+    await killZombieChromes().catch(() => {});
+    try {
+      db.saveSettings({ catalogSyncStatus: 'error', catalogSyncError: err.message || 'Extracción cancelada por timeout de 5 minutos' });
+    } catch (dbErr) {
+      console.error(`[ScrapeCatalogs Timeout Safety] Error al actualizar settings:`, dbErr.message);
+    }
+    return { success: false, message: err.message };
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }
 
@@ -3939,17 +3982,30 @@ async function verifyWorkOrder(orderId) {
     const page = await autoLogin(browser, username, password, settings.portalUrl);
     await verifyWorkOrderWithPage(page, orderId);
 
+    if (abandonedSyncOrderIds.has(orderId)) {
+      console.log(`[VerifyWorkOrder] Orden ${orderId} fue abandonada por timeout — ignorando resultado tardío, no se toca el lock ni la base.`);
+      abandonedSyncOrderIds.delete(orderId);
+      if (browser) try { await browser.close(); } catch (_) {}
+      return { success: false, message: 'Abandoned due to timeout' };
+    }
+
     await browser.close(); releaseBrowserLock();
     
     // Get updated status
     const updated = db.getWorkOrderById(orderId);
     return { 
-      success: updated.verifiedStatus === 'success', 
-      status: updated.verifiedStatus, 
-      error: updated.verifiedError, 
-      count: updated.verifiedCount 
+      success: updated ? updated.verifiedStatus === 'success' : false, 
+      status: updated ? updated.verifiedStatus : 'error', 
+      error: updated ? updated.verifiedError : null, 
+      count: updated ? updated.verifiedCount : 0 
     };
   } catch (error) {
+    if (abandonedSyncOrderIds.has(orderId)) {
+      console.log(`[VerifyWorkOrder] Orden ${orderId} fue abandonada por timeout — ignorando resultado tardío, no se toca el lock ni la base.`);
+      abandonedSyncOrderIds.delete(orderId);
+      if (browser) try { await browser.close(); } catch (_) {}
+      return { success: false, message: 'Abandoned due to timeout' };
+    }
     if (browser) await browser.close();
     releaseBrowserLock();
     db.updateWorkOrder(orderId, {
@@ -3957,6 +4013,32 @@ async function verifyWorkOrder(orderId) {
       verifiedError: error.message
     });
     return { success: false, message: error.message };
+  }
+}
+
+// Helper wrapper to execute verifyWorkOrder with a 5-minute global safety timeout
+async function verifyWorkOrderWithTimeout(orderId) {
+  let timeoutId;
+  try {
+    return await Promise.race([
+      verifyWorkOrder(orderId),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Timeout: verificación tardó más de 5 minutos')), 5 * 60 * 1000);
+      })
+    ]);
+  } catch (err) {
+    console.error(`[VerifyWorkOrder Timeout Safety] Fallo o timeout en verificación de orden ID ${orderId}:`, err.message);
+    abandonedSyncOrderIds.add(orderId);
+    try {
+      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedError: err.message || 'Verificación cancelada por timeout de 5 minutos' });
+    } catch (dbErr) {
+      console.error(`[VerifyWorkOrder Timeout Safety] Error al actualizar BD para orden ID ${orderId}:`, dbErr.message);
+    }
+    releaseBrowserLock();
+    await killZombieChromes().catch(() => {});
+    return { success: false, message: err.message };
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }
 
@@ -4218,8 +4300,10 @@ module.exports = {
   syncWorkOrder,
   syncWorkOrderWithTimeout,
   verifyWorkOrder,
+  verifyWorkOrderWithTimeout,
   verifyMultipleOrders,
   scrapeCatalogs,
+  scrapeCatalogsWithTimeout,
   isScraping,
   getIsScraping: () => isScraping,
   autoLogin
