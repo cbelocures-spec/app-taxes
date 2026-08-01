@@ -1,0 +1,7 @@
+Test 1: Sending message with NO history...
+Status: 200
+Response: {"response":"¡Hola! 👋 Soy Hugo AI, el asistente de mantenimiento del taller de Contenedores Hugo.\n\nPuedo ayudarte con información sobre:\n- 🔧 **Auxilios y reparaciones** de vehículos\n- 🔩 **Cambios de repuestos** y su historial\n- 📅 **Última vez** que se realizó un servicio a un interno específico\n- 📋 Detalles de órdenes de trabajo\n\n¿Qué necesitás consultar? Por ejemplo, podés preguntarme cosas como:\n- \"¿Cuándo fue el último auxilio del interno 96?\"\n- \"¿Qué repuestos se cambiaron en el interno 98?\"\n- \"¿Qué trabajos se hicieron el 30/06/2026?\""}
+
+Test 2: Sending message WITH history...
+Status: 200
+Response: {"response":"¡Hola! Para poder darte el último correctivo, ¿me podrías indicar el número de interno del vehículo? Así te doy el dato exacto. 🚛🔧\n\nSi te referís al correctivo más reciente en general (sin filtrar por unidad), el registro con fecha más nueva es el **01/07/2026**, y hay varios correctivos ese día, por ejemplo:\n\n- **Interno 147**: Colocar faros led de marcha atrás\n- **Interno 101**: Luces en general\n- **Interno 112**: Cambiar junta de cárter y mangueras de agua / Pérdida de aceite\n- **Interno 88**: No baja eje neumático\n- **Interno 53**: Pérdida de aceite, le cuesta arrancar\n- **Interno 59**: Cambiar puente de cardán\n- **Interno 1**: Luces traseras\n\nDecime el interno y te doy el detalle preciso 👍"}

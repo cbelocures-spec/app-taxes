@@ -8,3 +8,9 @@ find_portal.js
 sync_test.js
 verify_ot.js
 *.zip
+__pycache__/
+*.pyc
+db_backup*.json
+db_live*.json
+db_recovered.json
+db.json.tmp_*
