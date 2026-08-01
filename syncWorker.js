@@ -4209,6 +4209,7 @@ module.exports = {
   startWorker,
   stopWorker,
   syncWorkOrder,
+  syncWorkOrderWithTimeout,
   verifyWorkOrder,
   verifyMultipleOrders,
   scrapeCatalogs,

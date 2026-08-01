@@ -1180,7 +1180,7 @@ app.post('/api/orders/retry/:id', async (req, res) => {
     setImmediate(() => {
       try {
         const worker = require('./syncWorker');
-        worker.syncWorkOrder(order.id).catch(err => console.error('[RetrySync] Worker error:', err.message));
+        worker.syncWorkOrderWithTimeout(order.id).catch(err => console.error('[RetrySync] Worker error:', err.message));
       } catch (err) {
         console.error('[RetrySync] Trigger error:', err.message);
       }
