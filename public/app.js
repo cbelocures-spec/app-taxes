@@ -2257,6 +2257,76 @@ async function unlockTaskVerification(taskDbId, cardId) {
   }
 }
 
+let taskHistoryCache = [];
+
+function switchHistorialSubTab(tab) {
+  document.querySelectorAll('.historial-subview').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('[onclick^="switchHistorialSubTab"]').forEach(btn => btn.classList.remove('active'));
+  const target = document.getElementById(`historial-subview-${tab}`);
+  if (target) target.style.display = 'block';
+  if (event && event.target) event.target.classList.add('active');
+  if (tab === 'tareas') fetchTaskHistory();
+}
+
+async function fetchTaskHistory() {
+  try {
+    const res = await fetch('/api/tasks/history');
+    if (!res.ok) throw new Error('Error al cargar historial de tareas');
+    taskHistoryCache = await res.json();
+    renderTaskHistory();
+  } catch (err) {
+    const container = document.getElementById('task-history-container');
+    if (container) container.innerHTML = `<div class="empty-state"><p>Error: ${err.message}</p></div>`;
+  }
+}
+
+async function toggleTaskHistoryLock(orderId, taskId, currentlyLocked) {
+  const action = currentlyLocked ? 'unlock' : 'lock';
+  try {
+    const res = await fetch(`/api/orders/${orderId}/tasks/${taskId}/${action}`, { method: 'PATCH' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    showToast(currentlyLocked ? 'Candado abierto' : 'Candado cerrado', 'success');
+    await fetchTaskHistory();
+  } catch (err) {
+    showToast('Error al cambiar el candado: ' + err.message, 'danger');
+  }
+}
+
+function renderTaskHistory() {
+  const container = document.getElementById('task-history-container');
+  const badge = document.getElementById('task-history-count-badge');
+  const query = (document.getElementById('task-history-search')?.value || '').toLowerCase().trim();
+  if (!container) return;
+
+  const filtered = taskHistoryCache.filter(t =>
+    !query ||
+    String(t.interno || '').toLowerCase().includes(query) ||
+    String(t.rodado || '').toLowerCase().includes(query) ||
+    String(t.empleado || '').toLowerCase().includes(query)
+  );
+  if (badge) badge.textContent = `${filtered.length} tareas`;
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="empty-state"><span class="material-icons">assignment_turned_in</span><p>No hay tareas finalizadas para mostrar.</p></div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(t => `
+    <div class="card" style="padding:12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;">
+        <strong>${t.rodado || '(sin rodado)'} — Interno ${t.interno || '-'}</strong>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:var(--text-muted);font-size:12px;">${t.fechaEntrega || ''} ${t.taxesOrderNumber ? '· OT ' + t.taxesOrderNumber : ''}</span>
+          <span class="material-icons" style="cursor:pointer; font-size:18px; color:${t.verifiedLocked ? 'var(--success)' : 'var(--text-muted)'};" title="${t.verifiedLocked ? 'Verificado. Click para forzar re-control.' : 'Pendiente de verificar. Click para marcar como verificado.'}" onclick="toggleTaskHistoryLock('${t.orderId}','${t.taskId}',${t.verifiedLocked})">${t.verifiedLocked ? 'lock' : 'lock_open'}</span>
+        </div>
+      </div>
+      <div style="font-size:13px;margin-top:4px;">${t.empleado} · ${t.centroCosto} · ${t.horasEstimadas} hs</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">${t.descripcion}</div>
+      ${t.insumos ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Insumos: ${t.insumos}</div>` : ''}
+    </div>
+  `).join('');
+}
+
 function toggleInsumoRow(checkbox) {
   const row = checkbox.closest('.insumo-row');
   if (!row) return;

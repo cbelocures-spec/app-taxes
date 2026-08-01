@@ -945,6 +945,60 @@ app.patch('/api/orders/:id/tasks/:taskId/unlock', (req, res) => {
   }
 });
 
+// Read-only endpoint to retrieve history of all finished tasks across all orders
+app.get('/api/tasks/history', (req, res) => {
+  try {
+    const allOrders = db.read().workOrders || [];
+    const catalogs = db.getCatalogs();
+    const flatTasks = [];
+    allOrders.forEach(order => {
+      (order.tasks || []).forEach(task => {
+        if (task && task.status === 'Finalizada') {
+          const empOpt = (catalogs.empleados || []).find(e => e.value === task.empleado);
+          const ccOpt = (catalogs.centrosCosto || []).find(c => c.value === task.centroCosto);
+          flatTasks.push({
+            orderId: order.id,
+            taskId: task.id,
+            interno: order.interno,
+            rodado: order.rodado,
+            taxesOrderNumber: order.taxesOrderNumber || null,
+            fechaEntrega: order.fechaEntrega,
+            empleado: empOpt ? empOpt.label : (task.empleado || ''),
+            centroCosto: ccOpt ? ccOpt.label : (task.centroCosto || ''),
+            descripcion: task.descripcion || '',
+            horasEstimadas: task.horasEstimadas || 0,
+            insumos: task.insumos || '',
+            verifiedLocked: task.verifiedLocked === true
+          });
+        }
+      });
+    });
+    flatTasks.sort((a, b) => new Date(b.fechaEntrega || 0) - new Date(a.fechaEntrega || 0));
+    res.json(flatTasks);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Lock task verification lock manually
+app.patch('/api/orders/:id/tasks/:taskId/lock', (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const taskIdx = (order.tasks || []).findIndex(t => t.id === req.params.taskId);
+    if (taskIdx === -1) return res.status(404).json({ error: 'Task not found' });
+
+    const updatedTasks = [...order.tasks];
+    updatedTasks[taskIdx] = { ...updatedTasks[taskIdx], verifiedLocked: true };
+    db.updateWorkOrder(req.params.id, { tasks: updatedTasks });
+
+    res.json({ success: true, task: updatedTasks[taskIdx] });
+  } catch (err) {
+    console.error('[PATCH task lock] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Delete a work order (local only)
 app.delete('/api/orders/:id', (req, res) => {
 

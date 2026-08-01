@@ -999,37 +999,54 @@
         <p style="font-size:13px;color:var(--text-muted);margin-top:4px;">Órdenes archivadas — ya sincronizadas en Taxes. Podés borrarlas definitivamente acá.</p>
       </div>
 
-      <!-- Bulk delete bar for history -->
-      <div id="history-bulk-delete-bar" class="bulk-action-bar">
-        <span id="history-bulk-delete-count" style="color:#fff;font-weight:600;font-size:14px;">0 seleccionadas</span>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end;">
-          <button class="btn-secondary" onclick="toggleSelectAllHistoryOrdersList(false)" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Deseleccionar todo</button>
-          <button class="btn-primary" onclick="resyncSelectedHistoryOrders()" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><span class="material-icons" style="font-size:15px;">sync</span> Mandar a Sincronizar (Órdenes)</button>
-          <button class="btn-danger" onclick="deleteSelectedHistoryOrders()" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><span class="material-icons" style="font-size:15px;">delete_forever</span> Borrar seleccionadas</button>
+      <div style="display:flex; gap:8px; padding:0 16px 8px;">
+        <button class="preventivos-tab-btn active" onclick="switchHistorialSubTab('ordenes')">Órdenes</button>
+        <button class="preventivos-tab-btn" onclick="switchHistorialSubTab('tareas')">Tareas</button>
+      </div>
+
+      <div id="historial-subview-ordenes" class="historial-subview">
+        <!-- Bulk delete bar for history -->
+        <div id="history-bulk-delete-bar" class="bulk-action-bar">
+          <span id="history-bulk-delete-count" style="color:#fff;font-weight:600;font-size:14px;">0 seleccionadas</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end;">
+            <button class="btn-secondary" onclick="toggleSelectAllHistoryOrdersList(false)" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Deseleccionar todo</button>
+            <button class="btn-primary" onclick="resyncSelectedHistoryOrders()" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><span class="material-icons" style="font-size:15px;">sync</span> Mandar a Sincronizar (Órdenes)</button>
+            <button class="btn-danger" onclick="deleteSelectedHistoryOrders()" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><span class="material-icons" style="font-size:15px;">delete_forever</span> Borrar seleccionadas</button>
+          </div>
+        </div>
+
+        <!-- Select all / controls -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 4px;gap:8px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="history-select-all-chk" onchange="toggleSelectAllHistoryOrdersList(this.checked)" style="width:18px;height:18px;cursor:pointer;">
+            <label for="history-select-all-chk" style="font-size:13px;color:var(--text-muted);cursor:pointer;">Seleccionar todas</label>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button type="button" class="btn btn-primary btn-xs" onclick="verifyAllHistoryOrders()" id="btn-verify-history" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;font-size:12px;font-weight:600;border-radius:8px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;cursor:pointer;">
+              <span class="material-icons" style="font-size:16px;">fact_check</span> Ejecutar Control de Historial Ahora
+            </button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="openDeletedLogModal()" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;font-size:12px;font-weight:600;border-radius:8px;">
+              <span class="material-icons" style="font-size:16px;color:#0ea5e9;">receipt_long</span> Registro de Auditoría (Borradas)
+            </button>
+            <span id="history-count-badge" style="font-size:12px;color:var(--text-muted);"></span>
+          </div>
+        </div>
+
+        <div id="history-orders-container" style="padding:8px 16px;">
+          <div class="empty-state">
+            <span class="material-icons">inventory_2</span>
+            <p>No hay órdenes archivadas.</p>
+          </div>
         </div>
       </div>
 
-      <!-- Select all / controls -->
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 4px;gap:8px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <input type="checkbox" id="history-select-all-chk" onchange="toggleSelectAllHistoryOrdersList(this.checked)" style="width:18px;height:18px;cursor:pointer;">
-          <label for="history-select-all-chk" style="font-size:13px;color:var(--text-muted);cursor:pointer;">Seleccionar todas</label>
+      <div id="historial-subview-tareas" class="historial-subview" style="display:none; padding:8px 16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;flex-wrap:wrap;gap:8px;">
+          <input type="text" id="task-history-search" placeholder="Buscar por Interno, Rodado o Empleado..." style="flex:1;min-width:200px;padding:8px;border:1px solid var(--border-color);border-radius:8px;" oninput="renderTaskHistory()">
+          <span id="task-history-count-badge" style="font-size:12px;color:var(--text-muted);"></span>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <button type="button" class="btn btn-primary btn-xs" onclick="verifyAllHistoryOrders()" id="btn-verify-history" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;font-size:12px;font-weight:600;border-radius:8px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;cursor:pointer;">
-            <span class="material-icons" style="font-size:16px;">fact_check</span> Ejecutar Control de Historial Ahora
-          </button>
-          <button type="button" class="btn btn-secondary btn-xs" onclick="openDeletedLogModal()" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;font-size:12px;font-weight:600;border-radius:8px;">
-            <span class="material-icons" style="font-size:16px;color:#0ea5e9;">receipt_long</span> Registro de Auditoría (Borradas)
-          </button>
-          <span id="history-count-badge" style="font-size:12px;color:var(--text-muted);"></span>
-        </div>
-      </div>
-
-      <div id="history-orders-container" style="padding:8px 16px;">
-        <div class="empty-state">
-          <span class="material-icons">inventory_2</span>
-          <p>No hay órdenes archivadas.</p>
+        <div id="task-history-container">
+          <div class="empty-state"><span class="material-icons">assignment_turned_in</span><p>Cargando historial de tareas...</p></div>
         </div>
       </div>
     </section>
