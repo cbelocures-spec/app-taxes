@@ -3933,6 +3933,33 @@ async function verifyWorkOrder(orderId) {
   }
 }
 
+// Helper wrapper to execute syncWorkOrder with a 5-minute global safety timeout
+async function syncWorkOrderWithTimeout(orderId) {
+  let timeoutId;
+  try {
+    await Promise.race([
+      syncWorkOrder(orderId),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Timeout: sincronización tardó más de 5 minutos')), 5 * 60 * 1000);
+      })
+    ]);
+  } catch (err) {
+    console.error(`[SyncWorker Timeout Safety] Fallo o timeout en sincronización de orden ID ${orderId}:`, err.message);
+    try {
+      db.updateWorkOrder(orderId, {
+        syncStatus: 'error',
+        syncError: err.message || 'Sincronización cancelada por timeout de 5 minutos'
+      });
+    } catch (dbErr) {
+      console.error(`[SyncWorker Timeout Safety] Error al actualizar BD para orden ID ${orderId}:`, dbErr.message);
+    }
+    releaseBrowserLock();
+    await killZombieChromes().catch(() => {});
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 // 3. BACKGROUND WORKER QUEUE LOOP
 async function startWorker() {
   if (isWorkerRunning) return;
@@ -3982,7 +4009,7 @@ async function startWorker() {
     console.error("Error resetting stuck verification status on startup:", err);
   }
 
- // Auto-fix settings for tasks that failed verification (wrong hours/status in Taxes)
+  // Auto-fix settings for tasks that failed verification (wrong hours/status in Taxes)
   const MAX_AUTO_VERIFY_RETRIES = 5;
   const AUTO_VERIFY_COOLDOWN_MS = 2 * 60 * 1000; // wait 2 min between auto retries per order
 
@@ -3993,7 +4020,7 @@ async function startWorker() {
 
       if (pendingOrder) {
         console.log(`Found pending Work Order ID: ${pendingOrder.id}. Launching sync...`);
-        await syncWorkOrder(pendingOrder.id);
+        await syncWorkOrderWithTimeout(pendingOrder.id);
       } else {
         // No new orders to sync — look for orders that need an automatic retry:
         // either their tasks failed the control check (verifiedStatus: 'error'),
@@ -4015,7 +4042,7 @@ async function startWorker() {
 
         if (brokenOrder) {
           console.log(`[AutoFix] Found order needing retry (ID: ${brokenOrder.id}, syncStatus=${brokenOrder.syncStatus}, verifiedStatus=${brokenOrder.verifiedStatus}). Retrying full reconciliation...`);
-          await syncWorkOrder(brokenOrder.id);
+          await syncWorkOrderWithTimeout(brokenOrder.id);
         } else {
           // Automatic verification control of archived history orders is disabled by request.
         }
