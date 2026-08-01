@@ -2997,11 +2997,11 @@ body {
 }
 
 /* Custom scrollbar: small Contenedores Hugo truck icon as the drag thumb.
-   The source image is landscape (wide truck photo), so the scrollbar itself
-   is widened a bit and background-size:contain keeps it undistorted. */
+   Kept thin/standard width on purpose — the truck image is just a small
+   badge inside it via background-size:contain, not stretched to fill it. */
 ::-webkit-scrollbar {
-  width: 22px;
-  height: 22px;
+  width: 14px;
+  height: 14px;
 }
 ::-webkit-scrollbar-track {
   background: var(--secondary-light);
@@ -3011,10 +3011,10 @@ body {
   background-image: url('assets/scrollbar-truck.ico');
   background-repeat: no-repeat;
   background-position: center;
-  background-size: contain;
+  background-size: 10px auto;
   border-radius: 6px;
   border: 1px solid var(--border-color);
-  min-height: 30px;
+  min-height: 24px;
 }
 ::-webkit-scrollbar-thumb:hover {
   filter: brightness(0.95);
