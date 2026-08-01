@@ -3011,10 +3011,10 @@ body {
   background-image: url('assets/scrollbar-truck.ico');
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 10px auto;
+  background-size: 20px auto;
   border-radius: 6px;
   border: 1px solid var(--border-color);
-  min-height: 24px;
+  min-height: 30px;
 }
 ::-webkit-scrollbar-thumb:hover {
   filter: brightness(0.95);

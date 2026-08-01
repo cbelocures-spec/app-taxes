@@ -2304,7 +2304,11 @@ function updateTaskHistoryBulkBar() {
   const count = document.getElementById('task-history-bulk-count');
   if (!bar) return;
   const n = selectedTaskHistoryKeys.size;
-  bar.style.display = n > 0 ? 'flex' : 'none';
+  if (n > 0) {
+    bar.classList.add('active');
+  } else {
+    bar.classList.remove('active');
+  }
   if (count) count.textContent = `${n} seleccionada${n === 1 ? '' : 's'}`;
 }
 
