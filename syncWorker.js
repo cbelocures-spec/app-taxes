@@ -3611,6 +3611,15 @@ async function verifyWorkOrderWithPage(page, orderId) {
         if (usedNarrowedSearch) await clearEmployeeFilterAndResearch().then(() => readTableTasks()).then(t => { tableTasks = t; });
         console.warn(`[Verify] Task #${idx+1} (${employeeLabel}) NOT found in tasks list table.`);
         errors.push(`Tarea #${idx + 1} (${employeeLabel}): No encontrada en el listado de tareas`);
+
+        // Auto-requeue for full sync to create missing task cards in Taxes
+        const currentVerifiedCount = (order ? order.verifiedCount || 0 : 0);
+        if (currentVerifiedCount < 5) {
+          console.log(`[Verify-AutoRequeue] Re-queuing order ${orderId} for full sync because task #${idx+1} is missing (verifiedCount: ${currentVerifiedCount + 1} <= 5)...`);
+          db.updateWorkOrder(orderId, { syncStatus: 'pending', syncError: null });
+        } else {
+          console.warn(`[Verify-AutoRequeue] Task #${idx+1} is missing, but verifiedCount (${currentVerifiedCount + 1}) exceeded limit of 5. Not re-queuing to prevent infinite loop.`);
+        }
       } else {
         const actualHours = parseFloat(String(matchedRow.hours).replace(',', '.')) || 0;
         // Also flag mismatch if tarea is Finalizada and Taxes shows 0 hours (blank field)
@@ -3942,6 +3951,15 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
         if (!matchedRow) {
           errors.push(`Tarea #${idx + 1} (${employeeLabel}): No se encontró la tarea tras guardar cambios.`);
+
+          // Auto-requeue for full sync to create missing task cards in Taxes
+          const currentVerifiedCount = (order ? order.verifiedCount || 0 : 0);
+          if (currentVerifiedCount < 5) {
+            console.log(`[Verify-AutoRequeue] Re-queuing order ${orderId} for full sync because task #${idx+1} is missing after save (verifiedCount: ${currentVerifiedCount + 1} <= 5)...`);
+            db.updateWorkOrder(orderId, { syncStatus: 'pending', syncError: null });
+          } else {
+            console.warn(`[Verify-AutoRequeue] Task #${idx+1} is missing after save, but verifiedCount (${currentVerifiedCount + 1}) exceeded limit of 5. Not re-queuing to prevent infinite loop.`);
+          }
         } else {
           const actualHours = parseFloat(String(matchedRow.hours).replace(',', '.')) || 0;
           // hoursOk: mismatch if expected > 0 but actual is 0 (blank in Taxes).
