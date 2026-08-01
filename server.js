@@ -945,7 +945,7 @@ app.patch('/api/orders/:id/tasks/:taskId/unlock', (req, res) => {
   }
 });
 
-// Read-only endpoint to retrieve history of all finished tasks across all orders
+// Read-only endpoint to retrieve history of finished tasks with OPEN locks (not yet verified in Taxes)
 app.get('/api/tasks/history', (req, res) => {
   try {
     const allOrders = db.read().workOrders || [];
@@ -953,7 +953,7 @@ app.get('/api/tasks/history', (req, res) => {
     const flatTasks = [];
     allOrders.forEach(order => {
       (order.tasks || []).forEach(task => {
-        if (task && task.status === 'Finalizada') {
+        if (task && task.status === 'Finalizada' && task.verifiedLocked !== true) {
           const empOpt = (catalogs.empleados || []).find(e => e.value === task.empleado);
           const ccOpt = (catalogs.centrosCosto || []).find(c => c.value === task.centroCosto);
           flatTasks.push({
@@ -995,6 +995,24 @@ app.patch('/api/orders/:id/tasks/:taskId/lock', (req, res) => {
     res.json({ success: true, task: updatedTasks[taskIdx] });
   } catch (err) {
     console.error('[PATCH task lock] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Force re-sync of an order from history (resets syncStatus to pending and unarchives)
+app.post('/api/orders/:id/force-resync', (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    db.updateWorkOrder(req.params.id, {
+      syncStatus: 'pending',
+      syncError: null,
+      archived: false,
+      archivedAt: null
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Force Resync] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });

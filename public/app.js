@@ -2280,15 +2280,27 @@ async function fetchTaskHistory() {
   }
 }
 
-async function toggleTaskHistoryLock(orderId, taskId, currentlyLocked) {
-  const action = currentlyLocked ? 'unlock' : 'lock';
+async function closeTaskHistoryLock(orderId, taskId) {
+  if (!confirm('¿Confirmar que esta tarea está bien en Taxes y cerrar el candado?')) return;
   try {
-    const res = await fetch(`/api/orders/${orderId}/tasks/${taskId}/${action}`, { method: 'PATCH' });
+    const res = await fetch(`/api/orders/${orderId}/tasks/${taskId}/lock`, { method: 'PATCH' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    showToast(currentlyLocked ? 'Candado abierto' : 'Candado cerrado', 'success');
+    showToast('Candado cerrado', 'success');
     await fetchTaskHistory();
   } catch (err) {
-    showToast('Error al cambiar el candado: ' + err.message, 'danger');
+    showToast('Error: ' + err.message, 'danger');
+  }
+}
+
+async function forceResyncFromHistory(orderId) {
+  if (!confirm('¿Mandar esta orden de vuelta a Órdenes para resincronizar contra Taxes?')) return;
+  try {
+    const res = await fetch(`/api/orders/${orderId}/force-resync`, { method: 'POST' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    showToast('Orden enviada a Órdenes para resincronizar', 'success');
+    await fetchTaskHistory();
+  } catch (err) {
+    showToast('Error: ' + err.message, 'danger');
   }
 }
 
@@ -2307,7 +2319,7 @@ function renderTaskHistory() {
   if (badge) badge.textContent = `${filtered.length} tareas`;
 
   if (filtered.length === 0) {
-    container.innerHTML = `<div class="empty-state"><span class="material-icons">assignment_turned_in</span><p>No hay tareas finalizadas para mostrar.</p></div>`;
+    container.innerHTML = `<div class="empty-state"><span class="material-icons">assignment_turned_in</span><p>No hay tareas finalizadas pendientes de verificar.</p></div>`;
     return;
   }
 
@@ -2315,9 +2327,12 @@ function renderTaskHistory() {
     <div class="card" style="padding:12px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;">
         <strong>${t.rodado || '(sin rodado)'} — Interno ${t.interno || '-'}</strong>
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
           <span style="color:var(--text-muted);font-size:12px;">${t.fechaEntrega || ''} ${t.taxesOrderNumber ? '· OT ' + t.taxesOrderNumber : ''}</span>
-          <span class="material-icons" style="cursor:pointer; font-size:18px; color:${t.verifiedLocked ? 'var(--success)' : 'var(--text-muted)'};" title="${t.verifiedLocked ? 'Verificado. Click para forzar re-control.' : 'Pendiente de verificar. Click para marcar como verificado.'}" onclick="toggleTaskHistoryLock('${t.orderId}','${t.taskId}',${t.verifiedLocked})">${t.verifiedLocked ? 'lock' : 'lock_open'}</span>
+          <button type="button" class="btn btn-secondary btn-xs" onclick="forceResyncFromHistory('${t.orderId}')" title="Mandar la orden de vuelta a Órdenes para resincronizar">
+            <span class="material-icons" style="font-size:14px;">sync</span> Resincronizar
+          </button>
+          <span class="material-icons" style="cursor:pointer; font-size:18px; color:var(--text-muted);" title="Marcar como verificado manualmente (cierra el candado)" onclick="closeTaskHistoryLock('${t.orderId}','${t.taskId}')">lock_open</span>
         </div>
       </div>
       <div style="font-size:13px;margin-top:4px;">${t.empleado} · ${t.centroCosto} · ${t.horasEstimadas} hs</div>
