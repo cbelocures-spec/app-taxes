@@ -2435,6 +2435,13 @@ async function syncWorkOrder(orderId) {
       }
     }
 
+    console.log("Closing any pre-existing toast notifications...");
+    await page.evaluate(() => {
+      const closeButtons = Array.from(document.querySelectorAll('.toast button.close, .b-toast button.close, .toast .close, .b-toast .close, .toast button, .b-toast button'));
+      closeButtons.forEach(btn => btn.click());
+    }).catch(() => {});
+    await delay(1000);
+
     console.log("Clicking NUEVO button to open create form modal...");
     const nuevoClicked = await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('button, a'));
@@ -2940,16 +2947,16 @@ async function syncWorkOrder(orderId) {
     console.log("Looking for Taxes Work Order Number from toast notifications...");
     const taxesOrderNumber = await page.evaluate(() => {
       const elements = Array.from(document.querySelectorAll('.toast, .b-toast, .alert, div, p, span'));
+      const found = [];
       for (const el of elements) {
         const text = el.textContent.trim();
-        const match = text.match(/Orden de Trabajo N\s*(\d+)\s*Creada/i) || 
-                      text.match(/Orden\s*N\s*(\d+)/i) || 
+        const match = text.match(/Orden de Trabajo N\s*(\d+)\s*Creada/i) ||
+                      text.match(/Orden\s*N\s*(\d+)/i) ||
                       text.match(/N\s*(\d+)\s*Creada/i);
-        if (match && match[1]) {
-          return match[1];
-        }
+        if (match && match[1]) found.push(parseInt(match[1], 10));
       }
-      return null;
+      if (found.length === 0) return null;
+      return String(Math.max(...found));
     });
 
     let finalTaxesOrderNumber = taxesOrderNumber;
