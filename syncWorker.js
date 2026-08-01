@@ -2382,11 +2382,18 @@ async function syncWorkOrder(orderId) {
 
     // PRE-CREATION SAFEGUARD: Check if an OT already exists in Taxes for this Interno ON TODAY'S DATE before creating a new one!
     if (order.interno) {
+      // Use explicit Argentina timezone, NOT the process's local/system timezone (Railway
+      // containers default to UTC). Argentina is UTC-3, so any order created roughly between
+      // 21:00 and 23:59 local time falls on 00:00-02:59 UTC THE NEXT DAY — computing the date
+      // with getDate()/getMonth()/getFullYear() would silently shift it by one day, the
+      // safeguard would then fail to match the OT Taxes actually shows under today's (Argentina)
+      // date, and a duplicate OT gets created. This is almost certainly why "me duplicaba
+      // órdenes" happened — it lines up with evening-created orders.
       const targetDateObj = order.createdAt ? new Date(order.createdAt) : new Date();
-      const dd = String(targetDateObj.getDate()).padStart(2, '0');
-      const mm = String(targetDateObj.getMonth() + 1).padStart(2, '0');
-      const yyyy = targetDateObj.getFullYear();
-      const todayDateStr = `${dd}/${mm}/${yyyy}`;
+      const todayDateStr = targetDateObj.toLocaleDateString('es-AR', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        day: '2-digit', month: '2-digit', year: 'numeric'
+      });
 
       console.log(`[Pre-Check Safeguard] Searching OT list table for pre-existing OT for Interno ${order.interno} on date ${todayDateStr}...`);
       const existingOtOnPage = await page.evaluate((targetInterno, targetDateStr) => {
