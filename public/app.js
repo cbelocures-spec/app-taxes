@@ -379,12 +379,16 @@ document.addEventListener('DOMContentLoaded', () => {
           const descTextarea = card.querySelector('.task-desc');
           const descVal = descTextarea ? descTextarea.value : '';
 
+          const insumoInput = card.querySelector('.task-insumos');
+          const insumosVal = insumoInput ? insumoInput.value : '';
+
           const taskInfo = {
             interno: internoVal,
             rodado: rodadoVal,
             empleado: empName,
             centroCosto: ccName,
-            descripcion: descVal
+            descripcion: descVal,
+            insumos: insumosVal
           };
 
           promptDiagnosis(taskInfo).then(result => {
@@ -740,9 +744,46 @@ function promptDiagnosis(taskInfo = null) {
       toggleInsumoRow(chk); // Hide inline inputs
     });
 
-    // Reset collapsible insumos section to closed by default
-    toggleDiagInsumosCollapse(false);
-    updateDiagInsumosBadge();
+    if (taskInfo && taskInfo.insumos && typeof taskInfo.insumos === 'string' && taskInfo.insumos.trim()) {
+      const items = taskInfo.insumos.split('|').map(s => s.trim()).filter(Boolean);
+      let hasAnyChecked = false;
+      items.forEach(item => {
+        let name = item;
+        let qty = '';
+        if (item.includes(':')) {
+          const parts = item.split(':');
+          name = parts[0].trim();
+          qty = parts.slice(1).join(':').trim();
+        }
+
+        const chkList = Array.from(checkboxes);
+        const targetChk = chkList.find(chk => chk.value.trim().toLowerCase() === name.toLowerCase());
+        if (targetChk) {
+          targetChk.checked = true;
+          toggleInsumoRow(targetChk);
+          hasAnyChecked = true;
+          if (qty) {
+            const row = targetChk.closest('.insumo-row');
+            if (row) {
+              const qtyInput = row.querySelector('.insumo-qty-input');
+              if (qtyInput) {
+                qtyInput.value = qty;
+              }
+            }
+          }
+        }
+      });
+      if (hasAnyChecked && typeof toggleDiagInsumosCollapse === 'function') {
+        toggleDiagInsumosCollapse(true);
+      }
+    } else {
+      if (typeof toggleDiagInsumosCollapse === 'function') {
+        toggleDiagInsumosCollapse(false);
+      }
+    }
+    if (typeof updateDiagInsumosBadge === 'function') {
+      updateDiagInsumosBadge();
+    }
 
     // Set up unit status toggle switch
     const statusSwitch = document.getElementById('diag-status-switch');
@@ -1936,6 +1977,38 @@ function addTaskField(taskData = null) {
       container.appendChild(cardElement);
     } else {
       container.prepend(cardElement);
+    }
+
+    // Pre-select insumos checkboxes and fill quantities if taskData.insumos exists
+    if (taskData && taskData.insumos && typeof taskData.insumos === 'string' && taskData.insumos.trim()) {
+      const items = taskData.insumos.split('|').map(s => s.trim()).filter(Boolean);
+      items.forEach(item => {
+        let name = item;
+        let qty = '';
+        if (item.includes(':')) {
+          const parts = item.split(':');
+          name = parts[0].trim();
+          qty = parts.slice(1).join(':').trim();
+        }
+
+        const checkboxes = Array.from(cardElement.querySelectorAll('.insumo-check'));
+        const targetCheckbox = checkboxes.find(chk => chk.value.trim().toLowerCase() === name.toLowerCase());
+        if (targetCheckbox) {
+          targetCheckbox.checked = true;
+          if (typeof toggleInsumoRow === 'function') {
+            toggleInsumoRow(targetCheckbox);
+          }
+          if (qty) {
+            const row = targetCheckbox.closest('.insumo-row');
+            if (row) {
+              const qtyInput = row.querySelector('.insumo-qty-input');
+              if (qtyInput) {
+                qtyInput.value = qty;
+              }
+            }
+          }
+        }
+      });
     }
 
     // Rebuild titles to ensure they match DOM order from top to bottom
@@ -4464,6 +4537,7 @@ async function markDashboardTaskFinished(orderId, taskId) {
     empleado: empName,
     centroCosto: ccName,
     descripcion: task.descripcion,
+    insumos: task.insumos || '',
     estadoUnidad: order.estadoUnidad || 'operativo'
   };
 

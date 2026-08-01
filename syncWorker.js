@@ -67,11 +67,11 @@ const abandonedSyncOrderIds = new Set();
 async function acquireBrowserLock(context) {
   let waited = false;
   let waitedMs = 0;
-  const MAX_WAIT_MS = 6 * 60 * 1000; // safety valve: never wait more than 6 minutes
+  const MAX_WAIT_MS = 5.5 * 60 * 1000; // safety valve: never wait more than 5.5 minutes
   while (browserBusy) {
     if (!waited) { console.log(`[Lock] Browser is busy, ${context} is waiting for it to free up...`); waited = true; }
     if (waitedMs >= MAX_WAIT_MS) {
-      console.warn(`[Lock] ${context} waited over 6 minutes for the browser lock — forcing it free (possible stuck process).`);
+      console.warn(`[Lock] ${context} waited over 5.5 minutes for the browser lock — forcing it free (possible stuck process).`);
       break;
     }
     await delay(3000);
@@ -2444,6 +2444,71 @@ async function syncWorkOrder(orderId) {
         timeZone: 'America/Argentina/Buenos_Aires',
         day: '2-digit', month: '2-digit', year: 'numeric'
       });
+
+      console.log(`[Pre-Check Safeguard] Filtering OT list page (Limit 500, Date: ${todayDateStr})...`);
+      try {
+        const filterApplied = await page.evaluate((targetDate) => {
+          let updatedAny = false;
+
+          // 1. Set Limite to 500
+          const inputs = Array.from(document.querySelectorAll('input'));
+          const limitInput = inputs.find(inp => {
+            const name = (inp.name || '').toLowerCase();
+            const id = (inp.id || '').toLowerCase();
+            const placeholder = (inp.placeholder || '').toLowerCase();
+            const parentText = inp.parentElement ? inp.parentElement.textContent.toLowerCase() : '';
+            return name.includes('limite') || id.includes('limite') || placeholder.includes('limite') || parentText.includes('limite');
+          });
+          if (limitInput) {
+            limitInput.value = '500';
+            limitInput.dispatchEvent(new Event('input', { bubbles: true }));
+            limitInput.dispatchEvent(new Event('change', { bubbles: true }));
+            updatedAny = true;
+          }
+
+          // 2. Set Fecha Desde / Fecha Hasta to targetDate (todayDateStr)
+          const dateInputs = inputs.filter(inp => {
+            const name = (inp.name || '').toLowerCase();
+            const id = (inp.id || '').toLowerCase();
+            const placeholder = (inp.placeholder || '').toLowerCase();
+            const type = (inp.type || '').toLowerCase();
+            const parentText = inp.parentElement ? inp.parentElement.textContent.toLowerCase() : '';
+            return type === 'date' || name.includes('fecha') || id.includes('fecha') || placeholder.includes('fecha') || parentText.includes('fecha') || name.includes('desde') || name.includes('hasta');
+          });
+
+          const parts = targetDate.split('/');
+          const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : targetDate;
+          for (const dInp of dateInputs) {
+            dInp.value = dInp.type === 'date' ? isoDate : targetDate;
+            dInp.dispatchEvent(new Event('input', { bubbles: true }));
+            dInp.dispatchEvent(new Event('change', { bubbles: true }));
+            updatedAny = true;
+          }
+
+          // 3. Click BUSCAR button
+          const buttons = Array.from(document.querySelectorAll('button, a, input[type="button"], input[type="submit"]'));
+          const searchBtn = buttons.find(b => {
+            const text = (b.textContent || b.value || '').trim().toUpperCase();
+            return text === 'BUSCAR' || text.includes('BUSCAR');
+          });
+
+          if (searchBtn) {
+            searchBtn.click();
+            return true;
+          }
+
+          return updatedAny;
+        }, todayDateStr);
+
+        if (filterApplied) {
+          console.log("[Pre-Check Safeguard] Filter inputs set and BUSCAR clicked. Waiting 2.5s for table refresh...");
+          await delay(2500);
+        } else {
+          console.warn("[Pre-Check Safeguard] Could not locate filter elements, proceeding with existing table scan...");
+        }
+      } catch (filterErr) {
+        console.warn("[Pre-Check Safeguard] Filter step encountered warning, proceeding with scan:", filterErr.message);
+      }
 
       console.log(`[Pre-Check Safeguard] Searching OT list table for pre-existing OT for Interno ${order.interno} on date ${todayDateStr}...`);
       const existingOtOnPage = await page.evaluate((targetInterno, targetDateStr) => {
