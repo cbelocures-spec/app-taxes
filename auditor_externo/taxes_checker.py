@@ -82,19 +82,47 @@ class TaxesChecker:
             self.page = self.context.new_page()
 
             # Navigate to Taxes Login
-            login_url = f"{self.config.get('taxes_url', 'https://taxes.com.ar').rstrip('/')}/login"
+            portal_url = self.config.get('taxes_url', 'https://taxes.com.ar').rstrip('/')
+            login_url = f"{portal_url}/login"
             print(f"[Checker] Navigating to {login_url}...")
-            self.page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
-            self.page.wait_for_timeout(1500)
 
-            # Fill Login Form
+            try:
+                self.page.goto(login_url, wait_until="domcontentloaded", timeout=20000)
+            except Exception as e:
+                print(f"[Checker] Initial goto login failed, retrying: {e}")
+                self.page.wait_for_timeout(2000)
+                try:
+                    self.page.goto(login_url, wait_until="domcontentloaded", timeout=20000)
+                except Exception as e2:
+                    print(f"[Checker] Second goto login failed: {e2}")
+
+            self.page.wait_for_timeout(2000)
+
+            # Check if already logged in / redirected to admin
+            current_url = self.page.url.lower()
+            if "/login" not in current_url:
+                print(f"[Checker] Already logged in or redirected to: {self.page.url}")
+                return True
+
+            # Poll for input[name="loginUser"] or input[name="password"] up to 15 seconds
+            user_input = None
+            for _ in range(15):
+                if self.page.locator('input[name="loginUser"], input[name="email"], input[type="text"]').count() > 0:
+                    user_input = self.page.locator('input[name="loginUser"], input[name="email"], input[type="text"]').first
+                    break
+                self.page.wait_for_timeout(1000)
+
             user = self.config.get("taxes_user", "paniol@contenedoreshugo.com.ar")
             password = self.config.get("taxes_pass", "Paniol2015")
 
-            if self.page.locator('input[name="loginUser"]').count() > 0:
-                self.page.fill('input[name="loginUser"]', user)
-                self.page.fill('input[name="password"]', password)
-                login_btn = self.page.locator("button[type='submit'], button:has-text('INGRESAR')")
+            if user_input and self.page.locator('input[name="password"], input[type="password"]').count() > 0:
+                user_input.fill("")
+                user_input.fill(user)
+                pass_input = self.page.locator('input[name="password"], input[type="password"]').first
+                pass_input.fill("")
+                pass_input.fill(password)
+                
+                login_btn = self.page.locator("button[type='submit'], button:has-text('INGRESAR'), button:has-text('Ingresar')")
                 if login_btn.count() > 0:
                     login_btn.first.click()
                     self.page.wait_for_timeout(4000)
