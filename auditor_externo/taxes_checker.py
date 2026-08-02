@@ -291,16 +291,39 @@ class TaxesChecker:
                     "reason": f"No se encontraron tareas en Taxes para OT {ot_number}"
                 }
 
+            # Check 1: Total OT Hours in Taxes vs Total OT Hours in App
+            taxes_total_hours = sum([float(re.sub(r'[^0-9.]', '', t["horas"].replace(",", ".")) or 0) for t in extracted_tasks])
+            expected_order_total = task_item.get("orderTotalHours")
+            if expected_order_total is not None and float(expected_order_total) > 0:
+                exp_tot = float(expected_order_total)
+                if abs(taxes_total_hours - exp_tot) > 0.05:
+                    return {
+                        "status": "DISCREPANCY",
+                        "reason": f"Horas no coinciden: Taxes tiene {taxes_total_hours:.2f} hs y App tiene {exp_tot:.2f} hs"
+                    }
+
+            # Helper for alphanumeric cleaning (preserving numeric employee IDs like 598)
+            def clean_str(val):
+                return re.sub(r'[^a-zA-Z0-9]', '', str(val or '').lower())
+
+            emp_name_clean = clean_str(emp_name)
+            emp_code_clean = clean_str(task_item.get("empleadoCode"))
+            desc_clean = clean_str(expected_desc)
+
             # Find matching row by employee / description
             matched = None
-            emp_clean = re.sub(r'[^a-zA-Z]', '', emp_name.lower())
-            desc_clean = re.sub(r'[^a-zA-Z0-9]', '', expected_desc.lower())
-
             for t in extracted_tasks:
-                t_emp = re.sub(r'[^a-zA-Z]', '', t["empleado"].lower())
-                t_desc = re.sub(r'[^a-zA-Z0-9]', '', t["descripcion"].lower())
+                t_emp = clean_str(t["empleado"])
+                t_desc = clean_str(t["descripcion"])
 
-                emp_ok = (emp_clean in t_emp or t_emp in emp_clean) if emp_clean else True
+                emp_ok = False
+                if emp_code_clean and emp_code_clean in t_emp:
+                    emp_ok = True
+                elif emp_name_clean and (emp_name_clean in t_emp or t_emp in emp_name_clean):
+                    emp_ok = True
+                elif not emp_code_clean and not emp_name_clean:
+                    emp_ok = True
+
                 desc_ok = (desc_clean in t_desc or t_desc in desc_clean) if desc_clean else True
 
                 if emp_ok and desc_ok:
@@ -316,14 +339,14 @@ class TaxesChecker:
                     "reason": f"No se encontró la tarea de '{emp_name}' en Taxes"
                 }
 
-            # Check Realizada == SI
+            # Check 2: Realizada == SI
             if matched["realizada"].upper() != "SI":
                 return {
                     "status": "DISCREPANCY",
                     "reason": f"Estado REALIZADA es '{matched['realizada']}' en Taxes (debe ser SI)"
                 }
 
-            # Check Hours
+            # Check 3: Individual Task Hours
             try:
                 actual_hrs = float(re.sub(r'[^0-9.]', '', matched["horas"].replace(",", ".")) or 0)
             except ValueError:
@@ -332,10 +355,10 @@ class TaxesChecker:
             if expected_hrs > 0 and abs(expected_hrs - actual_hrs) > 0.05:
                 return {
                     "status": "DISCREPANCY",
-                    "reason": f"Horas no coinciden: Taxes tiene {actual_hrs:.2f} hs y App tiene {expected_hrs:.2f} hs"
+                    "reason": f"Horas de tarea no coinciden: Taxes tiene {actual_hrs:.2f} hs y Tarea tiene {expected_hrs:.2f} hs"
                 }
 
-            # Check Description completeness
+            # Check 4: Description completeness
             t_desc_lower = matched["descripcion"].lower()
             exp_desc_lower = expected_desc.lower()
 

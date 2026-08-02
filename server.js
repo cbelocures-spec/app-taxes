@@ -957,6 +957,10 @@ app.get('/api/tasks/history', (req, res) => {
         if (task && task.status === 'Finalizada' && task.verifiedLocked !== true) {
           const empOpt = (catalogs.empleados || []).find(e => e.value === task.empleado);
           const ccOpt = (catalogs.centrosCosto || []).find(c => c.value === task.centroCosto);
+          const orderTotalHours = (order.tasks || []).reduce((sum, t) => {
+            const h = parseFloat(String(t ? t.horasEstimadas || '0' : '0').replace(',', '.')) || 0;
+            return sum + h;
+          }, 0);
           flatTasks.push({
             orderId: order.id,
             taskId: task.id,
@@ -965,11 +969,13 @@ app.get('/api/tasks/history', (req, res) => {
             taxesOrderNumber: order.taxesOrderNumber || null,
             fechaEntrega: order.fechaEntrega,
             empleado: empOpt ? empOpt.label : (task.empleado || ''),
+            empleadoCode: task.empleado || '',
             centroCosto: ccOpt ? ccOpt.label : (task.centroCosto || ''),
             descripcion: task.descripcion || '',
             horasEstimadas: task.horasEstimadas || 0,
             insumos: task.insumos || '',
-            verifiedLocked: task.verifiedLocked === true
+            verifiedLocked: task.verifiedLocked === true,
+            orderTotalHours: orderTotalHours
           });
         }
       });
