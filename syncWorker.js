@@ -3915,24 +3915,10 @@ async function verifyWorkOrderWithPage(page, orderId) {
           await clearEmployeeFilterAndResearch();
           tableTasks = await readTableTasks();
 
-          console.log(`[Verify] Task #${idx+1} is 100% correct in Taxes (found via employee search). Locking task verification.`);
-          const currentOrder = db.getWorkOrderById(orderId);
-          if (currentOrder && currentOrder.tasks) {
-            const updatedTasks = currentOrder.tasks.map(taskItem =>
-              taskItem.id === t.id ? { ...taskItem, verifiedLocked: true } : taskItem
-            );
-            db.updateWorkOrder(orderId, { tasks: updatedTasks });
-          }
+          console.log(`[Verify] Task #${idx+1} is 100% correct in Taxes (found via employee search).`);
         } else {
-          // Task was fine on the first broad search, no narrowing needed — lock it here too.
-          console.log(`[Verify] Task #${idx+1} is 100% correct in Taxes (found on first search). Locking task verification.`);
-          const currentOrder = db.getWorkOrderById(orderId);
-          if (currentOrder && currentOrder.tasks) {
-            const updatedTasks = currentOrder.tasks.map(taskItem =>
-              taskItem.id === t.id ? { ...taskItem, verifiedLocked: true } : taskItem
-            );
-            db.updateWorkOrder(orderId, { tasks: updatedTasks });
-          }
+          // Task was fine on the first broad search, no narrowing needed.
+          console.log(`[Verify] Task #${idx+1} is 100% correct in Taxes (found on first search).`);
         }
       }
     }
@@ -4014,14 +4000,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
             errors.push(`Tarea #${idx + 1} (${employeeLabel}): Descripción no coincidió tras guardar.`);
           }
           if (hoursOk && descOkFinal) {
-            console.log(`[Verify] Task #${idx+1} double-check OK after save. Locking task verification.`);
-            const currentOrder = db.getWorkOrderById(orderId);
-            if (currentOrder && currentOrder.tasks) {
-              const updatedTasks = currentOrder.tasks.map(taskItem =>
-                taskItem.id === t.id ? { ...taskItem, verifiedLocked: true } : taskItem
-              );
-              db.updateWorkOrder(orderId, { tasks: updatedTasks });
-            }
+            console.log(`[Verify] Task #${idx+1} double-check OK after save.`);
           }
         }
       }

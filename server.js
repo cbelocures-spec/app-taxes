@@ -952,7 +952,7 @@ app.get('/api/tasks/history', (req, res) => {
     const catalogs = db.getCatalogs();
     const flatTasks = [];
     allOrders.forEach(order => {
-      if (order.deleted === true || order.archived === true) return;
+      if (order.deleted === true) return;
       (order.tasks || []).forEach(task => {
         if (task && task.status === 'Finalizada' && task.verifiedLocked !== true) {
           const empOpt = (catalogs.empleados || []).find(e => e.value === task.empleado);
