@@ -825,7 +825,8 @@ app.put('/api/orders/:id', (req, res) => {
         timerStarted: t.timerStarted !== undefined ? (t.timerStarted === true || t.timerStarted === 'true') : (existingTask ? existingTask.timerStarted : false),
         timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : (existingTask ? existingTask.timerHistory || [] : []),
         synced: synced,
-        taxesRealizadaSynced: taxesRealizadaSynced
+        taxesRealizadaSynced: taxesRealizadaSynced,
+        verifiedLocked: existingTask ? (existingTask.verifiedLocked === true) : false
       });
     });
 
