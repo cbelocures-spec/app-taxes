@@ -118,10 +118,21 @@ class AuditorApp(ctk.CTk):
             button_hover_color="#64748b",
             dropdown_fg_color="#1e293b",
             dropdown_hover_color="#334155",
-            width=180
+            command=lambda choice: self.refresh_tables()
         )
         self.combo_sector.set("Todos los Sectores")
         self.combo_sector.pack(side="left", padx=5, pady=10)
+
+        self.btn_clear_history = ctk.CTkButton(
+            self.ctrl_frame,
+            text="🗑️ Borrar Historial Auditor",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color="#991b1b",
+            hover_color="#7f1d1d",
+            width=170,
+            command=self.clear_auditor_history
+        )
+        self.btn_clear_history.pack(side="right", padx=10, pady=10)
 
         self.btn_refresh = ctk.CTkButton(
             self.ctrl_frame,
@@ -260,8 +271,17 @@ class AuditorApp(ctk.CTk):
         )
         btn_resync.pack(side="left", padx=5)
 
-        cols = ("ot", "interno", "sector", "empleado", "horas", "descripcion", "insumos")
-        self.tree_tareas = ttk.Treeview(self.tab_tareas, columns=cols, show="headings", selectmode="browse")
+        # Subtabview inside Tareas
+        self.subtabview_tareas = ctk.CTkTabview(self.tab_tareas)
+        self.subtabview_tareas.pack(fill="both", expand=True, padx=5, pady=5)
+
+        self.subtab_pendientes = self.subtabview_tareas.add("⏳ Pendientes de Control")
+        self.subtab_confirmadas = self.subtabview_tareas.add("🔒 Tareas Confirmadas (Candado Cerrado)")
+        self.subtab_resync = self.subtabview_tareas.add("⚠️ Tareas Resincronizadas (Con Discrepancia)")
+
+        # --- 1. Pendientes Treeview ---
+        cols_p = ("ot", "interno", "sector", "empleado", "horas", "descripcion", "insumos")
+        self.tree_tareas = ttk.Treeview(self.subtab_pendientes, columns=cols_p, show="headings", selectmode="browse")
 
         self.tree_tareas.heading("ot", text="Nº O.T.")
         self.tree_tareas.heading("interno", text="Interno")
@@ -279,11 +299,64 @@ class AuditorApp(ctk.CTk):
         self.tree_tareas.column("descripcion", width=340, anchor="w")
         self.tree_tareas.column("insumos", width=220, anchor="w")
 
-        scrollbar = ttk.Scrollbar(self.tab_tareas, orient="vertical", command=self.tree_tareas.yview)
-        self.tree_tareas.configure(yscrollcommand=scrollbar.set)
-
+        sc1 = ttk.Scrollbar(self.subtab_pendientes, orient="vertical", command=self.tree_tareas.yview)
+        self.tree_tareas.configure(yscrollcommand=sc1.set)
         self.tree_tareas.pack(side="left", fill="both", expand=True, padx=5, pady=5)
-        scrollbar.pack(side="right", fill="y", pady=5)
+        sc1.pack(side="right", fill="y", pady=5)
+
+        # --- 2. Confirmadas Treeview ---
+        cols_c = ("fecha", "ot", "interno", "sector", "empleado", "horas", "descripcion", "insumos")
+        self.tree_tareas_confirmadas = ttk.Treeview(self.subtab_confirmadas, columns=cols_c, show="headings", selectmode="browse")
+
+        self.tree_tareas_confirmadas.heading("fecha", text="Fecha Confirmación")
+        self.tree_tareas_confirmadas.heading("ot", text="Nº O.T.")
+        self.tree_tareas_confirmadas.heading("interno", text="Interno")
+        self.tree_tareas_confirmadas.heading("sector", text="Sector")
+        self.tree_tareas_confirmadas.heading("empleado", text="Empleado")
+        self.tree_tareas_confirmadas.heading("horas", text="Horas")
+        self.tree_tareas_confirmadas.heading("descripcion", text="Descripción")
+        self.tree_tareas_confirmadas.heading("insumos", text="Insumos / Diagnóstico")
+
+        self.tree_tareas_confirmadas.column("fecha", width=140, anchor="center")
+        self.tree_tareas_confirmadas.column("ot", width=90, anchor="center")
+        self.tree_tareas_confirmadas.column("interno", width=80, anchor="center")
+        self.tree_tareas_confirmadas.column("sector", width=100, anchor="center")
+        self.tree_tareas_confirmadas.column("empleado", width=170, anchor="w")
+        self.tree_tareas_confirmadas.column("horas", width=70, anchor="center")
+        self.tree_tareas_confirmadas.column("descripcion", width=300, anchor="w")
+        self.tree_tareas_confirmadas.column("insumos", width=200, anchor="w")
+
+        sc2 = ttk.Scrollbar(self.subtab_confirmadas, orient="vertical", command=self.tree_tareas_confirmadas.yview)
+        self.tree_tareas_confirmadas.configure(yscrollcommand=sc2.set)
+        self.tree_tareas_confirmadas.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        sc2.pack(side="right", fill="y", pady=5)
+
+        # --- 3. Resincronizadas Treeview ---
+        cols_r = ("fecha", "ot", "interno", "sector", "empleado", "horas", "descripcion", "motivo")
+        self.tree_tareas_resync = ttk.Treeview(self.subtab_resync, columns=cols_r, show="headings", selectmode="browse")
+
+        self.tree_tareas_resync.heading("fecha", text="Fecha Resincro")
+        self.tree_tareas_resync.heading("ot", text="Nº O.T.")
+        self.tree_tareas_resync.heading("interno", text="Interno")
+        self.tree_tareas_resync.heading("sector", text="Sector")
+        self.tree_tareas_resync.heading("empleado", text="Empleado")
+        self.tree_tareas_resync.heading("horas", text="Horas")
+        self.tree_tareas_resync.heading("descripcion", text="Descripción")
+        self.tree_tareas_resync.heading("motivo", text="Motivo / Observación de Resincronización")
+
+        self.tree_tareas_resync.column("fecha", width=140, anchor="center")
+        self.tree_tareas_resync.column("ot", width=90, anchor="center")
+        self.tree_tareas_resync.column("interno", width=80, anchor="center")
+        self.tree_tareas_resync.column("sector", width=100, anchor="center")
+        self.tree_tareas_resync.column("empleado", width=170, anchor="w")
+        self.tree_tareas_resync.column("horas", width=70, anchor="center")
+        self.tree_tareas_resync.column("descripcion", width=260, anchor="w")
+        self.tree_tareas_resync.column("motivo", width=240, anchor="w")
+
+        sc3 = ttk.Scrollbar(self.subtab_resync, orient="vertical", command=self.tree_tareas_resync.yview)
+        self.tree_tareas_resync.configure(yscrollcommand=sc3.set)
+        self.tree_tareas_resync.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        sc3.pack(side="right", fill="y", pady=5)
 
     def refresh_tables(self):
         selected_sector = self.combo_sector.get() if hasattr(self, 'combo_sector') else "Todos los Sectores"
@@ -336,7 +409,7 @@ class AuditorApp(ctk.CTk):
                     r.get("observacion", "-")
                 ))
 
-        # Refresh Tareas Treeview
+        # Refresh Tareas Treeviews
         tasks_count = 0
         if hasattr(self, 'tree_tareas'):
             for item in self.tree_tareas.get_children():
@@ -363,6 +436,50 @@ class AuditorApp(ctk.CTk):
                         t.get("descripcion", "-"),
                         t.get("insumos", "-")
                     ), iid=item_iid)
+
+        # Refresh Tareas Confirmadas Treeview
+        if hasattr(self, 'tree_tareas_confirmadas'):
+            for item in self.tree_tareas_confirmadas.get_children():
+                self.tree_tareas_confirmadas.delete(item)
+            tc_list = self.db.get_tareas_confirmadas()
+            for tc in tc_list:
+                sec = tc.get("sector") or "Taller"
+                if selected_sector == "Todos los Sectores" or \
+                   (selected_sector == "Herrería" and "herreria" in sec.lower()) or \
+                   (selected_sector == "Edilicio" and "edilic" in sec.lower()) or \
+                   (selected_sector == "Taller (Mecánica)" and ("taller" in sec.lower() or "correctiv" in sec.lower() or "preventiv" in sec.lower())):
+                    self.tree_tareas_confirmadas.insert("", "end", values=(
+                        tc.get("fechaConfirmado", "-"),
+                        tc.get("numeroOrden", "-"),
+                        tc.get("interno", "-"),
+                        sec,
+                        tc.get("empleado", "-"),
+                        tc.get("horas", "0"),
+                        tc.get("descripcion", "-"),
+                        tc.get("insumos", "-")
+                    ))
+
+        # Refresh Tareas Resincronizadas Treeview
+        if hasattr(self, 'tree_tareas_resync'):
+            for item in self.tree_tareas_resync.get_children():
+                self.tree_tareas_resync.delete(item)
+            tr_list = self.db.get_tareas_resincronizadas()
+            for tr in tr_list:
+                sec = tr.get("sector") or "Taller"
+                if selected_sector == "Todos los Sectores" or \
+                   (selected_sector == "Herrería" and "herreria" in sec.lower()) or \
+                   (selected_sector == "Edilicio" and "edilic" in sec.lower()) or \
+                   (selected_sector == "Taller (Mecánica)" and ("taller" in sec.lower() or "correctiv" in sec.lower() or "preventiv" in sec.lower())):
+                    self.tree_tareas_resync.insert("", "end", values=(
+                        tr.get("fechaResincronizado", "-"),
+                        tr.get("numeroOrden", "-"),
+                        tr.get("interno", "-"),
+                        sec,
+                        tr.get("empleado", "-"),
+                        tr.get("horas", "0"),
+                        tr.get("descripcion", "-"),
+                        tr.get("motivo", "-")
+                    ))
 
         self.log(f"Tablas actualizadas ({selected_sector}): {len(filtered_borradas)} borradas auditadas, {len(filtered_resyncs)} resincronizadas, {tasks_count} tareas de historial.")
 
@@ -523,12 +640,14 @@ class AuditorApp(ctk.CTk):
             reason = res.get("reason", "")
 
             if status == "MATCH":
-                self.log(f"  ✅ Tarea OT {ot} ({emp}) OK en Taxes. Cerrando candado...")
+                self.log(f"  ✅ Tarea OT {ot} ({emp}) OK en Taxes. Cerrando candado y registrando en historial...")
                 self.client.lock_task(order_id, task_id)
+                self.db.add_tarea_confirmada(task_item)
 
             elif status == "DISCREPANCY":
-                self.log(f"  ⚠️ Tarea OT {ot} DISCREPANCIA: {reason}. Mandando orden a resincronizar (botón azul)...")
+                self.log(f"  ⚠️ Tarea OT {ot} DISCREPANCIA: {reason}. Mandando a resincronizar (botón azul)...")
                 self.client.force_resync(order_id)
+                self.db.add_tarea_resincronizada({**task_item, "motivo": reason})
             else:
                 self.log(f"  ❌ Error en tarea OT {ot}: {reason}")
 
@@ -564,8 +683,12 @@ class AuditorApp(ctk.CTk):
             if self.client.force_resync(order_id):
                 self.log(f"🔄 Orden {order_id} mandada a resincronizar (botón azul)")
                 self.refresh_tables()
-            else:
-                messagebox.showerror("Error", "No se pudo enviar a resincronizar.")
+    def clear_auditor_history(self):
+        if messagebox.askyesno("Confirmar Limpieza", "¿Desea borrar todo el historial registrado por el auditor (Órdenes y Tareas)?"):
+            self.db.clear_all_history()
+            self.txt_log.delete("1.0", "end")
+            self.log("🧹 Historial del auditor limpiado correctamente.")
+            self.refresh_tables()
 
 if __name__ == "__main__":
     app = AuditorApp()

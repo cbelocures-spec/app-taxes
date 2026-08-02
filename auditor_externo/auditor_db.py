@@ -13,7 +13,9 @@ class AuditorDB:
         if not os.path.exists(self.db_path):
             initial_data = {
                 "ordenes_borradas": [],
-                "ordenes_resincronizadas": []
+                "ordenes_resincronizadas": [],
+                "tareas_confirmadas": [],
+                "tareas_resincronizadas": []
             }
             self._write(initial_data)
 
@@ -23,7 +25,12 @@ class AuditorDB:
                 return json.load(f)
         except Exception as e:
             print(f"[DB-Error] Error reading db: {e}")
-            return {"ordenes_borradas": [], "ordenes_resincronizadas": []}
+            return {
+                "ordenes_borradas": [],
+                "ordenes_resincronizadas": [],
+                "tareas_confirmadas": [],
+                "tareas_resincronizadas": []
+            }
 
     def _write(self, data):
         try:
@@ -31,6 +38,16 @@ class AuditorDB:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"[DB-Error] Error writing db: {e}")
+
+    def clear_all_history(self):
+        empty_data = {
+            "ordenes_borradas": [],
+            "ordenes_resincronizadas": [],
+            "tareas_confirmadas": [],
+            "tareas_resincronizadas": []
+        }
+        self._write(empty_data)
+        return True
 
     def get_ordenes_borradas(self):
         data = self._read()
@@ -107,6 +124,56 @@ class AuditorDB:
             "tasks": entry.get("tasks", [])
         }
         data["ordenes_resincronizadas"].insert(0, record)
+        self._write(data)
+        return record
+
+    def get_tareas_confirmadas(self):
+        data = self._read()
+        return data.get("tareas_confirmadas", [])
+
+    def get_tareas_resincronizadas(self):
+        data = self._read()
+        return data.get("tareas_resincronizadas", [])
+
+    def add_tarea_confirmada(self, entry):
+        data = self._read()
+        if "tareas_confirmadas" not in data:
+            data["tareas_confirmadas"] = []
+
+        now_str = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
+        record = {
+            "id": f"TASK-LOCK-{int(datetime.now().timestamp())}",
+            "fechaConfirmado": now_str,
+            "numeroOrden": str(entry.get("taxesOrderNumber") or entry.get("ot") or entry.get("orderId") or "N/A"),
+            "interno": str(entry.get("interno") or "N/A"),
+            "sector": str(entry.get("clasificacion") or entry.get("sector") or "Taller"),
+            "empleado": str(entry.get("empleado") or "N/A"),
+            "horas": str(entry.get("horasEstimadas") or entry.get("horas") or "0"),
+            "descripcion": str(entry.get("descripcion") or "N/A"),
+            "insumos": str(entry.get("insumos") or "-")
+        }
+        data["tareas_confirmadas"].insert(0, record)
+        self._write(data)
+        return record
+
+    def add_tarea_resincronizada(self, entry):
+        data = self._read()
+        if "tareas_resincronizadas" not in data:
+            data["tareas_resincronizadas"] = []
+
+        now_str = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
+        record = {
+            "id": f"TASK-RESYNC-{int(datetime.now().timestamp())}",
+            "fechaResincronizado": now_str,
+            "numeroOrden": str(entry.get("taxesOrderNumber") or entry.get("ot") or entry.get("orderId") or "N/A"),
+            "interno": str(entry.get("interno") or "N/A"),
+            "sector": str(entry.get("clasificacion") or entry.get("sector") or "Taller"),
+            "empleado": str(entry.get("empleado") or "N/A"),
+            "horas": str(entry.get("horasEstimadas") or entry.get("horas") or "0"),
+            "descripcion": str(entry.get("descripcion") or "N/A"),
+            "motivo": str(entry.get("motivo") or entry.get("observacion") or "Discrepancia en Taxes")
+        }
+        data["tareas_resincronizadas"].insert(0, record)
         self._write(data)
         return record
 
