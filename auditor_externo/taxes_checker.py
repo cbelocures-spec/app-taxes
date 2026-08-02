@@ -6,6 +6,48 @@ from playwright.sync_api import sync_playwright
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
 
+FALLBACK_EMPLOYEE_MAPPINGS = [
+    {"appName": "GODOY DAVID",               "taxesName": "Vera, Domingo Sergio"},
+    {"appName": "DOMINIC DYLAN",              "taxesName": "Vera, Domingo Sergio"},
+    {"appName": "PEREZ FACUNDO",              "taxesName": "Vera, Domingo Sergio"},
+    {"appName": "LOPEZ GUSTAVO",              "taxesName": "Vera, Domingo Sergio"},
+    {"appName": "CALOMINO DARIO",             "taxesName": "Vera, Domingo Sergio"},
+    {"appName": "MUSDALINO FRANCO",           "taxesName": "Vera, Domingo Sergio"},
+    {"appName": "RODRIGUEZ MARCELO",          "taxesName": "Vera, Domingo Sergio"},
+    {"appName": "Cuba Orosco, Kevín Genaro",  "taxesName": "Cuba Orosco, Kevín Genaro"},
+    {"appName": "Federico",                   "taxesName": "García, Yamandú Liborio"},
+    {"appName": "Luciano",                    "taxesName": "Carmona González, Juan Manuel"},
+    {"appName": "Digno",                      "taxesName": "García, Yamandú Liborio"}
+]
+
+def is_employee_match(app_emp_name, app_emp_code, taxes_emp_str, taxes_desc_str):
+    def clean_str(val):
+        return re.sub(r'[^a-zA-Z0-9]', '', str(val or '').lower())
+
+    clean_app_name = clean_str(app_emp_name)
+    clean_app_code = clean_str(app_emp_code)
+    clean_taxes_emp = clean_str(taxes_emp_str)
+    clean_taxes_desc = clean_str(taxes_desc_str)
+
+    # 1. Direct match on code or name in Taxes Empleado column
+    if clean_app_code and clean_app_code in clean_taxes_emp:
+        return True
+    if clean_app_name and (clean_app_name in clean_taxes_emp or clean_taxes_emp in clean_app_name):
+        return True
+
+    # 2. Check Proxy / Vera rule:
+    # If app_emp_name is mapped to Vera or proxy, OR if Taxes Empleado is Vera / proxy employee,
+    # AND the real app_emp_name is written in the Taxes description (e.g. "Realizó: LOPEZ GUSTAVO")
+    mapped_entry = next((m for m in FALLBACK_EMPLOYEE_MAPPINGS if clean_str(m["appName"]) in clean_app_name or clean_app_name in clean_str(m["appName"])), None)
+    proxy_taxes_name = clean_str(mapped_entry["taxesName"]) if mapped_entry else ""
+
+    if "vera" in clean_taxes_emp or (proxy_taxes_name and proxy_taxes_name in clean_taxes_emp):
+        if clean_app_name and clean_app_name in clean_taxes_desc:
+            return True
+
+    return False
+
+
 class TaxesChecker:
     def __init__(self, config_path=CONFIG_FILE, headless=True):
         self.config_path = config_path
@@ -291,28 +333,18 @@ class TaxesChecker:
                     "reason": f"No se encontraron tareas en Taxes para OT {ot_number}"
                 }
 
-            # Helper for alphanumeric cleaning (preserving numeric employee IDs like 598)
+            emp_code = str(task_item.get("empleadoCode") or "").strip()
+
             def clean_str(val):
                 return re.sub(r'[^a-zA-Z0-9]', '', str(val or '').lower())
 
-            emp_name_clean = clean_str(emp_name)
-            emp_code_clean = clean_str(task_item.get("empleadoCode"))
             desc_clean = clean_str(expected_desc)
 
-            # Find matching row by employee / description
+            # Find matching row by employee / description (handling Vera proxy rule)
             matched = None
             for t in extracted_tasks:
-                t_emp = clean_str(t["empleado"])
+                emp_ok = is_employee_match(emp_name, emp_code, t["empleado"], t["descripcion"])
                 t_desc = clean_str(t["descripcion"])
-
-                emp_ok = False
-                if emp_code_clean and emp_code_clean in t_emp:
-                    emp_ok = True
-                elif emp_name_clean and (emp_name_clean in t_emp or t_emp in emp_name_clean):
-                    emp_ok = True
-                elif not emp_code_clean and not emp_name_clean:
-                    emp_ok = True
-
                 desc_ok = (desc_clean in t_desc or t_desc in desc_clean) if desc_clean else True
 
                 if emp_ok and desc_ok:
@@ -320,7 +352,9 @@ class TaxesChecker:
                     break
 
             if not matched and len(extracted_tasks) == 1:
-                matched = extracted_tasks[0]
+                t_single = extracted_tasks[0]
+                if is_employee_match(emp_name, emp_code, t_single["empleado"], t_single["descripcion"]):
+                    matched = t_single
 
             if not matched:
                 return {
