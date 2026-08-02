@@ -9451,8 +9451,9 @@ function unitMatchesSearch(unit) {
     itemsStr = unit.novedad_items.map(x => x.texto || '').join(' ').toLowerCase();
   }
   const destStr = String(unit.destinoIngreso || '').toLowerCase();
+  const servStr = String(unit.servicio || unit.tipo_servicio || '').toLowerCase();
   
-  return intStr.includes(q) || rodStr.includes(q) || tipoStr.includes(q) || novStr.includes(q) || itemsStr.includes(q) || destStr.includes(q);
+  return intStr.includes(q) || rodStr.includes(q) || tipoStr.includes(q) || novStr.includes(q) || itemsStr.includes(q) || destStr.includes(q) || servStr.includes(q);
 }
 
 async function fetchParteTallerEstado() {
@@ -10068,7 +10069,7 @@ function renderParteTallerDashboard(state) {
   }
 
   // 3. Servicios pendientes
-  const pendientes = displayState.servicios_pendientes || [];
+  const pendientes = (displayState.servicios_pendientes || []).filter(matchesPtSector).filter(unitMatchesSearch);
   if (el('pt-pend-count')) el('pt-pend-count').textContent = pendientes.length;
   if (el('pt-pendientes-tbody')) {
     if (pendientes.length === 0) {
