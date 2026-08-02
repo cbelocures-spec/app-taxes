@@ -351,6 +351,9 @@ class AuditorApp(ctk.CTk):
                    (selected_sector == "Taller (Mecánica)" and ("taller" in sec.lower() or "correctiv" in sec.lower() or "preventiv" in sec.lower())):
                     tasks_count += 1
                     ot = t.get("taxesOrderNumber") or t.get("orderId") or "-"
+                    task_id = t.get("taskId") or t.get("id") or f"t-{tasks_count}"
+                    order_id = t.get("orderId") or f"o-{tasks_count}"
+                    item_iid = f"{order_id}::{task_id}"
                     self.tree_tareas.insert("", "end", values=(
                         ot,
                         t.get("interno", "-"),
@@ -359,7 +362,7 @@ class AuditorApp(ctk.CTk):
                         t.get("horasEstimadas", "0"),
                         t.get("descripcion", "-"),
                         t.get("insumos", "-")
-                    ), iid=f"{t.get('orderId')}::{t.get('id')}")
+                    ), iid=item_iid)
 
         self.log(f"Tablas actualizadas ({selected_sector}): {len(filtered_borradas)} borradas auditadas, {len(filtered_resyncs)} resincronizadas, {tasks_count} tareas de historial.")
 
@@ -539,7 +542,7 @@ class AuditorApp(ctk.CTk):
             emp = task_item.get("empleado", "N/A")
             hrs = task_item.get("horasEstimadas", "0")
             order_id = task_item.get("orderId")
-            task_id = task_item.get("id")
+            task_id = task_item.get("taskId") or task_item.get("id")
 
             self.log(f"[{idx}/{len(to_audit)}] Inspeccionando Tarea OT {ot} - Operario: {emp} ({hrs} hs)...")
 
