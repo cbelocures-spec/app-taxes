@@ -10314,6 +10314,69 @@ function closePtUnitModal() {
   document.getElementById('pt-unit-modal').classList.remove('open');
 }
 
+async function markPtUnitOperativo() {
+  const interno = document.getElementById('pt-unit-interno').value.trim();
+  if (!interno) {
+    showToast('El número de interno es obligatorio.', 'warning');
+    return;
+  }
+  const empresa = document.getElementById('pt-unit-empresa').value;
+  let saveInterno = interno;
+  if (empresa === 'irineo') saveInterno = 'Irineo ' + interno;
+  else if (empresa === 'nico') saveInterno = 'Nico ' + interno;
+
+  const btn = document.getElementById('btn-pt-unit-operativo');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  try {
+    // Si la unidad ya estaba registrada en alguna lista de Parte Taller, sacarla (queda resuelta)
+    if (window._ptState && currentEditingPtInterno) {
+      const state = window._ptState;
+      const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
+      let removed = false;
+      lists.forEach(listName => {
+        if (state[listName]) {
+          const idx = state[listName].findIndex(u => String(u.interno).trim() === currentEditingPtInterno);
+          if (idx !== -1) { state[listName].splice(idx, 1); removed = true; }
+        }
+      });
+      if (removed) {
+        await fetch('/api/parte-taller/novedad', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accion: 'save_state', state: state })
+        }).catch(() => {});
+      }
+    }
+
+    showToast(`Unidad ${saveInterno} marcada como Operativa ✓`, 'success');
+    closePtUnitModal();
+    fetchParteTallerEstado();
+
+    if (window._ptLinkedOrderId) {
+      const linkedId = window._ptLinkedOrderId;
+      window._ptLinkedOrderId = null;
+      const targetOrder = (typeof activeOrders !== 'undefined' && Array.isArray(activeOrders)) ? activeOrders.find(o => o.id === linkedId) : null;
+      try {
+        await fetch(`/api/orders/${linkedId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-username': localStorage.getItem('currentUserUsername') || ''
+          },
+          body: JSON.stringify(targetOrder ? { ...targetOrder, estadoUnidad: 'operativo' } : { estadoUnidad: 'operativo' })
+        }).catch(() => {});
+      } catch (e) {}
+      if (typeof fetchOrders === 'function') fetchOrders();
+    }
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || 'Error al marcar la unidad como operativa.', 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Operativo (Sin Novedades)'; }
+  }
+}
+
 // Toggles visual style when user checks/unchecks an item in the edit checklist
 function ptToggleEditItem(checkbox) {
   const idx = checkbox.id.replace('ptck_edit_', '');
