@@ -93,8 +93,8 @@ class AuditorApp(ctk.CTk):
             self.ctrl_frame,
             text="🔄 Resincronizar Discrepancias",
             font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color="#f59e0b",
-            hover_color="#d97706",
+            fg_color="#2563eb",
+            hover_color="#1d4ed8",
             width=210,
             command=self.resync_discrepancies_thread
         )
@@ -252,9 +252,9 @@ class AuditorApp(ctk.CTk):
         btn_resync = ctk.CTkButton(
             bar,
             text="🔄 Resincronizar Orden",
-            font=ctk.CTkFont(size=12),
-            fg_color="#d97706",
-            hover_color="#b45309",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#2563eb",
+            hover_color="#1d4ed8",
             width=150,
             command=self.resync_selected_task
         )
