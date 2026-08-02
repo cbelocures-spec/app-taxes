@@ -642,6 +642,11 @@ class LocalDB {
     return db.catalogs;
   }
 
+  getSyncableOrders() {
+    const db = this.read();
+    return (db.workOrders || []).filter(o => o.deleted !== true);
+  }
+
   // --- Work Orders Methods ---
   // Returns ACTIVE (non-archived) orders only — strictly deduplicated by internal ID ('interno') or 'id'
   getWorkOrders() {

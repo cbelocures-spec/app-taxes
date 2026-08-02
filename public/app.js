@@ -2422,11 +2422,11 @@ async function closeTaskHistoryLock(orderId, taskId) {
 }
 
 async function forceResyncFromHistory(orderId) {
-  if (!confirm('¿Mandar esta orden de vuelta a Órdenes para resincronizar contra Taxes?')) return;
+  if (!confirm('¿Volver a sincronizar y controlar esta orden con Taxes?')) return;
   try {
     const res = await fetch(`/api/orders/${orderId}/force-resync`, { method: 'POST' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    showToast('Orden enviada a Órdenes para resincronizar', 'success');
+    showToast('Orden reencolada para sincronizar y controlar con Taxes', 'success');
     await fetchTaskHistory();
   } catch (err) {
     showToast('Error: ' + err.message, 'danger');
@@ -2785,7 +2785,7 @@ function createHistoryCardHtml(order) {
             <span class="material-icons">visibility</span>
           </button>
           ${canManageHistory ? `
-          <button class="icon-btn" onclick="unarchiveOrder('${order.id}')" title="Re-sincronizar (volver a pendientes)" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;">
+          <button class="icon-btn" onclick="resyncOrderFromHistory('${order.id}')" title="Resincronizar y Controlar con Taxes" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;">
             <span class="material-icons">sync</span>
           </button>
           <button class="icon-btn danger" onclick="deleteOrder('${order.id}')" title="Eliminar definitivamente de la App">
@@ -2822,6 +2822,18 @@ async function unarchiveOrder(orderId) {
       showToast("Error al desarchivar orden", "danger");
       console.error(error);
     }
+  }
+}
+
+async function resyncOrderFromHistory(orderId) {
+  if (!confirm('¿Volver a sincronizar y controlar esta orden con Taxes?')) return;
+  try {
+    const res = await fetch(`/api/orders/${orderId}/force-resync`, { method: 'POST' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    showToast('Orden reencolada para sincronizar y controlar con Taxes', 'success');
+    await fetchArchivedOrders();
+  } catch (err) {
+    showToast('Error: ' + err.message, 'danger');
   }
 }
 

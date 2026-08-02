@@ -4031,11 +4031,8 @@ async function verifyWorkOrderWithPage(page, orderId) {
       // If order is in Historial (archived) and verified 100% correct in Taxes (REALIZ = SI, matched):
       // Record audit log entry and AUTO-DELETE from app!
       // Auto-deletion disabled by request: keep order in app without deleting
-      const hasTaxesOt = !!(order.taxesOrderNumber && String(order.taxesOrderNumber).trim() !== '');
-      const allTasksCompleted = (order.tasks || []).length > 0 && order.tasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada'));
       const isOutOfService = order.estadoUnidad === 'fuera_de_servicio';
-      const isPendingSync = (order.syncStatus === 'pending' || order.syncStatus === 'syncing');
-      const shouldArchive = order.archived === true || (hasTaxesOt && allTasksCompleted && !isOutOfService && !isPendingSync);
+      const shouldArchive = order.archived === true || !isOutOfService;
       const updatePayload = {
         verifiedStatus: 'success',
         verifiedCount: count,
@@ -4196,7 +4193,7 @@ async function startWorker() {
 
   // Reset any orders stuck in 'syncing' back to 'pending' on startup
   try {
-    const orders = db.getWorkOrders();
+    const orders = db.getSyncableOrders();
     for (const o of orders) {
       if (o.syncStatus === 'syncing') {
         console.log(`Resetting stuck sync status for order ID: ${o.id} to 'pending' on worker startup.`);
@@ -4212,7 +4209,7 @@ async function startWorker() {
   // in flight, the in-memory promise dies with it and the DB is left showing "CONTROLANDO..."
   // forever, since the code path that would set 'success'/'error' never gets to run.
   try {
-    const orders = db.getWorkOrders();
+    const orders = db.getSyncableOrders();
     for (const o of orders) {
       if (o.verifiedStatus === 'checking') {
         console.log(`Resetting stuck verifiedStatus for order ID: ${o.id} to 'error' on worker startup.`);
@@ -4229,7 +4226,7 @@ async function startWorker() {
 
   while (isWorkerRunning) {
     try {
-      const orders = db.getWorkOrders();
+      const orders = db.getSyncableOrders();
       const pendingOrder = orders.find(o => o.syncStatus === 'pending');
 
       if (pendingOrder) {
@@ -4241,7 +4238,7 @@ async function startWorker() {
         // or a later re-sync attempt itself failed (syncStatus: 'error') even
         // though they were already synced before (have a taxesOrderNumber).
         const brokenOrder = orders.find(o => {
-          if (!o.taxesOrderNumber || o.archived || o.syncStatus === 'local' || o.syncStatus === 'draft') return false;
+          if (!o.taxesOrderNumber || o.syncStatus === 'local' || o.syncStatus === 'draft') return false;
 
           const needsVerifyRetry = o.syncStatus === 'success' && o.verifiedStatus === 'error' &&
             (o.verifiedCount || 0) < MAX_AUTO_VERIFY_RETRIES &&
@@ -4258,7 +4255,7 @@ async function startWorker() {
           console.log(`[AutoFix] Found order needing retry (ID: ${brokenOrder.id}, syncStatus=${brokenOrder.syncStatus}, verifiedStatus=${brokenOrder.verifiedStatus}). Retrying full reconciliation...`);
           await syncWorkOrderWithTimeout(brokenOrder.id);
         } else {
-          // Automatic verification control of archived history orders is disabled by request.
+          // Nada pendiente por ahora — se revisa de nuevo en el próximo ciclo.
         }
       }
     } catch (e) {

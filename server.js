@@ -835,15 +835,15 @@ app.put('/api/orders/:id', (req, res) => {
     const targetEstadoUnidad = estadoUnidad !== undefined ? estadoUnidad : existing.estadoUnidad;
     const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
     const allTasksCompleted = finalTasksToSave.length > 0 && finalTasksToSave.every(t => t && (t.status === "Finalizada" || t.status === "Completada"));
-    
-    // STRICT RULE: Must have an assigned Taxes OT number to be archived into Historial!
-    const hasTaxesOt = (existing.taxesOrderNumber || req.body.taxesOrderNumber) && String(existing.taxesOrderNumber || req.body.taxesOrderNumber).trim() !== '';
+
     const explicitUnarchive = (req.body.archived === false);
     const targetSyncStatus = req.body.syncStatus || ((existing.syncStatus === 'success' && incomingTasks.length === 0) ? existing.syncStatus : "pending");
-    const isPendingSync = (targetSyncStatus === 'pending' || targetSyncStatus === 'syncing');
 
-    const autoArchive = hasTaxesOt && allTasksCompleted && !isOutOfService && !explicitUnarchive && !isPendingSync;
-    const isArchived = explicitUnarchive ? false : (isPendingSync ? false : ((req.body.archived === true && hasTaxesOt) || autoArchive));
+    // La orden pasa a Historial apenas la unidad queda Operativa (no Fuera de Servicio),
+    // sin importar si todavía falta sincronizar o controlar con Taxes — eso lo sigue
+    // resolviendo el worker de fondo aunque la orden ya esté archivada.
+    const autoArchive = !isOutOfService && !explicitUnarchive;
+    const isArchived = explicitUnarchive ? false : ((req.body.archived === true) || autoArchive);
 
     const updated = db.updateWorkOrder(req.params.id, {
       rodado,
@@ -1014,9 +1014,7 @@ app.post('/api/orders/:id/force-resync', (req, res) => {
     if (!order) return res.status(404).json({ error: 'Order not found' });
     db.updateWorkOrder(req.params.id, {
       syncStatus: 'pending',
-      syncError: null,
-      archived: false,
-      archivedAt: null
+      syncError: null
     });
     res.json({ success: true });
   } catch (err) {
