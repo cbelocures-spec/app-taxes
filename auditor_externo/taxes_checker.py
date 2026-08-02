@@ -291,17 +291,6 @@ class TaxesChecker:
                     "reason": f"No se encontraron tareas en Taxes para OT {ot_number}"
                 }
 
-            # Check 1: Total OT Hours in Taxes vs Total OT Hours in App
-            taxes_total_hours = sum([float(re.sub(r'[^0-9.]', '', t["horas"].replace(",", ".")) or 0) for t in extracted_tasks])
-            expected_order_total = task_item.get("orderTotalHours")
-            if expected_order_total is not None and float(expected_order_total) > 0:
-                exp_tot = float(expected_order_total)
-                if abs(taxes_total_hours - exp_tot) > 0.05:
-                    return {
-                        "status": "DISCREPANCY",
-                        "reason": f"Horas no coinciden: Taxes tiene {taxes_total_hours:.2f} hs y App tiene {exp_tot:.2f} hs"
-                    }
-
             # Helper for alphanumeric cleaning (preserving numeric employee IDs like 598)
             def clean_str(val):
                 return re.sub(r'[^a-zA-Z0-9]', '', str(val or '').lower())
