@@ -111,7 +111,7 @@ class TaxesChecker:
         try:
             tareas_url = f"{self.config.get('taxes_url', 'https://taxes.com.ar').rstrip('/')}/tms/produccion/tareas"
             if "/tms/produccion/tareas" not in self.page.url:
-                self.page.goto(tareas_url, wait_until="networkidle", timeout=30000)
+                self.page.goto(tareas_url, wait_until="domcontentloaded", timeout=30000)
                 self.page.wait_for_timeout(2000)
 
             # Locate Search Input Box for OT / Interno
@@ -246,7 +246,7 @@ class TaxesChecker:
         try:
             tareas_url = f"{self.config.get('taxes_url', 'https://taxes.com.ar').rstrip('/')}/tms/produccion/tareas"
             if "/tms/produccion/tareas" not in self.page.url:
-                self.page.goto(tareas_url, wait_until="networkidle", timeout=30000)
+                self.page.goto(tareas_url, wait_until="domcontentloaded", timeout=30000)
                 self.page.wait_for_timeout(2000)
 
             # Search OT in Taxes
