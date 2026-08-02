@@ -1,6 +1,7 @@
 import requests
 import json
 import os
+import time
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
 
@@ -73,6 +74,39 @@ class AppClient:
                 return False
         except Exception as e:
             print(f"[Client-Exception] delete_order error: {e}")
+            return False
+
+    def fetch_task_history(self):
+        """Fetches all unverified finished tasks from backend API."""
+        self.config = self._load_config()
+        self.base_url = self.config.get("app_url", "https://app-taxes-production-ec67.up.railway.app").rstrip("/")
+        url = f"{self.base_url}/api/tasks/history"
+        try:
+            resp = requests.get(url, timeout=30)
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception as e:
+            print(f"[Client-Exception] fetch_task_history error: {e}")
+        return []
+
+    def lock_task(self, order_id, task_id):
+        """Locks verification for a specific task (closes verification lock)."""
+        try:
+            url = f"{self.base_url}/api/orders/{order_id}/tasks/{task_id}/lock"
+            resp = requests.patch(url, timeout=15)
+            return resp.status_code in (200, 201)
+        except Exception as e:
+            print(f"[Client-Exception] lock_task error: {e}")
+            return False
+
+    def force_resync(self, order_id):
+        """Forces an order back to active state for re-synchronization (blue button action)."""
+        try:
+            url = f"{self.base_url}/api/orders/{order_id}/force-resync"
+            resp = requests.post(url, timeout=15)
+            return resp.status_code in (200, 201)
+        except Exception as e:
+            print(f"[Client-Exception] force_resync error: {e}")
             return False
 
 if __name__ == "__main__":

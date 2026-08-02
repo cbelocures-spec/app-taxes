@@ -140,9 +140,11 @@ class AuditorApp(ctk.CTk):
 
         self.tab_borradas = self.tabview.add("🗑️ Órdenes Borradas (Auditadas OK)")
         self.tab_resync = self.tabview.add("⚠️ Órdenes Resincronizadas (Con Discrepancia)")
+        self.tab_tareas = self.tabview.add("📌 Tareas (Historial)")
 
         self._build_borradas_tab()
         self._build_resync_tab()
+        self._build_tareas_tab()
 
         # --- Log Console ---
         self.log_frame = ctk.CTkFrame(self, fg_color="#0f172a", height=120)
@@ -221,6 +223,68 @@ class AuditorApp(ctk.CTk):
         self.tree_resync.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         scrollbar.pack(side="right", fill="y", pady=5)
 
+    def _build_tareas_tab(self):
+        bar = ctk.CTkFrame(self.tab_tareas, fg_color="transparent")
+        bar.pack(fill="x", padx=5, pady=(5, 0))
+
+        btn_audit_tasks = ctk.CTkButton(
+            bar,
+            text="⚡ Controlar Tareas en Taxes",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color="#0284c7",
+            hover_color="#0369a1",
+            width=200,
+            command=self.start_task_audit_thread
+        )
+        btn_audit_tasks.pack(side="left", padx=5)
+
+        btn_lock = ctk.CTkButton(
+            bar,
+            text="🔒 Cerrar Candado",
+            font=ctk.CTkFont(size=12),
+            fg_color="#334155",
+            hover_color="#475569",
+            width=130,
+            command=self.lock_selected_task
+        )
+        btn_lock.pack(side="left", padx=5)
+
+        btn_resync = ctk.CTkButton(
+            bar,
+            text="🔄 Resincronizar Orden",
+            font=ctk.CTkFont(size=12),
+            fg_color="#d97706",
+            hover_color="#b45309",
+            width=150,
+            command=self.resync_selected_task
+        )
+        btn_resync.pack(side="left", padx=5)
+
+        cols = ("ot", "interno", "sector", "empleado", "horas", "descripcion", "insumos")
+        self.tree_tareas = ttk.Treeview(self.tab_tareas, columns=cols, show="headings", selectmode="browse")
+
+        self.tree_tareas.heading("ot", text="Nº O.T.")
+        self.tree_tareas.heading("interno", text="Interno")
+        self.tree_tareas.heading("sector", text="Sector")
+        self.tree_tareas.heading("empleado", text="Empleado")
+        self.tree_tareas.heading("horas", text="Horas")
+        self.tree_tareas.heading("descripcion", text="Descripción")
+        self.tree_tareas.heading("insumos", text="Insumos / Diagnóstico")
+
+        self.tree_tareas.column("ot", width=90, anchor="center")
+        self.tree_tareas.column("interno", width=80, anchor="center")
+        self.tree_tareas.column("sector", width=100, anchor="center")
+        self.tree_tareas.column("empleado", width=170, anchor="w")
+        self.tree_tareas.column("horas", width=70, anchor="center")
+        self.tree_tareas.column("descripcion", width=340, anchor="w")
+        self.tree_tareas.column("insumos", width=220, anchor="w")
+
+        scrollbar = ttk.Scrollbar(self.tab_tareas, orient="vertical", command=self.tree_tareas.yview)
+        self.tree_tareas.configure(yscrollcommand=scrollbar.set)
+
+        self.tree_tareas.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        scrollbar.pack(side="right", fill="y", pady=5)
+
     def refresh_tables(self):
         selected_sector = self.combo_sector.get() if hasattr(self, 'combo_sector') else "Todos los Sectores"
 
@@ -272,7 +336,32 @@ class AuditorApp(ctk.CTk):
                     r.get("observacion", "-")
                 ))
 
-        self.log(f"Tablas actualizadas ({selected_sector}): {len(filtered_borradas)} borradas auditadas, {len(filtered_resyncs)} resincronizadas.")
+        # Refresh Tareas Treeview
+        tasks_count = 0
+        if hasattr(self, 'tree_tareas'):
+            for item in self.tree_tareas.get_children():
+                self.tree_tareas.delete(item)
+
+            tasks = self.client.fetch_task_history()
+            for t in tasks:
+                sec = t.get("clasificacion") or "Taller"
+                if selected_sector == "Todos los Sectores" or \
+                   (selected_sector == "Herrería" and "herreria" in sec.lower()) or \
+                   (selected_sector == "Edilicio" and "edilic" in sec.lower()) or \
+                   (selected_sector == "Taller (Mecánica)" and ("taller" in sec.lower() or "correctiv" in sec.lower() or "preventiv" in sec.lower())):
+                    tasks_count += 1
+                    ot = t.get("taxesOrderNumber") or t.get("orderId") or "-"
+                    self.tree_tareas.insert("", "end", values=(
+                        ot,
+                        t.get("interno", "-"),
+                        sec,
+                        t.get("empleado", "-"),
+                        t.get("horasEstimadas", "0"),
+                        t.get("descripcion", "-"),
+                        t.get("insumos", "-")
+                    ), iid=f"{t.get('orderId')}::{t.get('id')}")
+
+        self.log(f"Tablas actualizadas ({selected_sector}): {len(filtered_borradas)} borradas auditadas, {len(filtered_resyncs)} resincronizadas, {tasks_count} tareas de historial.")
 
     def start_audit_thread(self):
         if self.is_auditing:
@@ -403,6 +492,105 @@ class AuditorApp(ctk.CTk):
             if matching:
                 self.client.trigger_resync(matching[0].get("id"))
         self.log("✅ Resincronización masiva finalizada.")
+
+    def start_task_audit_thread(self):
+        if self.is_auditing:
+            return
+        self.is_auditing = True
+        self.btn_start.configure(state="disabled")
+        self.btn_stop.configure(state="normal")
+        self.status_badge.configure(text="🟡 Controlando Tareas...", text_color="#f59e0b", fg_color="#451a03")
+        
+        t = threading.Thread(target=self._run_task_audit_process, daemon=True)
+        t.start()
+
+    def _run_task_audit_process(self):
+        selected_sector = self.combo_sector.get()
+        self.log(f"Obteniendo tareas del historial desde Railway para: {selected_sector}...")
+        tasks = self.client.fetch_task_history()
+
+        if not tasks:
+            self.log("⚠️ No hay tareas pendientes de controlar en el historial.")
+            self.stop_audit()
+            return
+
+        to_audit = []
+        for t in tasks:
+            sec = t.get("clasificacion") or "Taller"
+            if selected_sector == "Todos los Sectores" or \
+               (selected_sector == "Herrería" and "herreria" in sec.lower()) or \
+               (selected_sector == "Edilicio" and "edilic" in sec.lower()) or \
+               (selected_sector == "Taller (Mecánica)" and ("taller" in sec.lower() or "correctiv" in sec.lower() or "preventiv" in sec.lower())):
+                to_audit.append(t)
+
+        self.log(f"Se encontraron {len(to_audit)} tareas ({selected_sector}) para controlar en Taxes.")
+
+        self.checker = TaxesChecker(headless=True)
+        if not self.checker.start():
+            self.log("❌ Error iniciando sesión en Taxes.")
+            self.stop_audit()
+            return
+
+        for idx, task_item in enumerate(to_audit, 1):
+            if not self.is_auditing:
+                break
+
+            ot = task_item.get("taxesOrderNumber") or task_item.get("orderId")
+            emp = task_item.get("empleado", "N/A")
+            hrs = task_item.get("horasEstimadas", "0")
+            order_id = task_item.get("orderId")
+            task_id = task_item.get("id")
+
+            self.log(f"[{idx}/{len(to_audit)}] Inspeccionando Tarea OT {ot} - Operario: {emp} ({hrs} hs)...")
+
+            res = self.checker.audit_task(task_item)
+            status = res.get("status")
+            reason = res.get("reason", "")
+
+            if status == "MATCH":
+                self.log(f"  ✅ Tarea OT {ot} ({emp}) OK en Taxes. Cerrando candado...")
+                self.client.lock_task(order_id, task_id)
+
+            elif status == "DISCREPANCY":
+                self.log(f"  ⚠️ Tarea OT {ot} DISCREPANCIA: {reason}. Mandando orden a resincronizar (botón azul)...")
+                self.client.force_resync(order_id)
+            else:
+                self.log(f"  ❌ Error en tarea OT {ot}: {reason}")
+
+            self.after(0, self.refresh_tables)
+            time.sleep(1)
+
+        self.checker.stop()
+        self.log(f"✅ Control de tareas ({selected_sector}) completado.")
+        self.after(0, self.stop_audit)
+
+    def lock_selected_task(self):
+        sel = self.tree_tareas.selection()
+        if not sel:
+            messagebox.showwarning("Atención", "Seleccioná una tarea de la tabla de Tareas.")
+            return
+        item_id = sel[0]
+        if "::" in item_id:
+            order_id, task_id = item_id.split("::")
+            if self.client.lock_task(order_id, task_id):
+                self.log(f"🔒 Candado cerrado manualmente para tarea {task_id}")
+                self.refresh_tables()
+            else:
+                messagebox.showerror("Error", "No se pudo cerrar el candado.")
+
+    def resync_selected_task(self):
+        sel = self.tree_tareas.selection()
+        if not sel:
+            messagebox.showwarning("Atención", "Seleccioná una tarea de la tabla de Tareas.")
+            return
+        item_id = sel[0]
+        if "::" in item_id:
+            order_id, task_id = item_id.split("::")
+            if self.client.force_resync(order_id):
+                self.log(f"🔄 Orden {order_id} mandada a resincronizar (botón azul)")
+                self.refresh_tables()
+            else:
+                messagebox.showerror("Error", "No se pudo enviar a resincronizar.")
 
 if __name__ == "__main__":
     app = AuditorApp()
