@@ -804,11 +804,20 @@
     <!-- VIEW 6: PARTE TALLER -->
     <section id="view-partetaller" class="app-view">
       <div class="view-header">
-        <div>
-          <h2>Parte Diario de Taller</h2>
-          <small style="color: var(--text-muted);">Sincronizado en tiempo real</small>
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; flex: 1;">
+          <div>
+            <h2 style="margin: 0;">Parte Diario de Taller</h2>
+            <small style="color: var(--text-muted);">Sincronizado en tiempo real</small>
+          </div>
+          <div style="position: relative; flex: 1; min-width: 220px; max-width: 380px;">
+            <span class="material-icons" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 18px; pointer-events: none;">search</span>
+            <input type="text" id="pt-search-input" placeholder="Buscar interno (ej. 122) o tarea (ej. calefacción)..." 
+              oninput="filterParteTallerUI(this.value)" 
+              style="width: 100%; padding: 7px 30px 7px 34px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px; background: var(--bg-card); color: var(--text-main);">
+            <button id="pt-search-clear" onclick="clearPtSearch()" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px;">✕</button>
+          </div>
         </div>
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           <button class="btn btn-primary btn-sm" onclick="openPtAddUnitModal()" style="display: flex; align-items: center; gap: 4px; background-color: var(--primary); border-color: var(--primary); color: white;">
             <span class="material-icons" style="font-size: 16px;">add</span>
             <span>Agregar Unidad</span>

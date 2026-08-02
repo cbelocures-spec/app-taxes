@@ -9395,6 +9395,66 @@ async function procesarCombustiblePlanilla() {
 // PARTE TALLER MODULE
 // ============================================================
 
+window._ptCurrentSearchQuery = '';
+
+function filterParteTallerUI(query) {
+  window._ptCurrentSearchQuery = (query || '').trim();
+  const clearBtn = document.getElementById('pt-search-clear');
+  if (clearBtn) clearBtn.style.display = window._ptCurrentSearchQuery ? 'block' : 'none';
+  if (window._ptState) {
+    renderParteTallerDashboard(window._ptState);
+  }
+}
+
+function clearPtSearch() {
+  const input = document.getElementById('pt-search-input');
+  if (input) input.value = '';
+  filterParteTallerUI('');
+}
+
+function deduplicateUnitsByInterno(unitList) {
+  if (!Array.isArray(unitList)) return [];
+  const map = new Map();
+  unitList.forEach(item => {
+    const key = String(item.interno || '').trim().toUpperCase();
+    if (!key) return;
+    if (!map.has(key)) {
+      map.set(key, JSON.parse(JSON.stringify(item)));
+    } else {
+      const existing = map.get(key);
+      if (Array.isArray(item.novedad_items) && item.novedad_items.length > 0) {
+        const existingItems = Array.isArray(existing.novedad_items) ? existing.novedad_items : [];
+        const existingTexts = new Set(existingItems.map(x => String(x.texto || '').trim().toUpperCase()));
+        item.novedad_items.forEach(newItem => {
+          const tClean = String(newItem.texto || '').trim().toUpperCase();
+          if (tClean && !existingTexts.has(tClean)) {
+            existingItems.push(newItem);
+            existingTexts.add(tClean);
+          }
+        });
+        existing.novedad_items = existingItems;
+      }
+    }
+  });
+  return Array.from(map.values());
+}
+
+function unitMatchesSearch(unit) {
+  const q = (window._ptCurrentSearchQuery || '').toLowerCase().trim();
+  if (!q) return true;
+  const intStr = String(unit.interno || '').toLowerCase();
+  const rodStr = String(unit.rodado || '').toLowerCase();
+  const tipoStr = String(unit.tipo || '').toLowerCase();
+  const novStr = String(unit.novedad || '').toLowerCase();
+  let itemsStr = '';
+  if (Array.isArray(unit.novedad_items)) {
+    itemsStr = unit.novedad_items.map(x => x.texto || '').join(' ').toLowerCase();
+  }
+  const destStr = String(unit.destinoIngreso || '').toLowerCase();
+  
+  return intStr.includes(q) || rodStr.includes(q) || tipoStr.includes(q) || novStr.includes(q) || itemsStr.includes(q) || destStr.includes(q);
+}
+
 async function fetchParteTallerEstado() {
   const tbody = document.getElementById('pt-fuera-tbody');
   const repTbody = document.getElementById('pt-reparacion-tbody');
@@ -9828,8 +9888,12 @@ function renderParteTallerDashboard(state) {
     return item.sector === currentPtSector;
   }
 
+  // Deduplicate transito units in state
+  if (state.transito) state.transito = deduplicateUnitsByInterno(state.transito);
+  if (displayState.transito) displayState.transito = deduplicateUnitsByInterno(displayState.transito);
+
   // 0. En tránsito
-  const transito = (displayState.transito || []).filter(matchesPtSector).sort((a, b) => getDaysValue(b) - getDaysValue(a));
+  const transito = deduplicateUnitsByInterno((displayState.transito || []).filter(matchesPtSector)).filter(unitMatchesSearch).sort((a, b) => getDaysValue(b) - getDaysValue(a));
   if (el('pt-trans-count')) el('pt-trans-count').textContent = transito.length;
   if (el('pt-transito-tbody')) {
     if (transito.length === 0) {
@@ -9900,7 +9964,7 @@ function renderParteTallerDashboard(state) {
   }
 
   // 1. Fuera de servicio
-  const fueraDeServicio = (displayState.fuera_de_servicio || []).filter(matchesPtSector).sort((a, b) => getDaysValue(b) - getDaysValue(a));
+  const fueraDeServicio = (displayState.fuera_de_servicio || []).filter(matchesPtSector).filter(unitMatchesSearch).sort((a, b) => getDaysValue(b) - getDaysValue(a));
   if (el('pt-out-count')) el('pt-out-count').textContent = fueraDeServicio.length;
   if (el('stat-total-taller')) el('stat-total-taller').textContent = fueraDeServicio.length;
   if (el('pt-fuera-tbody')) {
@@ -9952,7 +10016,7 @@ function renderParteTallerDashboard(state) {
   }
 
   // 2. En reparación
-  const reparacion = (displayState.reparacion || []).filter(matchesPtSector).sort((a, b) => getDaysValue(b) - getDaysValue(a));
+  const reparacion = (displayState.reparacion || []).filter(matchesPtSector).filter(unitMatchesSearch).sort((a, b) => getDaysValue(b) - getDaysValue(a));
   if (el('pt-rep-count')) el('pt-rep-count').textContent = reparacion.length;
   if (el('stat-active-orders')) el('stat-active-orders').textContent = reparacion.length;
   if (el('pt-reparacion-tbody')) {
@@ -10467,10 +10531,10 @@ async function ingresarUnidadTransito(interno) {
   }
 
   const currentUser = localStorage.getItem('currentUserUsername') || 'Rodriguez Nicolas';
+  const targetIntStr = String(interno).trim().toUpperCase();
 
-  // 1. Remove from transito
-  const idx = transList.findIndex(u => String(u.interno).trim() === String(interno).trim());
-  if (idx !== -1) transList.splice(idx, 1);
+  // 1. Remove ALL occurrences of this interno from transito array
+  state.transito = (state.transito || []).filter(u => String(u.interno).trim().toUpperCase() !== targetIntStr);
 
   // 2. Set entry date & new state
   unit.estado = targetEstado;
@@ -10479,9 +10543,13 @@ async function ingresarUnidadTransito(interno) {
   unit.fecha_ingreso = new Date().toLocaleDateString('es-AR');
   delete unit.destinoIngreso;
 
-  // 3. Add to target state list
+  // 3. Add to target state list (removing any existing duplicate in target list first)
   if (!state[targetEstado]) state[targetEstado] = [];
+  state[targetEstado] = state[targetEstado].filter(u => String(u.interno).trim().toUpperCase() !== targetIntStr);
   state[targetEstado].push(unit);
+
+  // Re-render UI immediately
+  renderParteTallerDashboard(state);
 
   // 4. Send update to server / Google Sheets
   try {
