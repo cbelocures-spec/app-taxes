@@ -1045,6 +1045,7 @@
           <span id="task-history-bulk-count" style="color:#fff;font-weight:600;font-size:14px;">0 seleccionadas</span>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end;">
             <button class="btn-secondary" onclick="toggleSelectAllTaskHistory(false)" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Deseleccionar todo</button>
+            <button class="btn-primary" onclick="bulkVerifyTaskHistory()" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><span class="material-icons" style="font-size:15px;">fact_check</span> Controlar en Taxes</button>
             <button class="btn-primary" onclick="bulkCloseTaskHistoryLocks()" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Cerrar Candado</button>
             <button class="btn-primary" onclick="bulkForceResyncTaskHistory()" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Resincronizar</button>
             <button class="btn-danger" onclick="bulkDeleteTaskHistory()" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Borrar</button>
@@ -1056,6 +1057,9 @@
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;flex-wrap:wrap;gap:8px;">
           <input type="text" id="task-history-search" placeholder="Buscar por Interno, Rodado o Empleado..." style="flex:1;min-width:200px;padding:8px;border:1px solid var(--border-color);border-radius:8px;" oninput="renderTaskHistory()">
+          <button type="button" class="btn btn-primary btn-xs" onclick="verifyTaskHistory()" id="btn-verify-task-history" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;font-size:12px;font-weight:600;border-radius:8px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;cursor:pointer;">
+            <span class="material-icons" style="font-size:16px;">fact_check</span> Ejecutar Control de Tareas Ahora
+          </button>
           <span id="task-history-count-badge" style="font-size:12px;color:var(--text-muted);"></span>
         </div>
         <div id="task-history-container">

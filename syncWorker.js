@@ -4034,26 +4034,17 @@ async function verifyWorkOrderWithPage(page, orderId) {
       
       // If the order was in Historial (archived) and failed verification or has missing OT/tasks in Taxes,
       // un-archive it, move it back to active orders, and queue for re-sync!
-      if (order.archived) {
-        console.log(`[Verify-AutoRetry] Order ${orderId} in Historial failed verification (${errors.join(' | ')}). Unarchiving and queuing for re-sync!`);
-        db.updateWorkOrder(orderId, {
-          archived: false,
-          archivedAt: null,
-          syncStatus: 'pending',
-          syncError: null,
-          verifiedStatus: 'error',
-          verifiedCount: count,
-          verifiedError: errors.join(' | '),
-          lastVerifyAttempt: new Date().toISOString()
-        });
-      } else {
-        db.updateWorkOrder(orderId, {
-          verifiedStatus: 'error',
-          verifiedCount: count,
-          verifiedError: errors.join(' | '),
-          lastVerifyAttempt: new Date().toISOString()
-        });
-      }
+      console.log(`[Verify-AutoRetry] Order ${orderId} failed task verification (${errors.join(' | ')}). Unarchiving and queuing for re-sync!`);
+      db.updateWorkOrder(orderId, {
+        archived: false,
+        archivedAt: null,
+        syncStatus: 'pending',
+        syncError: null,
+        verifiedStatus: 'error',
+        verifiedCount: count,
+        verifiedError: errors.join(' | '),
+        lastVerifyAttempt: new Date().toISOString()
+      });
     } else {
       const msg = madeChanges ? 'Verificado y corregido correctamente vía listado de tareas.' : 'Todo correcto, verificado sin cambios necesarios.';
       console.log(`[Verify] SUCCESS. ${msg}`);

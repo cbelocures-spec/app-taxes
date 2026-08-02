@@ -2351,6 +2351,64 @@ async function bulkDeleteTaskHistory() {
   await fetchTaskHistory();
 }
 
+async function verifyTaskHistory(orderIds = null) {
+  const btn = document.getElementById('btn-verify-task-history');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons" style="font-size:16px;">sync</span> Iniciando Control...';
+  }
+
+  try {
+    let idsToVerify = orderIds;
+    if (!idsToVerify || !Array.isArray(idsToVerify)) {
+      const orderIdSet = new Set(taskHistoryCache.map(t => t.orderId));
+      idsToVerify = Array.from(orderIdSet);
+    }
+
+    if (idsToVerify.length === 0) {
+      showToast('No hay tareas pendientes de controlar en Taxes.', 'warning');
+      return;
+    }
+
+    const res = await fetch('/api/tasks/verify-history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderIds: idsToVerify })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al iniciar control');
+
+    showToast(`✅ Control de tareas iniciado para ${data.queued || idsToVerify.length} orden(es). El agente las verificará en Taxes en breve.`, 'success');
+
+    let polls = 0;
+    const pollInterval = setInterval(() => {
+      polls++;
+      fetchTaskHistory();
+      if (polls >= 12) clearInterval(pollInterval);
+    }, 5000);
+
+  } catch (err) {
+    showToast('Error al iniciar control de tareas: ' + err.message, 'danger');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons" style="font-size:16px;">fact_check</span> Ejecutar Control de Tareas Ahora';
+    }
+  }
+}
+
+async function bulkVerifyTaskHistory() {
+  if (selectedTaskHistoryKeys.size === 0) {
+    showToast('Seleccioná al menos una tarea.', 'warning');
+    return;
+  }
+  const orderIds = Array.from(new Set([...selectedTaskHistoryKeys].map(k => k.split('::')[0])));
+  await verifyTaskHistory(orderIds);
+  selectedTaskHistoryKeys.clear();
+  updateTaskHistoryBulkBar();
+}
+
 async function closeTaskHistoryLock(orderId, taskId) {
   if (!confirm('¿Confirmar que esta tarea está bien en Taxes y cerrar el candado?')) return;
   try {

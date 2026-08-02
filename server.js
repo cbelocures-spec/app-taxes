@@ -1501,6 +1501,48 @@ app.post('/api/orders/verify-all', async (req, res) => {
   }
 });
 
+// Verify specific order IDs or all orders containing unverified history tasks
+app.post('/api/tasks/verify-history', async (req, res) => {
+  try {
+    let { orderIds } = req.body || {};
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      // Default to all order IDs of unverified tasks in history
+      const allOrders = db.read().workOrders || [];
+      const eligibleSet = new Set();
+      allOrders.forEach(order => {
+        const hasUnverifiedFinishedTask = (order.tasks || []).some(t => t && t.status === 'Finalizada' && t.verifiedLocked !== true);
+        if (hasUnverifiedFinishedTask) {
+          eligibleSet.add(order.id);
+        }
+      });
+      orderIds = Array.from(eligibleSet);
+    }
+
+    const eligible = orderIds.filter(id => {
+      const order = db.getWorkOrderById(id);
+      return order && order.verifiedStatus !== 'checking';
+    });
+
+    if (eligible.length === 0) {
+      return res.json({ success: true, queued: 0, message: "No hay tareas pendientes de controlar en Taxes." });
+    }
+
+    for (const id of eligible) {
+      db.updateWorkOrder(id, { verifiedStatus: 'checking' });
+    }
+
+    worker.verifyMultipleOrders(eligible).then(() => {
+      console.log(`[TaskVerify] Background task verification of ${eligible.length} order(s) complete.`);
+    }).catch(err => {
+      console.error(`[TaskVerify] Background error:`, err);
+    });
+
+    res.json({ success: true, queued: eligible.length, message: `${eligible.length} orden(es) encoladas para control de tareas en Taxes.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get current Taxes connection settings
 app.get('/api/settings', (req, res) => {
   try {
