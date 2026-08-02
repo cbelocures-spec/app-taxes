@@ -408,14 +408,9 @@ class AuditorApp(ctk.CTk):
             elif selected_sector == "Taller (Mecánica)" and sec == "Taller":
                 to_audit.append(o)
 
-        self.log(f"Se encontraron {len(to_audit)} órdenes ({selected_sector}) para inspeccionar.")
+        self.log(f"Se encontraron {len(to_audit)} órdenes ({selected_sector}) para verificar candados.")
 
-        self.checker = TaxesChecker(headless=True)
-        if not self.checker.start():
-            self.log("❌ Error iniciando sesión en Taxes.")
-            self.stop_audit()
-            return
-
+        processed_count = 0
         for idx, order in enumerate(to_audit, 1):
             if not self.is_auditing:
                 break
@@ -423,19 +418,16 @@ class AuditorApp(ctk.CTk):
             ot = order.get("taxesOrderNumber") or order.get("id")
             interno = order.get("interno")
             sec = self._get_order_sector(order)
-            self.log(f"[{idx}/{len(to_audit)}] Inspeccionando OT {ot} (Interno {interno} - {sec})...")
+            order_tasks = order.get("tasks", [])
+            
+            has_tasks = len(order_tasks) > 0
+            all_locked = has_tasks and all(t.get("verifiedLocked") is True for t in order_tasks)
 
-            result = self.checker.audit_order(order)
-            status = result.get("status")
-            reason = result.get("reason", "")
-
-            tasks = order.get("tasks", [])
-            emp = tasks[0].get("empleado", "N/A") if tasks else "N/A"
-            hrs = tasks[0].get("horasEstimadas", "0") if tasks else "0"
-            desc = tasks[0].get("descripcion", "N/A") if tasks else "N/A"
-
-            if status == "MATCH":
-                self.log(f"  ✅ OT {ot} ({sec}) coincide 100%. Registrando en Borradas Auditadas...")
+            if all_locked:
+                self.log(f"[{idx}/{len(to_audit)}] ✅ OT {ot} ({sec}) tiene TODOS los candados verdes. Moviendo a Órdenes Borradas (Auditadas OK)...")
+                emp = order_tasks[0].get("empleado", "N/A") if order_tasks else "N/A"
+                hrs = sum([float(t.get("horasEstimadas") or 0) for t in order_tasks])
+                desc = " / ".join([str(t.get("descripcion") or "") for t in order_tasks if t.get("descripcion")])
                 self.db.add_orden_borrada({
                     "numeroOrden": ot,
                     "interno": interno,
@@ -444,39 +436,19 @@ class AuditorApp(ctk.CTk):
                     "descripcion": desc,
                     "clasificacion": order.get("clasificacion", sec),
                     "realizada": "SI",
-                    "tasks": tasks
+                    "tasks": order_tasks
                 })
                 # Soft delete in App
                 self.client.delete_order(order.get("id"))
-
-            elif status == "DISCREPANCY":
-                self.log(f"  ⚠️ OT {ot} ({sec}) DISCREPANCIA: {reason}. Desarchivando y moviendo a órdenes pendientes...")
-                # Unarchive & move order back to active pending orders module for editing
-                self.client.unarchive_order(order.get("id"))
-                
-                # Record in Resincronizadas DB
-                taxes_data = result.get("taxes_data", [])
-                taxes_hrs = taxes_data[0].get("horas", "0") if taxes_data else "0"
-                self.db.add_orden_resincronizada({
-                    "numeroOrden": ot,
-                    "interno": interno,
-                    "empleado": emp,
-                    "horasApp": hrs,
-                    "horasTaxes": taxes_hrs,
-                    "descripcion": desc,
-                    "clasificacion": order.get("clasificacion", sec),
-                    "realizada": "NO",
-                    "observacion": reason,
-                    "tasks": tasks
-                })
+                processed_count += 1
             else:
-                self.log(f"  ❌ Error inspeccionando OT {ot}: {reason}")
+                open_count = sum(1 for t in order_tasks if t.get("verifiedLocked") is not True)
+                self.log(f"[{idx}/{len(to_audit)}] ⏳ OT {ot} ({sec}): Tiene {open_count} tarea(s) sin candado verde. Se omite a la espera del control de tareas.")
 
             self.after(0, self.refresh_tables)
-            time.sleep(1)
+            time.sleep(0.1)
 
-        self.checker.stop()
-        self.log(f"✅ Auditoría de {selected_sector} completada.")
+        self.log(f"✅ Auditoría de órdenes ({selected_sector}) completada. {processed_count} orden(es) con candados completos auditadas y movidas a Borradas.")
         self.after(0, self.stop_audit)
 
     def resync_discrepancies_thread(self):
