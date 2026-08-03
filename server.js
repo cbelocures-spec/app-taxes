@@ -1027,6 +1027,32 @@ app.patch('/api/orders/:id/tasks/:taskId/unlock', (req, res) => {
   }
 });
 
+// If the OT tied to this order was deleted or renumbered directly in Taxes (so the sync
+// worker can no longer find it to reconcile/edit), this clears the stale taxesOrderNumber
+// and re-queues the order so the next sync attempt creates a brand-new OT instead of
+// endlessly failing to find one that no longer exists.
+app.post('/api/orders/:id/reset-taxes-number', (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+
+    const updated = db.updateWorkOrder(req.params.id, {
+      taxesOrderNumber: null,
+      syncStatus: 'pending',
+      syncError: null,
+      autoSyncRetryCount: 0,
+      lastAutoSyncAttempt: null,
+      tasks: (order.tasks || []).map(t => t ? { ...t, synced: false } : t)
+    });
+
+    console.log(`[Reset OT] Orden ${req.params.id} (Interno ${order.interno}): se limpio taxesOrderNumber=${order.taxesOrderNumber} y se reencolo para crear una OT nueva.`);
+    res.json({ success: true, order: updated });
+  } catch (err) {
+    console.error('[Reset OT] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Read-only endpoint to retrieve history of finished tasks with OPEN locks (not yet verified in Taxes)
 app.get('/api/tasks/history', (req, res) => {
   try {
