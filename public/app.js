@@ -10534,6 +10534,20 @@ async function markPtUnitOperativo() {
   if (empresa === 'irineo') saveInterno = 'Irineo ' + interno;
   else if (empresa === 'nico') saveInterno = 'Nico ' + interno;
 
+  // "Sin Novedades" discards ALL items of this unit (checked and unchecked alike) — nothing
+  // moves to Servicios Pendientes. Warn before wiping if there's still an unchecked item or
+  // unsaved text in "Agregar nuevos ítems", so it isn't used by mistake when there really is
+  // something pending.
+  const uncheckedCount = document.querySelectorAll('#pt-unit-checklist-editor .pt-edit-item-checkbox:not(:checked)').length;
+  const newItemsText = (document.getElementById('pt-unit-novedad')?.value || '').trim();
+  if (uncheckedCount > 0 || newItemsText) {
+    const pieces = [];
+    if (uncheckedCount > 0) pieces.push(`${uncheckedCount} ítem${uncheckedCount === 1 ? '' : 's'} sin marcar como realizado`);
+    if (newItemsText) pieces.push(`el texto nuevo que escribiste en "Agregar nuevos ítems"`);
+    const warnMsg = `Esta unidad todavía tiene ${pieces.join(' y ')}.\n\nMarcarla como "Operativo (Sin Novedades)" BORRA esos ítems — no los mueve a Servicios Pendientes.\n\n¿Continuar de todas formas?`;
+    if (!confirm(warnMsg)) return;
+  }
+
   const btn = document.getElementById('btn-pt-unit-operativo');
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
 

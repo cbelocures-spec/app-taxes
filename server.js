@@ -2826,16 +2826,30 @@ app.post('/api/parte-taller/novedad', async (req, res) => {
       payload.estado = 'fuera_de_servicio';
     }
 
-    const response = await fetch(scriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
-    const data = await response.json();
-    res.json(data);
+    // Google Apps Script web apps are occasionally flaky (cold starts, transient 5xx,
+    // or a non-JSON response) even though the underlying spreadsheet write went through.
+    // Retry once before giving up, instead of surfacing a false "failed to save" error
+    // to the user for a save that actually succeeded on the sheet.
+    let lastError = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await fetch(scriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const rawText = await response.text();
+        if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+        const data = rawText ? JSON.parse(rawText) : {};
+        return res.json(data);
+      } catch (attemptError) {
+        lastError = attemptError;
+        console.error(`Error forwarding post to parte taller (attempt ${attempt}/2):`, attemptError.message);
+        if (attempt < 2) await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+    throw lastError;
   } catch (error) {
-    console.error("Error forwarding post to parte taller:", error);
     res.status(500).json({ error: error.message });
   }
 });
