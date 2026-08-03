@@ -1810,7 +1810,9 @@ async function syncWorkOrder(orderId) {
           );
           console.log(`[Reconcile] Table rows (first 35):`, JSON.stringify(rowsInfo));
         } catch(se) { console.warn('[Reconcile] Screenshot failed:', se.message); }
-        throw new Error(`No se encontró la OT ${otNumClean} en el listado para editar. Verificar número de OT en Taxes.`);
+        console.warn(`[Reconcile] Could not open pencil form in /tms/produccion/ot for OT ${otNumClean}. Falling back to task list verification & repair in /tms/produccion/tareas...`);
+        await verifyWorkOrderWithPage(page, orderId);
+        return { success: true, message: "Reconciled via tareas list" };
       }
 
 
@@ -3653,7 +3655,9 @@ async function verifyWorkOrderWithPage(page, orderId) {
             if (!taskTable) return null;
             const rows = Array.from(taskTable.querySelectorAll('tbody tr'));
             const row = rows[rowIdx];
-            const btn = row ? row.querySelector('a, button') : null;
+            if (!row) return null;
+            const btns = Array.from(row.querySelectorAll('a, button'));
+            const btn = btns.length > 0 ? btns[btns.length - 1] : null;
             if (!btn) return null;
             const id = 'tmp-eye-btn-' + Date.now();
             btn.id = id;
@@ -4445,5 +4449,6 @@ module.exports = {
   scrapeCatalogsWithTimeout,
   isScraping,
   getIsScraping: () => isScraping,
+  clearAbandoned: (id) => abandonedSyncOrderIds.delete(id),
   autoLogin
 };

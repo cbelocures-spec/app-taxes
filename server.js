@@ -1078,14 +1078,21 @@ app.patch('/api/orders/:id/tasks/:taskId/lock', (req, res) => {
   }
 });
 
-// Force re-sync of an order from history (resets syncStatus to pending and unarchives)
+// Force re-sync of an order from history (resets syncStatus to pending and clears locks)
 app.post('/api/orders/:id/force-resync', (req, res) => {
   try {
     const order = db.getWorkOrderById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (typeof syncWorker.clearAbandoned === 'function') {
+      syncWorker.clearAbandoned(req.params.id);
+    }
     db.updateWorkOrder(req.params.id, {
       syncStatus: 'pending',
-      syncError: null
+      syncError: null,
+      syncLockTime: null,
+      autoSyncRetryCount: 0,
+      verifiedStatus: null,
+      verifiedError: null
     });
     res.json({ success: true });
   } catch (err) {
