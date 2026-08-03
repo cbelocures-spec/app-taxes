@@ -175,7 +175,16 @@ async function launchBrowser() {
       '--disable-extensions'
     ]
   };
-  return await puppeteer.launch(launchOptions);
+
+  try {
+    return await puppeteer.launch(launchOptions);
+  } catch (err) {
+    console.warn(`[Puppeteer] First launch attempt failed: ${err.message}. Retrying with zombie cleanup...`);
+    await killZombieChromes().catch(() => {});
+    await new Promise(r => setTimeout(r, 2000));
+    launchOptions.args.push('--single-process');
+    return await puppeteer.launch(launchOptions);
+  }
 }
 
 async function setupPage(page) {
@@ -3664,11 +3673,17 @@ async function verifyWorkOrderWithPage(page, orderId) {
             return id;
           }, matchedRow.rowIndex);
           if (eyeBtnId) {
-            try { await page.click(`#${eyeBtnId}`); }
-            catch (e) { console.warn(`[Verify] Native click on eye button raised: ${e.message} (likely navigated away)`); }
+            try {
+              await Promise.all([
+                page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {}),
+                page.click(`#${eyeBtnId}`).catch(() => {})
+              ]);
+            } catch (e) {
+              console.warn(`[Verify] Click on eye button navigation: ${e.message}`);
+            }
           }
           
-          await delay(5000); // Wait for task edit page/modal to load
+          await delay(3000); // Wait for task edit page/modal to load
 
           // Update description if mismatch
           if (!descOkFinal) {
