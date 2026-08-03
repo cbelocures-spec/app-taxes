@@ -8055,7 +8055,7 @@ async function submitMassiveOrders() {
       interno: interno,
       clasificacion: clasificacion,
       incidente: "",
-      estadoUnidad: "fuera_de_servicio",
+      estadoUnidad: "operativo",
       tasks: [{
         centroCosto: cc,
         empleado: empleado,
