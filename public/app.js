@@ -5647,7 +5647,8 @@ async function submitBulkOrders() {
       fechaEntrega: fechaEntrega,
       horario: horario,
       incidente: incidenteEl.value.trim(),
-      tasks: vehicleTasks
+      tasks: vehicleTasks,
+      estadoUnidad: "operativo"
     });
   }
 
