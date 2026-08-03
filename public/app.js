@@ -2785,6 +2785,9 @@ function createHistoryCardHtml(order) {
             <span class="material-icons">visibility</span>
           </button>
           ${canManageHistory ? `
+          <button class="icon-btn warning" onclick="editOrder('${order.id}')" title="Editar Orden">
+            <span class="material-icons">edit</span>
+          </button>
           <button class="icon-btn" onclick="resyncOrderFromHistory('${order.id}')" title="Resincronizar y Controlar con Taxes" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;">
             <span class="material-icons">sync</span>
           </button>
@@ -3101,6 +3104,14 @@ function filterHistory() {
   renderOrders();
 }
 
+// Looks up an order by id in either the active or the archived (Historial) list.
+function findAnyOrderById(orderId) {
+  if (!orderId) return null;
+  const inActive = Array.isArray(activeOrders) ? activeOrders.find(o => o.id === orderId) : null;
+  if (inActive) return inActive;
+  return (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders)) ? archivedOrders.find(o => o.id === orderId) : null;
+}
+
 let isSubmittingWorkOrder = false;
 async function submitWorkOrder() {
   if (isSubmittingWorkOrder) return;
@@ -3110,6 +3121,7 @@ async function submitWorkOrder() {
   if (submitBtn) submitBtn.disabled = true;
 
   try {
+    const editingOrder = currentEditingOrderId ? findAnyOrderById(currentEditingOrderId) : null;
     const rodadoEl = document.getElementById('form-rodado');
     const responsableEl = document.getElementById('form-responsable');
     const internoEl = document.getElementById('form-interno');
@@ -3220,11 +3232,8 @@ async function submitWorkOrder() {
       }
 
       let existingTaskObj = null;
-      if (currentEditingOrderId && Array.isArray(activeOrders)) {
-        const orderObj = activeOrders.find(o => o.id === currentEditingOrderId);
-        if (orderObj && Array.isArray(orderObj.tasks)) {
-          existingTaskObj = orderObj.tasks.find(et => et && et.id === taskId);
-        }
+      if (editingOrder && Array.isArray(editingOrder.tasks)) {
+        existingTaskObj = editingOrder.tasks.find(et => et && et.id === taskId);
       }
 
       let finalInsumosVal = insumos;
@@ -3263,9 +3272,8 @@ async function submitWorkOrder() {
     }
 
     // Double check: if we are editing an order that originally had tasks, but now we collect 0 tasks
-    if (currentEditingOrderId) {
-      const originalOrder = activeOrders.find(o => o.id === currentEditingOrderId);
-      if (originalOrder && Array.isArray(originalOrder.tasks) && originalOrder.tasks.length > 0 && tasks.length === 0) {
+    if (editingOrder) {
+      if (Array.isArray(editingOrder.tasks) && editingOrder.tasks.length > 0 && tasks.length === 0) {
         const confirmDelete = confirm("ATENCIÓN: La orden original tenía tareas, pero ahora se guardará con 0 tareas (se borrarán permanentemente). ¿Está seguro de que desea continuar?");
         if (!confirmDelete) {
           return;
@@ -3282,9 +3290,11 @@ async function submitWorkOrder() {
       horario: horaEl ? horaEl.value : '',
       incidente: incidenteEl ? incidenteEl.value : '',
       tasks: tasks,
-      estadoUnidad: currentEditingOrderId ? (activeOrders.find(o => o.id === currentEditingOrderId)?.estadoUnidad || 'fuera_de_servicio') : 'fuera_de_servicio',
+      estadoUnidad: editingOrder ? (editingOrder.estadoUnidad || 'fuera_de_servicio') : 'fuera_de_servicio',
       combustibleReset: currentCombustibleReset,
-      archived: false,
+      // Al editar una orden que ya estaba en Historial (archivada), no forzar su regreso a Activas:
+      // solo las ediciones desde la vista Activa deben garantizar archived:false.
+      archived: editingOrder ? !!editingOrder.archived : false,
       syncStatus: 'pending'
     };
    
