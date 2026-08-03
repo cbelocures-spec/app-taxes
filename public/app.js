@@ -2875,7 +2875,7 @@ async function resyncOrderFromHistory(orderId) {
   const target = archivedOrders.find(o => String(o.id) === String(orderId));
   if (target) {
     target.syncStatus = 'pending';
-    renderArchivedOrders();
+    renderHistoryOrders();
   }
   try {
     const res = await fetch(`/api/orders/${orderId}/force-resync`, { method: 'POST' });
@@ -2885,7 +2885,7 @@ async function resyncOrderFromHistory(orderId) {
   } catch (err) {
     if (target) {
       target.syncStatus = 'error';
-      renderArchivedOrders();
+      renderHistoryOrders();
     }
     showToast('Error: ' + err.message, 'danger');
   }
