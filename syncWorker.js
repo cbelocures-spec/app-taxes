@@ -4104,10 +4104,35 @@ async function verifyWorkOrder(orderId) {
 
   await acquireBrowserLock(`verifyWorkOrder(${orderId})`);
   let browser = null;
+  const isFrameDetachError = (err) => {
+    const msg = (err && err.message) || '';
+    return msg.includes('detached Frame') || msg.includes('Execution context was destroyed') || msg.includes('frame was detached');
+  };
+
   try {
-    browser = await launchBrowser();
-    const page = await autoLogin(browser, username, password, settings.portalUrl);
-    await verifyWorkOrderWithPage(page, orderId);
+    // A "detached Frame" error can come from ANY Puppeteer call on a frame that got torn down
+    // by an unexpected navigation (not just page.evaluate — click/waitForSelector/$eval can all
+    // throw it too). Rather than chase every call site, retry the whole verification once with
+    // a brand-new browser/login instead of reusing whatever page state broke.
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        browser = await launchBrowser();
+        const page = await autoLogin(browser, username, password, settings.portalUrl);
+        await verifyWorkOrderWithPage(page, orderId);
+        lastErr = null;
+        break;
+      } catch (attemptErr) {
+        lastErr = attemptErr;
+        if (browser) { try { await browser.close(); } catch (_) {} browser = null; }
+        if (attempt < 2 && isFrameDetachError(attemptErr)) {
+          console.warn(`[VerifyWorkOrder] Frame detached on attempt ${attempt}/2, retrying with a fresh browser session...`);
+          await delay(2000);
+          continue;
+        }
+        throw attemptErr;
+      }
+    }
 
     if (abandonedSyncOrderIds.has(orderId)) {
       console.log(`[VerifyWorkOrder] Orden ${orderId} fue abandonada por timeout — ignorando resultado tardío, no se toca el lock ni la base.`);
@@ -4116,15 +4141,16 @@ async function verifyWorkOrder(orderId) {
       return { success: false, message: 'Abandoned due to timeout' };
     }
 
-    await browser.close(); releaseBrowserLock();
-    
+    if (browser) await browser.close();
+    releaseBrowserLock();
+
     // Get updated status
     const updated = db.getWorkOrderById(orderId);
-    return { 
-      success: updated ? updated.verifiedStatus === 'success' : false, 
-      status: updated ? updated.verifiedStatus : 'error', 
-      error: updated ? updated.verifiedError : null, 
-      count: updated ? updated.verifiedCount : 0 
+    return {
+      success: updated ? updated.verifiedStatus === 'success' : false,
+      status: updated ? updated.verifiedStatus : 'error',
+      error: updated ? updated.verifiedError : null,
+      count: updated ? updated.verifiedCount : 0
     };
   } catch (error) {
     if (abandonedSyncOrderIds.has(orderId)) {
