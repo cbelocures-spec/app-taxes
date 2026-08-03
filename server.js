@@ -166,6 +166,17 @@ function isEdilicio(cls) {
   return norm.includes('edilici') || norm.includes('edilicio');
 }
 
+// Fuente única de verdad: el label de Rodado SIEMPRE se deriva del catálogo por Interno
+// cuando existe una unidad con ese interno, para que Rodado e Interno Unidad nunca queden
+// desincronizados en una orden guardada (el cliente puede enviarlos desincronizados por bug de UI).
+function resolveRodadoForInterno(interno, fallbackRodado) {
+  const cleanInterno = String(interno || '').trim();
+  if (!cleanInterno) return fallbackRodado;
+  const rodados = (db.read().catalogs || {}).rodados || [];
+  const match = rodados.find(r => String(r.interno || '').trim().toLowerCase() === cleanInterno.toLowerCase());
+  return (match && match.label) ? match.label : fallbackRodado;
+}
+
 function isHerreriaExclusiveEquipment(rodado, interno) {
   const str = (String(rodado || '') + ' ' + String(interno || '')).toUpperCase();
   const cleanStr = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -576,20 +587,22 @@ app.post('/api/orders', (req, res) => {
       finalClasificacion = 'Edilicio';
     }
 
+    const resolvedRodado = resolveRodadoForInterno(interno, rodado);
+
     // Deduplication check: if an active order with identical interno, rodado, classification, and task descriptions
     // was created by the same user within the last 15 seconds, return that order instead of creating a duplicate!
     const existingOrders = db.getWorkOrders ? db.getWorkOrders() : [];
     const now = Date.now();
     const taskDescs = (tasks || []).map(t => String(t.descripcion || '').trim()).join('|');
-    
+
     const duplicateOrder = existingOrders.find(o => {
       if (o.archived || o.deleted) return false;
       const createdTime = parseInt(o.id) || 0;
       if (now - createdTime > 15000) return false; // Only check last 15 seconds
-      
+
       const sameUser = (o.createdBy === createdBy);
       const sameInterno = String(o.interno || '').trim().toUpperCase() === String(interno || '').trim().toUpperCase();
-      const sameRodado = String(o.rodado || '').trim().toUpperCase() === String(rodado || '').trim().toUpperCase();
+      const sameRodado = String(o.rodado || '').trim().toUpperCase() === String(resolvedRodado || '').trim().toUpperCase();
       const sameClasif = String(o.clasificacion || '').trim().toUpperCase() === String(finalClasificacion || '').trim().toUpperCase();
       const sameTasks = (o.tasks || []).map(t => String(t.descripcion || '').trim()).join('|') === taskDescs;
 
@@ -602,7 +615,7 @@ app.post('/api/orders', (req, res) => {
     }
 
     const newOrder = db.createWorkOrder({
-      rodado,
+      rodado: resolvedRodado,
       responsable,
       fechaEntrega,
       horario,
@@ -671,7 +684,7 @@ app.post('/api/orders/bulk', (req, res) => {
       }
 
       const newOrder = db.createWorkOrder({
-        rodado,
+        rodado: resolveRodadoForInterno(interno, rodado),
         responsable,
         fechaEntrega,
         horario,
@@ -845,8 +858,11 @@ app.put('/api/orders/:id', (req, res) => {
     const autoArchive = !isOutOfService && !explicitUnarchive;
     const isArchived = explicitUnarchive ? false : ((req.body.archived === true) || autoArchive);
 
+    const resolvedInterno = interno !== undefined ? interno : existing.interno;
+    const resolvedRodado = resolveRodadoForInterno(resolvedInterno, rodado !== undefined ? rodado : existing.rodado);
+
     const updated = db.updateWorkOrder(req.params.id, {
-      rodado,
+      rodado: resolvedRodado,
       responsable,
       fechaEntrega,
       horario,
