@@ -1083,8 +1083,8 @@ app.post('/api/orders/:id/force-resync', (req, res) => {
   try {
     const order = db.getWorkOrderById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
-    if (typeof syncWorker.clearAbandoned === 'function') {
-      syncWorker.clearAbandoned(req.params.id);
+    if (typeof worker.clearAbandoned === 'function') {
+      worker.clearAbandoned(req.params.id);
     }
     db.updateWorkOrder(req.params.id, {
       syncStatus: 'pending',

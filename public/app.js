@@ -2773,17 +2773,44 @@ function createHistoryCardHtml(order) {
             <div class="order-card-subtitle" style="font-size:13px; color:var(--text-muted); margin-top:2px;">Interno: <strong style="color:var(--text-color);">${order.interno}</strong> | Clasificación: <strong>${order.clasificacion || 'Preventivo'}</strong></div>
           </div>
         </div>
-        ${order.taxesOrderNumber ? `
-          <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px; padding:4px 10px; font-size:13px; font-weight:600;">
-            <span class="material-icons" style="font-size:16px;">check_circle</span>
-            <span>Sincronizado O.T.: ${order.taxesOrderNumber}</span>
-          </span>
-        ` : `
-          <span class="badge-status warning" style="display: inline-flex; align-items: center; gap: 4px; background-color:#fff7ed; color:#c2410c; border:1px solid rgba(194,65,12,0.2); padding:4px 10px; font-size:12px;" title="Esta orden no tiene número de O.T. asignado en Taxes">
-            <span class="material-icons" style="font-size:14px;">warning</span>
-            <span>Sin O.T. Asignada</span>
-          </span>
-        `}
+        ${(() => {
+          if (order.syncStatus === 'pending') {
+            return `
+              <span class="badge-status pending" style="display: inline-flex; align-items: center; gap: 4px; padding:4px 10px; font-size:12px; font-weight:600; background:#fef3c7; color:#b45309; border:1px solid #fde68a;">
+                <span class="material-icons spinner" style="font-size:14px;">autorenew</span>
+                <span>Reconstruyendo / En Cola O.T.: ${order.taxesOrderNumber || ''}</span>
+              </span>
+            `;
+          } else if (order.syncStatus === 'syncing') {
+            return `
+              <span class="badge-status syncing" style="display: inline-flex; align-items: center; gap: 4px; padding:4px 10px; font-size:12px; font-weight:600; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">
+                <span class="material-icons spinner" style="font-size:14px;">autorenew</span>
+                <span>Reconstruyendo O.T.: ${order.taxesOrderNumber || ''}</span>
+              </span>
+            `;
+          } else if (order.syncStatus === 'error') {
+            return `
+              <span class="badge-status error" style="display: inline-flex; align-items: center; gap: 4px; padding:4px 10px; font-size:12px; background:#fee2e2; color:#991b1b; border:1px solid #fca5a5;" title="${order.syncError || 'Error al resincronizar'}">
+                <span class="material-icons" style="font-size:14px;">error</span>
+                <span>Error al Reconstruir O.T.: ${order.taxesOrderNumber || ''}</span>
+              </span>
+            `;
+          } else if (order.taxesOrderNumber) {
+            return `
+              <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px; padding:4px 10px; font-size:13px; font-weight:600;">
+                <span class="material-icons" style="font-size:16px;">check_circle</span>
+                <span>Sincronizado O.T.: ${order.taxesOrderNumber}</span>
+              </span>
+            `;
+          } else {
+            return `
+              <span class="badge-status warning" style="display: inline-flex; align-items: center; gap: 4px; background-color:#fff7ed; color:#c2410c; border:1px solid rgba(194,65,12,0.2); padding:4px 10px; font-size:12px;" title="Esta orden no tiene número de O.T. asignado en Taxes">
+                <span class="material-icons" style="font-size:14px;">warning</span>
+                <span>Sin O.T. Asignada</span>
+              </span>
+            `;
+          }
+        })()}
       </div>
 
       <div style="padding:10px 14px;">
@@ -2843,13 +2870,23 @@ async function unarchiveOrder(orderId) {
 }
 
 async function resyncOrderFromHistory(orderId) {
-  if (!confirm('¿Volver a sincronizar y controlar esta orden con Taxes?')) return;
+  if (!confirm('¿Reconstruir y resincronizar tareas de esta orden con Taxes?')) return;
+  // Optimistically set status to pending in local memory for instant user feedback
+  const target = archivedOrders.find(o => String(o.id) === String(orderId));
+  if (target) {
+    target.syncStatus = 'pending';
+    renderArchivedOrders();
+  }
   try {
     const res = await fetch(`/api/orders/${orderId}/force-resync`, { method: 'POST' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    showToast('Orden reencolada para sincronizar y controlar con Taxes', 'success');
+    showToast('Reconstrucción iniciada: La orden se está resincronizando en segundo plano', 'success');
     await fetchArchivedOrders();
   } catch (err) {
+    if (target) {
+      target.syncStatus = 'error';
+      renderArchivedOrders();
+    }
     showToast('Error: ' + err.message, 'danger');
   }
 }
