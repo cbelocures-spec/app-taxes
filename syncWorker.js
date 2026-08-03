@@ -3657,7 +3657,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
             const row = rows[rowIdx];
             if (!row) return null;
             const btns = Array.from(row.querySelectorAll('a, button'));
-            const btn = btns.length > 0 ? btns[btns.length - 1] : null;
+            const btn = btns.find(b => !b.className.includes('danger') && !b.className.includes('red')) || btns[0];
             if (!btn) return null;
             const id = 'tmp-eye-btn-' + Date.now();
             btn.id = id;
