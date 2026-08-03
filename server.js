@@ -1094,6 +1094,12 @@ app.post('/api/orders/:id/force-resync', (req, res) => {
       verifiedStatus: null,
       verifiedError: null
     });
+    // Immediately spawn background sync execution for this order
+    setTimeout(() => {
+      if (typeof worker.syncWorkOrderWithTimeout === 'function') {
+        worker.syncWorkOrderWithTimeout(req.params.id).catch(e => console.error('[ForceResync Worker] Error:', e.message));
+      }
+    }, 100);
     res.json({ success: true });
   } catch (err) {
     console.error('[Force Resync] Error:', err);

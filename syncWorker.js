@@ -4139,21 +4139,21 @@ async function verifyWorkOrder(orderId) {
   }
 }
 
-// Helper wrapper to execute verifyWorkOrder with a 5-minute global safety timeout
+// Helper wrapper to execute verifyWorkOrder with a 90-second global safety timeout
 async function verifyWorkOrderWithTimeout(orderId) {
   let timeoutId;
   try {
     return await Promise.race([
       verifyWorkOrder(orderId),
       new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Timeout: verificación tardó más de 5 minutos')), 5 * 60 * 1000);
+        timeoutId = setTimeout(() => reject(new Error('Timeout: verificación tardó más de 90 segundos')), 90 * 1000);
       })
     ]);
   } catch (err) {
     console.error(`[VerifyWorkOrder Timeout Safety] Fallo o timeout en verificación de orden ID ${orderId}:`, err.message);
     abandonedSyncOrderIds.add(orderId);
     try {
-      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedError: err.message || 'Verificación cancelada por timeout de 5 minutos' });
+      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedError: err.message || 'Verificación cancelada por timeout de 90 segundos' });
     } catch (dbErr) {
       console.error(`[VerifyWorkOrder Timeout Safety] Error al actualizar BD para orden ID ${orderId}:`, dbErr.message);
     }
@@ -4165,14 +4165,14 @@ async function verifyWorkOrderWithTimeout(orderId) {
   }
 }
 
-// Helper wrapper to execute syncWorkOrder with a 5-minute global safety timeout
+// Helper wrapper to execute syncWorkOrder with a 90-second global safety timeout
 async function syncWorkOrderWithTimeout(orderId) {
   let timeoutId;
   try {
     await Promise.race([
       syncWorkOrder(orderId),
       new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Timeout: sincronización tardó más de 5 minutos')), 5 * 60 * 1000);
+        timeoutId = setTimeout(() => reject(new Error('Timeout: sincronización tardó más de 90 segundos')), 90 * 1000);
       })
     ]);
   } catch (err) {
@@ -4181,7 +4181,7 @@ async function syncWorkOrderWithTimeout(orderId) {
     try {
       db.updateWorkOrder(orderId, {
         syncStatus: 'error',
-        syncError: err.message || 'Sincronización cancelada por timeout de 5 minutos'
+        syncError: err.message || 'Sincronización cancelada por timeout de 90 segundos'
       });
     } catch (dbErr) {
       console.error(`[SyncWorker Timeout Safety] Error al actualizar BD para orden ID ${orderId}:`, dbErr.message);
