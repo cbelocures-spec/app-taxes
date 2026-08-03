@@ -152,6 +152,26 @@ class TaxesChecker:
             self.context = None
             self.playwright = None
 
+    def _dismiss_open_modals(self):
+        """Dismisses any active Bootstrap/Vue modals or backdrops in Taxes that might intercept pointer events."""
+        if not self.page:
+            return
+        try:
+            modals = self.page.locator(".modal.show, div[role='dialog'].show, .modal-backdrop").all()
+            if modals:
+                print(f"[Checker] Detected {len(modals)} open modal/backdrop(s). Dismissing...")
+                self.page.keyboard.press("Escape")
+                self.page.wait_for_timeout(300)
+                close_btns = self.page.locator(".modal.show button.close, .modal.show button:has-text('Cancelar'), .modal.show button:has-text('Cerrar'), .modal.show .btn-close").all()
+                for cb in close_btns:
+                    try:
+                        cb.click(force=True, timeout=1000)
+                    except Exception:
+                        pass
+                self.page.wait_for_timeout(300)
+        except Exception as e:
+            print(f"[Checker-Warning] Error dismissing modals: {e}")
+
     def audit_order(self, app_order):
         """
         Audits a single App Taxes order against Taxes /tms/produccion/tareas table.
@@ -184,6 +204,8 @@ class TaxesChecker:
                 self.page.goto(tareas_url, wait_until="domcontentloaded", timeout=30000)
                 self.page.wait_for_timeout(2000)
 
+            self._dismiss_open_modals()
+
             # Locate Search Input Box for OT / Interno
             # In Taxes /tms/produccion/tareas:
             # First box is Interno, Second box is "Buscar por Numero o Titulo de OT"
@@ -209,8 +231,14 @@ class TaxesChecker:
                 # Click Buscar button
                 buscar_btn = self.page.locator("button:has-text('BUSCAR')")
                 if buscar_btn.count() > 0:
-                    buscar_btn.first.click()
-                    self.page.wait_for_timeout(2500)
+                    try:
+                        buscar_btn.first.click(timeout=3000)
+                    except Exception:
+                        try:
+                            buscar_btn.first.click(force=True, timeout=3000)
+                        except Exception:
+                            buscar_btn.first.dispatch_event("click")
+                    self.page.wait_for_timeout(2000)
 
             # Extract Rows directly from the Tasks Table (WITHOUT clicking the eye icon 👁️)
             rows = self.page.locator("table tbody tr").all()
@@ -319,6 +347,8 @@ class TaxesChecker:
                 self.page.goto(tareas_url, wait_until="domcontentloaded", timeout=30000)
                 self.page.wait_for_timeout(2000)
 
+            self._dismiss_open_modals()
+
             # Search OT in Taxes
             search_inputs = self.page.locator("input[type='text'], input[placeholder]").all()
             ot_input = None
@@ -339,8 +369,14 @@ class TaxesChecker:
 
                 buscar_btn = self.page.locator("button:has-text('BUSCAR')")
                 if buscar_btn.count() > 0:
-                    buscar_btn.first.click()
-                    self.page.wait_for_timeout(2500)
+                    try:
+                        buscar_btn.first.click(timeout=3000)
+                    except Exception:
+                        try:
+                            buscar_btn.first.click(force=True, timeout=3000)
+                        except Exception:
+                            buscar_btn.first.dispatch_event("click")
+                    self.page.wait_for_timeout(2000)
 
             rows = self.page.locator("table tbody tr").all()
             extracted_tasks = []
