@@ -4191,6 +4191,44 @@ async function startWorker() {
     console.error("Error resetting stuck catalog sync status on startup:", err);
   }
 
+  // One-time cleanup: collapse consecutive duplicate "Pausó"/"Fin" timerHistory entries
+  // (e.g. many "Pausó" in a row from the same already-closed segment). This was caused by
+  // a bug where the auto-conflict-resolver (client-side resolveDatabaseConflicts) paused
+  // an older task but never cleared its timerStarted flag, so the dashboard kept "reviving"
+  // it and re-pausing it every poll cycle. That bug is fixed, but existing orders can still
+  // have the leftover duplicate entries bloating the UI. Only pause/fin-type duplicates are
+  // touched (never "Inició"/"Reanudó"): the elapsed-hours calculation already treats every
+  // pause/fin event beyond the one that actually closes a segment as a pure no-op, so
+  // dropping the extras is guaranteed not to change any computed hours.
+  try {
+    const orders = db.getSyncableOrders();
+    for (const o of orders) {
+      let changed = false;
+      const dedupedTasks = (o.tasks || []).map(t => {
+        if (!t || !Array.isArray(t.timerHistory) || t.timerHistory.length < 2) return t;
+        const deduped = [];
+        for (const ev of t.timerHistory) {
+          const curType = String(ev.type || ev.event || '').trim().toLowerCase();
+          const prevType = deduped.length > 0 ? String(deduped[deduped.length - 1].type || deduped[deduped.length - 1].event || '').trim().toLowerCase() : null;
+          const isPauseOrFin = curType.startsWith('paus') || curType.startsWith('fin');
+          if (isPauseOrFin && prevType === curType) continue; // drop consecutive duplicate pause/fin
+          deduped.push(ev);
+        }
+        if (deduped.length !== t.timerHistory.length) {
+          changed = true;
+          return { ...t, timerHistory: deduped };
+        }
+        return t;
+      });
+      if (changed) {
+        console.log(`[Startup Cleanup] Collapsing duplicate timerHistory entries for order ID: ${o.id}`);
+        db.updateWorkOrder(o.id, { tasks: dedupedTasks });
+      }
+    }
+  } catch (err) {
+    console.error("Error deduping timerHistory on startup:", err);
+  }
+
   // Reset any orders stuck in 'syncing' back to 'pending' on startup
   try {
     const orders = db.getSyncableOrders();

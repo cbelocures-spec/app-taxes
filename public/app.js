@@ -3603,8 +3603,20 @@ async function resolveDatabaseConflicts() {
         // Clean up local storage and update database task
         clearLocalStorageTimerKeys(task.id);
 
-        addTimerEventToTask(task, 'Pausó');
+        // Idempotency guard: if a previous run (or another device) already closed this
+        // segment, don't pile on another duplicate 'Pausó' entry — just make sure the
+        // running flags are cleared below.
+        const lastEvent = Array.isArray(task.timerHistory) && task.timerHistory.length > 0
+          ? task.timerHistory[task.timerHistory.length - 1] : null;
+        const lastType = lastEvent ? String(lastEvent.type || lastEvent.event || '').trim().toLowerCase() : '';
+        if (!(lastType.startsWith('paus') || lastType.startsWith('fin'))) {
+          addTimerEventToTask(task, 'Pausó');
+        }
         task.timerStart = null;
+        task.timerStarted = false; // Without this, renderDashboard() sees timerStarted still true
+                                    // and "revives" a fresh phantom timer on the next render, which
+                                    // this same function then re-pauses forever, spamming duplicate
+                                    // 'Pausó' entries every poll cycle.
         task.horasEstimadas = newHours;
 
         const updatedTasks = order.tasks.map(t => {
@@ -3612,6 +3624,7 @@ async function resolveDatabaseConflicts() {
             return {
               ...t,
               timerStart: null,
+              timerStarted: false,
               horasEstimadas: newHours,
               timerHistory: task.timerHistory || []
             };
