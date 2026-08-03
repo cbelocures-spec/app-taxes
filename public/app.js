@@ -1883,6 +1883,9 @@ function addTaskField(taskData = null) {
       displayHours = minutesToHmm(Math.round(totalSeconds / 60));
     }
 
+    const isLocked = !!(taskData && taskData.verifiedLocked);
+    const lockedAttr = isLocked ? 'disabled' : '';
+
     const cardHtml = `
       <div class="task-item-card ${isNew ? 'new-task' : ''}" id="${taskId}" data-timer-started="${timerStarted}" data-timer-history='${timerHistoryJson}'>
         <div class="task-item-header">
@@ -1892,104 +1895,108 @@ function addTaskField(taskData = null) {
           ` : `
             <span class="material-icons task-lock-icon" style="color: var(--text-muted); font-size: 18px;" title="Pendiente de verificar en el próximo control.">lock_open</span>
           `}
-          <button type="button" class="task-delete-btn" onclick="removeTaskField('${taskId}')">
+          <button type="button" class="task-delete-btn" onclick="${isLocked ? 'showLockedTaskAlert()' : `removeTaskField('${taskId}')`}">
             <span class="material-icons">delete</span>
           </button>
         </div>
 
-        <div class="form-group">
-          <label>Centro de Costo *</label>
-          <select class="task-cc" required>
-            ${ccOptions}
-          </select>
-        </div>
+        <div class="task-fields-wrapper" style="position:relative;">
+          ${isLocked ? `<div class="task-locked-overlay" onclick="showLockedTaskAlert()" title="Tarea cerrada y verificada — no se puede modificar" style="position:absolute; inset:0; z-index:5; cursor:not-allowed;"></div>` : ''}
 
-        <div class="form-group">
-          <label>Empleado Asignado *</label>
-          <select class="task-emp" required>
-            <option value="">Seleccionar Empleado...</option>
-          </select>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group col-6">
-            <label>Horas Estimadas</label>
-            <input type="number" step="0.01" min="0" value="${displayHours.toFixed(2)}" class="task-hours" oninput="updateHoursReadable(this)">
-            <small class="hours-readable" style="color:var(--primary);font-size:11px;margin-top:2px;display:block;">${displayHours > 0 ? formatDecimalHours(displayHours) : ''}</small>
-          </div>
-          <div class="form-group col-6">
-            <label>Estado Inicial</label>
-            <select class="task-status">
-              <option value="Pendiente" ${(taskData && taskData.status === 'Pendiente') ? 'selected' : ''}>Pendiente</option>
-              <option value="Finalizada" ${(taskData && taskData.status === 'Finalizada') ? 'selected' : ''}>Finalizada</option>
+          <div class="form-group">
+            <label>Centro de Costo *</label>
+            <select class="task-cc" required ${lockedAttr}>
+              ${ccOptions}
             </select>
           </div>
-        </div>
 
-        <!-- TIMER CHRONOMETER WIDGET -->
-        <div class="timer-container-row">
-          <div class="timer-label">
-            <span class="material-icons" style="font-size:16px;">timer</span>
-            <span>Cronómetro</span>
+          <div class="form-group">
+            <label>Empleado Asignado *</label>
+            <select class="task-emp" required ${lockedAttr}>
+              <option value="">Seleccionar Empleado...</option>
+            </select>
           </div>
-          <div class="timer-widget">
-            <span class="timer-time" id="timer-display-${taskId}">00:00:00</span>
-            <button type="button" class="btn btn-primary btn-xs btn-timer-toggle" id="timer-btn-${taskId}" onclick="toggleTaskTimer('${taskId}')">
-              <span class="material-icons" style="font-size:14px;">play_arrow</span>
-              <span class="btn-text">Iniciar</span>
+
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label>Horas Estimadas</label>
+              <input type="number" step="0.01" min="0" value="${displayHours.toFixed(2)}" class="task-hours" oninput="updateHoursReadable(this)" ${lockedAttr}>
+              <small class="hours-readable" style="color:var(--primary);font-size:11px;margin-top:2px;display:block;">${displayHours > 0 ? formatDecimalHours(displayHours) : ''}</small>
+            </div>
+            <div class="form-group col-6">
+              <label>Estado Inicial</label>
+              <select class="task-status" ${lockedAttr}>
+                <option value="Pendiente" ${(taskData && taskData.status === 'Pendiente') ? 'selected' : ''}>Pendiente</option>
+                <option value="Finalizada" ${(taskData && taskData.status === 'Finalizada') ? 'selected' : ''}>Finalizada</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- TIMER CHRONOMETER WIDGET -->
+          <div class="timer-container-row">
+            <div class="timer-label">
+              <span class="material-icons" style="font-size:16px;">timer</span>
+              <span>Cronómetro</span>
+            </div>
+            <div class="timer-widget">
+              <span class="timer-time" id="timer-display-${taskId}">00:00:00</span>
+              <button type="button" class="btn btn-primary btn-xs btn-timer-toggle" id="timer-btn-${taskId}" onclick="${isLocked ? 'showLockedTaskAlert()' : `toggleTaskTimer('${taskId}')`}" ${lockedAttr}>
+                <span class="material-icons" style="font-size:14px;">play_arrow</span>
+                <span class="btn-text">Iniciar</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 12px;">
+            <label>Descripción de Actividades</label>
+            <textarea placeholder="Describe las actividades a realizar..." rows="2" class="task-desc" ${lockedAttr}>${taskData ? taskData.descripcion || '' : ''}</textarea>
+          </div>
+
+          <div class="form-group task-insumos-section" style="margin-top: 10px;">
+            <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Insumos / Repuestos Utilizados</label>
+            <div class="insumos-checkbox-grid">
+              <div class="insumo-row">
+                <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Aceite Motor" onchange="toggleInsumoRow(this)" ${lockedAttr}> Aceite Motor</label>
+                <input type="text" placeholder="ej: 5L" class="insumo-qty-input" style="display: none;" ${lockedAttr}>
+              </div>
+              <div class="insumo-row">
+                <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Refrigerante" onchange="toggleInsumoRow(this)" ${lockedAttr}> Refrigerante</label>
+                <input type="text" placeholder="ej: 3L" class="insumo-qty-input" style="display: none;" ${lockedAttr}>
+              </div>
+              <div class="insumo-row">
+                <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Diferencial" onchange="toggleInsumoRow(this)" ${lockedAttr}> Grasa Diferencial</label>
+                <input type="text" placeholder="ej: 1Kg" class="insumo-qty-input" style="display: none;" ${lockedAttr}>
+              </div>
+              <div class="insumo-row">
+                <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Caja" onchange="toggleInsumoRow(this)" ${lockedAttr}> Grasa Caja</label>
+                <input type="text" placeholder="ej: 2L" class="insumo-qty-input" style="display: none;" ${lockedAttr}>
+              </div>
+              <div class="insumo-row">
+                <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Equipo" onchange="toggleInsumoRow(this)" ${lockedAttr}> Hco Equipo</label>
+                <input type="text" placeholder="ej: 10L" class="insumo-qty-input" style="display: none;" ${lockedAttr}>
+              </div>
+              <div class="insumo-row">
+                <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Direccion" onchange="toggleInsumoRow(this)" ${lockedAttr}> Hco Direccion</label>
+                <input type="text" placeholder="ej: 1L" class="insumo-qty-input" style="display: none;" ${lockedAttr}>
+              </div>
+              <div class="insumo-row">
+                <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Engrase x KG" onchange="toggleInsumoRow(this)" ${lockedAttr}> Grasa Engrase x KG</label>
+                <input type="text" placeholder="ej: 2Kg" class="insumo-qty-input" style="display: none;" ${lockedAttr}>
+              </div>
+              <div class="insumo-row">
+                <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Otros" onchange="toggleInsumoRow(this)" ${lockedAttr}> Otros</label>
+                <input type="text" placeholder="ej: Filtro de aire" class="insumo-qty-input" style="display: none;" ${lockedAttr}>
+              </div>
+            </div>
+            <button type="button" class="btn btn-secondary btn-xs btn-agregar-insumos" style="margin-top: 8px; display: flex; align-items: center; gap: 4px;" onclick="agregarCantidadesInsumos(this)" ${lockedAttr}>
+              <span class="material-icons" style="font-size: 14px;">add_circle_outline</span> Agregar cantidades a la tarea
             </button>
+            <input type="hidden" class="task-insumos" value="${taskData && taskData.insumos ? taskData.insumos : ''}">
           </div>
-        </div>
 
-        <div class="form-group" style="margin-top: 12px;">
-          <label>Descripción de Actividades</label>
-          <textarea placeholder="Describe las actividades a realizar..." rows="2" class="task-desc">${taskData ? taskData.descripcion || '' : ''}</textarea>
-        </div>
-
-        <div class="form-group task-insumos-section" style="margin-top: 10px;">
-          <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Insumos / Repuestos Utilizados</label>
-          <div class="insumos-checkbox-grid">
-            <div class="insumo-row">
-              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Aceite Motor" onchange="toggleInsumoRow(this)"> Aceite Motor</label>
-              <input type="text" placeholder="ej: 5L" class="insumo-qty-input" style="display: none;">
-            </div>
-            <div class="insumo-row">
-              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Refrigerante" onchange="toggleInsumoRow(this)"> Refrigerante</label>
-              <input type="text" placeholder="ej: 3L" class="insumo-qty-input" style="display: none;">
-            </div>
-            <div class="insumo-row">
-              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Diferencial" onchange="toggleInsumoRow(this)"> Grasa Diferencial</label>
-              <input type="text" placeholder="ej: 1Kg" class="insumo-qty-input" style="display: none;">
-            </div>
-            <div class="insumo-row">
-              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Caja" onchange="toggleInsumoRow(this)"> Grasa Caja</label>
-              <input type="text" placeholder="ej: 2L" class="insumo-qty-input" style="display: none;">
-            </div>
-            <div class="insumo-row">
-              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Equipo" onchange="toggleInsumoRow(this)"> Hco Equipo</label>
-              <input type="text" placeholder="ej: 10L" class="insumo-qty-input" style="display: none;">
-            </div>
-            <div class="insumo-row">
-              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Hco Direccion" onchange="toggleInsumoRow(this)"> Hco Direccion</label>
-              <input type="text" placeholder="ej: 1L" class="insumo-qty-input" style="display: none;">
-            </div>
-            <div class="insumo-row">
-              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Grasa Engrase x KG" onchange="toggleInsumoRow(this)"> Grasa Engrase x KG</label>
-              <input type="text" placeholder="ej: 2Kg" class="insumo-qty-input" style="display: none;">
-            </div>
-            <div class="insumo-row">
-              <label class="insumo-check-label"><input type="checkbox" class="insumo-check" value="Otros" onchange="toggleInsumoRow(this)"> Otros</label>
-              <input type="text" placeholder="ej: Filtro de aire" class="insumo-qty-input" style="display: none;">
-            </div>
+          <div class="timer-history-log" style="font-size: 11px; color: var(--text-muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+            ${renderTimerHistoryHtml(taskData ? taskData.timerHistory : [])}
           </div>
-          <button type="button" class="btn btn-secondary btn-xs btn-agregar-insumos" style="margin-top: 8px; display: flex; align-items: center; gap: 4px;" onclick="agregarCantidadesInsumos(this)">
-            <span class="material-icons" style="font-size: 14px;">add_circle_outline</span> Agregar cantidades a la tarea
-          </button>
-          <input type="hidden" class="task-insumos" value="${taskData && taskData.insumos ? taskData.insumos : ''}">
-        </div>
-
-        <div class="timer-history-log" style="font-size: 11px; color: var(--text-muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
-          ${renderTimerHistoryHtml(taskData ? taskData.timerHistory : [])}
         </div>
       </div>
     `;
@@ -2241,6 +2248,15 @@ function addTaskField(taskData = null) {
     editModalHasRenderingError = true;
     showToast("Error de renderizado al cargar una tarea. Por favor, recargue la página.", "danger");
   }
+}
+
+let _lockedTaskAlertShownAt = 0;
+function showLockedTaskAlert() {
+  // Debounce: clicking a disabled field can fire this repeatedly (overlay + child element).
+  const now = Date.now();
+  if (now - _lockedTaskAlertShownAt < 1500) return;
+  _lockedTaskAlertShownAt = now;
+  showToast('🔒 Esta tarea ya fue VERIFICADA y CERRADA en Taxes — no se puede modificar (ni cronómetro, ni descripción, ni horas). Si necesitás cargar más trabajo, agregá una NUEVA tarea para el mismo empleado y esta misma orden.', 'danger');
 }
 
 async function unlockTaskVerification(taskDbId, cardId) {

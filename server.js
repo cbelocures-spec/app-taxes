@@ -812,9 +812,10 @@ app.put('/api/orders/:id', (req, res) => {
     const deletedIds = new Set(Array.isArray(req.body.deletedTaskIds) ? req.body.deletedTaskIds : []);
 
     const mergedTasksMap = new Map();
-    // 1. Preserve existing tasks
+    // 1. Preserve existing tasks. A verified/locked task can't be deleted this way either —
+    // it has to be unlocked first (PATCH .../unlock) before it can be removed.
     (existing.tasks || []).forEach(et => {
-      if (et && et.id && !deletedIds.has(et.id)) {
+      if (et && et.id && (et.verifiedLocked === true || !deletedIds.has(et.id))) {
         mergedTasksMap.set(et.id, { ...et });
       }
     });
@@ -824,7 +825,16 @@ app.put('/api/orders/:id', (req, res) => {
       if (!t) return;
       const tId = t.id || `${Date.now()}-${idx}`;
       const existingTask = mergedTasksMap.get(tId) || (existing.tasks ? existing.tasks.find(et => et.id === tId) : null);
-      
+
+      // A verified/locked task is frozen: keep it exactly as stored, ignore whatever the
+      // client sent for it. It has to be unlocked (PATCH .../unlock) before it can change
+      // again — this mirrors the UI, which disables all of its fields, but enforces it even
+      // if a client sends a raw edit for it directly.
+      if (existingTask && existingTask.verifiedLocked === true) {
+        mergedTasksMap.set(tId, { ...existingTask });
+        return;
+      }
+
       let synced = existingTask ? (existingTask.synced === true) : false;
       let taxesRealizadaSynced = existingTask ? (existingTask.taxesRealizadaSynced === true) : false;
       if (t.status === "Finalizada" && (!existingTask || existingTask.status !== "Finalizada")) {
