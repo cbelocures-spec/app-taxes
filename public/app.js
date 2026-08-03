@@ -11384,10 +11384,80 @@ async function verifyAllOrders() {
 
 let currentVerifyOrderId = null;
 
+// Parses "Tarea #N (Empleado): No encontrada en el listado de tareas" out of the verifier's
+// error text and builds step-by-step instructions (with the task's real data) for adding that
+// task manually to the OT on taxes.com.ar — the same steps a person would otherwise have to ask
+// for one at a time.
+function buildMissingTaskGuide(errorMsg, order) {
+  if (!order || !Array.isArray(order.tasks)) return '';
+  const regex = /Tarea #(\d+)\s*\(([^)]*)\)\s*:\s*No encontrada en el listado de tareas/gi;
+  const missing = [];
+  let m;
+  while ((m = regex.exec(String(errorMsg || ''))) !== null) {
+    const task = order.tasks[parseInt(m[1], 10) - 1];
+    if (task) missing.push({ empName: m[2].trim(), task });
+  }
+  if (missing.length === 0) return '';
+
+  const ccLabel = (val) => {
+    const opt = (cachedCatalogs.centrosCosto || []).find(c => String(c.value) === String(val));
+    return opt ? opt.label : (val || '-');
+  };
+
+  const rows = missing.map(({ empName, task }) => {
+    const hours = parseFloat(String(task.horasEstimadas || 0).replace(',', '.')) || 0;
+    const desc = String(task.descripcion || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+    const insumos = task.insumos ? `<br><em>Insumos: ${String(task.insumos).replace(/</g, '&lt;')}</em>` : '';
+    return `<tr>
+      <td style="padding:6px 8px; border-bottom:1px solid #e0f2fe;"><strong>${empName}</strong></td>
+      <td style="padding:6px 8px; border-bottom:1px solid #e0f2fe;">${ccLabel(task.centroCosto)}</td>
+      <td style="padding:6px 8px; border-bottom:1px solid #e0f2fe;">${hours.toFixed(2)}</td>
+      <td style="padding:6px 8px; border-bottom:1px solid #e0f2fe; font-size:12px;">${desc}${insumos}</td>
+    </tr>`;
+  }).join('');
+
+  const otNum = order.taxesOrderNumber ? `#${String(order.taxesOrderNumber).replace(/^#/, '')}` : '(sin número de OT todavía)';
+
+  return `
+    <div style="margin-top:14px; padding:12px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px;">
+      <p style="margin:0 0 8px; font-weight:700; color:#0369a1; display:flex; align-items:center; gap:6px;">
+        <span class="material-icons" style="font-size:18px;">build</span> Cómo agregar la${missing.length === 1 ? '' : 's'} tarea${missing.length === 1 ? '' : 's'} faltante${missing.length === 1 ? '' : 's'} en Taxes
+      </p>
+      <ol style="margin:0 0 10px; padding-left:20px; font-size:13px; color:#0c4a6e;">
+        <li>Andá a <strong>Producción &gt; OT</strong>, buscá la OT <strong>${otNum}</strong> y hacé click en el lápiz de editar.</li>
+        <li>Hacé click en <strong>"Agregar Tarea"</strong> ${missing.length} ${missing.length === 1 ? 'vez' : 'veces'} (una por cada fila de abajo).</li>
+        <li>Completá cada tarjeta con estos datos y marcá <strong>Realizada</strong>:</li>
+      </ol>
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:12px; background:#fff; border-radius:6px; overflow:hidden;">
+          <thead>
+            <tr style="background:#e0f2fe; text-align:left;">
+              <th style="padding:6px 8px;">Empleado</th>
+              <th style="padding:6px 8px;">Centro de Costo</th>
+              <th style="padding:6px 8px;">Horas</th>
+              <th style="padding:6px 8px;">Descripción</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <p style="margin:8px 0 0; font-size:12px; color:#0369a1;">4. Guardá en Taxes y después tocá "Volver a Controlar" acá.</p>
+    </div>
+  `;
+}
+
 function openVerificationErrorModal(errorMsg, orderId) {
   currentVerifyOrderId = orderId;
   const formattedMsg = String(errorMsg || '').split(' | ').join('\n');
   document.getElementById('verify-error-modal-log').textContent = formattedMsg || 'No hay detalles de error.';
+
+  const howtoEl = document.getElementById('verify-error-howto');
+  if (howtoEl) {
+    const order = (typeof activeOrders !== 'undefined' && Array.isArray(activeOrders) ? activeOrders.find(o => o.id === orderId) : null)
+      || (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders.find(o => o.id === orderId) : null);
+    howtoEl.innerHTML = buildMissingTaskGuide(errorMsg, order);
+  }
+
   document.getElementById('verification-error-modal').classList.add('open');
 }
 
