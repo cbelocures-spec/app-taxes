@@ -4015,13 +4015,12 @@ async function verifyWorkOrderWithPage(page, orderId) {
     if (errors.length > 0) {
       console.log(`[Verify] Completed with issues:`, errors);
       
-      // If the order was in Historial (archived) and failed verification or has missing OT/tasks in Taxes,
-      // un-archive it, move it back to active orders, and queue for re-sync!
-      console.log(`[Verify-AutoRetry] Order ${orderId} failed task verification (${errors.join(' | ')}). Unarchiving and queuing for re-sync!`);
+      // Keep order in Historial (archived: true). NEVER unarchive or delete automatically!
+      console.log(`[Verify] Order ${orderId} task verification result logged (${errors.join(' | ')}). Keeping in Historial for Auditor...`);
       db.updateWorkOrder(orderId, {
-        archived: false,
-        archivedAt: null,
-        syncStatus: 'pending',
+        archived: true,
+        archivedAt: order.archivedAt || new Date().toISOString(),
+        syncStatus: 'success',
         syncError: null,
         verifiedStatus: 'error',
         verifiedCount: count,
