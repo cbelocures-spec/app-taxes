@@ -2711,6 +2711,7 @@ function createHistoryCardHtml(order) {
             <th style="padding:6px 8px; font-size:11px; font-weight:700; text-align:left;">HORAS ESTIMADAS</th>
             <th style="padding:6px 8px; font-size:11px; font-weight:700; text-align:left;">DESCRIPCION</th>
             <th style="padding:6px 8px; font-size:11px; font-weight:700; text-align:center;">REALIZADA</th>
+            <th style="padding:6px 8px; font-size:11px; font-weight:700; text-align:center;">CANDADO</th>
           </tr>
         </thead>
         <tbody>
@@ -2728,6 +2729,16 @@ function createHistoryCardHtml(order) {
             }
             const horasStr = displayHours > 0 ? `${displayHours} hs` : '-';
             const isDone = t.status === 'Finalizada' || t.status === 'Sincronizada' || t.completed === true;
+            const isLocked = t.verifiedLocked === true;
+            const lockBadge = isLocked ? `
+              <span class="badge" style="background:#16a34a; color:#ffffff; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;" title="Candado Cerrado (Verificado)">
+                <span class="material-icons" style="font-size:12px;">lock</span> Cerrado
+              </span>
+            ` : `
+              <span class="badge" style="background:#ef4444; color:#ffffff; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;" title="Candado Abierto (Pendiente de verificación)">
+                <span class="material-icons" style="font-size:12px;">lock_open</span> Abierto
+              </span>
+            `;
 
             return `
               <tr style="border-bottom:1px solid #f1f5f9; background:#ffffff;">
@@ -2740,6 +2751,9 @@ function createHistoryCardHtml(order) {
                   <span style="display:inline-flex; align-items:center; justify-content:center; padding:2px 8px; border-radius:4px; background:${isDone ? '#d1fae5' : '#fef3c7'}; color:${isDone ? '#047857' : '#b45309'}; font-weight:700; font-size:11px;" title="${isDone ? 'Realizada' : 'Pendiente'}">
                     ${isDone ? 'SI' : 'NO'}
                   </span>
+                </td>
+                <td style="padding:6px 8px; text-align:center;">
+                  ${lockBadge}
                 </td>
               </tr>
             `;
