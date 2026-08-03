@@ -4114,6 +4114,12 @@ async function verifyWorkOrder(orderId) {
     // by an unexpected navigation (not just page.evaluate — click/waitForSelector/$eval can all
     // throw it too). Rather than chase every call site, retry the whole verification once with
     // a brand-new browser/login instead of reusing whatever page state broke.
+    // Guarded by a time budget: the caller (verifyWorkOrderWithTimeout) enforces a 3-minute
+    // ceiling, so only retry if the first attempt failed fast enough to leave real room —
+    // otherwise a slow-but-legitimate attempt plus a full retry would blow past that ceiling
+    // and turn a "would have eventually succeeded" run into a wasted timeout.
+    const verifyStartedAt = Date.now();
+    const RETRY_BUDGET_MS = 100 * 1000; // only retry if under ~100s elapsed, leaving ~80s for attempt 2
     let lastErr = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
@@ -4125,8 +4131,9 @@ async function verifyWorkOrder(orderId) {
       } catch (attemptErr) {
         lastErr = attemptErr;
         if (browser) { try { await browser.close(); } catch (_) {} browser = null; }
-        if (attempt < 2 && isFrameDetachError(attemptErr)) {
-          console.warn(`[VerifyWorkOrder] Frame detached on attempt ${attempt}/2, retrying with a fresh browser session...`);
+        const elapsed = Date.now() - verifyStartedAt;
+        if (attempt < 2 && isFrameDetachError(attemptErr) && elapsed < RETRY_BUDGET_MS) {
+          console.warn(`[VerifyWorkOrder] Frame detached on attempt ${attempt}/2 after ${Math.round(elapsed/1000)}s, retrying with a fresh browser session...`);
           await delay(2000);
           continue;
         }
