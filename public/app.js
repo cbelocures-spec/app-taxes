@@ -11404,6 +11404,7 @@ async function openDeletedLogModal() {
             <th style="padding:8px 10px;">Horas</th>
             <th style="padding:8px 10px;">Descripción</th>
             <th style="padding:8px 10px;text-align:center;">Taxes Realizada</th>
+            <th style="padding:8px 10px;text-align:center;">Acción</th>
           </tr>
         </thead>
         <tbody>
@@ -11411,6 +11412,7 @@ async function openDeletedLogModal() {
 
     logs.slice().reverse().forEach(item => {
       const fechaStr = item.deletedAt ? new Date(item.deletedAt).toLocaleString('es-AR') : 'N/A';
+      const orderIdTarget = item.id || item.numeroOrden || '';
       html += `
         <tr style="border-bottom:1px solid var(--border-color);">
           <td style="padding:8px 10px;white-space:nowrap;">${fechaStr}</td>
@@ -11422,6 +11424,11 @@ async function openDeletedLogModal() {
           <td style="padding:8px 10px;text-align:center;">
             <span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px;">SI</span>
           </td>
+          <td style="padding:8px 10px;text-align:center;">
+            <button onclick="restoreOrderFromDeletedLog('${orderIdTarget}')" class="btn" style="background:#10b981;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;border:none;cursor:pointer;" title="Restaurar al Historial para re-sincronizar y controlar">
+              <span class="material-icons" style="font-size:12px;vertical-align:middle;">restore</span> Restaurar
+            </button>
+          </td>
         </tr>
       `;
     });
@@ -11431,6 +11438,22 @@ async function openDeletedLogModal() {
   } catch (err) {
     console.error('Error fetching deleted log:', err);
     container.innerHTML = `<div style="color:var(--danger-color);padding:16px;">Error al cargar registros: ${err.message}</div>`;
+  }
+}
+
+async function restoreOrderFromDeletedLog(orderId) {
+  if (!confirm('¿Restaurar esta orden al Historial para volver a sincronizarla y ver sus tareas?')) return;
+  try {
+    const res = await fetch(`/api/orders/${orderId}/restore`, { method: 'POST' });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP ${res.status}`);
+    }
+    showToast('Orden restaurada exitosamente al Historial ✓', 'success');
+    closeDeletedLogModal();
+    await fetchArchivedOrders();
+  } catch (err) {
+    showToast('Error al restaurar orden: ' + err.message, 'danger');
   }
 }
 

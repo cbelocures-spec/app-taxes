@@ -1218,6 +1218,52 @@ app.post('/api/backup/restore/:id', (req, res) => {
   }
 });
 
+// Restore a soft-deleted or backup order back to active Historial
+app.post('/api/orders/:id/restore', (req, res) => {
+  try {
+    const orderId = String(req.params.id).trim();
+    const dbData = db.read();
+    let target = (dbData.workOrders || []).find(o => String(o.id) === orderId || String(o.taxesOrderNumber) === orderId);
+    
+    if (!target && dbData.backupOrders) {
+      target = dbData.backupOrders[orderId];
+      if (!target) {
+        const foundKey = Object.keys(dbData.backupOrders).find(k => String(dbData.backupOrders[k].taxesOrderNumber) === orderId);
+        if (foundKey) target = dbData.backupOrders[foundKey];
+      }
+    }
+    
+    if (!target) {
+      return res.status(404).json({ error: 'Orden no encontrada en borradas ni respaldo' });
+    }
+
+    // Restore properties
+    target.deleted = false;
+    target.deletedAt = null;
+    target.archived = true;
+    target.archivedAt = target.archivedAt || new Date().toISOString();
+    target.syncStatus = 'pending';
+    target.syncError = null;
+    target.syncLockTime = null;
+    target.autoSyncRetryCount = 0;
+
+    const idx = (dbData.workOrders || []).findIndex(o => String(o.id) === String(target.id));
+    if (idx !== -1) {
+      dbData.workOrders[idx] = target;
+    } else {
+      dbData.workOrders.push(target);
+    }
+
+    db.write(dbData);
+    cachedArchivedOrders = null;
+    console.log(`[Restore] Restored order ${target.id} (OT: ${target.taxesOrderNumber || 'N/A'}) to Historial.`);
+    res.json({ success: true, order: target });
+  } catch (err) {
+    console.error('[Restore Order] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Manually trigger pruning of orders older than 7 days
 app.post('/api/backup/prune', (req, res) => {
   try {
