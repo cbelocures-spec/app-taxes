@@ -128,8 +128,15 @@ async function killZombieChromes() {
 }
 
 async function launchBrowser() {
-  // Free up PIDs and memory by killing any leftover chrome instances
-  await killZombieChromes().catch(() => {});
+  // NOTE: this used to unconditionally pkill every chrome process here before every single
+  // launch. The global browserBusy lock (acquireBrowserLock/releaseBrowserLock) is supposed to
+  // guarantee only one browser runs at a time, but a stuck/hung previous session can force its
+  // way past the lock's 5.5-minute safety valve while its own browser is still technically
+  // alive — in that narrow window, an unconditional pkill here kills a still-legitimately-open
+  // session belonging to another order, producing exactly the cascading "detached Frame" /
+  // "Password input not found" failures seen across multiple orders in quick succession
+  // (2026-08-03). Zombie cleanup still happens where it's unambiguously safe: after a launch
+  // failure (below) and in the timeout-safety abandonment paths.
 
   let execPath = process.env.PUPPETEER_EXECUTABLE_PATH || null;
   const fs = require('fs');
