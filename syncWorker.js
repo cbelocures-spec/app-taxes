@@ -213,6 +213,10 @@ async function safeGoto(page, url, options = {}) {
       console.warn(`[safeGoto] Navigation timeout hit for ${url}. Attempting to continue...`);
       return null;
     }
+    if (err.message.includes('Session closed') || err.message.includes('Target closed') || err.message.includes('Protocol error')) {
+      console.warn(`[safeGoto] Session/page closed during navigation to ${url}: ${err.message}`);
+      throw new Error('La conexión o sesión de navegación en Taxes fue interrumpida. Reintentando...');
+    }
     throw err;
   }
 }
@@ -4139,40 +4143,39 @@ async function verifyWorkOrder(orderId) {
   }
 }
 
-// Helper wrapper to execute verifyWorkOrder with a 90-second global safety timeout
+// Helper wrapper to execute verifyWorkOrder with a 3-minute global safety timeout
 async function verifyWorkOrderWithTimeout(orderId) {
   let timeoutId;
   try {
     return await Promise.race([
       verifyWorkOrder(orderId),
       new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Timeout: verificación tardó más de 90 segundos')), 90 * 1000);
+        timeoutId = setTimeout(() => reject(new Error('Timeout: verificación tardó más de 3 minutos')), 180 * 1000);
       })
     ]);
   } catch (err) {
     console.error(`[VerifyWorkOrder Timeout Safety] Fallo o timeout en verificación de orden ID ${orderId}:`, err.message);
     abandonedSyncOrderIds.add(orderId);
     try {
-      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedError: err.message || 'Verificación cancelada por timeout de 90 segundos' });
+      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedError: err.message || 'Verificación cancelada por timeout de 3 minutos' });
     } catch (dbErr) {
       console.error(`[VerifyWorkOrder Timeout Safety] Error al actualizar BD para orden ID ${orderId}:`, dbErr.message);
     }
     releaseBrowserLock();
-    await killZombieChromes().catch(() => {});
     return { success: false, message: err.message };
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
   }
 }
 
-// Helper wrapper to execute syncWorkOrder with a 90-second global safety timeout
+// Helper wrapper to execute syncWorkOrder with a 3-minute global safety timeout
 async function syncWorkOrderWithTimeout(orderId) {
   let timeoutId;
   try {
     await Promise.race([
       syncWorkOrder(orderId),
       new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Timeout: sincronización tardó más de 90 segundos')), 90 * 1000);
+        timeoutId = setTimeout(() => reject(new Error('Timeout: sincronización tardó más de 3 minutos')), 180 * 1000);
       })
     ]);
   } catch (err) {
@@ -4181,13 +4184,12 @@ async function syncWorkOrderWithTimeout(orderId) {
     try {
       db.updateWorkOrder(orderId, {
         syncStatus: 'error',
-        syncError: err.message || 'Sincronización cancelada por timeout de 90 segundos'
+        syncError: err.message || 'Sincronización cancelada por timeout de 3 minutos'
       });
     } catch (dbErr) {
       console.error(`[SyncWorker Timeout Safety] Error al actualizar BD para orden ID ${orderId}:`, dbErr.message);
     }
     releaseBrowserLock();
-    await killZombieChromes().catch(() => {});
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
   }
