@@ -3035,7 +3035,7 @@ async function syncWorkOrder(orderId) {
     // 6. VERIFY SUCCESS
     console.log("Verifying if the order was created successfully...");
     const currentUrl = page.url();
-    const errors = await page.evaluate(() => {
+    const errors = await safeEvaluate(page, () => {
       // Filter out global informative banners, only check real invalid field labels or error popups
       const alertElements = document.querySelectorAll('.alert-danger, .is-invalid, .invalid-feedback, .text-danger');
       return Array.from(alertElements)
@@ -3043,7 +3043,7 @@ async function syncWorkOrder(orderId) {
         .filter(t => t.length > 0 && t.length < 200 && !t.includes('soporte') && !t.includes('comprobante'));
     });
 
-    const isModalClosed = await page.evaluate(() => {
+    const isModalClosed = await safeEvaluate(page, () => {
       const form = document.querySelector('input[name="rodado_id"]');
       return !form;
     });
@@ -3058,7 +3058,7 @@ async function syncWorkOrder(orderId) {
 
     // Extract Taxes OT number from green toast notifications
     console.log("Looking for Taxes Work Order Number from toast notifications...");
-    const taxesOrderNumber = await page.evaluate(() => {
+    const taxesOrderNumber = await safeEvaluate(page, () => {
       const elements = Array.from(document.querySelectorAll('.toast, .b-toast, .alert, div, p, span'));
       const found = [];
       for (const el of elements) {
@@ -3080,7 +3080,7 @@ async function syncWorkOrder(orderId) {
       try {
         await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 20000 });
         await delay(2000);
-        const capturedFromList = await page.evaluate((rodadoVal) => {
+        const capturedFromList = await safeEvaluate(page, (rodadoVal) => {
           const rows = Array.from(document.querySelectorAll('table tbody tr'));
           for (const row of rows) {
             const text = row.textContent || '';
