@@ -854,8 +854,20 @@ app.put('/api/orders/:id', (req, res) => {
     // Guard: a person can't physically work on two tasks at once. The client already
     // warns about this using its own last-polled snapshot of orders, but two devices
     // starting a timer for the same employee within the same ~2s polling window can each
-    // miss the other's change. Reject here as a last line of defense instead of silently
-    // saving two simultaneous timers for the same empleado.
+    // miss the other's change. Instead of blocking this save, auto-pause the other task
+    // (same behavior the client already offers via a confirm dialog), mirroring the exact
+    // hmm-format hours math used everywhere else in the app.
+    const hmmToMinutesServer = (hmmVal) => {
+      const h = Math.floor(hmmVal);
+      const m = Math.round((hmmVal - h) * 100);
+      return h * 60 + m;
+    };
+    const minutesToHmmServer = (totalMinutes) => {
+      const h = Math.floor(totalMinutes / 60);
+      const m = Math.round(totalMinutes % 60);
+      return parseFloat((h + m / 100).toFixed(2));
+    };
+
     for (const task of finalTasksToSave) {
       if (!task || !task.empleado || task.timerStarted !== true) continue;
       const existingTask = (existing.tasks || []).find(et => et.id === task.id);
@@ -866,11 +878,25 @@ app.put('/api/orders/:id', (req, res) => {
         (o.tasks || []).some(t => t && String(t.empleado) === String(task.empleado) && t.timerStarted === true)
       );
       if (conflictOrder) {
-        const empOpt = (cachedCatalogs.empleados || []).find(e => String(e.value) === String(task.empleado));
-        const empName = empOpt ? empOpt.label : task.empleado;
-        return res.status(409).json({
-          error: `${empName} ya tiene un cronómetro activo en otra orden (Interno ${conflictOrder.interno}). Actualizá la pantalla: vas a ver la opción de pausar esa tarea automáticamente antes de iniciar esta.`
+        const conflictTask = (conflictOrder.tasks || []).find(t => t && String(t.empleado) === String(task.empleado) && t.timerStarted === true);
+        const startVal = (conflictTask.timerStart && parseInt(conflictTask.timerStart) > 0) ? parseInt(conflictTask.timerStart) : Date.now();
+        const elapsedMinutes = Math.round(Math.max(0, Date.now() - startVal) / 60000);
+        const currentMinutes = hmmToMinutesServer(parseFloat(String(conflictTask.horasEstimadas || 0).replace(',', '.')) || 0);
+        const newHours = minutesToHmmServer(currentMinutes + elapsedMinutes);
+
+        const updatedConflictTasks = (conflictOrder.tasks || []).map(t => {
+          if (t !== conflictTask) return t;
+          const history = Array.isArray(t.timerHistory) ? [...t.timerHistory] : [];
+          const lastEvent = history.length > 0 ? history[history.length - 1] : null;
+          const lastType = lastEvent ? String(lastEvent.type || lastEvent.event || '').trim().toLowerCase() : '';
+          if (!(lastType.startsWith('paus') || lastType.startsWith('fin'))) {
+            history.push({ type: 'Pausó', formatted: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }), timestamp: Date.now() });
+          }
+          return { ...t, timerStart: null, timerStarted: false, horasEstimadas: newHours, timerHistory: history };
         });
+
+        db.updateWorkOrder(conflictOrder.id, { tasks: updatedConflictTasks });
+        console.log(`[Auto-Pause] Empleado ${task.empleado} tenia un cronometro activo en orden ${conflictOrder.id} (Interno ${conflictOrder.interno}); se pauso automaticamente para iniciar en orden ${existing.id}.`);
       }
     }
 
