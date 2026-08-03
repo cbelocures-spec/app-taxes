@@ -126,6 +126,11 @@ let cachedNovelties = [];
 let activeOrders = [];
 let currentRetryOrderId = null;
 let currentEditingOrderId = null;
+// Real (already-saved) task IDs removed from the modal during this edit session. removeTaskField()
+// only takes the card out of the DOM — without tracking this separately and sending it as
+// deletedTaskIds, the server's task-merge logic (which preserves every existing task unless its id
+// is explicitly listed as deleted) silently restores "deleted" tasks on save.
+let deletedTaskIdsInModal = new Set();
 let catalogSyncInterval = null;
 let activeMechanicsList = [];
 let selectedOrderIds = new Set();
@@ -915,6 +920,7 @@ async function submitPreOrderCheck() {
 function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
   console.log("[openNewOrderModal] presetInterno:", presetInterno, "presetClasificacion:", presetClasificacion);
   currentEditingOrderId = null;
+  deletedTaskIdsInModal = new Set();
   document.getElementById('modal-order-title').textContent = "Nueva Orden de Trabajo";
   
   const modal = document.getElementById('new-order-modal');
@@ -1036,6 +1042,7 @@ function editOrder(orderId) {
   if (!order) return;
 
   currentEditingOrderId = orderId;
+  deletedTaskIdsInModal = new Set();
 
   // Set modal title
   document.getElementById('modal-order-title').textContent = "Editar Orden de Trabajo";
@@ -1152,6 +1159,7 @@ function viewOrder(orderId) {
 
   // Open in read-only mode (no save, no edit)
   currentEditingOrderId = null;
+  deletedTaskIdsInModal = new Set();
 
   // Set modal title with sync date
   const syncDate = order.syncDate ? ` — Subida: ${new Date(order.syncDate).toLocaleDateString('es-AR')}` : '';
@@ -2557,8 +2565,17 @@ function agregarCantidadesInsumos(btn) {
 function removeTaskField(cardId) {
   const card = document.getElementById(cardId);
   if (card) {
+    // If this card is an already-saved task (not a brand-new unsaved card), track its id so
+    // submitWorkOrder() can tell the server to actually delete it — otherwise the server-side
+    // merge preserves every existing task it doesn't hear otherwise about, and the "deleted"
+    // task silently comes back on save.
+    const isTempId = cardId.startsWith('task-card-');
+    if (!isTempId) {
+      deletedTaskIdsInModal.add(cardId);
+    }
+
     card.remove();
-    
+
     // Clean up timers from localStorage and interval registry
     clearLocalStorageTimerKeys(cardId);
     if (activeIntervalTimers[cardId]) {
@@ -3357,6 +3374,7 @@ async function submitWorkOrder() {
       horario: horaEl ? horaEl.value : '',
       incidente: incidenteEl ? incidenteEl.value : '',
       tasks: tasks,
+      deletedTaskIds: Array.from(deletedTaskIdsInModal),
       estadoUnidad: editingOrder ? (editingOrder.estadoUnidad || 'fuera_de_servicio') : 'fuera_de_servicio',
       combustibleReset: currentCombustibleReset,
       // Al editar una orden que ya estaba en Historial (archivada), no forzar su regreso a Activas:
