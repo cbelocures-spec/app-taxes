@@ -790,6 +790,34 @@ async function safeEvaluate(page, fn, ...args) {
 }
 
 // Automate login to Taxes.com.ar
+// Taxes.com.ar started showing a "Nos estamos modernizando" WhatsApp promo modal on top of
+// the page (2026-08). Left up, it blocks interaction with whatever is underneath — including
+// the login form — which is what caused the sudden wave of "Password input not found" /
+// login failures across many orders at once. Dismiss it via "Ahora no" or its close (X)
+// button whenever present; a harmless no-op otherwise.
+async function dismissWhatsappPromoModal(page) {
+  try {
+    return await safeEvaluate(page, () => {
+      const isVisible = (el) => !!(el && el.offsetParent !== null);
+      const all = Array.from(document.querySelectorAll('button, a, span, div'));
+      const dismissBtn = all.find(el => isVisible(el) && (el.textContent || '').trim().toLowerCase() === 'ahora no');
+      if (dismissBtn) { dismissBtn.click(); return true; }
+      const modals = Array.from(document.querySelectorAll('[class*="modal"], [role="dialog"]'));
+      for (const modal of modals) {
+        if (!isVisible(modal)) continue;
+        const text = (modal.textContent || '').toLowerCase();
+        if (text.includes('whatsapp') || text.includes('modernizando')) {
+          const closeBtn = modal.querySelector('button, [class*="close"], .fa-times, .material-icons');
+          if (closeBtn) { closeBtn.click(); return true; }
+        }
+      }
+      return false;
+    });
+  } catch (e) {
+    return false;
+  }
+}
+
 async function autoLogin(browser, username, password, portalUrl) {
   // Always create a FRESH page to avoid detached frame issues
   console.log(`[autoLogin] Creating fresh page and navigating to ${portalUrl}/login ...`);
@@ -837,6 +865,7 @@ async function autoLogin(browser, username, password, portalUrl) {
   }
 
   await delay(2000); // Give Vue.js time to hydrate the DOM
+  await dismissWhatsappPromoModal(page);
 
   // Check if we landed on /login or got redirected to /admin (already logged in)
   const urlAfterLoad = page.url().toLowerCase();
@@ -854,9 +883,11 @@ async function autoLogin(browser, username, password, portalUrl) {
   // Poll for password input using evaluate (avoids detached frame from waitForSelector)
   console.log('[autoLogin] Waiting for password input via polling...');
   await delay(5000); // Wait longer for Vue.js + any redirects to settle
+  await dismissWhatsappPromoModal(page);
   const inputReady = await (async () => {
     for (let i = 0; i < 40; i++) { // 40 × 500ms = 20 seconds max
       try {
+        if (i % 6 === 0) await dismissWhatsappPromoModal(page);
         const found = await safeEvaluate(page, (sel) => !!document.querySelector(sel), passSelector);
         if (found) { console.log(`[autoLogin] Password input found after ${i * 500 + 5000}ms`); return true; }
       } catch (e) {
@@ -868,6 +899,7 @@ async function autoLogin(browser, username, password, portalUrl) {
     console.log('[autoLogin] Input not found after 25s - retrying goto /login...');
     try { await page.goto(`${portalUrl}/login`, { waitUntil: 'domcontentloaded', timeout: 20000 }); } catch (_) {}
     await delay(3000);
+    await dismissWhatsappPromoModal(page);
     try {
       const found = await safeEvaluate(page, (sel) => !!document.querySelector(sel), passSelector);
       if (found) { console.log('[autoLogin] Password input found after retry goto'); return true; }
