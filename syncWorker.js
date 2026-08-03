@@ -225,14 +225,14 @@ async function safeGoto(page, url, options = {}) {
 async function clickByText(page, text, elementType = '*') {
   const elements = await page.$$(elementType);
   for (const element of elements) {
-    const content = await page.evaluate(el => el.textContent, element);
+    const content = await safeEvaluate(page, el => el.textContent, element);
     if (content && content.toLowerCase().includes(text.toLowerCase())) {
-      const isVisible = await page.evaluate(el => {
+      const isVisible = await safeEvaluate(page, el => {
         const style = window.getComputedStyle(el);
         return style && style.display !== 'none' && style.visibility !== 'hidden' && el.offsetWidth > 0;
       }, element);
       if (isVisible) {
-        await page.evaluate(el => el.click(), element);
+        await safeEvaluate(page, el => el.click(), element);
         return true;
       }
     }
@@ -244,18 +244,18 @@ async function clickByText(page, text, elementType = '*') {
 async function fillInputByLabel(page, labelText, value) {
   const inputs = await page.$$('input, textarea, select');
   for (const input of inputs) {
-    const id = await page.evaluate(el => el.id, input);
-    const name = await page.evaluate(el => el.getAttribute('name'), input);
-    const placeholder = await page.evaluate(el => el.getAttribute('placeholder'), input);
+    const id = await safeEvaluate(page, el => el.id, input);
+    const name = await safeEvaluate(page, el => el.getAttribute('name'), input);
+    const placeholder = await safeEvaluate(page, el => el.getAttribute('placeholder'), input);
     
     // Check if ID matches any labels
     if (id) {
       const label = await page.$(`label[for="${id}"]`);
       if (label) {
-        const text = await page.evaluate(el => el.textContent, label);
+        const text = await safeEvaluate(page, el => el.textContent, label);
         if (text && text.toLowerCase().includes(labelText.toLowerCase())) {
           await input.focus();
-          await page.evaluate(el => el.value = '', input); // Clear
+          await safeEvaluate(page, el => el.value = '', input); // Clear
           await input.type(value);
           return true;
         }
@@ -266,7 +266,7 @@ async function fillInputByLabel(page, labelText, value) {
     if ((placeholder && placeholder.toLowerCase().includes(labelText.toLowerCase())) || 
         (name && name.toLowerCase().includes(labelText.toLowerCase()))) {
       await input.focus();
-      await page.evaluate(el => el.value = '', input); // Clear
+      await safeEvaluate(page, el => el.value = '', input); // Clear
       await input.type(value);
       return true;
     }
@@ -291,7 +291,7 @@ async function fillSearchableSelect(page, labelText, searchValue) {
   console.log(`Searching for searchable select for: "${labelText}" with target value: "${searchValue}"`);
   try {
     // Find the correct searchable-input by looking at the label
-    const inputInfo = await page.evaluate((label) => {
+    const inputInfo = await safeEvaluate(page, (label) => {
       const clean = (str) => {
         if (!str) return '';
         return str.normalize("NFD")
@@ -417,7 +417,7 @@ async function fillSearchableSelect(page, labelText, searchValue) {
       console.log(`Attempting search query for "${labelText}": "${query}"...`);
       
       // Check if dropdown is visible, if not click it to open
-      const isDropdownOpen = await page.evaluate(() => {
+      const isDropdownOpen = await safeEvaluate(page, () => {
         const dropdownContainers = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"]'));
         return dropdownContainers.some(container => container.offsetHeight > 0);
       });
@@ -429,7 +429,7 @@ async function fillSearchableSelect(page, labelText, searchValue) {
       }
 
       // Focus and clear existing text reliably via evaluate and keyboard
-      await page.evaluate((sel) => {
+      await safeEvaluate(page, (sel) => {
         const el = document.querySelector(sel);
         if (el) {
           el.value = '';
@@ -445,7 +445,7 @@ async function fillSearchableSelect(page, labelText, searchValue) {
       await delay(2000); // Wait for dropdown to appear and filter
 
       // Click the first visible option in the dropdown that matches
-      const optionClicked = await page.evaluate((targetVal, rodadoInfo) => {
+      const optionClicked = await safeEvaluate(page, (targetVal, rodadoInfo) => {
         // Find visible options inside portal dropdown containers (ID starts with "searchable-select-dropdown-")
         const dropdownContainers = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"]'));
         
@@ -556,7 +556,7 @@ async function fillSearchableSelect(page, labelText, searchValue) {
         await delay(1000);
         
         // Verify either hidden input or search input got a value
-        const checkResult = await page.evaluate((hSel, sSel) => {
+        const checkResult = await safeEvaluate(page, (hSel, sSel) => {
           const hEl = document.querySelector(hSel);
           const sEl = document.querySelector(sSel);
           return {
@@ -603,7 +603,7 @@ async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
       console.log(`Attempting employee search query: "${query}"...`);
       
       // Focus the input inside the correct card container using page.evaluate
-      const focused = await page.evaluate((idx) => {
+      const focused = await safeEvaluate(page, (idx) => {
         const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
         const targetHoursInput = horasInputs[idx];
         if (!targetHoursInput) return false;
@@ -649,7 +649,7 @@ async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
       await delay(2000); // Wait for dropdown to filter
 
       // Select option
-      const optionClicked = await page.evaluate((targetVal) => {
+      const optionClicked = await safeEvaluate(page, (targetVal) => {
         const dropdownContainers = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"]'));
         let visibleOptions = [];
         dropdownContainers.forEach(container => {
@@ -709,7 +709,7 @@ async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
     // =====================================================================
     if (employeeObj) {
       console.log(`Dropdown selection failed. Attempting DIRECT INJECTION fallback for ID=${employeeObj.value}, Label="${employeeObj.label}"...`);
-      const injected = await page.evaluate((idx, empId, empLabel) => {
+      const injected = await safeEvaluate(page, (idx, empId, empLabel) => {
         const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
         const targetHoursInput = horasInputs[idx];
         if (!targetHoursInput) return false;
@@ -850,7 +850,7 @@ async function autoLogin(browser, username, password, portalUrl) {
   const inputReady = await (async () => {
     for (let i = 0; i < 40; i++) { // 40 × 500ms = 20 seconds max
       try {
-        const found = await page.evaluate((sel) => !!document.querySelector(sel), passSelector);
+        const found = await safeEvaluate(page, (sel) => !!document.querySelector(sel), passSelector);
         if (found) { console.log(`[autoLogin] Password input found after ${i * 500 + 5000}ms`); return true; }
       } catch (e) {
         if (i % 4 === 0) console.log(`[autoLogin] Polling attempt ${i}: ${e.message.substring(0, 80)}`);
@@ -862,7 +862,7 @@ async function autoLogin(browser, username, password, portalUrl) {
     try { await page.goto(`${portalUrl}/login`, { waitUntil: 'domcontentloaded', timeout: 20000 }); } catch (_) {}
     await delay(3000);
     try {
-      const found = await page.evaluate((sel) => !!document.querySelector(sel), passSelector);
+      const found = await safeEvaluate(page, (sel) => !!document.querySelector(sel), passSelector);
       if (found) { console.log('[autoLogin] Password input found after retry goto'); return true; }
     } catch (e) { console.log('[autoLogin] Retry evaluate failed:', e.message.substring(0, 80)); }
     return false;
@@ -878,25 +878,25 @@ async function autoLogin(browser, username, password, portalUrl) {
   console.log('[autoLogin] Filling form with real keyboard simulation...');
 
   // Clear and type email
-  await page.evaluate((sel) => { const el = document.querySelector(sel); if (el) { el.value = ''; el.focus(); } }, emailSelector);
+  await safeEvaluate(page, (sel) => { const el = document.querySelector(sel); if (el) { el.value = ''; el.focus(); } }, emailSelector);
   await page.click(emailSelector, { clickCount: 3 }); // select all
   await page.type(emailSelector, username, { delay: 30 });
 
   // Clear and type password
-  await page.evaluate((sel) => { const el = document.querySelector(sel); if (el) { el.value = ''; el.focus(); } }, passSelector);
+  await safeEvaluate(page, (sel) => { const el = document.querySelector(sel); if (el) { el.value = ''; el.focus(); } }, passSelector);
   await page.click(passSelector, { clickCount: 3 }); // select all
   await page.type(passSelector, password, { delay: 30 });
 
   await delay(300);
 
   // Extract and inject CSRF token (Taxes.com.ar is Laravel-based and requires _token)
-  const csrfToken = await page.evaluate(() => {
+  const csrfToken = await safeEvaluate(page, () => {
     const meta = document.querySelector('meta[name="csrf-token"]');
     return meta ? meta.getAttribute('content') : null;
   });
   if (csrfToken) {
     console.log(`[autoLogin] CSRF token found (length=${csrfToken.length}), injecting into form...`);
-    await page.evaluate((token) => {
+    await safeEvaluate(page, (token) => {
       const form = document.querySelector('form.login-form') || document.querySelector('form');
       if (!form) return;
       let tokenInput = form.querySelector('input[name="_token"]');
@@ -914,7 +914,7 @@ async function autoLogin(browser, username, password, portalUrl) {
 
   // Submit by clicking the submit button ONCE (avoid double-POST 419 error)
   console.log('[autoLogin] Submitting form with single button click...');
-  await page.evaluate(() => {
+  await safeEvaluate(page, () => {
     const btn = document.querySelector('button[type="submit"], input[type="submit"], .btn-primary, form button, .btn');
     if (btn) {
       btn.click();
@@ -949,7 +949,7 @@ async function autoLogin(browser, username, password, portalUrl) {
     // We are still on the login page or got a 429 rate limit error, so it failed. Let's find out why:
     let errorMsg = "Credenciales incorrectas o error de inicio de sesión en Taxes.com.ar";
     try {
-      const pageInfo = await page.evaluate(() => {
+      const pageInfo = await safeEvaluate(page, () => {
         const bodyText = document.body ? document.body.textContent.toLowerCase() : '';
         const titleText = document.title ? document.title.toLowerCase() : '';
         return {
@@ -1039,7 +1039,7 @@ async function scrapeCatalogs(triggerUsername = null) {
 
     // Set limit to 999 to show all vehicles
     console.log("Setting limit to 999 to show all vehicles...");
-    const limitSet = await page.evaluate(() => {
+    const limitSet = await safeEvaluate(page, () => {
       // The Límite field is an input field on the Taxes Flota page
       const inputs = Array.from(document.querySelectorAll('input'));
       for (const inp of inputs) {
@@ -1081,7 +1081,7 @@ async function scrapeCatalogs(triggerUsername = null) {
 
     // Click "BUSCAR" button
     console.log("Clicking BUSCAR button...");
-    const buscarClicked = await page.evaluate(() => {
+    const buscarClicked = await safeEvaluate(page, () => {
       const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
       for (const btn of buttons) {
         const text = btn.textContent.trim().toUpperCase();
@@ -1104,7 +1104,7 @@ async function scrapeCatalogs(triggerUsername = null) {
     await delay(3000);
 
     // Log total count from page
-    const totalText = await page.evaluate(() => {
+    const totalText = await safeEvaluate(page, () => {
       const body = document.body.textContent;
       const match = body.match(/Total:\s*(\d+)\s*registros/i);
       return match ? match[0] : 'Total not found';
@@ -1113,7 +1113,7 @@ async function scrapeCatalogs(triggerUsername = null) {
 
     // Attempt to set DataTable page length to maximum to reduce pagination overhead
     console.log("Attempting to set DataTable page length to maximum...");
-    const lengthResult = await page.evaluate(() => {
+    const lengthResult = await safeEvaluate(page, () => {
       const select = document.querySelector('select[name$="_length"], select[class*="length"], .dataTables_length select');
       if (select) {
         let bestOpt = null;
@@ -1152,7 +1152,7 @@ async function scrapeCatalogs(triggerUsername = null) {
     while (hasNextPage) {
       console.log(`Scraping DataTable page ${pageNum}...`);
       
-      const pageVehicles = await page.evaluate(() => {
+      const pageVehicles = await safeEvaluate(page, () => {
         const results = [];
         const mainTable = document.querySelector('#tabla_flota');
         if (!mainTable) return results;
@@ -1194,7 +1194,7 @@ async function scrapeCatalogs(triggerUsername = null) {
       rodados.push(...pageVehicles);
       
       // Check if "Siguiente" button is enabled
-      const nextButtonInfo = await page.evaluate(() => {
+      const nextButtonInfo = await safeEvaluate(page, () => {
         const nextBtn = document.querySelector('#tabla_flota_next');
         if (!nextBtn) return { exists: false };
         
@@ -1225,7 +1225,7 @@ async function scrapeCatalogs(triggerUsername = null) {
       // Dump the page HTML structure for debugging
       const pageTitle = await page.title();
       const pageUrl = page.url();
-      const bodyText = await page.evaluate(() => document.body.textContent.substring(0, 500));
+      const bodyText = await safeEvaluate(page, () => document.body.textContent.substring(0, 500));
       console.log(`Page title: ${pageTitle}`);
       console.log(`Page URL: ${pageUrl}`);
       console.log(`Body text preview: ${bodyText}`);
@@ -1253,7 +1253,7 @@ async function scrapeCatalogs(triggerUsername = null) {
     // Poll for select elements (avoids waitForSelector detached frame issues)
     for (let i = 0; i < 20; i++) {
       try {
-        const hasSelect = await page.evaluate(() => !!document.querySelector('select'));
+        const hasSelect = await safeEvaluate(page, () => !!document.querySelector('select'));
         if (hasSelect) { console.log("Select found after polling."); break; }
       } catch (e) { /* still navigating */ }
       await delay(500);
@@ -1262,7 +1262,7 @@ async function scrapeCatalogs(triggerUsername = null) {
     console.log("Waiting for employee select options to populate...");
     for (let i = 0; i < 30; i++) {
       try {
-        const hasOptions = await page.evaluate(() => {
+        const hasOptions = await safeEvaluate(page, () => {
           const selects = Array.from(document.querySelectorAll('select'));
           return selects.some(s => s.options.length > 50);
         });
@@ -1273,7 +1273,7 @@ async function scrapeCatalogs(triggerUsername = null) {
 
     // Scrape all employees from the select that has the most options
     console.log("Scraping employees/responsibles from list page...");
-    const employees = await page.evaluate(() => {
+    const employees = await safeEvaluate(page, () => {
       const selects = Array.from(document.querySelectorAll('select'));
       let empSelect = null;
       let maxOptions = 0;
@@ -1299,7 +1299,7 @@ async function scrapeCatalogs(triggerUsername = null) {
 
     // Click NUEVO button to open creation form modal
     console.log("Clicking NUEVO button...");
-    const nuevoClicked = await page.evaluate(() => {
+    const nuevoClicked = await safeEvaluate(page, () => {
       const buttons = Array.from(document.querySelectorAll('button, a'));
       for (const btn of buttons) {
         const text = btn.textContent.trim().toUpperCase();
@@ -1320,7 +1320,7 @@ async function scrapeCatalogs(triggerUsername = null) {
     await delay(2000);
     for (let i = 0; i < 20; i++) {
       try {
-        const found = await page.evaluate(() => !!document.querySelector('select[name="inv_ot_clasificacion_id"]'));
+        const found = await safeEvaluate(page, () => !!document.querySelector('select[name="inv_ot_clasificacion_id"]'));
         if (found) { console.log('Modal select found.'); break; }
       } catch (e) { /* navigating */ }
       await delay(500);
@@ -1328,7 +1328,7 @@ async function scrapeCatalogs(triggerUsername = null) {
 
     // Click AGREGAR TAREA
     console.log("Clicking AGREGAR TAREA...");
-    await page.evaluate(() => {
+    await safeEvaluate(page, () => {
       const buttons = Array.from(document.querySelectorAll('button'));
       const addBtn = buttons.find(b => b.textContent.includes('AGREGAR TAREA') || b.textContent.includes('Agregar Tarea'));
       if (addBtn) addBtn.click();
@@ -1339,7 +1339,7 @@ async function scrapeCatalogs(triggerUsername = null) {
     await delay(2000);
     for (let i = 0; i < 20; i++) {
       try {
-        const found = await page.evaluate(() => !!document.querySelector('select[name="syj_centro_costo_id_0"]'));
+        const found = await safeEvaluate(page, () => !!document.querySelector('select[name="syj_centro_costo_id_0"]'));
         if (found) { console.log('CC select found.'); break; }
       } catch (e) { /* navigating */ }
       await delay(500);
@@ -1348,7 +1348,7 @@ async function scrapeCatalogs(triggerUsername = null) {
     console.log("Waiting for Centro de Costo options to populate via polling...");
     for (let i = 0; i < 20; i++) {
       try {
-        const ready = await page.evaluate(() => {
+        const ready = await safeEvaluate(page, () => {
           const ccSelect = document.querySelector('select[name="syj_centro_costo_id_0"]');
           return ccSelect && ccSelect.options.length > 1;
         });
@@ -1359,7 +1359,7 @@ async function scrapeCatalogs(triggerUsername = null) {
 
     // Scrape Centros de Costo from the newly added task card
     console.log("Scraping Centros de Costo from task card...");
-    const centrosCosto = await page.evaluate(() => {
+    const centrosCosto = await safeEvaluate(page, () => {
       const ccSelect = document.querySelector('select[name="syj_centro_costo_id_0"]');
       if (ccSelect) {
         return Array.from(ccSelect.options)
@@ -1640,7 +1640,7 @@ async function syncWorkOrder(orderId) {
 
       // Click "En Proceso" tab
       console.log(`[Reconcile] Clicking 'En Proceso' tab...`);
-      await page.evaluate(() => {
+      await safeEvaluate(page, () => {
         const navLinks = Array.from(document.querySelectorAll('a.nav-link, [role="tab"], .nav-tabs li a, .nav li a'));
         const tab = navLinks.find(t => t.textContent.trim().toLowerCase().includes('en proceso'));
         if (tab) { tab.click(); return; }
@@ -1651,7 +1651,7 @@ async function syncWorkOrder(orderId) {
       await delay(2500);
 
       // Find and click the Numero input using the exact logic from test_ot_search.js
-      const numInputId = await page.evaluate(() => {
+      const numInputId = await safeEvaluate(page, () => {
         const normalizeText = s => (s || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         // 1. Look for exact "Numero" label
         const allEls = Array.from(document.querySelectorAll('label, span, small, p, .col > div'));
@@ -1708,7 +1708,7 @@ async function syncWorkOrder(orderId) {
       console.log(`[Reconcile] Waiting up to 12s for OT row "${otNumClean}" to appear in table...`);
       let foundOTRow = false;
       for (let attempt = 1; attempt <= 12; attempt++) {
-        foundOTRow = await page.evaluate((otNum) => {
+        foundOTRow = await safeEvaluate(page, (otNum) => {
           const rows = Array.from(document.querySelectorAll('table tbody tr'));
           return rows.some(row => {
             const cells = Array.from(row.querySelectorAll('td'));
@@ -1730,10 +1730,10 @@ async function syncWorkOrder(orderId) {
       // IMPORTANT: we only *locate* the button via evaluate() (read-only, safe).
       // The actual click is done with Puppeteer's native page.click(), which
       // doesn't hang when the click triggers a page navigation — unlike calling
-      // .click() on the element from inside page.evaluate(), which can leave the
+      // .click() on the element from inside safeEvaluate(page, ), which can leave the
       // browser's execution context waiting for a response that never comes.
       const findAndTagPencil = async () => {
-        return await page.evaluate((otNum) => {
+        return await safeEvaluate(page, (otNum) => {
           const rows = Array.from(document.querySelectorAll('table tbody tr'));
           for (const row of rows) {
             const cells = Array.from(row.querySelectorAll('td'));
@@ -1809,14 +1809,14 @@ async function syncWorkOrder(orderId) {
           // Also log current URL and page title
           console.log(`[Reconcile] Current URL: ${page.url()}`);
           // Log all visible inputs and their values
-          const inputsInfo = await page.evaluate(() =>
+          const inputsInfo = await safeEvaluate(page, () =>
             Array.from(document.querySelectorAll('input')).filter(i => i.offsetParent).map(i => ({
               id: i.id, name: i.name, type: i.type, value: i.value, placeholder: i.placeholder
             }))
           );
           console.log(`[Reconcile] Visible inputs:`, JSON.stringify(inputsInfo));
           // Log table rows
-          const rowsInfo = await page.evaluate(() =>
+          const rowsInfo = await safeEvaluate(page, () =>
             Array.from(document.querySelectorAll('table tbody tr')).slice(0, 35).map(r =>
               Array.from(r.querySelectorAll('td')).map(c => c.textContent.trim()).join(' | ')
             )
@@ -1836,7 +1836,7 @@ async function syncWorkOrder(orderId) {
       // 4. Read ALL task cards currently in the form
       //    Each card has: empleado input/text, horas input, descripcion textarea, realizada checkbox, red trash button
       const readFormCards = async () => {
-        return await page.evaluate(() => {
+        return await safeEvaluate(page, () => {
           const clean = s => (s || '').trim();
           // Each task card is a container with horas_estimadas or horas_X input
           const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
@@ -1877,7 +1877,7 @@ async function syncWorkOrder(orderId) {
       if (diff > 0) {
         console.log(`[Reconcile] Form has ${formCards.length} cards, but app has ${order.tasks.length}. Clicking AGREGAR TAREA ${diff} times...`);
         for (let i = 0; i < diff; i++) {
-          const added = await page.evaluate(() => {
+          const added = await safeEvaluate(page, () => {
             const btns = Array.from(document.querySelectorAll('button, a, [role="button"], .btn'));
             const addBtn = btns.find(b => b.textContent.toLowerCase().includes('agregar tarea'));
             if (addBtn) {
@@ -1957,7 +1957,7 @@ async function syncWorkOrder(orderId) {
         for (let di = toDeleteIndices.length - 1; di >= 0; di--) {
           const cardIdx = toDeleteIndices[di];
           page.once('dialog', d => d.accept().catch(() => {}));
-          const deleted = await page.evaluate((idx) => {
+          const deleted = await safeEvaluate(page, (idx) => {
             const clickConfirm = () => {
               const confirmBtn = Array.from(document.querySelectorAll('button, a, input[type="button"]')).find(b => {
                 const txt = (b.textContent || '').toLowerCase().trim();
@@ -2012,7 +2012,7 @@ async function syncWorkOrder(orderId) {
         const toAdd = order.tasks.length - currentLength;
         console.log(`[Reconcile] Form has ${currentLength} cards, but app has ${order.tasks.length}. Clicking AGREGAR TAREA ${toAdd} times...`);
         for (let i = 0; i < toAdd; i++) {
-          const added = await page.evaluate(() => {
+          const added = await safeEvaluate(page, () => {
             const btns = Array.from(document.querySelectorAll('button, a, [role="button"], .btn'));
             const addBtn = btns.find(b => b.textContent.toLowerCase().includes('agregar tarea'));
             if (addBtn) {
@@ -2064,7 +2064,7 @@ async function syncWorkOrder(orderId) {
         const ccObj = ccCatalog.find(c => c.value === appTask.centroCosto);
         const ccLabel = ccObj ? ccObj.label : appTask.centroCosto;
         console.log(`[Reconcile] Card #${ci} Centro de Costo: "${ccLabel}" (ID: ${appTask.centroCosto})`);
-        await page.evaluate((idx, taskCC) => {
+        await safeEvaluate(page, (idx, taskCC) => {
           const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
           const targetHoursInput = horasInputs[idx];
           if (!targetHoursInput) return;
@@ -2100,7 +2100,7 @@ async function syncWorkOrder(orderId) {
 
         // 2. Fill/Fix Employee if empty, placeholder, or mismatch
         const { employeeLabel } = resolveAndMapEmployee(appTask);
-        const hiddenEmpValue = await page.evaluate((idx) => {
+        const hiddenEmpValue = await safeEvaluate(page, (idx) => {
           const inp = document.querySelector(`input[name="syj_empleado_id_tarea_${idx}"], input[name$="empleado_id_tarea_${idx}"], input[name*="empleado_id_tarea_${idx}"]`);
           return inp ? inp.value : '';
         }, ci);
@@ -2127,7 +2127,7 @@ async function syncWorkOrder(orderId) {
 
         if (descMismatch) {
           console.log(`[Reconcile] Card #${ci} description update required (Taxes: "${cleanDescTaxes}" → Target: "${cleanDescTarget}"). Writing...`);
-          const descId = await page.evaluate((idx) => {
+          const descId = await safeEvaluate(page, (idx) => {
             const textareas = Array.from(document.querySelectorAll('textarea, textarea[name*="descripcion"], textarea[id*="descripcion"], textarea[placeholder*="Describe"], input[name*="descripcion"]'));
             const el = textareas[idx] || textareas[0];
             if (!el) return null;
@@ -2143,7 +2143,7 @@ async function syncWorkOrder(orderId) {
             await page.click(sel, { clickCount: 3 }).catch(() => {});
 
             // 1. Force DOM flush & clear
-            await page.evaluate((s) => {
+            await safeEvaluate(page, (s) => {
               const el = document.querySelector(s);
               if (el) {
                 el.value = '';
@@ -2163,7 +2163,7 @@ async function syncWorkOrder(orderId) {
             await delay(200);
 
             // 3. Set exact target string via DOM and dispatch events
-            await page.evaluate((s, val) => {
+            await safeEvaluate(page, (s, val) => {
               const el = document.querySelector(s);
               if (el) {
                 el.value = val;
@@ -2207,7 +2207,7 @@ async function syncWorkOrder(orderId) {
 
         if (!hoursOk) {
           console.log(`[Reconcile] Fixing hours for card #${ci} to "${expectedHours}"...`);
-          const hoursId = await page.evaluate((idx) => {
+          const hoursId = await safeEvaluate(page, (idx) => {
             const inputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
             const el = inputs[idx];
             if (!el) return null;
@@ -2216,7 +2216,7 @@ async function syncWorkOrder(orderId) {
           }, ci);
           if (hoursId) {
             const sel = `#${hoursId}`;
-            await page.evaluate((s, val) => {
+            await safeEvaluate(page, (s, val) => {
               const el = document.querySelector(s);
               if (el) {
                 const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
@@ -2237,7 +2237,7 @@ async function syncWorkOrder(orderId) {
             await page.type(sel, expectedHours, { delay: 50 }).catch(() => {});
             await page.keyboard.press('Tab').catch(() => {});
 
-            await page.evaluate((s) => {
+            await safeEvaluate(page, (s) => {
               const el = document.querySelector(s);
               if (el) {
                 el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -2256,7 +2256,7 @@ async function syncWorkOrder(orderId) {
 
         if (shouldBeRealizada !== currentRealizada) {
           console.log(`[Reconcile] Toggling Realizada for card #${ci} (current=${currentRealizada}, target=${shouldBeRealizada})...`);
-          await page.evaluate((idx, targetState) => {
+          await safeEvaluate(page, (idx, targetState) => {
             const switches = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
             const sw = switches[idx];
             if (!sw) return;
@@ -2315,7 +2315,7 @@ async function syncWorkOrder(orderId) {
       const [y, m, d] = targetDateIso.split('-');
       const targetDateRegional = `${d}/${m}/${y}`;
 
-      const fixedDates = await page.evaluate((iso, regional) => {
+      const fixedDates = await safeEvaluate(page, (iso, regional) => {
         const fixed = [];
         // 1. Force ISO format on all HTML5 type="date" inputs
         const dateInputs = Array.from(document.querySelectorAll('input[type="date"]'));
@@ -2349,7 +2349,7 @@ async function syncWorkOrder(orderId) {
 
       console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
       await delay(4000);
-      const guardarBtnId = await page.evaluate(() => {
+      const guardarBtnId = await safeEvaluate(page, () => {
         let btn = document.querySelector('.taxes-btn-save');
         if (!btn) {
           const buttons = Array.from(document.querySelectorAll('button'));
@@ -2379,7 +2379,7 @@ async function syncWorkOrder(orderId) {
       await delay(5000);
  
       // Verify if the form was actually saved by checking if we left the edit form
-      const isFormStillOpen = await page.evaluate(() => {
+      const isFormStillOpen = await safeEvaluate(page, () => {
         const formInput = document.querySelector('input[name="horas_estimadas"], textarea[id^="descripcion_"]');
         return !!formInput;
       });
@@ -2387,7 +2387,7 @@ async function syncWorkOrder(orderId) {
       let validationErrors = [];
       if (isFormStillOpen) {
         // Collect validation errors only if the form remains open
-        validationErrors = await page.evaluate(() => {
+        validationErrors = await safeEvaluate(page, () => {
           const alertElements = document.querySelectorAll('.alert-danger, .is-invalid, .invalid-feedback, .text-danger');
           return Array.from(alertElements)
             .map(el => el.textContent.trim())
@@ -2467,7 +2467,7 @@ async function syncWorkOrder(orderId) {
 
       console.log(`[Pre-Check Safeguard] Filtering OT list page (Limit 500, Date: ${todayDateStr})...`);
       try {
-        const filterApplied = await page.evaluate((targetDate) => {
+        const filterApplied = await safeEvaluate(page, (targetDate) => {
           let updatedAny = false;
 
           // 1. Set Limite to 500
@@ -2531,7 +2531,7 @@ async function syncWorkOrder(orderId) {
       }
 
       console.log(`[Pre-Check Safeguard] Searching OT list table for pre-existing OT for Interno ${order.interno} on date ${todayDateStr}...`);
-      const existingOtOnPage = await page.evaluate((targetInterno, targetDateStr) => {
+      const existingOtOnPage = await safeEvaluate(page, (targetInterno, targetDateStr) => {
         const clean = s => (s || '').toString().trim();
         const tables = Array.from(document.querySelectorAll('table'));
         for (const table of tables) {
@@ -2564,14 +2564,14 @@ async function syncWorkOrder(orderId) {
     }
 
     console.log("Closing any pre-existing toast notifications...");
-    await page.evaluate(() => {
+    await safeEvaluate(page, () => {
       const closeButtons = Array.from(document.querySelectorAll('.toast button.close, .b-toast button.close, .toast .close, .b-toast .close, .toast button, .b-toast button'));
       closeButtons.forEach(btn => btn.click());
     }).catch(() => {});
     await delay(1000);
 
     console.log("Clicking NUEVO button to open create form modal...");
-    const nuevoClicked = await page.evaluate(() => {
+    const nuevoClicked = await safeEvaluate(page, () => {
       const buttons = Array.from(document.querySelectorAll('button, a'));
       for (const btn of buttons) {
         const text = btn.textContent.trim().toUpperCase();
@@ -2600,7 +2600,7 @@ async function syncWorkOrder(orderId) {
     const isEmailOrAuto = !targetResponsable || targetResponsable === 'AUTO' || targetResponsable.includes('@');
     if (isEmailOrAuto) {
       console.log("Resolving Responsable automatically...");
-      const profileName = await page.evaluate(() => {
+      const profileName = await safeEvaluate(page, () => {
         const el = document.querySelector('.user-profile-name, .user-profile-toggle, .user-profile-info, .profile-user, .user-profile, .user-name, .nav-item .nav-link span, .dropdown-toggle');
         return el ? el.textContent.trim() : '';
       });
@@ -2695,7 +2695,7 @@ async function syncWorkOrder(orderId) {
     console.log("Filling standard fields (Clasificación, Interno, Date, Horario, Incidente)...");
     
     // Fill Fecha (Set both visible and hidden)
-    await page.evaluate((dateVal) => {
+    await safeEvaluate(page, (dateVal) => {
       // Set the visible date input
       const dateInput = document.querySelector('input[type="date"].taxes-datepicker');
       if (dateInput) {
@@ -2715,7 +2715,7 @@ async function syncWorkOrder(orderId) {
 
     // Fill Horario (Timepicker)
     const orderTime = order.horario || new Date().toTimeString().substring(0, 5);
-    await page.evaluate((time) => {
+    await safeEvaluate(page, (time) => {
       // Try finding the time input directly
       const timeInputs = document.querySelectorAll('input[type="time"]');
       timeInputs.forEach(ti => {
@@ -2735,7 +2735,7 @@ async function syncWorkOrder(orderId) {
     }, orderTime);
 
     // Fill Titulo, Clasificación, and Incidente (Descripción)
-    await page.evaluate((clasificacionVal, internoVal, incidenteVal) => {
+    await safeEvaluate(page, (clasificacionVal, internoVal, incidenteVal) => {
       // Classification select (name: inv_ot_clasificacion_id)
       const classSelect = document.querySelector('select[name="inv_ot_clasificacion_id"]');
       if (classSelect) {
@@ -2799,7 +2799,7 @@ async function syncWorkOrder(orderId) {
                              
       if (!clickedAddTask) {
         // Fallback search button containing plus sign or word Tarea
-        await page.evaluate(() => {
+        await safeEvaluate(page, () => {
           const btns = Array.from(document.querySelectorAll('button'));
           const addBtn = btns.find(b => b.textContent.includes('TAREA') || b.textContent.includes('Tarea') || b.textContent.includes('+'));
           if (addBtn) addBtn.click();
@@ -2812,7 +2812,7 @@ async function syncWorkOrder(orderId) {
       console.log(`Setting Centro de Costo to: "${task.centroCosto}" (label: "${ccLabel}")`);
       const ccSelectSelector = `select#centro_costo_${i}`;
       await page.waitForSelector(ccSelectSelector, { timeout: 5000 });
-      await page.evaluate((sel, taskCC) => {
+      await safeEvaluate(page, (sel, taskCC) => {
         const ccSelect = document.querySelector(sel);
         if (ccSelect) {
           const cleanForCompare = (str) => {
@@ -2877,7 +2877,7 @@ async function syncWorkOrder(orderId) {
       console.log(`[Hours] Target Horas Estimadas for task #${i+1}: "${hoursVal3}"`);
 
       // Resolve input ID
-      const hoursInputId = await page.evaluate((idx) => {
+      const hoursInputId = await safeEvaluate(page, (idx) => {
         const inputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
         const el = inputs[idx];
         if (!el) return null;
@@ -2896,7 +2896,7 @@ async function syncWorkOrder(orderId) {
         await page.keyboard.press('Backspace').catch(() => {});
         await page.type(sel, hoursVal3, { delay: 50 });
         await page.keyboard.press('Tab').catch(() => {}); // Force Vue blur to persist the value
-        await page.evaluate((s) => {
+        await safeEvaluate(page, (s) => {
           const el = document.querySelector(s);
           if (el) {
             el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -2908,7 +2908,7 @@ async function syncWorkOrder(orderId) {
         await delay(800);
 
         // Verification step — re-read the input to confirm the value stuck
-        const hoursVerify = await page.evaluate((s) => {
+        const hoursVerify = await safeEvaluate(page, (s) => {
           const el = document.querySelector(s);
           if (!el) return { found: false };
           return { found: true, value: el.value };
@@ -2920,7 +2920,7 @@ async function syncWorkOrder(orderId) {
         // Attempt 2 (fallback): use Vue-compatible native setter if value didn't stick
         if (!hoursFilled) {
           console.log(`[Hours] Attempt 1 failed. Retrying with Vue-native setter for index ${i}...`);
-          await page.evaluate((s, val) => {
+          await safeEvaluate(page, (s, val) => {
             const el = document.querySelector(s);
             if (!el) return;
             // Use HTMLInputElement native setter to bypass Vue's internal value caching
@@ -2936,7 +2936,7 @@ async function syncWorkOrder(orderId) {
           }, sel, hoursVal3);
           await delay(500);
 
-          const hoursVerify2 = await page.evaluate((s) => {
+          const hoursVerify2 = await safeEvaluate(page, (s) => {
             const el = document.querySelector(s);
             if (!el) return { found: false };
             return { found: true, value: el.value };
@@ -2969,7 +2969,7 @@ async function syncWorkOrder(orderId) {
       console.log(`Setting Task Status for task #${i+1}. Current db status: "${task.status}"`);
       if (task.status && task.status.toLowerCase() === 'finalizada') {
         console.log(`Task #${i+1} is Finalizada, toggling switch to Tarea Completada...`);
-        const toggled = await page.evaluate((index) => {
+        const toggled = await safeEvaluate(page, (index) => {
           // Find all custom-switch containers on the page
           const allSwitches = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
           // The i-th switch corresponds to the i-th task
@@ -2999,7 +2999,7 @@ async function syncWorkOrder(orderId) {
         await delay(1500);
 
         // Verify the toggle state after clicking
-        const verifyState = await page.evaluate((index) => {
+        const verifyState = await safeEvaluate(page, (index) => {
           const allSwitches = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
           const targetSwitch = allSwitches[index];
           if (!targetSwitch) return { verified: false };
@@ -3021,7 +3021,7 @@ async function syncWorkOrder(orderId) {
 
     // 5. SUBMIT FORM
     console.log("Saving the Work Order on the website...");
-    const saved = await page.evaluate(() => {
+    const saved = await safeEvaluate(page, () => {
       const btn = document.querySelector('.taxes-btn-save');
       if (btn) {
         btn.click();
@@ -3121,7 +3121,7 @@ async function syncWorkOrder(orderId) {
     }
 
     // Close any visible toast notifications by clicking close button inside them
-    await page.evaluate(() => {
+    await safeEvaluate(page, () => {
       const closeButtons = Array.from(document.querySelectorAll('.toast button.close, .b-toast button.close, .toast .close, .b-toast .close, .toast button, .b-toast button'));
       closeButtons.forEach(btn => btn.click());
     }).catch(() => {});
@@ -3216,7 +3216,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
     // 1b. Robust selector resolution for the OT search input
     // Since Taxes removed placeholders on their search inputs, we locate the input next to label or by name/type.
     const getSearchInputId = async () => {
-      return await page.evaluate(() => {
+      return await safeEvaluate(page, () => {
         const cleanText = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         const labels = Array.from(document.querySelectorAll('label'));
         
@@ -3262,7 +3262,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     // 1c. Selector resolution for Interno search input (first box)
     const getInternoSearchInputId = async () => {
-      return await page.evaluate(() => {
+      return await safeEvaluate(page, () => {
         const cleanText = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         const labels = Array.from(document.querySelectorAll('label'));
         let targetLabel = labels.find(l => {
@@ -3322,7 +3322,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     const searchTerm = isSearchingByInterno ? String(order.interno).trim() : otNumClean;
     console.log(`[Verify] Searching for ${searchTerm} in ${isSearchingByInterno ? 'Interno' : 'OT'} box...`);
-    await page.evaluate((sel, val) => {
+    await safeEvaluate(page, (sel, val) => {
       const el = document.querySelector(sel);
       if (el) {
         const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
@@ -3348,7 +3348,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     // 3. Set 'Realizada' filter to 'Todos' (empty string) to make completed tasks visible
     console.log(`[Verify] Setting 'Realizada' filter to 'Todos'...`);
-    await page.evaluate(() => {
+    await safeEvaluate(page, () => {
       const cleanText = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
       const labels = Array.from(document.querySelectorAll('label, div, span'));
       const targetLabel = labels.find(l => cleanText(l.textContent) === 'realizada');
@@ -3365,7 +3365,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
     });
     await delay(500);
 
-    const clickedBuscar = await page.evaluate(() => {
+    const clickedBuscar = await safeEvaluate(page, () => {
       const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
       const btn = buttons.find(b => b.textContent.trim().toUpperCase().includes('BUSCAR') || (b.value || '').toUpperCase().includes('BUSCAR'));
       if (btn) { btn.click(); return true; }
@@ -3376,7 +3376,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
     // Helper to read table tasks
     const readTableTasks = async () => {
-      return await page.evaluate(() => {
+      return await safeEvaluate(page, () => {
         const cleanText = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         const tables = Array.from(document.querySelectorAll('table'));
         const taskTable = tables.find(t => {
@@ -3435,7 +3435,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
     // far more reliable than comparing description text on our end.
     const filterByEmployee = async (employeeName) => {
       try {
-        const empFieldId = await page.evaluate(() => {
+        const empFieldId = await safeEvaluate(page, () => {
           // Try locating input by placeholder first
           const directInput = document.querySelector('input[placeholder*="Empleado" i], input[placeholder*="Operario" i], input[placeholder*="Responsable" i], input[placeholder*="Personal" i]');
           if (directInput) {
@@ -3467,12 +3467,12 @@ async function verifyWorkOrderWithPage(page, orderId) {
         await page.keyboard.type(employeeName, { delay: 60 });
         await delay(1200);
         // If a dropdown suggestion appears, pick the first option
-        await page.evaluate(() => {
+        await safeEvaluate(page, () => {
           const opts = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"] li, .multiselect__option, .dropdown-item, ul[role="listbox"] li'));
           if (opts.length > 0) opts[0].click();
         }).catch(() => {});
         await delay(500);
-        const clicked = await page.evaluate(() => {
+        const clicked = await safeEvaluate(page, () => {
           const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase().includes('BUSCAR'));
           if (btn) { btn.click(); return true; }
           return false;
@@ -3486,7 +3486,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
     };
 
     const clearEmployeeFilterAndResearch = async () => {
-      await page.evaluate(() => {
+      await safeEvaluate(page, () => {
         const directInput = document.querySelector('input[placeholder*="Empleado" i], input[placeholder*="Operario" i], input[placeholder*="Responsable" i], input[placeholder*="Personal" i]');
         if (directInput) {
           directInput.value = '';
@@ -3503,7 +3503,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
         const input = container ? container.querySelector('input') : null;
         if (input) { input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); }
       }).catch(() => {});
-      await page.evaluate(() => {
+      await safeEvaluate(page, () => {
         const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase().includes('BUSCAR'));
         if (btn) btn.click();
       }).catch(() => {});
@@ -3657,7 +3657,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
         if (!hoursOk || !realizadaOk || !descOkFinal) {
           console.log(`[Verify] Mismatch found for Task #${idx+1}. Clicking eye edit button...`);
-          const eyeBtnId = await page.evaluate((rowIdx) => {
+          const eyeBtnId = await safeEvaluate(page, (rowIdx) => {
             const cleanText = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
             const tables = Array.from(document.querySelectorAll('table'));
             const taskTable = tables.find(t => {
@@ -3692,7 +3692,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
           // Update description if mismatch
           if (!descOkFinal) {
             console.log(`[Verify] Setting description to "${finalDescription}"...`);
-            const descId = await page.evaluate(() => {
+            const descId = await safeEvaluate(page, () => {
               const el = document.querySelector('textarea[name="descripcion"]') || document.querySelector('textarea');
               if (!el) return null;
               if (!el.id) el.id = 'temp-fix-desc-single-' + Date.now();
@@ -3701,7 +3701,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
             if (descId) {
               const sel = `#${descId}`;
               // 1. Erase textarea completely via DOM evaluate
-              await page.evaluate((s) => {
+              await safeEvaluate(page, (s) => {
                 const el = document.querySelector(s);
                 if (el) {
                   el.value = '';
@@ -3717,7 +3717,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
               await page.keyboard.up('Control');
               await page.keyboard.press('Backspace');
               // 3. Set exact target string via DOM and dispatch events
-              await page.evaluate((s, val) => {
+              await safeEvaluate(page, (s, val) => {
                 const el = document.querySelector(s);
                 if (el) {
                   el.value = val;
@@ -3737,7 +3737,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
             const expectedHoursDot = expectedHoursStr;
             console.log(`[Verify] Setting hours to "${expectedHoursDot}" via keyboard simulation...`);
 
-            const hoursInputId = await page.evaluate(() => {
+            const hoursInputId = await safeEvaluate(page, () => {
               // 1. Try the exact CSS path discovered in the Taxes DOM for the hours input.
               let el = document.querySelector('div.card-body > div > p > div:nth-child(2) > div:nth-child(1) > input');
               // 2. Fallback to the known input name used by the Taxes edit form.
@@ -3767,7 +3767,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
               await page.keyboard.press('Backspace').catch(() => {});
               await page.type(sel, expectedHoursDot, { delay: 50 });
               await page.keyboard.press('Tab').catch(() => {}); // Force Vue blur to persist the value
-              await page.evaluate((s) => {
+              await safeEvaluate(page, (s) => {
                 const el = document.querySelector(s);
                 if (el) {
                   el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3779,7 +3779,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
               await delay(800);
 
               // Re-read to confirm it stuck
-              const recheck = await page.evaluate((s) => {
+              const recheck = await safeEvaluate(page, (s) => {
                 const el = document.querySelector(s);
                 return el ? { value: el.value } : null;
               }, sel).catch(() => null);
@@ -3794,7 +3794,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
               // Attempt 2 (fallback): Vue-native setter if keyboard didn't work
               if (!hoursStuck) {
                 console.log(`[Verify] Hours not stuck after attempt 1. Retrying with Vue-native setter...`);
-                await page.evaluate((s, val) => {
+                await safeEvaluate(page, (s, val) => {
                   const el = document.querySelector(s);
                   if (!el) return;
                   const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
@@ -3809,7 +3809,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
                 }, sel, expectedHoursDot);
                 await delay(500);
 
-                const recheck2 = await page.evaluate((s) => {
+                const recheck2 = await safeEvaluate(page, (s) => {
                   const el = document.querySelector(s);
                   return el ? { value: el.value } : null;
                 }, sel).catch(() => null);
@@ -3831,7 +3831,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
           // Update status if mismatch
           if (!realizadaOk) {
             console.log(`[Verify] Setting status to ${t.status}...`);
-            await page.evaluate((targetStatus) => {
+            await safeEvaluate(page, (targetStatus) => {
               const container = document.querySelector('.modal-content, .modal-dialog, .modal') || document;
               // 1. Try to find a select dropdown first
               const selects = Array.from(container.querySelectorAll('select'));
@@ -3885,7 +3885,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
 
           // Click GUARDAR
           console.log(`[Verify] Saving task edit...`);
-          const guardarBtnId2 = await page.evaluate(() => {
+          const guardarBtnId2 = await safeEvaluate(page, () => {
             let btn = document.querySelector('.taxes-btn-save');
             if (!btn) {
               const buttons = Array.from(document.querySelectorAll('button'));
@@ -3910,7 +3910,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
           await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
           searchInpSelector = await getSearchInputId() || searchInpSelector;
           await page.waitForSelector(searchInpSelector, { timeout: 15000 });
-          await page.evaluate((sel) => {
+          await safeEvaluate(page, (sel) => {
             const el = document.querySelector(sel);
             if (el) {
               el.focus();
@@ -3922,7 +3922,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
           await delay(200);
           await page.keyboard.type(otNumClean, { delay: 80 });
           await delay(500);
-          const clickedBuscarRetry = await page.evaluate(() => {
+          const clickedBuscarRetry = await safeEvaluate(page, () => {
             const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
             const btn = buttons.find(b => b.textContent.trim().toUpperCase().includes('BUSCAR') || (b.value || '').toUpperCase().includes('BUSCAR'));
             if (btn) { btn.click(); return true; }
@@ -3952,7 +3952,7 @@ async function verifyWorkOrderWithPage(page, orderId) {
       tableTasks = await readTableTasks();
 
       // DIAG: log what the table contains after re-read
-      const diagHeaders = await page.evaluate(() => Array.from(document.querySelectorAll('table th')).map(h => `"${h.textContent.trim()}"`).join(', '));
+      const diagHeaders = await safeEvaluate(page, () => Array.from(document.querySelectorAll('table th')).map(h => `"${h.textContent.trim()}"`).join(', '));
       console.log(`[Verify-DIAG] Table headers: ${diagHeaders}`);
       console.log(`[Verify-DIAG] tableTasks after double-read: ${JSON.stringify(tableTasks)}`);
 
