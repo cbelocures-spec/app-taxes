@@ -772,7 +772,8 @@ class LocalDB {
           return { ...t, id };
         });
         return this.updateWorkOrder(existingOrder.id, {
-          tasks: [...(existingOrder.tasks || []), ...newTasksWithIds]
+          tasks: [...(existingOrder.tasks || []), ...newTasksWithIds],
+          estadoUnidad: orderData.estadoUnidad !== undefined ? orderData.estadoUnidad : existingOrder.estadoUnidad
         });
       }
     }
