@@ -851,6 +851,29 @@ app.put('/api/orders/:id', (req, res) => {
 
     const finalTasksToSave = Array.from(mergedTasksMap.values());
 
+    // Guard: a person can't physically work on two tasks at once. The client already
+    // warns about this using its own last-polled snapshot of orders, but two devices
+    // starting a timer for the same employee within the same ~2s polling window can each
+    // miss the other's change. Reject here as a last line of defense instead of silently
+    // saving two simultaneous timers for the same empleado.
+    for (const task of finalTasksToSave) {
+      if (!task || !task.empleado || task.timerStarted !== true) continue;
+      const existingTask = (existing.tasks || []).find(et => et.id === task.id);
+      if (existingTask && existingTask.timerStarted === true) continue; // already running before this save, not a new start
+
+      const conflictOrder = (db.getSyncableOrders() || []).find(o =>
+        o.id !== existing.id && o.archived !== true && o.deleted !== true &&
+        (o.tasks || []).some(t => t && String(t.empleado) === String(task.empleado) && t.timerStarted === true)
+      );
+      if (conflictOrder) {
+        const empOpt = (cachedCatalogs.empleados || []).find(e => String(e.value) === String(task.empleado));
+        const empName = empOpt ? empOpt.label : task.empleado;
+        return res.status(409).json({
+          error: `${empName} ya tiene un cronómetro activo en otra orden (Interno ${conflictOrder.interno}). Actualizá la pantalla: vas a ver la opción de pausar esa tarea automáticamente antes de iniciar esta.`
+        });
+      }
+    }
+
     const targetEstadoUnidad = estadoUnidad !== undefined ? estadoUnidad : existing.estadoUnidad;
     const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
     const allTasksCompleted = finalTasksToSave.length > 0 && finalTasksToSave.every(t => t && (t.status === "Finalizada" || t.status === "Completada"));

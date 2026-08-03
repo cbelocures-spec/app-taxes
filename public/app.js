@@ -4670,6 +4670,17 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
   const localStart = localStorage.getItem(timerKey);
   const isRunning = (task.timerStart !== null && task.timerStart > 0) || (localStart !== null && parseInt(localStart) > 0);
 
+  // Snapshot so we can roll back this task's optimistic changes if the server rejects
+  // the save (e.g. another device already started a timer for this same employee).
+  const preSnapshot = {
+    timerStart: task.timerStart,
+    timerStarted: task.timerStarted,
+    horasEstimadas: task.horasEstimadas,
+    timerHistory: JSON.parse(JSON.stringify(task.timerHistory || [])),
+    localStart: localStart
+  };
+  const wasStarting = !isRunning;
+
   if (!isRunning) {
     // --- START TIMER ---
     const employeeVal = task.empleado;
@@ -4758,6 +4769,24 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
     }
     fetchOrders();
   } catch (error) {
+    // Roll back the optimistic timer start so the UI doesn't keep showing a timer
+    // running that the server refused to save (e.g. employee conflict on another device).
+    if (wasStarting) {
+      task.timerStart = preSnapshot.timerStart;
+      task.timerStarted = preSnapshot.timerStarted;
+      task.horasEstimadas = preSnapshot.horasEstimadas;
+      task.timerHistory = preSnapshot.timerHistory;
+      if (preSnapshot.localStart === null) {
+        clearLocalStorageTimerKeys(taskId);
+      } else {
+        localStorage.setItem(timerKey, preSnapshot.localStart);
+      }
+      if (activeDashboardIntervals[taskId]) {
+        clearInterval(activeDashboardIntervals[taskId]);
+        delete activeDashboardIntervals[taskId];
+      }
+      renderDashboard();
+    }
     showToast(`Error al guardar el cronómetro: ${error.message}`, "danger");
     console.error(error);
   }
