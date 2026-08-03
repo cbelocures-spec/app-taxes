@@ -4052,6 +4052,10 @@ async function verifyWorkOrderWithPage(page, orderId) {
       const isOutOfService = order.estadoUnidad === 'fuera_de_servicio';
       const shouldArchive = order.archived === true || !isOutOfService;
       const updatePayload = {
+        syncStatus: 'success',
+        syncDate: new Date().toISOString(),
+        syncError: null,
+        autoSyncRetryCount: 0,
         verifiedStatus: 'success',
         verifiedCount: count,
         verifiedError: null,
