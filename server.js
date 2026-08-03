@@ -540,14 +540,20 @@ app.get('/api/orders', (req, res) => {
     // Filter orders based on user's authorized sectors
     const filtered = orders.filter(o => {
       const cls = o.clasificacion;
+      // An order for exclusive Herrería equipment (fabricación de cajas, prensa, etc.) belongs to
+      // Herrería regardless of what its 'clasificacion' field says: some orders end up saved with
+      // a generic clasificacion (e.g. "Correctivo") instead of "Herrería" for that equipment, and
+      // without this check they'd leak into Taller's view.
+      const isExclusiveHerreriaEquipment = isHerreriaExclusiveEquipment(o.rodado, o.interno);
+      const effectivelyHerreria = isHerreria(cls) || isExclusiveHerreriaEquipment;
       if (sector === 'Admin') return true;
-      if (allowed.some(s => isHerreria(s)) && isHerreria(cls)) return true;
+      if (allowed.some(s => isHerreria(s)) && effectivelyHerreria) return true;
       if (allowed.some(s => isEdilicio(s)) && isEdilicio(cls)) return true;
       if (allowed.some(s => s === 'Taller')) {
         // Taller sees non-Herreria, non-Edilicio orders
-        if (!isHerreria(cls) && !isEdilicio(cls)) return true;
+        if (!effectivelyHerreria && !isEdilicio(cls)) return true;
         // Taller ALSO sees Herrería orders for regular vehicles (e.g. Rodado 61), hiding only exclusive equipment (Foto 1)
-        if (isHerreria(cls) && !isHerreriaExclusiveEquipment(o.rodado, o.interno)) return true;
+        if (effectivelyHerreria && !isExclusiveHerreriaEquipment) return true;
       }
       return false;
     });

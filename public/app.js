@@ -6398,11 +6398,32 @@ function updateClassificationSelectOptions() {
   });
 }
 
+// Mirrors server.js's isHerreriaExclusiveEquipment(): equipment that is Herrer\u00eda-only
+// (fabricaci\u00f3n de cajas, prensa, contenedores, etc.) regardless of what 'clasificacion'
+// says on the order \u2014 some orders end up saved with a generic clasificacion like
+// "Correctivo" instead of "Herrer\u00eda" for this equipment, and without this check they
+// leak into the Taller tab / Inicio dashboard.
+function isHerreriaExclusiveEquipmentClient(rodado, interno) {
+  const str = (String(rodado || '') + ' ' + String(interno || '')).toUpperCase();
+  const cleanStr = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (cleanStr.includes('PRENSA')) return true;
+  if (cleanStr.includes('FABRIC')) return true;
+  if (cleanStr.includes('FINAL')) return true;
+  if (cleanStr.includes('CONTENE')) return true;
+  if (cleanStr.includes('CONT. MET') || cleanStr.includes('CONT.MET') || cleanStr.includes('CONT. PLAS') || cleanStr.includes('CONT.PLAS')) return true;
+  if (cleanStr.includes('CAJA') || cleanStr.includes('ROLL-OFF')) return true;
+  if (cleanStr.includes('VOLQUET')) return true;
+  if (cleanStr.includes('CANASTO')) return true;
+  if (cleanStr.includes('10171')) return true;
+  return false;
+}
+
 function isHerreriaOrder(order) {
   if (!order) return false;
   const cls = String(order.clasificacion || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const sec = String(order.sector || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  return cls.includes('herrer') || sec.includes('herrer');
+  if (cls.includes('herrer') || sec.includes('herrer')) return true;
+  return isHerreriaExclusiveEquipmentClient(order.rodado, order.interno);
 }
 
 function isEdilicioOrder(order) {
