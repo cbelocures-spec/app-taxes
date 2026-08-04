@@ -6272,12 +6272,22 @@ function showNoveltiesForInterno(interno) {
     listContainer.appendChild(card);
   });
 
+  const ptOriginColors = {
+    transito: '#0288d1',
+    servicios_pendientes: '#2196f3',
+    reparacion: '#f59e0b',
+    fuera_de_servicio: '#ef4444'
+  };
+
   pendingServiceEntries.forEach(entry => {
     const card = document.createElement('div');
     card.className = 'novelty-item';
 
+    const badgeColor = ptOriginColors[entry.origen] || '#64748b';
+    const badgeText = entry.origenLabel || 'Servicio pendiente';
+
     card.innerHTML = `
-      <span class="novelty-badge">Servicio pendiente</span>
+      <span class="novelty-badge" style="background-color:${badgeColor};">${escapeHtml(badgeText)}</span>
       <span class="novelty-desc">${escapeHtml(entry.texto)}</span>
       <div class="novelty-action">
         <span class="material-icons" style="font-size:12px;">add_circle_outline</span>
