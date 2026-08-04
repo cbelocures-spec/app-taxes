@@ -2907,6 +2907,107 @@ app.post('/api/preventivos/process-fuel', async (req, res) => {
   }
 });
 
+// --- Insumos retirados (warehouse withdrawals) pending supervisor approval ---
+// Minimal quoted-CSV parser (handles commas inside quoted fields like "Rocha, Ariel").
+function parseCsvRows(csvText) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < csvText.length; i++) {
+    const c = csvText[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (csvText[i + 1] === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ',') {
+      row.push(field); field = '';
+    } else if (c === '\r') {
+      // skip
+    } else if (c === '\n') {
+      row.push(field); rows.push(row); row = []; field = '';
+    } else {
+      field += c;
+    }
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+async function fetchInsumosRowsFromSheet() {
+  const settings = db.getSettings();
+  const csvUrl = settings.insumosSheetCsvUrl;
+  if (!csvUrl) return [];
+
+  const res = await fetch(csvUrl);
+  if (!res.ok) throw new Error(`HTTP ${res.status} leyendo la hoja de insumos`);
+  const text = await res.text();
+  const rows = parseCsvRows(text);
+  if (rows.length < 2) return [];
+
+  const header = rows[0].map(h => h.trim().toLowerCase());
+  const idx = {
+    idEgreso: header.indexOf('id egreso'),
+    otTaxes: header.indexOf('o.t. taxes'),
+    interno: header.indexOf('interno'),
+    material: header.indexOf('material'),
+    cantidad: header.indexOf('cantidad'),
+    operario: header.indexOf('operario')
+  };
+
+  return rows.slice(1)
+    .filter(r => idx.idEgreso >= 0 && r[idx.idEgreso] && r[idx.idEgreso].trim())
+    .map(r => ({
+      idEgreso: (r[idx.idEgreso] || '').trim(),
+      otTaxes: (r[idx.otTaxes] || '').trim(),
+      interno: (r[idx.interno] || '').trim(),
+      material: (r[idx.material] || '').trim(),
+      cantidad: (r[idx.cantidad] || '').trim(),
+      operario: (r[idx.operario] || '').trim()
+    }));
+}
+
+// Pulls fresh rows from the warehouse sheet, tracks any new ones locally, and returns
+// only the pending items for the CURRENT turno (a supervisor only approves what
+// happened during their own shift).
+app.get('/api/insumos/pendientes', async (req, res) => {
+  try {
+    const rows = await fetchInsumosRowsFromSheet();
+    db.upsertInsumosFromRows(rows);
+    const turnoActual = db.getTurnoForDate(new Date());
+    const pendientes = db.getInsumosPendientes().filter(i => i.estado === 'pendiente' && i.turno === turnoActual);
+    res.json({ turno: turnoActual, items: pendientes });
+  } catch (error) {
+    console.error("[GET /api/insumos/pendientes] Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/insumos/:idEgreso/resolve', (req, res) => {
+  try {
+    const { estado } = req.body;
+    if (estado !== 'aprobado' && estado !== 'rechazado') {
+      return res.status(400).json({ error: "El campo 'estado' debe ser 'aprobado' o 'rechazado'." });
+    }
+    const aprobadoPor = req.headers['x-user-username'] || null;
+    const updated = db.resolveInsumoPendiente(req.params.idEgreso, estado, aprobadoPor);
+    if (!updated) {
+      return res.status(404).json({ error: "Insumo no encontrado." });
+    }
+    // NOTE: pushing the approve/reject result to Taxes is intentionally not implemented
+    // yet - to be added later, depending on which button was pressed.
+    res.json({ success: true, item: updated });
+  } catch (error) {
+    console.error("[POST /api/insumos/:idEgreso/resolve] Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/parte-taller/estado', async (req, res) => {
   const settings = db.getSettings();
   const scriptUrl = settings.parteTallerScriptUrl;

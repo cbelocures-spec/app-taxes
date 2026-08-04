@@ -298,6 +298,8 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchActiveMechanics();
     fetchParteTallerEstado();
     fetchPrevCombustible();
+    fetchAndRenderInsumosPendientes();
+    setInterval(fetchAndRenderInsumosPendientes, 30000);
   }
 
   // Setup Event Listeners
@@ -546,9 +548,6 @@ document.addEventListener('DOMContentLoaded', () => {
     preInternoTextEl.addEventListener('input', refreshPreOrderPendingItems);
     preInternoTextEl.addEventListener('change', refreshPreOrderPendingItems);
   }
-
-  // Restore free mechanics visibility from localStorage
-  applyFreeMechanicsVisibility();
 
   // Search input listeners for Carga Masiva auto-checking on Enter or Blur
   const bulkSearch = document.getElementById('bulk-vehicle-search');
@@ -4773,9 +4772,8 @@ function renderDashboard() {
   try {
     const gridWorking = document.getElementById('grid-working');
     const gridPaused = document.getElementById('grid-paused');
-    const listFree = document.getElementById('list-free-employees');
 
-    if (!gridWorking || !gridPaused || !listFree) return;
+    if (!gridWorking || !gridPaused) return;
 
     // IMPORTANT: Clear ALL existing dashboard timer intervals before re-rendering
     // This prevents ghost intervals from keeping dead timers alive after pause/finish
@@ -4970,74 +4968,9 @@ function renderDashboard() {
       }).join('');
     }
 
-    // 3. Render Free Mechanics
-    const cleanName = (str) => {
-      if (!str) return '';
-      return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
-    };
-
-    const currentUser = localStorage.getItem('currentUserUsername');
-    const userSector = getSectorByUsername(currentUser);
-    let baseList = userSector === 'Herrería' ? getSectorEmployees('Herrería') : getSectorEmployees('Taller');
-    const activeBaseList = (activeMechanicsList && activeMechanicsList.length > 0 && userSector !== 'Herrería') ? activeMechanicsList : baseList;
-
-    const freeMechanics = activeBaseList.filter(name => {
-      const cleaned = cleanName(name);
-      let isWorking = false;
-      workingEmployeeLabels.forEach(label => {
-        if (cleanName(label).includes(cleaned) || cleaned.includes(cleanName(label))) {
-          isWorking = true;
-        }
-      });
-
-      let isPaused = false;
-      pausedEmployeeLabels.forEach(label => {
-        if (cleanName(label).includes(cleaned) || cleaned.includes(cleanName(label))) {
-          isPaused = true;
-        }
-      });
-
-      return !isWorking && !isPaused;
-    });
-
-    const countFreeEl = document.getElementById('count-free');
-    if (countFreeEl) countFreeEl.textContent = freeMechanics.length;
-
-    if (freeMechanics.length === 0) {
-      listFree.innerHTML = `<div class="empty-dashboard-state">Todos los mecánicos están ocupados.</div>`;
-    } else {
-      listFree.innerHTML = freeMechanics.map(name => {
-        const shortName = name.split(',')[0].trim();
-        return `
-          <div class="free-employee-tag">
-            <span class="material-icons">check_circle</span>
-            <span>${shortName}</span>
-          </div>
-        `;
-      }).join('');
-    }
-    applyFreeMechanicsVisibility();
     renderEmployeeHoursSummary();
   } catch (err) {
     console.error("Error rendering dashboard:", err);
-  }
-}
-
-function toggleFreeMechanicsVisibility(checked) {
-  localStorage.setItem('hideFreeMechanicsList', checked ? 'true' : 'false');
-  applyFreeMechanicsVisibility();
-}
-
-function applyFreeMechanicsVisibility() {
-  const isHidden = localStorage.getItem('hideFreeMechanicsList') === 'true';
-  const listFree = document.getElementById('list-free-employees');
-  const chkHide = document.getElementById('chk-hide-free-dashboard');
-
-  if (listFree) {
-    listFree.style.display = isHidden ? 'none' : 'flex';
-  }
-  if (chkHide) {
-    chkHide.checked = isHidden;
   }
 }
 
@@ -5378,6 +5311,108 @@ async function fetchActiveMechanics() {
   }
 }
 
+// --- INSUMOS RETIRADOS (aprobación de supervisor por turno) ---
+
+let cachedInsumosPendientes = [];
+let cachedInsumosTurno = '-';
+
+async function fetchAndRenderInsumosPendientes() {
+  try {
+    const res = await fetch(`/api/insumos/pendientes?_=${Date.now()}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    cachedInsumosPendientes = Array.isArray(data.items) ? data.items : [];
+    cachedInsumosTurno = data.turno || '-';
+    renderInsumosPendientesPreview();
+  } catch (error) {
+    console.error("Error fetching insumos pendientes:", error);
+  }
+}
+
+function renderInsumosPendientesPreview() {
+  const preview = document.getElementById('insumos-pendientes-preview');
+  const countEl = document.getElementById('count-insumos-pendientes');
+  const turnoLabelEl = document.getElementById('insumos-turno-label');
+  if (!preview) return;
+
+  if (countEl) countEl.textContent = cachedInsumosPendientes.length;
+  if (turnoLabelEl) turnoLabelEl.textContent = cachedInsumosTurno;
+
+  if (cachedInsumosPendientes.length === 0) {
+    preview.innerHTML = '<div class="empty-dashboard-state">No hay insumos pendientes de aprobación en este turno.</div>';
+    return;
+  }
+
+  preview.innerHTML = cachedInsumosPendientes.slice(0, 4).map(item => `
+    <div class="free-employee-tag" style="width: 100%; justify-content: space-between; text-align: left;">
+      <span><strong>${escapeHtml(item.interno)}</strong> - ${escapeHtml(item.material)}</span>
+      <span>Cant: ${escapeHtml(item.cantidad)} · ${escapeHtml(item.operario)}</span>
+    </div>
+  `).join('');
+}
+
+function openInsumosApprovalModal() {
+  const modal = document.getElementById('insumos-approval-modal');
+  if (modal) modal.classList.add('open');
+  renderInsumosApprovalModalTable();
+  fetchAndRenderInsumosPendientes().then(renderInsumosApprovalModalTable);
+}
+
+function closeInsumosApprovalModal() {
+  const modal = document.getElementById('insumos-approval-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+function renderInsumosApprovalModalTable() {
+  const tbody = document.getElementById('insumos-modal-tbody');
+  const turnoLabelEl = document.getElementById('insumos-modal-turno-label');
+  if (!tbody) return;
+  if (turnoLabelEl) turnoLabelEl.textContent = cachedInsumosTurno;
+
+  if (cachedInsumosPendientes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">No hay insumos pendientes de aprobación en este turno.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = cachedInsumosPendientes.map(item => `
+    <tr>
+      <td style="padding: 8px;">${escapeHtml(item.otTaxes)}</td>
+      <td style="padding: 8px;">${escapeHtml(item.interno)}</td>
+      <td style="padding: 8px;">${escapeHtml(item.material)}</td>
+      <td style="padding: 8px;">${escapeHtml(item.cantidad)}</td>
+      <td style="padding: 8px;">${escapeHtml(item.operario)}</td>
+      <td style="padding: 8px;">${escapeHtml(item.turno)}</td>
+      <td style="padding: 8px; white-space: nowrap;">
+        <button class="btn btn-xs" style="background: var(--success); color: white; border-color: var(--success);" onclick="resolveInsumoPendiente('${item.idEgreso}', 'aprobado')">Aprobar</button>
+        <button class="btn btn-xs" style="background: var(--danger); color: white; border-color: var(--danger);" onclick="resolveInsumoPendiente('${item.idEgreso}', 'rechazado')">Rechazar</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function resolveInsumoPendiente(idEgreso, estado) {
+  try {
+    const res = await fetch(`/api/insumos/${encodeURIComponent(idEgreso)}/resolve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-username': localStorage.getItem('currentUserUsername') || ''
+      },
+      body: JSON.stringify({ estado })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Error al resolver el insumo");
+    }
+    cachedInsumosPendientes = cachedInsumosPendientes.filter(i => i.idEgreso !== idEgreso);
+    renderInsumosApprovalModalTable();
+    renderInsumosPendientesPreview();
+    showToast(estado === 'aprobado' ? "Insumo aprobado" : "Insumo rechazado", "success");
+  } catch (error) {
+    showToast(error.message || "Error al resolver el insumo", "danger");
+  }
+}
+
 let customAddedMechanicsList = [];
 
 function openActiveMechanicsModal() {
@@ -5403,11 +5438,6 @@ function openActiveMechanicsModal() {
 
   const searchInput = document.getElementById('filter-mechanics-search');
   if (searchInput) searchInput.value = '';
-
-  const chkHide = document.getElementById('chk-hide-free-dashboard');
-  if (chkHide) {
-    chkHide.checked = localStorage.getItem('hideFreeMechanicsList') === 'true';
-  }
 
   document.getElementById('active-mechanics-modal').classList.add('open');
 }

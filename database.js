@@ -59,6 +59,21 @@ function normalizeEmail(email) {
   return `${localPart}@${domain}`;
 }
 
+// Turnos: Mañana 06-14, Tarde 14-22, Noche 22-06 (hora de Argentina, sin importar
+// en qué timezone corra el servidor).
+function getTurnoForDate(date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    hour: 'numeric',
+    hour12: false
+  }).formatToParts(date);
+  const hourPart = parts.find(p => p.type === 'hour');
+  const hour = hourPart ? parseInt(hourPart.value, 10) % 24 : date.getHours();
+  if (hour >= 6 && hour < 14) return 'Mañana';
+  if (hour >= 14 && hour < 22) return 'Tarde';
+  return 'Noche';
+}
+
 function getDefaultUserPermissions(username, sector) {
   const normUser = normalizeEmail(username || '');
   const isPaniol = normUser.includes('paniol') || normUser.includes('panol') || normUser.includes('pañol') || sector === 'Admin';
@@ -260,6 +275,10 @@ const DEFAULT_DB = {
     googleActiveTasksUrl: "https://script.google.com/macros/s/AKfycbxBIPF6-uoK2aFNfRCxDUS5AAFxLeToB7iMz3rdf_J4JjJBvsNbOv7aIdXBBnoxRZiC/exec",
     preventivoScriptUrl: "https://script.google.com/macros/s/AKfycbwuPIslBnq77dG5bhk19h2H2s9TlOeB6XrCpqCMDX-8dvO8uisNRdx7P43lyJtT1sZIgQ/exec",
     parteTallerScriptUrl: "https://script.google.com/macros/s/AKfycbyoHEhogBxWcSIdDtzzUIV9mhzO25TNAChgBlCCJbuHPIylXNpIpX8LKM6qc4DQjij8/exec",
+    // Read-only CSV export of the "insumos" tab (a warehouse/pañol sheet fed by another
+    // sector, not by this app) - lets us pull withdrawn-parts rows without needing a
+    // custom Apps Script endpoint from that sector.
+    insumosSheetCsvUrl: "https://docs.google.com/spreadsheets/d/1EsRlEMIKU0P98WP-0gTJ0rn2Tu7Sjf__Re26YQpi7Ow/export?format=csv&gid=1958299152",
     catalogSyncStatus: "idle",
     catalogSyncError: null
   },
@@ -271,7 +290,8 @@ const DEFAULT_DB = {
   },
   workOrders: [],
   activeMechanics: DEFAULT_MECHANICS,
-  users: {}
+  users: {},
+  insumosPendientes: []
 };
 
 // Thread-safe read/write helper
@@ -417,6 +437,9 @@ class LocalDB {
     }
     if (!settings.parteTallerScriptUrl) {
       settings.parteTallerScriptUrl = DEFAULT_DB.settings.parteTallerScriptUrl;
+    }
+    if (!settings.insumosSheetCsvUrl) {
+      settings.insumosSheetCsvUrl = DEFAULT_DB.settings.insumosSheetCsvUrl;
     }
     if (!settings.username || String(settings.username).trim() === '') {
       settings.username = "paniol@contenedoreshugo.com.ar";
@@ -963,6 +986,58 @@ class LocalDB {
     }
   }
 
+  // --- Insumos retirados (warehouse withdrawals) pending supervisor approval ---
+  // Fed from a read-only CSV export of a sheet maintained by another sector (the
+  // warehouse/pañol) - this app never writes to that sheet, only tracks approval
+  // state locally, keyed by the sheet's own "id egreso".
+  getInsumosPendientes() {
+    const db = this.read();
+    return db.insumosPendientes || [];
+  }
+
+  // Adds any rows not already tracked (matched by idEgreso), tagging each new one with
+  // the turno computed from the moment we first saw it (the source sheet has no
+  // timestamp column of its own).
+  upsertInsumosFromRows(rows) {
+    const db = this.read();
+    if (!Array.isArray(db.insumosPendientes)) db.insumosPendientes = [];
+    const existingIds = new Set(db.insumosPendientes.map(i => i.idEgreso));
+    const now = new Date();
+    let added = 0;
+    (rows || []).forEach(row => {
+      if (!row || !row.idEgreso || existingIds.has(row.idEgreso)) return;
+      db.insumosPendientes.push({
+        idEgreso: row.idEgreso,
+        otTaxes: row.otTaxes || '',
+        interno: row.interno || '',
+        material: row.material || '',
+        cantidad: row.cantidad || '',
+        operario: row.operario || '',
+        turno: getTurnoForDate(now),
+        estado: 'pendiente',
+        aprobadoPor: null,
+        fechaDetectado: now.toISOString(),
+        fechaResolucion: null
+      });
+      existingIds.add(row.idEgreso);
+      added++;
+    });
+    if (added > 0) this.write(db);
+    return added;
+  }
+
+  resolveInsumoPendiente(idEgreso, estado, aprobadoPor) {
+    const db = this.read();
+    if (!Array.isArray(db.insumosPendientes)) return null;
+    const item = db.insumosPendientes.find(i => i.idEgreso === idEgreso);
+    if (!item) return null;
+    item.estado = estado;
+    item.aprobadoPor = aprobadoPor;
+    item.fechaResolucion = new Date().toISOString();
+    this.write(db);
+    return item;
+  }
+
   // --- Audit Log for Auto-Deleted Verified Orders ---
   getDeletedOrdersLog() {
     const db = this.read();
@@ -1067,3 +1142,4 @@ class LocalDB {
 }
 
 module.exports = new LocalDB();
+module.exports.getTurnoForDate = getTurnoForDate;
