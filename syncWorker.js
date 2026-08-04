@@ -127,16 +127,47 @@ async function killZombieChromes() {
   });
 }
 
+// Kills only chrome/chromium processes that have been running longer than minAgeSeconds.
+// A legitimate session is always younger than that (bounded by the sync/verify timeouts, both
+// well under 6 minutes), so this can never touch an actively-in-progress browser — but it does
+// clean up true zombies (orphaned renderer/zygote processes left behind when browser.close()
+// doesn't fully tear down the process tree) before they pile up and exhaust the container's
+// process table (see "fork: retry: Resource temporarily unavailable", 2026-08-03).
+async function killAgedZombieChromes(minAgeSeconds = 360) {
+  if (process.platform === 'win32') return; // dev machines: not worth the ps parsing
+  const { exec } = require('child_process');
+  return new Promise((resolve) => {
+    exec("ps -eo pid,etimes,comm | grep -Ei 'chrome|chromium' | grep -v grep", (err, stdout) => {
+      if (err || !stdout) return resolve();
+      const oldPids = [];
+      for (const line of stdout.trim().split('\n')) {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[0];
+        const etimes = parseInt(parts[1], 10);
+        if (pid && !isNaN(etimes) && etimes >= minAgeSeconds) oldPids.push(pid);
+      }
+      if (oldPids.length === 0) return resolve();
+      console.log(`[ZombieCleanup] Killing ${oldPids.length} chrome process(es) older than ${minAgeSeconds}s: ${oldPids.join(',')}`);
+      exec(`kill -9 ${oldPids.join(' ')}`, () => resolve());
+    });
+  });
+}
+
 async function launchBrowser() {
-  // NOTE: this used to unconditionally pkill every chrome process here before every single
-  // launch. The global browserBusy lock (acquireBrowserLock/releaseBrowserLock) is supposed to
-  // guarantee only one browser runs at a time, but a stuck/hung previous session can force its
+  // Clean up only long-lived zombie chrome processes before launching — see
+  // killAgedZombieChromes() above for why this is safe even under the browserBusy lock's
+  // 5.5-minute forced-through edge case, unlike the unconditional pkill this replaced. The
+  // global browserBusy lock (acquireBrowserLock/releaseBrowserLock) is supposed to guarantee
+  // only one browser runs at a time, but a stuck/hung previous session can force its
   // way past the lock's 5.5-minute safety valve while its own browser is still technically
   // alive — in that narrow window, an unconditional pkill here kills a still-legitimately-open
   // session belonging to another order, producing exactly the cascading "detached Frame" /
   // "Password input not found" failures seen across multiple orders in quick succession
   // (2026-08-03). Zombie cleanup still happens where it's unambiguously safe: after a launch
-  // failure (below) and in the timeout-safety abandonment paths.
+  // failure (below), in the timeout-safety abandonment paths, and here via the age-gated
+  // killAgedZombieChromes() (otherwise truly orphaned processes pile up and exhaust the
+  // container's process table — "fork: retry: Resource temporarily unavailable").
+  await killAgedZombieChromes().catch(() => {});
 
   let execPath = process.env.PUPPETEER_EXECUTABLE_PATH || null;
   const fs = require('fs');
