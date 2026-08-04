@@ -1157,6 +1157,10 @@
             <option value="Herrería">Herrería</option>
           </select>
         </div>
+        <div class="form-group" id="pre-order-pending-items-group" style="margin-top: 15px; display: none;">
+          <label>Ítems pendientes de esta unidad</label>
+          <div id="pre-order-pending-items-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
         <div class="form-group" style="margin-top: 25px;">
           <button class="btn btn-primary" onclick="submitPreOrderCheck()" style="width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; justify-content: center; display: flex; align-items: center; gap: 8px;">
             <span class="material-icons">arrow_forward</span> Continuar
@@ -1820,6 +1824,32 @@
 
 
   <!-- MODAL: AGREGAR / EDITAR UNIDAD EN PARTE TALLER -->
+  <!-- SIMPLE UNIT STATUS MODAL (shown when the last task of an order is finalized) -->
+  <div class="modal-overlay" id="unit-status-modal">
+    <div class="dialog-modal" style="max-width: 360px; text-align: center;">
+      <div class="dialog-body" style="padding: 24px;">
+        <p id="unit-status-modal-subtitle" style="font-size: 13px; color: var(--primary); font-weight: 700; margin: 0 0 4px;"></p>
+        <p style="font-size: 17px; font-weight: 500; margin: 0 0 20px;">¿Cómo queda la unidad?</p>
+
+        <button onclick="resolveUnitStatusModal('operativo')" style="width: 100%; border-radius: 8px; border: 2px solid var(--success); background: var(--success-light); color: #065f46; padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; margin-bottom: 10px;">
+          <span style="font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span class="material-icons" style="font-size: 20px;">check_circle</span>
+            Operativo
+          </span>
+          <span style="font-size: 11px; font-weight: 700;">No se podrán agregar más tareas a esta orden</span>
+        </button>
+
+        <button onclick="resolveUnitStatusModal('fuera_de_servicio')" style="width: 100%; border-radius: 8px; border: 2px solid var(--danger); background: var(--danger-light); color: #991b1b; padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;">
+          <span style="font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span class="material-icons" style="font-size: 20px;">build</span>
+            Fuera de servicio
+          </span>
+          <span style="font-size: 11px; font-weight: 700;">La orden sigue abierta por si hay que agregar más tareas</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="pt-unit-modal">
     <div class="dialog-modal" style="max-width: 450px;">
       <div class="dialog-header" id="pt-unit-modal-header" style="background-color: var(--primary); color: white;">

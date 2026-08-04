@@ -915,7 +915,11 @@ app.put('/api/orders/:id', (req, res) => {
     const allTasksCompleted = finalTasksToSave.length > 0 && finalTasksToSave.every(t => t && (t.status === "Finalizada" || t.status === "Completada"));
 
     const explicitUnarchive = (req.body.archived === false);
-    const targetSyncStatus = req.body.syncStatus || ((existing.syncStatus === 'success' && incomingTasks.length === 0) ? existing.syncStatus : "pending");
+    // Only force a resync on an ordinary edit if the OT header hasn't been created in
+    // Taxes yet. Once it exists, edits stay as-is until something explicitly asks for a
+    // sync (e.g. finishing the last task, or a manual retry) - otherwise every task edit
+    // re-triggers the whole Puppeteer flow.
+    const targetSyncStatus = req.body.syncStatus || (existing.taxesOrderNumber ? existing.syncStatus : "pending");
 
     // La orden pasa a Historial apenas la unidad queda Operativa (no Fuera de Servicio),
     // sin importar si todavía falta sincronizar o controlar con Taxes — eso lo sigue
@@ -994,10 +998,14 @@ app.patch('/api/orders/:id/tasks/:taskId', (req, res) => {
 
     const updatedTasks = [...order.tasks];
     updatedTasks[taskIdx] = { ...updatedTasks[taskIdx], ...updates, synced: false };
-    // Re-queue for Taxes sync: without this, an order already marked as synced never gets
-    // picked up again by the background worker, so hours/description edited from here
-    // (e.g. the dashboard quick-hours field) silently never reach Taxes.
-    db.updateWorkOrder(req.params.id, { tasks: updatedTasks, syncStatus: 'pending', syncError: null });
+    // Only force a resync here if the OT header doesn't exist in Taxes yet. Once it
+    // does, this edit rides along with the next explicit sync (last task finalized, or
+    // a manual retry) instead of re-triggering Puppeteer on every quick field edit.
+    const patchUpdate = { tasks: updatedTasks, syncError: null };
+    if (!order.taxesOrderNumber) {
+      patchUpdate.syncStatus = 'pending';
+    }
+    db.updateWorkOrder(req.params.id, patchUpdate);
     checkAndSendInsumosToSheet(order, updatedTasks, order.responsable, order.interno);
 
     console.log(`[PATCH task] Order ${req.params.id} / Task ${req.params.taskId} updated:`, updates);

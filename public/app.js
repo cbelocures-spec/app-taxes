@@ -209,15 +209,24 @@ function populateDatalist(datalistId, options) {
 function findRodadoForInterno(intVal) {
   const cleanInt = String(intVal || '').trim().toUpperCase();
   if (!cleanInt) return null;
-  return (cachedCatalogs.rodados || []).find(r => {
+  const rodados = cachedCatalogs.rodados || [];
+
+  // 1. Exact match by interno or value first, across the whole catalog,
+  // so a short interno (e.g. "5") earlier in the list never steals a
+  // selection meant for a longer one (e.g. "57").
+  const exactMatch = rodados.find(r => {
     const rInt = String(r.interno || '').trim().toUpperCase();
     const rVal = String(r.value || '').trim().toUpperCase();
-    const rLbl = String(r.label || '').trim().toUpperCase();
-    return (rInt && rInt === cleanInt) ||
-           (rVal && rVal === cleanInt) ||
-           (rLbl && rLbl.includes(cleanInt)) ||
-           (rInt && cleanInt.includes(rInt));
+    return (rInt && rInt === cleanInt) || (rVal && rVal === cleanInt);
   });
+  if (exactMatch) return exactMatch;
+
+  // 2. Fallback: fuzzy match by label text only (used while the user is
+  // still typing a partial interno).
+  return rodados.find(r => {
+    const rLbl = String(r.label || '').trim().toUpperCase();
+    return rLbl && rLbl.includes(cleanInt);
+  }) || null;
 }
 
 function findRodadoOption(selectEl, cleanInterno, rodadoOpt) {
@@ -241,11 +250,14 @@ function findRodadoOption(selectEl, cleanInterno, rodadoOpt) {
   );
   if (exactMatch) return exactMatch;
 
-  // 3. Match by option text containing intStr or intStr containing option text
+  // 3. Match by option text containing intStr (partial typing fallback).
+  // Deliberately NOT "intStr.includes(txt)" - that direction let a short
+  // option text (e.g. interno "5") falsely match a longer typed value
+  // (e.g. "57") whenever it appeared earlier in the option list.
   const matchText = options.find(opt => {
     const txt = String(opt.text || '').toUpperCase().trim();
     if (!txt || txt.startsWith('SELECCIONAR')) return false;
-    return txt.includes(intStr) || intStr.includes(txt) || txt.includes(`INTERNO ${intStr}`) || txt.includes(`INTERNO: ${intStr}`);
+    return txt.includes(intStr) || txt.includes(`INTERNO ${intStr}`) || txt.includes(`INTERNO: ${intStr}`);
   });
   if (matchText) return matchText;
 
@@ -423,7 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!stillHasPending && internoVal) {
-              openPtUnitModalForInterno(internoVal, currentEditingOrderId);
+              openUnitStatusModal(internoVal, currentEditingOrderId);
             }
           });
         }
@@ -521,6 +533,18 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     internoInput.addEventListener('input', handleInternoChange);
     internoInput.addEventListener('change', handleInternoChange);
+  }
+
+  // Show pending items (novelties + Parte Taller) for the unit selected in "Identificar Unidad"
+  const preInternoSelectEl = document.getElementById('pre-form-interno');
+  if (preInternoSelectEl) {
+    preInternoSelectEl.addEventListener('input', refreshPreOrderPendingItems);
+    preInternoSelectEl.addEventListener('change', refreshPreOrderPendingItems);
+  }
+  const preInternoTextEl = document.getElementById('pre-form-interno-text');
+  if (preInternoTextEl) {
+    preInternoTextEl.addEventListener('input', refreshPreOrderPendingItems);
+    preInternoTextEl.addEventListener('change', refreshPreOrderPendingItems);
   }
 
   // Restore free mechanics visibility from localStorage
@@ -672,6 +696,13 @@ function openPreOrderModal() {
 
   // Set up input vs select based on user sector AND updated classification
   setupAllFieldsForSector();
+
+  // Reset pending-items shortcut list from any previously selected unit
+  window._preOrderPendingItems = [];
+  const pendingGroup = document.getElementById('pre-order-pending-items-group');
+  const pendingList = document.getElementById('pre-order-pending-items-list');
+  if (pendingGroup) pendingGroup.style.display = 'none';
+  if (pendingList) pendingList.innerHTML = '';
 
   document.getElementById('pre-order-modal').classList.add('open');
 }
@@ -834,6 +865,167 @@ function promptDiagnosis(taskInfo = null) {
   });
 }
 
+// --- SIMPLE UNIT STATUS MODAL (shown when the last task of an order is finalized) ---
+
+let _unitStatusModalCtx = null;
+
+function openUnitStatusModal(interno, orderId) {
+  _unitStatusModalCtx = { interno, orderId };
+  const subtitle = document.getElementById('unit-status-modal-subtitle');
+  if (subtitle) subtitle.textContent = `Interno ${interno} · última tarea finalizada`;
+  const modal = document.getElementById('unit-status-modal');
+  if (modal) modal.classList.add('open');
+}
+
+function closeUnitStatusModal() {
+  const modal = document.getElementById('unit-status-modal');
+  if (modal) modal.classList.remove('open');
+  _unitStatusModalCtx = null;
+}
+
+async function resolveUnitStatusModal(estado) {
+  const ctx = _unitStatusModalCtx;
+  closeUnitStatusModal();
+  if (!ctx) return;
+  const { interno, orderId } = ctx;
+
+  const order = activeOrders.find(o => o.id === orderId);
+  if (order) {
+    order.estadoUnidad = estado;
+    try {
+      const currentUsername = localStorage.getItem('currentUserUsername') || 'paniol@contenedoreshugo.com.ar';
+      await fetch(`/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-username': currentUsername
+        },
+        body: JSON.stringify({
+          rodado: order.rodado,
+          responsable: order.responsable,
+          fechaEntrega: order.fechaEntrega,
+          horario: order.horario,
+          interno: order.interno,
+          clasificacion: order.clasificacion,
+          incidente: order.incidente,
+          tasks: order.tasks,
+          estadoUnidad: estado,
+          // Operativo = no more tasks coming, this is the moment to push everything to
+          // Taxes in one shot. Fuera de servicio leaves the order open (job still going),
+          // so it doesn't force a resync here - it rides along with the next explicit sync.
+          ...(estado === 'operativo' ? { syncStatus: 'pending' } : {})
+        })
+      });
+      fetchOrders();
+    } catch (e) {
+      console.error('[resolveUnitStatusModal] Error al actualizar estadoUnidad:', e);
+    }
+  }
+
+  if (estado === 'operativo') {
+    await reconcilePendingServicesAfterOperativo(interno, order);
+    showToast("Unidad marcada como Operativa", "success");
+  } else {
+    await markPendingServiceEnProceso(interno);
+    showToast("Unidad marcada como Fuera de servicio (En Proceso)", "warning");
+  }
+}
+
+// Marks only the checklist items whose text matches a Finalizada task of THIS order
+// as done (hecho:true). Anything not converted into a task stays untouched in
+// servicios_pendientes so it's never lost.
+async function reconcilePendingServicesAfterOperativo(interno, order) {
+  if (!window._ptState) return;
+  const cleanInterno = String(interno || '').trim().toLowerCase();
+  if (!cleanInterno) return;
+
+  const finalizedDescriptions = ((order && order.tasks) || [])
+    .filter(t => t && t.status === 'Finalizada')
+    .map(t => (t.descripcion || '').trim().toLowerCase());
+
+  if (finalizedDescriptions.length === 0) return;
+
+  let changed = false;
+
+  Object.keys(PT_LIST_LABELS).forEach(listName => {
+    (window._ptState[listName] || []).forEach(item => {
+      if (String(item.interno || '').trim().toLowerCase() !== cleanInterno) return;
+
+      let entries = (Array.isArray(item.novedad_items) && item.novedad_items.length > 0)
+        ? item.novedad_items.slice()
+        : (item.novedad || '').split('\n').map(line => {
+            const l = line.trim();
+            if (!l) return null;
+            const hecho = l.startsWith('[X]') || l.startsWith('[x]');
+            const texto = l.replace(/^\[\s*[xX]?\s*\]\s*/, '').trim();
+            return texto ? { texto, hecho } : null;
+          }).filter(Boolean);
+
+      let itemChanged = false;
+      entries = entries.map(entry => {
+        if (!entry.hecho && finalizedDescriptions.includes((entry.texto || '').trim().toLowerCase())) {
+          itemChanged = true;
+          return { texto: entry.texto, hecho: true };
+        }
+        return entry;
+      });
+
+      if (itemChanged) {
+        item.novedad_items = entries;
+        item.novedad = entries.map(e => `[${e.hecho ? 'X' : ' '}] ${e.texto}`).join('\n');
+        changed = true;
+      }
+    });
+  });
+
+  if (!changed) return;
+
+  try {
+    await fetch('/api/parte-taller/novedad', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accion: 'save_state', state: window._ptState })
+    });
+    fetchParteTallerEstado();
+  } catch (e) {
+    console.error('[reconcilePendingServicesAfterOperativo] Error guardando Parte Taller:', e);
+  }
+}
+
+// Flags the unit's Parte Taller entry as "En Proceso" (still being worked on),
+// since choosing Fuera de servicio leaves the order open for more tasks and the
+// job may take a while.
+async function markPendingServiceEnProceso(interno) {
+  if (!window._ptState) return;
+  const cleanInterno = String(interno || '').trim().toLowerCase();
+  if (!cleanInterno) return;
+
+  const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
+  let changed = false;
+
+  lists.forEach(listName => {
+    (window._ptState[listName] || []).forEach(item => {
+      if (String(item.interno || '').trim().toLowerCase() === cleanInterno) {
+        item.estadoTrabajo = 'en_proceso';
+        changed = true;
+      }
+    });
+  });
+
+  if (!changed) return;
+
+  try {
+    await fetch('/api/parte-taller/novedad', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accion: 'save_state', state: window._ptState })
+    });
+    fetchParteTallerEstado();
+  } catch (e) {
+    console.error('[markPendingServiceEnProceso] Error guardando Parte Taller:', e);
+  }
+}
+
 function openPtUnitModalForInterno(interno, sourceOrderId) {
   window._ptLinkedOrderId = sourceOrderId || null; // usado por savePtUnit para sincronizar el estado de vuelta a la orden
   if (!window._ptState) {
@@ -912,9 +1104,117 @@ async function submitPreOrderCheck() {
     closePreOrderModal();
     editOrder(existingOrder.id);
   } else {
+    // Read checked pending-items BEFORE closing the modal (closing just hides it, but
+    // let's not depend on that - grab the selection while it's still guaranteed live).
+    const items = window._preOrderPendingItems || [];
+    const checkedIndices = Array.from(document.querySelectorAll('#pre-order-pending-items-list input[type="checkbox"]:checked'))
+      .map(cb => parseInt(cb.dataset.idx, 10));
+    const selectedItems = checkedIndices.map(idx => items[idx]).filter(Boolean);
+
     closePreOrderModal();
     openNewOrderModal(interno, clasificacion);
+
+    if (selectedItems.length > 0) {
+      selectedItems.forEach(item => {
+        addTaskField({
+          centroCosto: mapRubroToCentroCosto(item.tipo),
+          empleado: "",
+          horasEstimadas: 0,
+          status: "Pendiente",
+          descripcion: item.texto
+        });
+      });
+    } else {
+      // No item selected: don't make the user click "Agregar Tarea" for nothing.
+      addTaskField({
+        centroCosto: "",
+        empleado: "",
+        horasEstimadas: 0,
+        status: "Pendiente",
+        descripcion: ""
+      });
+    }
   }
+}
+
+// Novelties for this interno that haven't already been turned into a Finalizada
+// task in some active order (same filter used by the big order form's sidebar).
+function getUncompletedNoveltiesForInterno(interno) {
+  const cleanInterno = String(interno || '').trim().toLowerCase();
+  if (!cleanInterno) return [];
+  return cachedNovelties.filter(n => {
+    if (String(n.interno || '').toLowerCase().trim() !== cleanInterno) return false;
+    const desc = [n.rubro, n.subrubro, n.observacion].filter(Boolean).join(' - ').toLowerCase().trim();
+    const isCompleted = activeOrders.some(order => {
+      const orderInterno = (order.interno || '').toLowerCase().trim();
+      if (orderInterno !== cleanInterno) return false;
+      return (order.tasks || []).some(task => {
+        const taskDesc = (task.descripcion || '').toLowerCase().trim();
+        return task.status === 'Finalizada' && taskDesc === desc;
+      });
+    });
+    return !isCompleted;
+  });
+}
+
+// Renders the pending-items shortcut list in "Identificar Unidad" (pre-order-modal)
+// once a Rodado/Interno is selected, so a task can be created straight from a novelty
+// or a Parte Taller pending service.
+function refreshPreOrderPendingItems() {
+  const group = document.getElementById('pre-order-pending-items-group');
+  const list = document.getElementById('pre-order-pending-items-list');
+  if (!group || !list) return;
+
+  const preInternoSelect = document.getElementById('pre-form-interno');
+  const preInternoText = document.getElementById('pre-form-interno-text');
+  let interno = preInternoSelect ? preInternoSelect.value.trim() : "";
+  if (!interno && preInternoText && preInternoText.value) {
+    interno = preInternoText.value.trim();
+  }
+
+  if (!interno) {
+    group.style.display = 'none';
+    list.innerHTML = '';
+    window._preOrderPendingItems = [];
+    return;
+  }
+
+  const novelties = getUncompletedNoveltiesForInterno(interno).map(n => ({
+    texto: [n.rubro, n.subrubro, n.observacion].filter(Boolean).join(' - '),
+    tipo: n.rubro
+  }));
+  const pendingServices = (typeof getPendingServiceEntriesForInterno === 'function')
+    ? getPendingServiceEntriesForInterno(interno)
+    : [];
+  const items = [...novelties, ...pendingServices];
+
+  window._preOrderPendingItems = items;
+  group.style.display = 'block';
+
+  if (items.length === 0) {
+    list.innerHTML = '<p style="font-size:12px; color:var(--text-muted); margin:0;">No hay ítems pendientes para esta unidad.</p>';
+    return;
+  }
+
+  const originColors = {
+    transito: '#0288d1',
+    servicios_pendientes: '#2196f3',
+    reparacion: '#f59e0b',
+    fuera_de_servicio: '#ef4444'
+  };
+
+  list.innerHTML = items.map((item, idx) => {
+    const originColor = originColors[item.origen] || 'var(--text-muted)';
+    const originBadge = item.origenLabel
+      ? `<span class="badge" style="background:${originColor}; color:white; font-size:10px; white-space:nowrap;">${escapeHtml(item.origenLabel)}</span>`
+      : '';
+    return `
+    <label style="display:flex; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--border-color); border-radius:8px; cursor:pointer;">
+      <input type="checkbox" data-idx="${idx}" style="width:18px; height:18px; flex-shrink:0; accent-color:var(--primary);">
+      <span style="font-size:13px; flex:1;">${escapeHtml(item.texto)}</span>
+      ${originBadge}
+    </label>`;
+  }).join('');
 }
 
 function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
@@ -5017,9 +5317,9 @@ async function markDashboardTaskFinished(orderId, taskId) {
 
     const stillHasPendingTasks = (order.tasks || []).some(t => t.id !== taskId && t.status !== 'Finalizada');
     if (!stillHasPendingTasks) {
-      openPtUnitModalForInterno(order.interno, orderId);
+      openUnitStatusModal(order.interno, orderId);
     }
-    
+
     if (allCompleted) {
       showToast("¡Todas las tareas finalizadas! Puedes subir la orden a Taxes manualmente desde el listado de órdenes.", "success");
     }
@@ -5874,26 +6174,28 @@ function showNoveltiesForInterno(interno) {
     if (n.interno.toLowerCase().trim() !== interno.toLowerCase().trim()) {
       return false;
     }
-    
+
     // Check if there is already a completed task for this novelty
     const desc = [n.rubro, n.subrubro, n.observacion].filter(Boolean).join(' - ').toLowerCase().trim();
-    
+
     const isCompleted = activeOrders.some(order => {
       const orderInterno = (order.interno || '').toLowerCase().trim();
       const matchInterno = orderInterno === interno.toLowerCase().trim();
       if (!matchInterno) return false;
-      
+
       return (order.tasks || []).some(task => {
         const taskDesc = (task.descripcion || '').toLowerCase().trim();
         const taskCompleted = task.status === 'Finalizada';
         return taskCompleted && taskDesc === desc;
       });
     });
-    
+
     return !isCompleted;
   });
-  
-  if (matches.length === 0) {
+
+  const pendingServiceEntries = getPendingServiceEntriesForInterno(interno);
+
+  if (matches.length === 0 && pendingServiceEntries.length === 0) {
     sidebar.style.display = 'none';
     listContainer.innerHTML = '';
     return;
@@ -5905,17 +6207,17 @@ function showNoveltiesForInterno(interno) {
   matches.forEach(n => {
     const card = document.createElement('div');
     card.className = 'novelty-item';
-    
+
     // Set custom rubro attribute for badge coloring in CSS
     const rubroLower = (n.rubro || '').toLowerCase().trim();
     card.setAttribute('data-rubro', rubroLower);
-    
+
     const rubroText = n.rubro || 'Novedad';
     const subrubroText = n.subrubro || '';
     const obsText = n.observacion || '';
     const mecanicoText = n.mecanico || '';
     const supervisorText = n.supervisor || '';
-    
+
     card.innerHTML = `
       <span class="novelty-badge">${escapeHtml(rubroText)}</span>
       ${subrubroText ? `<span class="novelty-title">${escapeHtml(subrubroText)}</span>` : ''}
@@ -5931,13 +6233,92 @@ function showNoveltiesForInterno(interno) {
         <span>Crear tarea</span>
       </div>
     `;
-    
+
     card.addEventListener('click', () => {
       handleNoveltyClick(n);
     });
-    
+
     listContainer.appendChild(card);
   });
+
+  pendingServiceEntries.forEach(entry => {
+    const card = document.createElement('div');
+    card.className = 'novelty-item';
+
+    card.innerHTML = `
+      <span class="novelty-badge">Servicio pendiente</span>
+      <span class="novelty-desc">${escapeHtml(entry.texto)}</span>
+      <div class="novelty-action">
+        <span class="material-icons" style="font-size:12px;">add_circle_outline</span>
+        <span>Crear tarea</span>
+      </div>
+    `;
+
+    card.addEventListener('click', () => {
+      handlePendingServiceClick(entry);
+    });
+
+    listContainer.appendChild(card);
+  });
+}
+
+// Pulls the pending checklist items registered in Parte Taller (servicios_pendientes)
+// for a given interno, so they show up alongside the novelties sidebar in Nueva Orden.
+const PT_LIST_LABELS = {
+  transito: 'Tránsito',
+  servicios_pendientes: 'Servicio Pendiente',
+  reparacion: 'Reparación',
+  fuera_de_servicio: 'Fuera de Servicio'
+};
+
+// Scans all four Parte Taller lists (not just servicios_pendientes) for the given
+// interno, so a unit already in Reparación/Fuera de servicio/Tránsito still surfaces
+// its pending checklist items when creating a new order for it.
+function getPendingServiceEntriesForInterno(interno) {
+  const cleanInterno = String(interno || '').trim().toLowerCase();
+  if (!cleanInterno) return [];
+
+  const state = window._ptState || {};
+  const entries = [];
+
+  Object.keys(PT_LIST_LABELS).forEach(listName => {
+    (state[listName] || [])
+      .filter(item => String(item.interno || '').trim().toLowerCase() === cleanInterno)
+      .forEach(item => {
+        let pendingTexts = [];
+        if (Array.isArray(item.novedad_items) && item.novedad_items.length > 0) {
+          pendingTexts = item.novedad_items
+            .filter(x => !x.hecho)
+            .map(x => (x.texto || '').replace(/^\[\s*\]\s*/, '').trim())
+            .filter(Boolean);
+        } else if (item.novedad) {
+          item.novedad.split('\n').forEach(line => {
+            const l = line.trim();
+            if (l && !l.startsWith('[X]') && !l.startsWith('[x]')) {
+              const clean = l.replace(/^\[\s*\]\s*/, '').trim();
+              if (clean) pendingTexts.push(clean);
+            }
+          });
+        }
+        pendingTexts.forEach(texto => {
+          entries.push({ texto, tipo: item.tipo || '', origen: listName, origenLabel: PT_LIST_LABELS[listName] });
+        });
+      });
+  });
+
+  return entries;
+}
+
+function handlePendingServiceClick(entry) {
+  addTaskField({
+    centroCosto: mapRubroToCentroCosto(entry.tipo),
+    empleado: "",
+    horasEstimadas: 0,
+    status: "Pendiente",
+    descripcion: entry.texto
+  });
+
+  showToast("Tarea creada a partir de servicio pendiente", "success");
 }
 
 function escapeHtml(str) {
@@ -10018,6 +10399,13 @@ function renderParteTallerDashboard(state) {
     </button>`;
   }
 
+  // Badge shown when the unit was marked "Fuera de servicio" from the simple
+  // status modal (order still open, job may take a while).
+  function getEstadoTrabajoBadgeHtml(item) {
+    if (!item || item.estadoTrabajo !== 'en_proceso') return '';
+    return `<span class="badge" style="background:#f59e0b; color:white; font-size:10px; margin-left:6px; vertical-align:middle;">En Proceso</span>`;
+  }
+
   // Helper to calculate days out of service
   function getDiasParadoHtml(item, desde) {
     let diasParado = item.dias_en_reparacion ? (item.dias_en_reparacion + ' días') : '—';
@@ -10151,7 +10539,7 @@ function renderParteTallerDashboard(state) {
           : `<strong>${internoPT}</strong>`;
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         return `<tr>
-          <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEditBtnHtml(internoPT, 'fuera_de_servicio')}</div></td>
+          <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEstadoTrabajoBadgeHtml(item)} ${getEditBtnHtml(internoPT, 'fuera_de_servicio')}</div></td>
           <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
@@ -10171,7 +10559,7 @@ function renderParteTallerDashboard(state) {
           const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
           return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
-              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
+              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}${getEstadoTrabajoBadgeHtml(item)}</div>
               ${getDiasParadoHtml(item, desde)}
             </div>
             <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>Ingreso: <strong>${desde}</strong></span></div>
@@ -10203,7 +10591,7 @@ function renderParteTallerDashboard(state) {
           : `<strong>${internoPT}</strong>`;
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         return `<tr>
-          <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEditBtnHtml(internoPT, 'reparacion')}</div></td>
+          <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEstadoTrabajoBadgeHtml(item)} ${getEditBtnHtml(internoPT, 'reparacion')}</div></td>
           <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
@@ -10223,7 +10611,7 @@ function renderParteTallerDashboard(state) {
           const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
           return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
-              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
+              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}${getEstadoTrabajoBadgeHtml(item)}</div>
               ${getDiasParadoHtml(item, desde)}
             </div>
             <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>Ingreso: <strong>${desde}</strong></span></div>
