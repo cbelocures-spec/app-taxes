@@ -1351,8 +1351,8 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
   `;
   updateTaskCountBadge();
   
-  // Hide novelties panel
-  showNoveltiesForInterno("");
+  // Show novelties/pending-items panel for the preselected unit (empty interno hides it)
+  showNoveltiesForInterno(cleanInterno);
 }
 
 function closeNewOrderModal() {
