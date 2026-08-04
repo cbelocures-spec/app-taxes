@@ -166,6 +166,57 @@ function isEdilicio(cls) {
   return norm.includes('edilici') || norm.includes('edilicio');
 }
 
+// A person can't physically work on two tasks at once. If a task in `tasksToCheck` just
+// started its timer (timerStarted:true and it wasn't already running before this save,
+// per `previousTasksById`) and that same employee has a timer running on another active
+// order, auto-pause the other one instead of blocking this save - two devices can each
+// start a timer for the same employee within the same ~2s polling window and miss the
+// other's change, so this has to be enforced here, not just client-side.
+function autoPauseConflictingTimers(currentOrderId, tasksToCheck, previousTasksById) {
+  const hmmToMinutesServer = (hmmVal) => {
+    const h = Math.floor(hmmVal);
+    const m = Math.round((hmmVal - h) * 100);
+    return h * 60 + m;
+  };
+  const minutesToHmmServer = (totalMinutes) => {
+    const h = Math.floor(totalMinutes / 60);
+    const m = Math.round(totalMinutes % 60);
+    return parseFloat((h + m / 100).toFixed(2));
+  };
+
+  for (const task of (tasksToCheck || [])) {
+    if (!task || !task.empleado || task.timerStarted !== true) continue;
+    const previousTask = previousTasksById ? previousTasksById.get(task.id) : null;
+    if (previousTask && previousTask.timerStarted === true) continue; // already running before this save, not a new start
+
+    const conflictOrder = (db.getSyncableOrders() || []).find(o =>
+      o.id !== currentOrderId && o.archived !== true && o.deleted !== true &&
+      (o.tasks || []).some(t => t && String(t.empleado) === String(task.empleado) && t.timerStarted === true)
+    );
+    if (conflictOrder) {
+      const conflictTask = (conflictOrder.tasks || []).find(t => t && String(t.empleado) === String(task.empleado) && t.timerStarted === true);
+      const startVal = (conflictTask.timerStart && parseInt(conflictTask.timerStart) > 0) ? parseInt(conflictTask.timerStart) : Date.now();
+      const elapsedMinutes = Math.round(Math.max(0, Date.now() - startVal) / 60000);
+      const currentMinutes = hmmToMinutesServer(parseFloat(String(conflictTask.horasEstimadas || 0).replace(',', '.')) || 0);
+      const newHours = minutesToHmmServer(currentMinutes + elapsedMinutes);
+
+      const updatedConflictTasks = (conflictOrder.tasks || []).map(t => {
+        if (t !== conflictTask) return t;
+        const history = Array.isArray(t.timerHistory) ? [...t.timerHistory] : [];
+        const lastEvent = history.length > 0 ? history[history.length - 1] : null;
+        const lastType = lastEvent ? String(lastEvent.type || lastEvent.event || '').trim().toLowerCase() : '';
+        if (!(lastType.startsWith('paus') || lastType.startsWith('fin'))) {
+          history.push({ type: 'Pausó', formatted: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }), timestamp: Date.now() });
+        }
+        return { ...t, timerStart: null, timerStarted: false, horasEstimadas: newHours, timerHistory: history };
+      });
+
+      db.updateWorkOrder(conflictOrder.id, { tasks: updatedConflictTasks });
+      console.log(`[Auto-Pause] Empleado ${task.empleado} tenia un cronometro activo en orden ${conflictOrder.id} (Interno ${conflictOrder.interno}); se pauso automaticamente para iniciar en orden ${currentOrderId}.`);
+    }
+  }
+}
+
 // Fuente única de verdad: el label de Rodado SIEMPRE se deriva del catálogo por Interno
 // cuando existe una unidad con ese interno, para que Rodado e Interno Unidad nunca queden
 // desincronizados en una orden guardada (el cliente puede enviarlos desincronizados por bug de UI).
@@ -638,6 +689,11 @@ app.post('/api/orders', (req, res) => {
       sector
     });
 
+    // Guard: a new task can be created with its timer already running (started while
+    // the "Nueva Orden" form was still open, before ever hitting the server) - check for
+    // conflicts here too, not just on later edits.
+    autoPauseConflictingTimers(newOrder.id, newOrder.tasks, null);
+
     // Respond immediately to the frontend so UI never freezes or hangs
     res.status(201).json(newOrder);
 
@@ -707,6 +763,7 @@ app.post('/api/orders/bulk', (req, res) => {
         sector
       });
 
+      autoPauseConflictingTimers(newOrder.id, newOrder.tasks, null);
       createdOrders.push(newOrder);
     }
 
@@ -868,54 +925,10 @@ app.put('/api/orders/:id', (req, res) => {
 
     const finalTasksToSave = Array.from(mergedTasksMap.values());
 
-    // Guard: a person can't physically work on two tasks at once. The client already
-    // warns about this using its own last-polled snapshot of orders, but two devices
-    // starting a timer for the same employee within the same ~2s polling window can each
-    // miss the other's change. Instead of blocking this save, auto-pause the other task
-    // (same behavior the client already offers via a confirm dialog), mirroring the exact
-    // hmm-format hours math used everywhere else in the app.
-    const hmmToMinutesServer = (hmmVal) => {
-      const h = Math.floor(hmmVal);
-      const m = Math.round((hmmVal - h) * 100);
-      return h * 60 + m;
-    };
-    const minutesToHmmServer = (totalMinutes) => {
-      const h = Math.floor(totalMinutes / 60);
-      const m = Math.round(totalMinutes % 60);
-      return parseFloat((h + m / 100).toFixed(2));
-    };
-
-    for (const task of finalTasksToSave) {
-      if (!task || !task.empleado || task.timerStarted !== true) continue;
-      const existingTask = (existing.tasks || []).find(et => et.id === task.id);
-      if (existingTask && existingTask.timerStarted === true) continue; // already running before this save, not a new start
-
-      const conflictOrder = (db.getSyncableOrders() || []).find(o =>
-        o.id !== existing.id && o.archived !== true && o.deleted !== true &&
-        (o.tasks || []).some(t => t && String(t.empleado) === String(task.empleado) && t.timerStarted === true)
-      );
-      if (conflictOrder) {
-        const conflictTask = (conflictOrder.tasks || []).find(t => t && String(t.empleado) === String(task.empleado) && t.timerStarted === true);
-        const startVal = (conflictTask.timerStart && parseInt(conflictTask.timerStart) > 0) ? parseInt(conflictTask.timerStart) : Date.now();
-        const elapsedMinutes = Math.round(Math.max(0, Date.now() - startVal) / 60000);
-        const currentMinutes = hmmToMinutesServer(parseFloat(String(conflictTask.horasEstimadas || 0).replace(',', '.')) || 0);
-        const newHours = minutesToHmmServer(currentMinutes + elapsedMinutes);
-
-        const updatedConflictTasks = (conflictOrder.tasks || []).map(t => {
-          if (t !== conflictTask) return t;
-          const history = Array.isArray(t.timerHistory) ? [...t.timerHistory] : [];
-          const lastEvent = history.length > 0 ? history[history.length - 1] : null;
-          const lastType = lastEvent ? String(lastEvent.type || lastEvent.event || '').trim().toLowerCase() : '';
-          if (!(lastType.startsWith('paus') || lastType.startsWith('fin'))) {
-            history.push({ type: 'Pausó', formatted: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }), timestamp: Date.now() });
-          }
-          return { ...t, timerStart: null, timerStarted: false, horasEstimadas: newHours, timerHistory: history };
-        });
-
-        db.updateWorkOrder(conflictOrder.id, { tasks: updatedConflictTasks });
-        console.log(`[Auto-Pause] Empleado ${task.empleado} tenia un cronometro activo en orden ${conflictOrder.id} (Interno ${conflictOrder.interno}); se pauso automaticamente para iniciar en orden ${existing.id}.`);
-      }
-    }
+    // Guard: a person can't physically work on two tasks at once (see
+    // autoPauseConflictingTimers for why this has to be enforced server-side too).
+    const previousTasksById = new Map((existing.tasks || []).map(et => [et.id, et]));
+    autoPauseConflictingTimers(existing.id, finalTasksToSave, previousTasksById);
 
     const targetEstadoUnidad = estadoUnidad !== undefined ? estadoUnidad : existing.estadoUnidad;
     const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
