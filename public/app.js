@@ -5358,6 +5358,15 @@ function openInsumosApprovalModal() {
   fetchAndRenderInsumosPendientes().then(renderInsumosApprovalModalTable);
 }
 
+async function refreshInsumosApprovalModal() {
+  const tbody = document.getElementById('insumos-modal-tbody');
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">Actualizando...</td></tr>';
+  }
+  await fetchAndRenderInsumosPendientes();
+  renderInsumosApprovalModalTable();
+}
+
 function closeInsumosApprovalModal() {
   const modal = document.getElementById('insumos-approval-modal');
   if (modal) modal.classList.remove('open');

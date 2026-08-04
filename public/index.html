@@ -1827,7 +1827,12 @@
     <div class="dialog-modal" style="max-width: 700px; width: 95%;">
       <div class="dialog-header">
         <h3>Insumos Retirados - Turno <span id="insumos-modal-turno-label">-</span></h3>
-        <button class="dialog-close" onclick="closeInsumosApprovalModal()">&times;</button>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button type="button" class="btn btn-link btn-xs" style="padding: 0; min-width: auto; color: var(--primary); display: inline-flex; align-items: center; gap: 4px;" onclick="refreshInsumosApprovalModal()" title="Refrescar">
+            <span class="material-icons" style="font-size: 18px;">refresh</span>
+          </button>
+          <button class="dialog-close" onclick="closeInsumosApprovalModal()">&times;</button>
+        </div>
       </div>
       <div class="dialog-body" style="max-height: 60vh; overflow-y: auto;">
         <div style="overflow-x: auto;">
