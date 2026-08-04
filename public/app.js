@@ -1111,17 +1111,32 @@ async function submitPreOrderCheck() {
       .map(cb => parseInt(cb.dataset.idx, 10));
     const selectedItems = checkedIndices.map(idx => items[idx]).filter(Boolean);
 
+    // Default: one task per selected item. If more than one is selected, ask how many
+    // tasks to group them into (e.g. 2 items -> 1 task means both go in the SAME task).
+    let taskGroups = selectedItems.map(item => [item]);
+    if (selectedItems.length > 1) {
+      const input = window.prompt(
+        `Seleccionaste ${selectedItems.length} ítems. ¿En cuántas tareas los agrupamos?`,
+        String(selectedItems.length)
+      );
+      if (input === null) return; // cancelled: stay on the pre-order modal, nothing created
+      const parsed = parseInt(input, 10);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= selectedItems.length) {
+        taskGroups = splitItemsIntoGroups(selectedItems, parsed);
+      }
+    }
+
     closePreOrderModal();
     openNewOrderModal(interno, clasificacion);
 
-    if (selectedItems.length > 0) {
-      selectedItems.forEach(item => {
+    if (taskGroups.length > 0) {
+      taskGroups.forEach(group => {
         addTaskField({
-          centroCosto: mapRubroToCentroCosto(item.tipo),
+          centroCosto: mapRubroToCentroCosto(group[0].tipo),
           empleado: "",
           horasEstimadas: 0,
           status: "Pendiente",
-          descripcion: item.texto
+          descripcion: group.map(i => i.texto).join(' / ')
         });
       });
     } else {
@@ -1135,6 +1150,22 @@ async function submitPreOrderCheck() {
       });
     }
   }
+}
+
+// Splits items into exactly `groupCount` contiguous, balanced groups (never empty,
+// as long as groupCount <= items.length) so several pending items can share one task.
+function splitItemsIntoGroups(items, groupCount) {
+  const result = [];
+  const base = Math.floor(items.length / groupCount);
+  let remainder = items.length % groupCount;
+  let idx = 0;
+  for (let g = 0; g < groupCount; g++) {
+    const size = base + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder--;
+    result.push(items.slice(idx, idx + size));
+    idx += size;
+  }
+  return result;
 }
 
 // Novelties for this interno that haven't already been turned into a Finalizada
