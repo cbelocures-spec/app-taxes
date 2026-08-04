@@ -545,13 +545,17 @@ app.get('/api/orders', (req, res) => {
       // a generic clasificacion (e.g. "Correctivo") instead of "Herrería" for that equipment, and
       // without this check they'd leak into Taller's view.
       const isExclusiveHerreriaEquipment = isHerreriaExclusiveEquipment(o.rodado, o.interno);
-      const effectivelyHerreria = isHerreria(cls) || isExclusiveHerreriaEquipment;
+      // `sector` (set at creation from the creator's own sector) also counts: a
+      // Herrería-sector user's order routes to Herrería even if its clasificacion
+      // is Correctivo/Preventivo/Auxilio, since that field is no longer forced.
+      const effectivelyHerreria = isHerreria(cls) || isHerreria(o.sector) || isExclusiveHerreriaEquipment;
+      const effectivelyEdilicio = isEdilicio(cls) || isEdilicio(o.sector);
       if (sector === 'Admin') return true;
       if (allowed.some(s => isHerreria(s)) && effectivelyHerreria) return true;
-      if (allowed.some(s => isEdilicio(s)) && isEdilicio(cls)) return true;
+      if (allowed.some(s => isEdilicio(s)) && effectivelyEdilicio) return true;
       if (allowed.some(s => s === 'Taller')) {
         // Taller sees non-Herreria, non-Edilicio orders
-        if (!effectivelyHerreria && !isEdilicio(cls)) return true;
+        if (!effectivelyHerreria && !effectivelyEdilicio) return true;
         // Taller ALSO sees Herrería orders for regular vehicles (e.g. Rodado 61), hiding only exclusive equipment (Foto 1)
         if (effectivelyHerreria && !isExclusiveHerreriaEquipment) return true;
       }
@@ -581,15 +585,14 @@ app.post('/api/orders', (req, res) => {
       return res.status(403).json({ error: "No tiene permiso configurado para crear órdenes." });
     }
 
-    // Normalize and assign final classification based on selection or user's sector
+    // Normalize accents/case only - don't override the classification the user actually
+    // picked based on their sector. A Herrería-sector user (e.g. Carmona) can genuinely
+    // log a Correctivo/Preventivo/Auxilio task without it being silently rewritten;
+    // routing to the Herrería/Edilicio views uses the separate `sector` field below.
     let finalClasificacion = clasificacion;
     if (isHerreria(clasificacion)) {
       finalClasificacion = 'Herrería';
     } else if (isEdilicio(clasificacion)) {
-      finalClasificacion = 'Edilicio';
-    } else if (sector === 'Herrería' || isHerreria(sector)) {
-      finalClasificacion = 'Herrería';
-    } else if (sector === 'Edilicio' || isEdilicio(sector)) {
       finalClasificacion = 'Edilicio';
     }
 
@@ -631,7 +634,8 @@ app.post('/api/orders', (req, res) => {
       tasks,
       createdBy,
       estadoUnidad: estadoUnidad || 'fuera_de_servicio',
-      combustibleReset
+      combustibleReset,
+      sector
     });
 
     // Respond immediately to the frontend so UI never freezes or hangs
@@ -678,10 +682,10 @@ app.post('/api/orders/bulk', (req, res) => {
         return res.status(400).json({ error: `Campos obligatorios faltantes en orden. Rodado, responsable y clasificacion son requeridos.` });
       }
 
+      // Don't force clasificacion by sector anymore (a Herrería-sector user can
+      // genuinely log Correctivo/Preventivo/Auxilio) - routing uses `sector` below.
       let finalClasificacion = clasificacion;
-      if (sector === 'Herrería') {
-        finalClasificacion = 'Herrería';
-      } else if (sector === 'Edilicio') {
+      if (sector === 'Edilicio') {
         finalClasificacion = 'Edilicio';
       } else if (sector === 'Taller') {
         if (clasificacion === 'Herrería' || clasificacion === 'Edilicio') {
@@ -699,7 +703,8 @@ app.post('/api/orders/bulk', (req, res) => {
         incidente: incidente || '',
         tasks: tasks || [],
         createdBy,
-        estadoUnidad: estadoUnidad || 'fuera_de_servicio'
+        estadoUnidad: estadoUnidad || 'fuera_de_servicio',
+        sector
       });
 
       createdOrders.push(newOrder);
@@ -796,12 +801,14 @@ app.put('/api/orders/:id', (req, res) => {
 
     // Allow order modifications and task additions for authenticated sector users
 
-    // Force sector classification when appropriate
+    // Normalize accents/case only - a Herrería-sector user (e.g. Carmona) no longer gets
+    // their clasificacion forced back to Herrería on every save; routing to the
+    // Herrería view uses the order's `sector` field (set at creation), not this.
+    // Edilicio-only users still get theirs forced, unchanged.
     let finalClasificacion = clasificacion;
-    const isHerreriaOnlyUser = sector === 'Herrería' && !allowed.some(s => s === 'Taller');
     const isEdilicioOnlyUser = sector === 'Edilicio' && !allowed.some(s => s === 'Taller');
 
-    if (isHerreria(clasificacion) || isHerreriaOnlyUser) {
+    if (isHerreria(clasificacion)) {
       finalClasificacion = 'Herrería';
     } else if (isEdilicio(clasificacion) || isEdilicioOnlyUser) {
       finalClasificacion = 'Edilicio';
@@ -944,6 +951,9 @@ app.put('/api/orders/:id', (req, res) => {
       syncDate: null,
       estadoUnidad: targetEstadoUnidad,
       combustibleReset: combustibleReset !== undefined ? combustibleReset : existing.combustibleReset,
+      // Backfill `sector` for orders created before this field existed, based on
+      // whoever originally created it (not whoever is editing it now).
+      sector: existing.sector || getSectorByUsername(createdBy),
       tasks: finalTasksToSave,
       archived: isArchived,
       archivedAt: isArchived ? (existing.archivedAt || new Date().toISOString()) : null
@@ -1384,11 +1394,13 @@ app.post('/api/orders/cleanup', (req, res) => {
     const idsToDelete = [];
 
     orders.forEach(order => {
-      // Check sector permission
+      // Check sector permission (clasificacion OR sector - see GET /api/orders for why)
       const cls = order.clasificacion;
-      if (sector === 'Herrería' && !isHerreria(cls)) return;
-      if (sector === 'Edilicio' && !isEdilicio(cls)) return;
-      if (sector === 'Taller' && (isHerreria(cls) || isEdilicio(cls))) return;
+      const isOrderHerreria = isHerreria(cls) || isHerreria(order.sector);
+      const isOrderEdilicio = isEdilicio(cls) || isEdilicio(order.sector);
+      if (sector === 'Herrería' && !isOrderHerreria) return;
+      if (sector === 'Edilicio' && !isOrderEdilicio) return;
+      if (sector === 'Taller' && (isOrderHerreria || isOrderEdilicio)) return;
 
       const tasks = (order.tasks || []).filter(t => t !== null && t !== undefined);
       const allFinished = tasks.length === 0 || tasks.every(t => t.status === "Finalizada");
@@ -1613,17 +1625,19 @@ app.post('/api/orders/verify/:id', async (req, res) => {
     const requester = req.headers['x-user-username'] || null;
     const sector = getSectorByUsername(requester);
 
-    // Check sector permission
+    // Check sector permission (clasificacion OR sector - see GET /api/orders for why)
     const existingCls = order.clasificacion;
+    const existingIsHerreria = isHerreria(existingCls) || isHerreria(order.sector);
+    const existingIsEdilicio = isEdilicio(existingCls) || isEdilicio(order.sector);
     const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
     if (!isPaniol) {
-      if ((sector === 'Herrería' || isHerreria(sector)) && !isHerreria(existingCls)) {
+      if ((sector === 'Herrería' || isHerreria(sector)) && !existingIsHerreria) {
         return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
       }
-      if ((sector === 'Edilicio' || isEdilicio(sector)) && !isEdilicio(existingCls)) {
+      if ((sector === 'Edilicio' || isEdilicio(sector)) && !existingIsEdilicio) {
         return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
       }
-      if (sector === 'Taller' && (isHerreria(existingCls) || isEdilicio(existingCls))) {
+      if (sector === 'Taller' && (existingIsHerreria || existingIsEdilicio)) {
         return res.status(403).json({ error: "No tiene permisos para controlar esta orden." });
       }
     }

@@ -820,6 +820,7 @@ class LocalDB {
       taxesOrderNumber: orderData.taxesOrderNumber || null,
       estadoUnidad: orderData.estadoUnidad || 'operativo',
       combustibleReset: orderData.combustibleReset || null,
+      sector: orderData.sector || null,
       archived: !!orderData.archived,
       deleted: !!orderData.deleted,
       deletedAt: orderData.deletedAt || null

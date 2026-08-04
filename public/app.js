@@ -6895,7 +6895,7 @@ function getSectorByUsername(username) {
   ) {
     return 'Admin';
   }
-  if (cleanUsername.includes('herrer')) return 'Herrería';
+  if (cleanUsername.includes('herrer') || cleanUsername.includes('carmona') || cleanUsername.includes('jcarmona')) return 'Herrería';
   if (cleanUsername.includes('toledo') || cleanUsername.includes('edilic')) return 'Edilicio';
   return 'Admin';
 }
@@ -6971,14 +6971,20 @@ function isHerreriaOrder(order) {
   if (!order) return false;
   const cls = String(order.clasificacion || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const sec = String(order.sector || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  if (cls.includes('herrer') || sec.includes('herrer')) return true;
+  const creator = String(order.createdBy || '').toLowerCase();
+  // `sector` is the source of truth now: a Herrer\u00eda-sector user (e.g. Carmona) keeps
+  // routing to Herrer\u00eda regardless of which clasificacion they actually picked for the
+  // task (Correctivo/Preventivo/Auxilio). `creator` covers orders saved before the
+  // `sector` field existed.
+  if (cls.includes('herrer') || sec.includes('herrer') || creator.includes('carmona')) return true;
   return isHerreriaExclusiveEquipmentClient(order.rodado, order.interno);
 }
 
 function isEdilicioOrder(order) {
   if (!order) return false;
   const cls = String(order.clasificacion || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  return cls.includes('edilic');
+  const sec = String(order.sector || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  return cls.includes('edilic') || sec.includes('edilic');
 }
 
 window.switchSector = function(sector) {
@@ -7596,7 +7602,15 @@ function checkUserSession() {
   if (userDisplay) {
     userDisplay.textContent = username;
   }
-  
+
+  // A Herrería/Edilicio-sector user (e.g. Carmona, Toledo) should land on their own
+  // sector view by default, not the generic Taller one - otherwise the Clasificación
+  // dropdown shows the wrong option set until they manually click their sector tab.
+  const loginSector = getSectorByUsername(username);
+  if (loginSector === 'Herrería' || loginSector === 'Edilicio') {
+    currentSelectedSector = loginSector;
+  }
+
   loadUserPermissionsUI();
   updateClassificationSelectOptions();
 }
