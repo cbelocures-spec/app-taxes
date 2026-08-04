@@ -919,7 +919,10 @@ app.put('/api/orders/:id', (req, res) => {
         timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : (existingTask ? existingTask.timerHistory || [] : []),
         synced: synced,
         taxesRealizadaSynced: taxesRealizadaSynced,
-        verifiedLocked: existingTask ? (existingTask.verifiedLocked === true) : false
+        verifiedLocked: existingTask ? (existingTask.verifiedLocked === true) : false,
+        // Preserve which insumos were already pushed to the Google Sheet - without this,
+        // every save of the order forgot this field and re-sent the same insumos again.
+        sentInsumos: Array.isArray(existingTask ? existingTask.sentInsumos : null) ? existingTask.sentInsumos : []
       });
     });
 
