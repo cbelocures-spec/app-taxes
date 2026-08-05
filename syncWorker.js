@@ -4733,9 +4733,10 @@ async function syncExpressOtHeader(orderId) {
     await delay(1000);
 
     const guardarBtnId = await safeEvaluate(page, () => {
-      const btns = Array.from(document.querySelectorAll('button'));
-      const b = btns.find(x => (x.textContent || '').trim().toLowerCase().includes('guardar'));
-      if (!b) return null;
+      const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+      const b = btns.find(x => (x.textContent || x.value || '').trim().toLowerCase().includes('guardar'));
+      if (!b || b.dataset.clicked === 'true') return null;
+      b.dataset.clicked = 'true';
       const id = 'tmp-guardar-express-' + Date.now();
       b.id = id;
       return id;
@@ -4743,6 +4744,14 @@ async function syncExpressOtHeader(orderId) {
 
     if (guardarBtnId) {
       await page.click(`#${guardarBtnId}`);
+      // Immediately disable button to prevent double-POST in Taxes
+      await safeEvaluate(page, (btnId) => {
+        const b = document.getElementById(btnId);
+        if (b) {
+          b.disabled = true;
+          b.style.pointerEvents = 'none';
+        }
+      }, guardarBtnId);
       await delay(3000);
     }
 
