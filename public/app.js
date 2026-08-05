@@ -1170,21 +1170,8 @@ function splitItemsIntoGroups(items, groupCount) {
 // Novelties for this interno that haven't already been turned into a Finalizada
 // task in some active order (same filter used by the big order form's sidebar).
 function getUncompletedNoveltiesForInterno(interno) {
-  const cleanInterno = String(interno || '').trim().toLowerCase();
-  if (!cleanInterno) return [];
-  return cachedNovelties.filter(n => {
-    if (String(n.interno || '').toLowerCase().trim() !== cleanInterno) return false;
-    const desc = [n.rubro, n.subrubro, n.observacion].filter(Boolean).join(' - ').toLowerCase().trim();
-    const isCompleted = activeOrders.some(order => {
-      const orderInterno = (order.interno || '').toLowerCase().trim();
-      if (orderInterno !== cleanInterno) return false;
-      return (order.tasks || []).some(task => {
-        const taskDesc = (task.descripcion || '').toLowerCase().trim();
-        return task.status === 'Finalizada' && taskDesc === desc;
-      });
-    });
-    return !isCompleted;
-  });
+  // Disposed per user rule: Old Google Sheets novelties are disabled so they never cross-contaminate orders
+  return [];
 }
 
 // Renders the pending-items shortcut list in "Identificar Unidad" (pre-order-modal)

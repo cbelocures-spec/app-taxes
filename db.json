@@ -13633,29 +13633,7 @@
           "horasEstimadas": 1,
           "descripcion": "Se quedó sin gas oil - Diagnóstico: Llevar gasoil",
           "status": "Finalizada",
-          "insumos": "",
-          "timerStart": null,
-          "timerStarted": false,
-          "timerHistory": [
-            {
-              "type": "Inició",
-              "formatted": "07:53",
-              "timestamp": 1785322398530
-            },
-            {
-              "type": "Reanudó",
-              "formatted": "10:07",
-              "timestamp": 1785330421047
-            },
-            {
-              "type": "Fin",
-              "formatted": "11:07",
-              "timestamp": 1785334039271
-            }
-          ],
-          "synced": false,
-          "taxesRealizadaSynced": true,
-          "verifiedLocked": true
+          "synced": false
         }
       ],
       "createdBy": "paniol@contenedoreshugo.com.ar",
