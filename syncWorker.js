@@ -1677,6 +1677,23 @@ async function syncWorkOrder(orderId) {
     return { success: false, message: "Order not found after lock" };
   }
 
+  // Pre-check DB safeguard: If this order has no taxesOrderNumber yet, check if another active order for the same interno already generated an OT today!
+  if (!order.taxesOrderNumber && order.interno) {
+    const dbData = db.read();
+    const existingWithOt = (dbData.workOrders || []).find(o => 
+      String(o.id) !== String(orderId) && 
+      o.deleted !== true &&
+      String(o.interno).trim().toLowerCase() === String(order.interno).trim().toLowerCase() &&
+      o.taxesOrderNumber && String(o.taxesOrderNumber).trim() !== '' &&
+      (Date.now() - new Date(o.createdAt || o.syncDate || Date.now()).getTime() < 24 * 60 * 60 * 1000)
+    );
+    if (existingWithOt && existingWithOt.taxesOrderNumber) {
+      console.log(`[Pre-Check DB Safeguard] Order ${orderId} (Interno ${order.interno}) matched existing OT #${existingWithOt.taxesOrderNumber} in DB! Linking...`);
+      db.updateWorkOrder(orderId, { taxesOrderNumber: existingWithOt.taxesOrderNumber });
+      order.taxesOrderNumber = existingWithOt.taxesOrderNumber;
+    }
+  }
+
   console.log(`\n=== Starting Background Sync for OT #${order.interno} (ID: ${order.id}) [taxesOrderNumber: ${order.taxesOrderNumber || 'NEW'}] ===`);
 
   let browser = null;
@@ -2604,6 +2621,17 @@ async function syncWorkOrder(orderId) {
       console.log(`[Pre-Check Safeguard] Searching OT list table for pre-existing OT for Interno ${order.interno} on date ${todayDateStr}...`);
       const existingOtOnPage = await safeEvaluate(page, (targetInterno, targetDateStr) => {
         const clean = s => (s || '').toString().trim();
+        const normalizeDateStr = (str) => {
+          const parts = (str || '').match(/\d+/g);
+          if (!parts || parts.length < 3) return '';
+          const d = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10);
+          const y = parts[2].length === 2 ? 2000 + parseInt(parts[2], 10) : parseInt(parts[2], 10);
+          return `${d}-${m}-${y}`;
+        };
+        const targetNorm = normalizeDateStr(targetDateStr);
+        const targetClean = clean(targetInterno).toUpperCase();
+
         const tables = Array.from(document.querySelectorAll('table'));
         for (const table of tables) {
           const rows = Array.from(table.querySelectorAll('tbody tr'));
@@ -2614,8 +2642,10 @@ async function syncWorkOrder(orderId) {
               const rowInterno = cells[1] || cells[0] || '';
               const rowOt = cells[2] || cells[1] || '';
 
-              const isSameInterno = clean(rowInterno) === clean(targetInterno);
-              const isSameDate = !targetDateStr || rowDate.includes(targetDateStr) || targetDateStr.includes(rowDate);
+              const isSameInterno = clean(rowInterno).toUpperCase() === targetClean ||
+                                   clean(rowOt).toUpperCase().includes(targetClean);
+              const rowDateNorm = normalizeDateStr(rowDate);
+              const isSameDate = !targetNorm || !rowDateNorm || rowDateNorm === targetNorm || rowDate.includes(targetDateStr);
 
               if (isSameInterno && isSameDate && rowOt.length >= 3 && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
                 return rowOt.replace(/\D/g, '');
