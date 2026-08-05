@@ -11864,6 +11864,39 @@ async function verifyAllOrders() {
   }
 }
 
+// Clears every order stuck with a sync error back to 'pending' in one shot. This does NOT
+// force Puppeteer to run immediately for each one - it just re-queues them, and the
+// background worker (10s poll, one order at a time) syncs them at its own pace, so it
+// doesn't fire a pile of browsers all at once.
+async function retryAllFailedOrders() {
+  const btn = document.getElementById('btn-retry-all-errors');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons" style="font-size:16px; animation: spin 1s linear infinite;">sync</span> Reintentando...';
+  }
+
+  try {
+    const res = await fetch('/api/orders/retry-all-errors', { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      showToast(data.error || 'Error al reintentar órdenes', 'danger');
+    } else if (data.queued === 0) {
+      showToast('No hay órdenes con error para reintentar.', 'info');
+    } else {
+      await fetchOrders();
+      showToast(`✅ ${data.queued} orden(es) encoladas para resincronizar. Se irán procesando de a una.`, 'success');
+    }
+  } catch (err) {
+    showToast('Error de conexión al reintentar: ' + err.message, 'danger');
+  }
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons" style="font-size:16px;">restart_alt</span> Reintentar Fallidas';
+  }
+}
+
 let currentVerifyOrderId = null;
 
 // Parses "Tarea #N (Empleado): No encontrada en el listado de tareas" out of the verifier's

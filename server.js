@@ -1710,6 +1710,30 @@ app.post('/api/orders/verify-all', async (req, res) => {
   }
 });
 
+// Clears every order stuck in syncStatus 'error' back to 'pending' in one shot (for
+// starting the day without a backlog of failed syncs). Deliberately does NOT trigger
+// Puppeteer immediately per order like /force-resync does - it just re-queues them, and
+// the existing background worker loop (10s poll, one order at a time) picks them up at
+// its own controlled pace instead of firing many browsers at once.
+app.post('/api/orders/retry-all-errors', (req, res) => {
+  try {
+    const orders = db.getWorkOrders() || [];
+    const failed = orders.filter(o => !o.archived && !o.deleted && o.syncStatus === 'error');
+
+    if (failed.length === 0) {
+      return res.json({ success: true, queued: 0, message: "No hay órdenes con error para reintentar." });
+    }
+
+    failed.forEach(o => {
+      db.updateWorkOrder(o.id, { syncStatus: 'pending', syncError: null, autoSyncRetryCount: 0 });
+    });
+
+    res.json({ success: true, queued: failed.length, message: `${failed.length} orden(es) encoladas para resincronizar.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Verify specific order IDs or all orders containing unverified history tasks
 app.post('/api/tasks/verify-history', async (req, res) => {
   try {
