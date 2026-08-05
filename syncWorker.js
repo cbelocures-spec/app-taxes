@@ -2777,10 +2777,33 @@ async function syncWorkOrder(orderId) {
 
     // Fill searchable select fields (Rodado and Responsable)
     let rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado);
+    if (!rodadoFilled && order.interno) {
+      console.warn(`[Rodado] Selection with full name "${order.rodado}" failed. Trying search by Interno "${order.interno}"...`);
+      rodadoFilled = await fillSearchableSelect(page, 'Rodado', String(order.interno).trim());
+    }
+    if (!rodadoFilled && order.interno) {
+      console.warn(`[Rodado] Searchable select failed. Attempting native select fallback for Interno ${order.interno}...`);
+      rodadoFilled = await safeEvaluate(page, (internoNum) => {
+        const sel = document.querySelector('select[name="rodado_id"], select#rodado_id, select.rodado-select');
+        if (!sel) return false;
+        const cleanInt = String(internoNum).trim().toLowerCase();
+        const opts = Array.from(sel.options);
+        const matched = opts.find(o => {
+          const txt = o.textContent.toLowerCase();
+          return txt.includes(`interno ${cleanInt}`) || txt.includes(` ${cleanInt} `) || txt.startsWith(`${cleanInt} `) || txt.startsWith(`${cleanInt}-`) || txt.endsWith(` ${cleanInt}`);
+        });
+        if (matched) {
+          sel.value = matched.value;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        }
+        return false;
+      }, order.interno);
+    }
     if (!rodadoFilled) {
       console.warn(`[Rodado] Primary rodado selection failed for "${order.rodado}". Attempting fallback with first catalog vehicle...`);
       const catalogs = db.getCatalogs();
-      const firstRodado = (catalogs.rodados && catalogs.rodados.length > 0) ? catalogs.rodados[0].label : "1";
+      const firstRodado = (catalogs.rodados && catalogs.rodados.length > 0) ? (catalogs.rodados[0].label || catalogs.rodados[0].value) : "1";
       rodadoFilled = await fillSearchableSelect(page, 'Rodado', firstRodado);
     }
     if (!rodadoFilled) throw new Error("No se pudo seleccionar el Rodado. Asegúrese de que el valor sea válido.");
