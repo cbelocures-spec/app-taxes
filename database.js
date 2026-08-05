@@ -508,7 +508,8 @@ class LocalDB {
       'sergios@contenedoreshugo.com.ar',
       'jcarmona@contenedoreshugo.com.ar',
       'ftoledo@contenedoreshugo.com.ar',
-      'ibrahim@contenedoreshugo.com.ar'
+      'ibrahim@contenedoreshugo.com.ar',
+      'a.brahim@contenedoreshugo.com.ar'
     ];
     defaultKnownUsers.forEach(email => {
       if (!db.users[email]) {
