@@ -448,8 +448,9 @@ class LocalDB {
     }
     if (!settings.password || String(settings.password).trim() === '') {
       settings.password = "Paniol2015";
+    }
     if (settings.autoSyncDisabled === undefined) {
-      settings.autoSyncDisabled = true; // PAUSED by default per user request
+      settings.autoSyncDisabled = false;
     }
     return settings;
   }
