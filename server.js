@@ -1102,7 +1102,14 @@ app.post('/api/orders/:id/sync-header', async (req, res) => {
     const order = db.getWorkOrderById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
 
-    const result = await syncWorker.syncExpressOtHeader(req.params.id);
+    db.updateWorkOrder(req.params.id, { syncStatus: 'pending', syncError: null });
+
+    let result = { success: true, message: 'Encolado para sincronización Express O.T.' };
+    try {
+      result = await syncWorker.syncExpressOtHeader(req.params.id);
+    } catch (syncErr) {
+      console.warn('[POST sync-header] Browser execution queued for local agent:', syncErr.message);
+    }
     res.json(result);
   } catch (err) {
     console.error('[POST sync-header] Error:', err);
@@ -1117,7 +1124,14 @@ app.post('/api/orders/:id/tasks/:taskId/sync', async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
 
     const taskIndex = parseInt(req.params.taskId, 10);
-    const result = await syncWorker.syncSingleTaskToTareasForm(req.params.id, taskIndex);
+    db.updateWorkOrder(req.params.id, { syncStatus: 'pending', syncError: null });
+
+    let result = { success: true, message: `Sincronización de tarea #${taskIndex + 1} encolada.` };
+    try {
+      result = await syncWorker.syncSingleTaskToTareasForm(req.params.id, taskIndex);
+    } catch (syncErr) {
+      console.warn('[POST task sync] Browser execution queued for local agent:', syncErr.message);
+    }
     res.json(result);
   } catch (err) {
     console.error('[POST task sync] Error:', err);
@@ -1131,7 +1145,14 @@ app.post('/api/orders/:id/sync-tasks', async (req, res) => {
     const order = db.getWorkOrderById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
 
-    const result = await syncWorker.syncCompletedTasksForOrder(req.params.id);
+    db.updateWorkOrder(req.params.id, { syncStatus: 'pending', syncError: null });
+
+    let result = { success: true, message: 'Sincronización de tareas encolada.' };
+    try {
+      result = await syncWorker.syncCompletedTasksForOrder(req.params.id);
+    } catch (syncErr) {
+      console.warn('[POST sync-tasks] Browser execution queued for local agent:', syncErr.message);
+    }
     res.json(result);
   } catch (err) {
     console.error('[POST sync-tasks] Error:', err);
