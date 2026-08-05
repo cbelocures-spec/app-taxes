@@ -4651,8 +4651,39 @@ async function syncExpressOtHeader(orderId) {
 
     console.log(`[Express OT] Creating OT header for Interno ${order.interno} (Clasificación: ${order.clasificacion})...`);
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
-    await page.waitForSelector('select', { timeout: 10000 }).catch(() => {});
+    await page.waitForSelector('table', { timeout: 10000 }).catch(() => {});
     await delay(1000);
+
+    // PRE-CHECK: Check if Taxes table already has an OT for this Interno & Clasificación!
+    const existingTableOt = await safeEvaluate(page, (targetInterno, targetClasif) => {
+      const clean = s => (s || '').toString().trim().toUpperCase();
+      const tables = Array.from(document.querySelectorAll('table'));
+      for (const table of tables) {
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        for (const row of rows) {
+          const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
+          if (cells.length >= 3) {
+            const rowInterno = cells[1] || cells[0] || '';
+            const rowOt = cells[2] || cells[1] || '';
+            const rowClasif = cells[4] || cells[3] || '';
+            const intMatch = rowInterno.includes(clean(targetInterno));
+            const clasifMatch = !targetClasif || rowClasif.includes(clean(targetClasif));
+            const otNum = rowOt.replace(/\D/g, '');
+            if (intMatch && clasifMatch && /^\d+$/.test(otNum)) {
+              return otNum;
+            }
+          }
+        }
+      }
+      return null;
+    }, order.interno, order.clasificacion);
+
+    if (existingTableOt) {
+      console.log(`[Express OT Pre-Check] Found pre-existing OT #${existingTableOt} in Taxes for Interno ${order.interno}! Linking immediately.`);
+      db.updateWorkOrder(orderId, { taxesOrderNumber: existingTableOt, syncStatus: 'success', syncError: null });
+      await browser.close(); releaseBrowserLock();
+      return { success: true, taxesOrderNumber: existingTableOt, preExisting: true };
+    }
 
     const nuevoBtnId = await safeEvaluate(page, () => {
       const btns = Array.from(document.querySelectorAll('button, a'));
