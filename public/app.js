@@ -4902,10 +4902,15 @@ function renderDashboard() {
 
           seenTaskKeys.add(taskUniqueKey);
 
+          const hasPauseHistory = Array.isArray(task.timerHistory) && task.timerHistory.some(h => {
+            const tStr = String(h.type || h.action || h.event || '').toLowerCase();
+            return tStr.includes('paus') || tStr.includes('pause');
+          });
+
           if (isTimerRunning) {
             workingTasks.push(taskInfo);
             workingEmployeeLabels.add(String(empLabel).toLowerCase().trim());
-          } else {
+          } else if (hasPauseHistory) {
             pausedTasks.push(taskInfo);
             pausedEmployeeLabels.add(String(empLabel).toLowerCase().trim());
           }
