@@ -799,7 +799,7 @@
       "verifiedStatus": "success",
       "verifiedError": null,
       "verifiedCount": 46,
-      "archived": false,
+      "archived": true,
       "deletedAt": "2026-07-31T13:18:41.933Z",
       "deleted": false,
       "archivedAt": null,
@@ -18992,16 +18992,7 @@
       "createdBy": "paniol@contenedoreshugo.com.ar",
       "createdAt": "2026-08-05T21:08:58.157Z",
       "estadoUnidad": "fuera_de_servicio",
-      "tasks": [
-        {
-          "id": "task-1",
-          "descripcion": "Mantenimiento 158",
-          "empleado": "Personal Taller",
-          "centroCosto": "15",
-          "horasEstimadas": 1,
-          "synced": true
-        }
-      ],
+      "tasks": [],
       "deleted": false,
       "archived": false,
       "taxesOrderNumber": "28372",
