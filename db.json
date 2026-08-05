@@ -23078,7 +23078,12 @@
     "Sosa, Alejandro Damian",
     "Vera, Domingo Sergio"
   ],
-  "users": {},
+  "users": {
+    "a.brahim@contenedoreshugo.com.ar": {
+      "password": "123",
+      "role": "Mecánico"
+    }
+  },
   "backupOrders": {
     "1785149764743": {
       "id": "1785149764743",
@@ -38275,5 +38280,13 @@
       "_backupAt": "2026-08-03T08:44:10.994Z"
     }
   },
-  "insumosPendientes": []
+  "insumosPendientes": [],
+  "userPermissions": {
+    "a.brahim@contenedoreshugo.com.ar": {
+      "canEdit": true,
+      "canDelete": false,
+      "canArchive": false,
+      "canSync": true
+    }
+  }
 }
