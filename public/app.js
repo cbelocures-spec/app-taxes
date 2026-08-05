@@ -3192,6 +3192,9 @@ function createHistoryCardHtml(order) {
           <button class="icon-btn warning" onclick="editOrder('${order.id}')" title="Editar Orden">
             <span class="material-icons">edit</span>
           </button>
+          <button class="icon-btn" onclick="unarchiveOrder('${order.id}')" title="Desarchivar (volver a Órdenes activas)" style="background:#f59e0b;color:#fff;border:none;">
+            <span class="material-icons">unarchive</span>
+          </button>
           <button class="icon-btn" onclick="resyncOrderFromHistory('${order.id}')" title="Resincronizar y Controlar con Taxes" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;">
             <span class="material-icons">sync</span>
           </button>
