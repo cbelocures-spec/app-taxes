@@ -880,6 +880,12 @@ class LocalDB {
       Object.keys(cleanUpdates).forEach(key => {
         if (cleanUpdates[key] === undefined) delete cleanUpdates[key];
       });
+
+      // PERMANENT OT GUARANTEE: Never erase an existing taxesOrderNumber! Once assigned, it stays.
+      if (db.workOrders[idx].taxesOrderNumber && (!cleanUpdates.taxesOrderNumber || String(cleanUpdates.taxesOrderNumber).trim() === '')) {
+        delete cleanUpdates.taxesOrderNumber;
+      }
+
       db.workOrders[idx] = { ...db.workOrders[idx], ...cleanUpdates };
       this.write(db);
       // Save backup snapshot automatically on every meaningful update

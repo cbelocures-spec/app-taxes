@@ -3323,49 +3323,31 @@ function createOrderCardHtml(order) {
   const hasPendingTasks = !allCompleted;
 
   let statusBadge = '';
-  if (order.syncStatus === 'pending') {
-    statusBadge = `<span class="badge-status pending"><span class="material-icons">hourglass_empty</span> Pendiente</span>`;
-  } else if (order.syncStatus === 'syncing') {
-    if (order.taxesOrderNumber) {
-      statusBadge = `
-        <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px;">
-          <span class="material-icons spinner">autorenew</span> 
-          <span>Sincronizando O.T.: ${order.taxesOrderNumber}</span>
-        </span>
-      `;
-    } else {
-      statusBadge = `<span class="badge-status syncing"><span class="material-icons spinner">autorenew</span> Sincronizando</span>`;
-    }
-  } else if (order.syncStatus === 'success') {
-    const otText = order.taxesOrderNumber ? ` O.T.: ${order.taxesOrderNumber}` : '';
+  if (order.taxesOrderNumber && String(order.taxesOrderNumber).trim() !== '') {
+    // ALWAYS DISPLAY THE OT NUMBER BADGE ONCE ASSIGNED!
+    const otNum = order.taxesOrderNumber;
     statusBadge = `
       <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px;">
         <span class="material-icons">check_circle</span> 
-        <span>Sincronizado${otText}</span>
+        <span>Sincronizado O.T.: ${otNum}</span>
         <button onclick="event.stopPropagation(); retrySync('${order.id}')" title="Volver a Sincronizar con Taxes" style="background: none; border: none; padding: 2px; margin-left: 4px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #065f46; outline: none;" onmouseover="this.style.color='#047857'" onmouseout="this.style.color='#065f46'">
           <span class="material-icons" style="font-size: 14px; font-weight: bold;">sync</span>
         </button>
       </span>
     `;
-  } else if (order.syncStatus === 'error') {
-    if (order.taxesOrderNumber) {
-      // Already synced before (has an OT number) — keep showing that, plus a small
-      // extra badge indicating the latest re-sync attempt failed.
-      statusBadge = `
-        <span style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-          <span class="badge-status success" style="display: inline-flex; align-items: center; gap: 4px;">
-            <span class="material-icons">check_circle</span>
-            <span>Sincronizado O.T.: ${order.taxesOrderNumber}</span>
-            <button onclick="event.stopPropagation(); retrySync('${order.id}')" title="Volver a Sincronizar con Taxes" style="background: none; border: none; padding: 2px; margin-left: 4px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #065f46; outline: none;" onmouseover="this.style.color='#047857'" onmouseout="this.style.color='#065f46'">
-              <span class="material-icons" style="font-size: 14px; font-weight: bold;">sync</span>
-            </button>
-          </span>
-          <span class="badge-status error" onclick="event.stopPropagation(); openErrorModal(null, '${order.id}')" title="Fall\u00f3 el \u00faltimo reintento de sincronizaci\u00f3n. Clic para ver el detalle."><span class="material-icons">error</span> Error al resincronizar${order.autoSyncRetryCount ? ` x${order.autoSyncRetryCount}` : ''}</span>
-        </span>
-      `;
-    } else {
-      statusBadge = `<span class="badge-status error" onclick="event.stopPropagation(); openErrorModal(null, '${order.id}')"><span class="material-icons">error</span> Error</span>`;
+    if (order.syncStatus === 'error') {
+      statusBadge += ` <span class="badge-status error" onclick="event.stopPropagation(); openErrorModal(null, '${order.id}')" title="Falló el último reintento. Clic para ver detalle."><span class="material-icons">error</span> Error</span>`;
+    } else if (order.syncStatus === 'syncing') {
+      statusBadge += ` <span class="badge-status syncing"><span class="material-icons spinner">autorenew</span> Sincronizando</span>`;
+    } else if (order.syncStatus === 'pending') {
+      statusBadge += ` <span class="badge-status pending" style="font-size:11px;"><span class="material-icons">hourglass_empty</span> Pendiente Tareas</span>`;
     }
+  } else if (order.syncStatus === 'pending') {
+    statusBadge = `<span class="badge-status pending"><span class="material-icons">hourglass_empty</span> Pendiente</span>`;
+  } else if (order.syncStatus === 'syncing') {
+    statusBadge = `<span class="badge-status syncing"><span class="material-icons spinner">autorenew</span> Sincronizando</span>`;
+  } else if (order.syncStatus === 'error') {
+    statusBadge = `<span class="badge-status error" onclick="event.stopPropagation(); openErrorModal(null, '${order.id}')"><span class="material-icons">error</span> Error</span>`;
   } else if (order.syncStatus === 'local') {
     if (allCompleted) {
       statusBadge = `<span class="badge-status success" style="background-color:#d1fae5; color:#065f46; border:1px solid rgba(6,95,70,0.2);"><span class="material-icons" style="font-size:12px;">check_circle</span> Completada</span>`;
