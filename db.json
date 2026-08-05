@@ -7256,7 +7256,7 @@
       "interno": "118",
       "clasificacion": "Auxilio",
       "incidente": "",
-      "syncStatus": "syncing",
+      "syncStatus": "success",
       "syncError": null,
       "syncDate": null,
       "createdAt": "2026-07-28T09:57:34.719Z",
@@ -7299,7 +7299,7 @@
         }
       ],
       "createdBy": null,
-      "taxesOrderNumber": "26286",
+      "taxesOrderNumber": "28275",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
       "archived": false,
