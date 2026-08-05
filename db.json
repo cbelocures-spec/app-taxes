@@ -1365,8 +1365,8 @@
       "interno": "REPARACIONES INTERNAS",
       "clasificacion": "Herrería",
       "incidente": "",
-      "syncStatus": "error",
-      "syncError": "Input.dispatchKeyEvent timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed.",
+      "syncStatus": "pending",
+      "syncError": null,
       "syncDate": null,
       "createdAt": "2026-07-29T12:04:35.392Z",
       "tasks": [
@@ -1940,8 +1940,8 @@
       "interno": "10024",
       "clasificacion": "Herrería",
       "incidente": "",
-      "syncStatus": "error",
-      "syncError": "No se pudo seleccionar el Rodado. Aseg��������������rese de que el valor sea v���lido.",
+      "syncStatus": "pending",
+      "syncError": null,
       "syncDate": null,
       "createdAt": "2026-07-29T13:00:25.352Z",
       "tasks": [
