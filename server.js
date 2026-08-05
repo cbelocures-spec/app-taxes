@@ -187,7 +187,12 @@ function autoPauseConflictingTimers(currentOrderId, tasksToCheck, previousTasksB
   for (const task of (tasksToCheck || [])) {
     if (!task || !task.empleado || task.timerStarted !== true) continue;
     const previousTask = previousTasksById ? previousTasksById.get(task.id) : null;
-    if (previousTask && previousTask.timerStarted === true) continue; // already running before this save, not a new start
+    // If the employee assigned to this task changed, treat it as a new start even if the
+    // timer was already running - otherwise reassigning an already-running timer from one
+    // mechanic to another skips the conflict check entirely (nothing ever flags the new
+    // mechanic as double-booked).
+    const employeeChanged = previousTask && String(previousTask.empleado) !== String(task.empleado);
+    if (previousTask && previousTask.timerStarted === true && !employeeChanged) continue; // already running before this save under the same employee, not a new start
 
     const conflictOrder = (db.getSyncableOrders() || []).find(o =>
       o.id !== currentOrderId && o.archived !== true && o.deleted !== true &&
@@ -950,7 +955,9 @@ app.put('/api/orders/:id', (req, res) => {
     // No importa si todavía falta sincronizar o controlar con Taxes — eso lo sigue
     // resolviendo el worker de fondo aunque la orden ya esté archivada.
     const autoArchive = !isOutOfService && allTasksCompleted && !explicitUnarchive;
-    const isArchived = explicitUnarchive ? false : ((req.body.archived === true) || autoArchive);
+    // Hard gate: fuera de servicio NUNCA se archiva a Historial, ni siquiera si algo manda
+    // explícitamente archived:true - no solo cuando se decide automáticamente.
+    const isArchived = isOutOfService ? false : (explicitUnarchive ? false : ((req.body.archived === true) || autoArchive));
 
     const resolvedInterno = interno !== undefined ? interno : existing.interno;
     const resolvedRodado = resolveRodadoForInterno(resolvedInterno, rodado !== undefined ? rodado : existing.rodado);
