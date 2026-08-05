@@ -1677,18 +1677,19 @@ async function syncWorkOrder(orderId) {
     return { success: false, message: "Order not found after lock" };
   }
 
-  // Pre-check DB safeguard: If this order has no taxesOrderNumber yet, check if another active order for the same interno already generated an OT today!
+  // Pre-check DB safeguard: If this order has no taxesOrderNumber yet, check if another active order for the same interno AND same clasificacion already generated an OT today!
   if (!order.taxesOrderNumber && order.interno) {
     const dbData = db.read();
     const existingWithOt = (dbData.workOrders || []).find(o => 
       String(o.id) !== String(orderId) && 
       o.deleted !== true &&
       String(o.interno).trim().toLowerCase() === String(order.interno).trim().toLowerCase() &&
+      String(o.clasificacion || '').trim().toLowerCase() === String(order.clasificacion || '').trim().toLowerCase() &&
       o.taxesOrderNumber && String(o.taxesOrderNumber).trim() !== '' &&
       (Date.now() - new Date(o.createdAt || o.syncDate || Date.now()).getTime() < 24 * 60 * 60 * 1000)
     );
     if (existingWithOt && existingWithOt.taxesOrderNumber) {
-      console.log(`[Pre-Check DB Safeguard] Order ${orderId} (Interno ${order.interno}) matched existing OT #${existingWithOt.taxesOrderNumber} in DB! Linking...`);
+      console.log(`[Pre-Check DB Safeguard] Order ${orderId} (Interno ${order.interno}, Clasificación ${order.clasificacion}) matched existing OT #${existingWithOt.taxesOrderNumber} in DB! Linking...`);
       db.updateWorkOrder(orderId, { taxesOrderNumber: existingWithOt.taxesOrderNumber });
       order.taxesOrderNumber = existingWithOt.taxesOrderNumber;
     }
@@ -2618,8 +2619,8 @@ async function syncWorkOrder(orderId) {
         console.warn("[Pre-Check Safeguard] Filter step encountered warning, proceeding with scan:", filterErr.message);
       }
 
-      console.log(`[Pre-Check Safeguard] Searching OT list table for pre-existing OT for Interno ${order.interno} on date ${todayDateStr}...`);
-      const existingOtOnPage = await safeEvaluate(page, (targetInterno, targetDateStr) => {
+      console.log(`[Pre-Check Safeguard] Searching OT list table for pre-existing OT for Interno ${order.interno} (Clasificación: ${order.clasificacion}) on date ${todayDateStr}...`);
+      const existingOtOnPage = await safeEvaluate(page, (targetInterno, targetClasif, targetDateStr) => {
         const clean = s => (s || '').toString().trim();
         const normalizeDateStr = (str) => {
           const parts = (str || '').match(/\d+/g);
@@ -2630,7 +2631,8 @@ async function syncWorkOrder(orderId) {
           return `${d}-${m}-${y}`;
         };
         const targetNorm = normalizeDateStr(targetDateStr);
-        const targetClean = clean(targetInterno).toUpperCase();
+        const targetCleanInt = clean(targetInterno).toUpperCase();
+        const targetCleanClasif = clean(targetClasif).toUpperCase();
 
         const tables = Array.from(document.querySelectorAll('table'));
         for (const table of tables) {
@@ -2641,20 +2643,22 @@ async function syncWorkOrder(orderId) {
               const rowDate = cells[0] || '';
               const rowInterno = cells[1] || cells[0] || '';
               const rowOt = cells[2] || cells[1] || '';
+              const rowClasif = cells[4] || cells[3] || '';
 
-              const isSameInterno = clean(rowInterno).toUpperCase() === targetClean ||
-                                   clean(rowOt).toUpperCase().includes(targetClean);
+              const isSameInterno = clean(rowInterno).toUpperCase() === targetCleanInt ||
+                                   clean(rowOt).toUpperCase().includes(targetCleanInt);
+              const isSameClasif = !targetCleanClasif || clean(rowClasif).toUpperCase().includes(targetCleanClasif) || targetCleanClasif.includes(clean(rowClasif).toUpperCase());
               const rowDateNorm = normalizeDateStr(rowDate);
               const isSameDate = !targetNorm || !rowDateNorm || rowDateNorm === targetNorm || rowDate.includes(targetDateStr);
 
-              if (isSameInterno && isSameDate && rowOt.length >= 3 && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
+              if (isSameInterno && isSameClasif && isSameDate && rowOt.length >= 3 && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
                 return rowOt.replace(/\D/g, '');
               }
             }
           }
         }
         return null;
-      }, order.interno, todayDateStr);
+      }, order.interno, order.clasificacion || '', todayDateStr);
 
       if (existingOtOnPage) {
         console.log(`[Pre-Check Safeguard] Found pre-existing OT #${existingOtOnPage} for Interno ${order.interno} on date ${todayDateStr} in Taxes! Linking and switching to reconciliation...`);
