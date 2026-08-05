@@ -6363,6 +6363,7 @@ function getPendingServiceEntriesForInterno(interno) {
 
   const state = window._ptState || {};
   const entries = [];
+  const seenTexts = new Set();
 
   Object.keys(PT_LIST_LABELS).forEach(listName => {
     (state[listName] || [])
@@ -6372,7 +6373,7 @@ function getPendingServiceEntriesForInterno(interno) {
         if (Array.isArray(item.novedad_items) && item.novedad_items.length > 0) {
           pendingTexts = item.novedad_items
             .filter(x => !x.hecho)
-            .map(x => (x.texto || '').replace(/^\[\s*\]\s*/, '').trim())
+            .map(x => (x.texto || '').replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim())
             .filter(Boolean);
         } else if (item.novedad) {
           item.novedad.split('\n').forEach(line => {
@@ -6384,7 +6385,11 @@ function getPendingServiceEntriesForInterno(interno) {
           });
         }
         pendingTexts.forEach(texto => {
-          entries.push({ texto, tipo: item.tipo || '', origen: listName, origenLabel: PT_LIST_LABELS[listName] });
+          const tClean = texto.toUpperCase();
+          if (!seenTexts.has(tClean)) {
+            seenTexts.add(tClean);
+            entries.push({ texto, tipo: item.tipo || '', origen: listName, origenLabel: PT_LIST_LABELS[listName] });
+          }
         });
       });
   });
@@ -10061,7 +10066,7 @@ function clearPtSearch() {
   filterParteTallerUI('');
 }
 
-function deduplicateUnitsByInterno(unitList) {
+function mergeUniqueUnits(unitList) {
   if (!Array.isArray(unitList)) return [];
   const map = new Map();
   unitList.forEach(item => {
@@ -10072,16 +10077,10 @@ function deduplicateUnitsByInterno(unitList) {
     } else {
       const existing = map.get(key);
       if (Array.isArray(item.novedad_items) && item.novedad_items.length > 0) {
-        const existingItems = Array.isArray(existing.novedad_items) ? existing.novedad_items : [];
-        const existingTexts = new Set(existingItems.map(x => String(x.texto || '').trim().toUpperCase()));
-        item.novedad_items.forEach(newItem => {
-          const tClean = String(newItem.texto || '').trim().toUpperCase();
-          if (tClean && !existingTexts.has(tClean)) {
-            existingItems.push(newItem);
-            existingTexts.add(tClean);
-          }
-        });
-        existing.novedad_items = existingItems;
+        existing.novedad_items = item.novedad_items.filter(x => !x.hecho);
+        existing.novedad = existing.novedad_items.map(x => `[ ] ${x.texto}`).join('\n');
+      } else if (item.novedad) {
+        existing.novedad = item.novedad;
       }
     }
   });
