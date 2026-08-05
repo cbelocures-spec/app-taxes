@@ -13627,7 +13627,7 @@
       "createdAt": "2026-07-29T10:53:27.531Z",
       "tasks": [
         {
-          "id": "task-112-1",
+          "id": "112-t1",
           "centroCosto": "15",
           "empleado": "Canaviri Fernandez, Jesús",
           "horasEstimadas": 1,
@@ -13636,7 +13636,7 @@
           "synced": true
         },
         {
-          "id": "task-112-2",
+          "id": "112-t2",
           "centroCosto": "15",
           "empleado": "Morel, Luis Maximiliano",
           "horasEstimadas": 1,

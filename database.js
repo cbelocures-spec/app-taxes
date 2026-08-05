@@ -865,6 +865,57 @@ class LocalDB {
     return null;
   }
 
+  cleanDuplicateTasksInActiveOrders() {
+    const db = this.read();
+    let cleanedCount = 0;
+    (db.workOrders || []).forEach(order => {
+      if (!order.deleted && !order.archived && Array.isArray(order.tasks) && order.tasks.length > 0) {
+        const targetInt = String(order.interno || '').trim();
+
+        // 1. Interno 112 custom clean: remove 'gas oil' task, keep ventea motor & sacar cartel
+        if (targetInt === '112') {
+          order.tasks = order.tasks.filter(t => t && !String(t.descripcion || '').toLowerCase().includes('gas oil'));
+        }
+        // 2. Interno 158 custom clean: keep only ploteo
+        if (targetInt === '158') {
+          order.tasks = order.tasks.filter(t => t && String(t.descripcion || '').toLowerCase().includes('ploteo'));
+          if (order.tasks.length === 0) {
+            order.tasks = [{ id: '158-1', centroCosto: '15', empleado: 'PEREZ FACUNDO', horasEstimadas: 1.41, descripcion: 'Terminado de ploteo', status: 'Finalizada', synced: true }];
+          }
+        }
+        // 3. Interno 155 custom clean: keep only cambiar filtros
+        if (targetInt === '155') {
+          order.tasks = order.tasks.filter(t => t && String(t.descripcion || '').toLowerCase().includes('filtros'));
+          if (order.tasks.length === 0) {
+            order.tasks = [{ id: '155-1', centroCosto: '15', empleado: 'PANETTA ALBARRACIN FEDERICO', horasEstimadas: 1, descripcion: 'cambiar filtros. - Diagnóstico: se cambiaron todos los filtros de motor y chasis.', status: 'Finalizada', synced: true }];
+          }
+        }
+
+        // Generic deduplication by clean description + employee
+        const seen = new Set();
+        const cleanTasks = [];
+        (order.tasks || []).forEach(t => {
+          if (!t) return;
+          const key = `${String(t.empleado || '').trim().toLowerCase()}_${String(t.descripcion || '').trim().toLowerCase()}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            cleanTasks.push(t);
+          }
+        });
+
+        if (cleanTasks.length !== order.tasks.length) {
+          order.tasks = cleanTasks;
+          cleanedCount++;
+        }
+      }
+    });
+
+    if (cleanedCount > 0) {
+      console.log(`[DB Auto-Clean] Deduplicated tasks across ${cleanedCount} active orders.`);
+      this.write(db);
+    }
+  }
+
   // --- Active Mechanics Methods ---
   getActiveMechanics() {
     const db = this.read();

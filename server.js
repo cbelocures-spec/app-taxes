@@ -3920,6 +3920,13 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   }
 
 
+  // Auto-clean duplicate tasks in active orders on startup
+  try {
+    db.cleanDuplicateTasksInActiveOrders();
+  } catch (cleanErr) {
+    console.warn('[Startup] Task auto-clean error:', cleanErr.message);
+  }
+
   // Start localtunnel for HTTPS access from mobile (no cert issues)
   if (localtunnel) {
     try {
@@ -3941,5 +3948,15 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
       console.error('[Tunnel] No se pudo crear el tunel:', tunnelErr.message);
       console.log(`  => Usa la IP local: http://${localIP}:${PORT}`);
     }
+  }
+});
+
+// Endpoint to trigger manual cleaning of duplicate tasks
+app.post('/api/orders/clean-duplicate-tasks', (req, res) => {
+  try {
+    db.cleanDuplicateTasksInActiveOrders();
+    res.json({ success: true, message: 'Tareas duplicadas limpiadas exitosamente.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
