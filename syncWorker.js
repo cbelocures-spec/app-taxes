@@ -4602,11 +4602,321 @@ async function verifyGroupWithBrowser(group, settings) {
   }
 }
 
+async function syncExpressOtHeader(orderId) {
+  let order = db.getWorkOrderById(orderId);
+  if (!order) return { success: false, message: "Orden no encontrada" };
+
+  if (order.taxesOrderNumber) {
+    return { success: true, message: `O.T. ya existe (#${order.taxesOrderNumber})`, taxesOrderNumber: order.taxesOrderNumber };
+  }
+
+  const settings = db.getSettings();
+  const username = settings.username;
+  const password = settings.password;
+
+  if (!username || !password) {
+    db.updateWorkOrder(orderId, { syncStatus: "error", syncError: "Faltan credenciales en Ajustes." });
+    return { success: false, message: "Faltan credenciales" };
+  }
+
+  await acquireBrowserLock(`syncExpressOtHeader(${orderId})`);
+
+  let browser = null;
+  try {
+    browser = await launchBrowser();
+    const page = await autoLogin(browser, username, password, settings.portalUrl);
+
+    console.log(`[Express OT] Creating OT header for Interno ${order.interno} (Clasificación: ${order.clasificacion})...`);
+    await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
+    await page.waitForSelector('select', { timeout: 10000 }).catch(() => {});
+    await delay(1000);
+
+    const nuevoBtnId = await safeEvaluate(page, () => {
+      const btns = Array.from(document.querySelectorAll('button, a'));
+      const b = btns.find(x => (x.textContent || '').trim().toUpperCase().includes('NUEVO'));
+      if (!b) return null;
+      const id = 'tmp-nuevo-btn-' + Date.now();
+      b.id = id;
+      return id;
+    });
+
+    if (nuevoBtnId) {
+      await page.click(`#${nuevoBtnId}`);
+      await delay(1500);
+    }
+
+    await safeEvaluate(page, (internoTarget, clasifTarget) => {
+      const selects = Array.from(document.querySelectorAll('select'));
+      const intSelect = selects.find(s => {
+        const name = (s.name || s.id || '').toLowerCase();
+        return name.includes('interno') || name.includes('unidad');
+      }) || selects[0];
+
+      if (intSelect) {
+        const targetClean = String(internoTarget).trim().toUpperCase();
+        const opt = Array.from(intSelect.options).find(o => o.textContent.toUpperCase().includes(targetClean));
+        if (opt) {
+          intSelect.value = opt.value;
+          intSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+
+      const clasSelect = selects.find(s => {
+        const name = (s.name || s.id || '').toLowerCase();
+        return name.includes('clasific') || name.includes('tipo') || name.includes('categoria');
+      }) || selects[1];
+
+      if (clasSelect && clasifTarget) {
+        const targetClean = String(clasifTarget).trim().toUpperCase();
+        const opt = Array.from(clasSelect.options).find(o => o.textContent.toUpperCase().includes(targetClean));
+        if (opt) {
+          clasSelect.value = opt.value;
+          clasSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+    }, order.interno, order.clasificacion);
+
+    await delay(1000);
+
+    const guardarBtnId = await safeEvaluate(page, () => {
+      const btns = Array.from(document.querySelectorAll('button'));
+      const b = btns.find(x => (x.textContent || '').trim().toLowerCase().includes('guardar'));
+      if (!b) return null;
+      const id = 'tmp-guardar-express-' + Date.now();
+      b.id = id;
+      return id;
+    });
+
+    if (guardarBtnId) {
+      await page.click(`#${guardarBtnId}`);
+      await delay(3000);
+    }
+
+    const generatedOt = await safeEvaluate(page, (targetInterno) => {
+      const clean = s => (s || '').toString().trim();
+      const tables = Array.from(document.querySelectorAll('table'));
+      for (const table of tables) {
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        for (const row of rows) {
+          const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
+          if (cells.length >= 3) {
+            const rowInterno = cells[1] || cells[0] || '';
+            const rowOt = cells[2] || cells[1] || '';
+            if (rowInterno.toUpperCase().includes(String(targetInterno).toUpperCase()) && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
+              return rowOt.replace(/\D/g, '');
+            }
+          }
+        }
+      }
+      return null;
+    }, order.interno);
+
+    if (generatedOt) {
+      console.log(`[Express OT] Generated OT #${generatedOt} for Interno ${order.interno} in 3 seconds!`);
+      db.updateWorkOrder(orderId, { taxesOrderNumber: generatedOt, syncStatus: 'success', syncError: null });
+      await browser.close(); releaseBrowserLock();
+      return { success: true, taxesOrderNumber: generatedOt };
+    }
+
+    await browser.close(); releaseBrowserLock();
+    return { success: false, message: "No se pudo leer el número de O.T. generado" };
+  } catch (err) {
+    if (browser) try { await browser.close(); } catch (_) {}
+    releaseBrowserLock();
+    return { success: false, message: err.message };
+  }
+}
+
+async function syncSingleTaskToTareasForm(orderId, taskIndex) {
+  let order = db.getWorkOrderById(orderId);
+  if (!order || !order.taxesOrderNumber) {
+    return { success: false, message: "La orden no tiene número de O.T. asignado en Taxes" };
+  }
+
+  const tasks = Array.isArray(order.tasks) ? order.tasks : [];
+  const task = tasks[taskIndex];
+  if (!task) return { success: false, message: "Tarea no encontrada en la orden" };
+
+  if (task.synced === true) {
+    return { success: true, message: "La tarea ya fue sincronizada previamente" };
+  }
+
+  const settings = db.getSettings();
+  const username = settings.username;
+  const password = settings.password;
+
+  if (!username || !password) {
+    return { success: false, message: "Faltan credenciales de Taxes en Ajustes" };
+  }
+
+  await acquireBrowserLock(`syncSingleTask(${orderId}, ${taskIndex})`);
+  let browser = null;
+
+  try {
+    browser = await launchBrowser();
+    const page = await autoLogin(browser, username, password, settings.portalUrl);
+
+    console.log(`[SyncTask] Subiendo tarea #${taskIndex + 1} para OT #${order.taxesOrderNumber} a /tms/produccion/tareas...`);
+    await safeGoto(page, `${settings.portalUrl}/tms/produccion/tareas`, { timeout: 30000 });
+    await page.waitForSelector('select, input', { timeout: 10000 }).catch(() => {});
+    await delay(1000);
+
+    const otNumber = String(order.taxesOrderNumber).replace(/\D/g, '');
+    const taskDate = task.date || order.createdAt || new Date().toISOString();
+    const targetDateStr = new Date(taskDate).toLocaleDateString('es-AR', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+
+    await safeEvaluate(page, (data) => {
+      const dateInputs = Array.from(document.querySelectorAll('input')).filter(i => {
+        const type = (i.type || '').toLowerCase();
+        const name = (i.name || i.id || i.placeholder || '').toLowerCase();
+        return type === 'date' || name.includes('fecha');
+      });
+      if (dateInputs.length > 0) {
+        const dInp = dateInputs[0];
+        const parts = data.targetDateStr.split('/');
+        const iso = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : data.targetDateStr;
+        dInp.value = dInp.type === 'date' ? iso : data.targetDateStr;
+        dInp.dispatchEvent(new Event('input', { bubbles: true }));
+        dInp.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      const selects = Array.from(document.querySelectorAll('select'));
+      const otSelect = selects.find(s => {
+        const name = (s.name || s.id || '').toLowerCase();
+        const parentText = s.parentElement ? s.parentElement.textContent.toLowerCase() : '';
+        return name.includes('ot') || parentText.includes('ot');
+      }) || selects[0];
+
+      if (otSelect) {
+        const opt = Array.from(otSelect.options).find(o => o.textContent.includes(data.otNumber));
+        if (opt) {
+          otSelect.value = opt.value;
+          otSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+
+      const ccSelect = selects.find(s => {
+        const name = (s.name || s.id || '').toLowerCase();
+        const parentText = s.parentElement ? s.parentElement.textContent.toLowerCase() : '';
+        return name.includes('centro') || name.includes('costo') || parentText.includes('centro');
+      }) || selects[1];
+
+      if (ccSelect) {
+        const targetCC = String(data.centroCosto || 'MECANICA').toUpperCase();
+        const opt = Array.from(ccSelect.options).find(o => o.textContent.toUpperCase().includes(targetCC));
+        if (opt) {
+          ccSelect.value = opt.value;
+          ccSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+
+      const empSelect = selects.find(s => {
+        const name = (s.name || s.id || '').toLowerCase();
+        const parentText = s.parentElement ? s.parentElement.textContent.toLowerCase() : '';
+        return name.includes('empleado') || name.includes('operario') || parentText.includes('empleado');
+      });
+
+      if (empSelect && data.empleado) {
+        const targetEmp = String(data.empleado).trim().toUpperCase();
+        const opt = Array.from(empSelect.options).find(o => o.textContent.toUpperCase().includes(targetEmp));
+        if (opt) {
+          empSelect.value = opt.value;
+          empSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+
+      const textareas = Array.from(document.querySelectorAll('textarea, input[type="text"]'));
+      const descInput = textareas.find(t => {
+        const name = (t.name || t.id || t.placeholder || '').toLowerCase();
+        return name.includes('descrip') || name.includes('comentario') || name.includes('tarea');
+      }) || textareas[0];
+
+      if (descInput) {
+        descInput.value = data.descripcion;
+        descInput.dispatchEvent(new Event('input', { bubbles: true }));
+        descInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      const toggles = Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"], .custom-control-input, .switch input'));
+      const realizadaToggle = toggles.find(t => {
+        const name = (t.name || t.id || '').toLowerCase();
+        const parentText = t.parentElement ? t.parentElement.textContent.toLowerCase() : '';
+        return name.includes('realizad') || parentText.includes('realizad');
+      });
+      if (realizadaToggle && !realizadaToggle.checked) {
+        realizadaToggle.click();
+      }
+    }, {
+      otNumber,
+      targetDateStr,
+      centroCosto: task.centroCostoLabel || task.centroCosto || 'MECANICA',
+      empleado: task.empleado || '',
+      descripcion: task.descripcion || 'Tarea finalizada',
+    });
+
+    await delay(1000);
+
+    const guardarBtnId = await safeEvaluate(page, () => {
+      const btns = Array.from(document.querySelectorAll('button'));
+      const b = btns.find(x => (x.textContent || '').trim().toLowerCase().includes('guardar'));
+      if (!b) return null;
+      const id = 'tmp-guardar-tarea-' + Date.now();
+      b.id = id;
+      return id;
+    });
+
+    if (guardarBtnId) {
+      await page.click(`#${guardarBtnId}`);
+      await delay(2500);
+    }
+
+    task.synced = true;
+    task.syncedAt = new Date().toISOString();
+    tasks[taskIndex] = task;
+
+    db.updateWorkOrder(orderId, { tasks });
+    console.log(`[SyncTask] Tarea #${taskIndex + 1} de la OT #${order.taxesOrderNumber} guardada con éxito en Taxes (tilde verde ✔)!`);
+
+    await browser.close(); releaseBrowserLock();
+    return { success: true, message: `Tarea #${taskIndex + 1} sincronizada correctamente en Taxes.` };
+  } catch (err) {
+    if (browser) try { await browser.close(); } catch (_) {}
+    releaseBrowserLock();
+    return { success: false, message: err.message };
+  }
+}
+
+async function syncCompletedTasksForOrder(orderId) {
+  const order = db.getWorkOrderById(orderId);
+  if (!order || !order.taxesOrderNumber) {
+    return { success: false, message: "La orden no tiene N° de O.T. asignado" };
+  }
+
+  const tasks = Array.isArray(order.tasks) ? order.tasks : [];
+  let syncedAny = false;
+
+  for (let idx = 0; idx < tasks.length; idx++) {
+    if (tasks[idx] && tasks[idx].synced !== true) {
+      console.log(`[SyncTasksBatch] Sincronizando tarea pendiente #${idx + 1} de la orden ${orderId}...`);
+      const res = await syncSingleTaskToTareasForm(orderId, idx);
+      if (res.success) syncedAny = true;
+    }
+  }
+
+  return { success: true, syncedAny };
+}
+
 module.exports = {
   startWorker,
   stopWorker,
   syncWorkOrder,
   syncWorkOrderWithTimeout,
+  syncExpressOtHeader,
+  syncSingleTaskToTareasForm,
+  syncCompletedTasksForOrder,
   verifyWorkOrder,
   verifyWorkOrderWithTimeout,
   verifyMultipleOrders,

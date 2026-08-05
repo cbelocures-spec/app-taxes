@@ -1096,6 +1096,49 @@ app.post('/api/orders/:id/reset-taxes-number', (req, res) => {
   }
 });
 
+// Trigger Express OT Header Creation in Taxes (Etapa 1 - 2 to 4 seconds)
+app.post('/api/orders/:id/sync-header', async (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+
+    const result = await syncWorker.syncExpressOtHeader(req.params.id);
+    res.json(result);
+  } catch (err) {
+    console.error('[POST sync-header] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Trigger Single Task Sync to /tms/produccion/tareas (Etapa 2 - per task)
+app.post('/api/orders/:id/tasks/:taskId/sync', async (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+
+    const taskIndex = parseInt(req.params.taskId, 10);
+    const result = await syncWorker.syncSingleTaskToTareasForm(req.params.id, taskIndex);
+    res.json(result);
+  } catch (err) {
+    console.error('[POST task sync] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Trigger Batch Sync for all completed tasks missing sync
+app.post('/api/orders/:id/sync-tasks', async (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+
+    const result = await syncWorker.syncCompletedTasksForOrder(req.params.id);
+    res.json(result);
+  } catch (err) {
+    console.error('[POST sync-tasks] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Read-only endpoint to retrieve history of finished tasks with OPEN locks (not yet verified in Taxes)
 app.get('/api/tasks/history', (req, res) => {
   try {

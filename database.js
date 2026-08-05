@@ -1143,6 +1143,68 @@ class LocalDB {
     this.write(db);
     return snapshot;
   }
+
+  hasDuplicateActiveOrder(interno, clasificacion, sector = 'Taller', excludeOrderId = null) {
+    if (sector !== 'Taller') return false;
+    const db = this.read();
+    const cleanInt = String(interno || '').trim().toUpperCase();
+    const cleanClas = String(clasificacion || '').trim().toUpperCase();
+    if (!cleanInt || !cleanClas) return false;
+
+    return (db.workOrders || []).some(o => {
+      if (o.archived || o.deleted === true) return false;
+      if (excludeOrderId && String(o.id) === String(excludeOrderId)) return false;
+      const orderSector = o.sector || getSectorByUsername(o.createdBy) || 'Taller';
+      if (orderSector !== 'Taller') return false;
+      const oInt = String(o.interno || '').trim().toUpperCase();
+      const oClas = String(o.clasificacion || '').trim().toUpperCase();
+      return oInt === cleanInt && oClas === cleanClas;
+    });
+  }
+
+  canOrderBeArchived(order) {
+    if (!order) return false;
+    if (order.estadoUnidad !== 'operativo') return false;
+    if (order.fuera_de_servicio === true) return false;
+    const tasks = Array.isArray(order.tasks) ? order.tasks : [];
+    if (tasks.length === 0) return false;
+    return tasks.every(t => t.synced === true);
+  }
+
+  autoPauseWorkerActiveTasks(employeeName, newOrderId = null, newTaskId = null) {
+    if (!employeeName) return null;
+    const db = this.read();
+    const cleanEmp = String(employeeName).trim().toLowerCase();
+    let autoPausedInfo = null;
+
+    (db.workOrders || []).forEach(o => {
+      if (o.archived || o.deleted === true) return;
+      (o.tasks || []).forEach((t, idx) => {
+        if (!t) return;
+        if (String(o.id) === String(newOrderId) && String(idx) === String(newTaskId)) return;
+        const taskEmp = String(t.empleado || '').trim().toLowerCase();
+        if (taskEmp === cleanEmp && (t.timerStarted || t.timerStart > 0)) {
+          const now = Date.now();
+          const elapsed = t.timerStart > 0 ? (now - t.timerStart) : 0;
+          t.timerStarted = false;
+          t.timerStart = 0;
+          t.accumulatedTime = (t.accumulatedTime || 0) + elapsed;
+          if (!t.timerHistory) t.timerHistory = [];
+          t.timerHistory.push({ action: 'pause', timestamp: new Date().toISOString(), autoPaused: true });
+          if (t.accumulatedTime > 0) {
+            t.horasEstimadas = Math.round((t.accumulatedTime / (1000 * 60 * 60)) * 100) / 100;
+          }
+          autoPausedInfo = { orderId: o.id, interno: o.interno || 'Unidad', taskIndex: idx, taskDesc: t.descripcion };
+          console.log(`[AutoPause] Paused active task for employee "${employeeName}" in Order Interno ${o.interno}`);
+        }
+      });
+    });
+
+    if (autoPausedInfo) {
+      this.write(db);
+    }
+    return autoPausedInfo;
+  }
 }
 
 module.exports = new LocalDB();

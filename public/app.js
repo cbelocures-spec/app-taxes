@@ -2224,10 +2224,18 @@ function addTaskField(taskData = null) {
     const isLocked = !!(taskData && taskData.verifiedLocked);
     const lockedAttr = isLocked ? 'disabled' : '';
 
+    const isSynced = !!(taskData && taskData.synced === true);
+    const taskDateVal = taskData && taskData.date ? taskData.date.split('T')[0] : new Date().toISOString().split('T')[0];
+
     const cardHtml = `
       <div class="task-item-card ${isNew ? 'new-task' : ''}" id="${taskId}" data-timer-started="${timerStarted}" data-timer-history='${timerHistoryJson}'>
         <div class="task-item-header">
           <span class="task-item-title">Tarea #${taskIndex + 1}</span>
+          ${isSynced ? `
+            <span class="badge-status success" style="background:#d1fae5; color:#065f46; border:1px solid #a7f3d0; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; display:inline-flex; align-items:center; gap:3px;">
+              <span class="material-icons" style="font-size:13px;">check_circle</span> Sincronizada
+            </span>
+          ` : ''}
           ${taskData && taskData.verifiedLocked ? `
             <span class="material-icons task-lock-icon" style="cursor:pointer; color: var(--success); font-size: 18px;" title="Ya verificado en Taxes. Click para forzar re-control." onclick="unlockTaskVerification('${taskData.id}', '${taskId}')">lock</span>
           ` : `
@@ -2241,11 +2249,17 @@ function addTaskField(taskData = null) {
         <div class="task-fields-wrapper" style="position:relative;">
           ${isLocked ? `<div class="task-locked-overlay" onclick="showLockedTaskAlert()" title="Tarea cerrada y verificada — no se puede modificar" style="position:absolute; inset:0; z-index:5; cursor:not-allowed;"></div>` : ''}
 
-          <div class="form-group">
-            <label>Centro de Costo *</label>
-            <select class="task-cc" required ${lockedAttr}>
-              ${ccOptions}
-            </select>
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label>Fecha Tarea</label>
+              <input type="date" class="task-date" value="${taskDateVal}" ${lockedAttr}>
+            </div>
+            <div class="form-group col-6">
+              <label>Centro de Costo *</label>
+              <select class="task-cc" required ${lockedAttr}>
+                ${ccOptions}
+              </select>
+            </div>
           </div>
 
           <div class="form-group">
@@ -2890,6 +2904,38 @@ function agregarCantidadesInsumos(btn) {
     toggleInsumoRow(c);
   });
   showToast('Insumos agregados a la tarea ✓', 'success');
+}
+
+async function triggerExpressOtSync(orderId) {
+  try {
+    showToast("Generando N° de O.T. en Taxes...", "info");
+    const response = await fetch(`/api/orders/${orderId}/sync-header`, { method: 'POST' });
+    const data = await response.json();
+    if (data.success && data.taxesOrderNumber) {
+      showToast(`✅ N° de O.T. asignado: #${data.taxesOrderNumber}`, "success");
+      loadOrders();
+    } else {
+      showToast(data.message || "No se pudo obtener el N° de O.T.", "danger");
+    }
+  } catch (err) {
+    showToast(`Error al obtener O.T.: ${err.message}`, "danger");
+  }
+}
+
+async function triggerSingleTaskSync(orderId, taskIndex) {
+  try {
+    showToast(`Sincronizando tarea #${taskIndex + 1} en Taxes...`, "info");
+    const response = await fetch(`/api/orders/${orderId}/tasks/${taskIndex}/sync`, { method: 'POST' });
+    const data = await response.json();
+    if (data.success) {
+      showToast(`✅ Tarea #${taskIndex + 1} sincronizada con éxito en Taxes (✔)!`, "success");
+      loadOrders();
+    } else {
+      showToast(data.message || "Error al sincronizar tarea", "danger");
+    }
+  } catch (err) {
+    showToast(`Error al sincronizar tarea: ${err.message}`, "danger");
+  }
 }
 
 function removeTaskField(cardId) {
@@ -3664,8 +3710,12 @@ async function submitWorkOrder() {
         finalDescVal = existingTaskObj.descripcion;
       }
 
+      const dateEl = card.querySelector('.task-date');
+      const taskDateVal = dateEl && dateEl.value ? dateEl.value : new Date().toISOString().split('T')[0];
+
       tasks.push({
         id: taskId,
+        date: taskDateVal,
         centroCosto: cc,
         empleado: emp,
         horasEstimadas: parsedHours,
@@ -3675,7 +3725,8 @@ async function submitWorkOrder() {
         diagnostico: finalDiagVal,
         timerStart: timerStartVal,
         timerStarted: card.dataset.timerStarted === 'true',
-        timerHistory: timerHistoryVal
+        timerHistory: timerHistoryVal,
+        synced: existingTaskObj ? existingTaskObj.synced : false
       });
     });
    
