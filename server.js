@@ -944,10 +944,12 @@ app.put('/api/orders/:id', (req, res) => {
     // re-triggers the whole Puppeteer flow.
     const targetSyncStatus = req.body.syncStatus || (existing.taxesOrderNumber ? existing.syncStatus : "pending");
 
-    // La orden pasa a Historial apenas la unidad queda Operativa (no Fuera de Servicio),
-    // sin importar si todavía falta sincronizar o controlar con Taxes — eso lo sigue
+    // La orden pasa a Historial apenas la unidad queda Operativa (no Fuera de Servicio) Y
+    // todas sus tareas están Finalizadas — no alcanza con que la unidad esté "operativa" si
+    // todavía hay tareas en curso, o esa orden desaparece de Órdenes sin estar terminada.
+    // No importa si todavía falta sincronizar o controlar con Taxes — eso lo sigue
     // resolviendo el worker de fondo aunque la orden ya esté archivada.
-    const autoArchive = !isOutOfService && !explicitUnarchive;
+    const autoArchive = !isOutOfService && allTasksCompleted && !explicitUnarchive;
     const isArchived = explicitUnarchive ? false : ((req.body.archived === true) || autoArchive);
 
     const resolvedInterno = interno !== undefined ? interno : existing.interno;
