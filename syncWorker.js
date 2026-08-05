@@ -4287,7 +4287,11 @@ async function syncWorkOrderWithTimeout(orderId) {
     await Promise.race([
       syncWorkOrder(orderId),
       new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Timeout: sincronización tardó más de 3 minutos')), 180 * 1000);
+        // Kept comfortably above protocolTimeout (180s, see launchBrowser) so a hung CDP
+        // call fails there first with a specific error - otherwise both fire at the same
+        // moment and every timeout looks identical and generic here, whether the real
+        // cause was a stuck evaluate() or a genuinely slow multi-task sync.
+        timeoutId = setTimeout(() => reject(new Error('Timeout: sincronización tardó más de 5 minutos')), 300 * 1000);
       })
     ]);
   } catch (err) {
