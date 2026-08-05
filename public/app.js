@@ -10066,7 +10066,7 @@ function clearPtSearch() {
   filterParteTallerUI('');
 }
 
-function mergeUniqueUnits(unitList) {
+function deduplicateUnitsByInterno(unitList) {
   if (!Array.isArray(unitList)) return [];
   const map = new Map();
   unitList.forEach(item => {
@@ -10076,16 +10076,22 @@ function mergeUniqueUnits(unitList) {
       map.set(key, JSON.parse(JSON.stringify(item)));
     } else {
       const existing = map.get(key);
-      if (Array.isArray(item.novedad_items) && item.novedad_items.length > 0) {
-        existing.novedad_items = item.novedad_items.filter(x => !x.hecho);
-        existing.novedad = existing.novedad_items.map(x => `[ ] ${x.texto}`).join('\n');
-      } else if (item.novedad) {
-        existing.novedad = item.novedad;
-      }
+      const existingItems = Array.isArray(existing.novedad_items) ? existing.novedad_items : [];
+      const existingTexts = new Set(existingItems.map(x => String(x.texto || '').trim().toUpperCase()));
+      const newItems = Array.isArray(item.novedad_items) ? item.novedad_items : [];
+      newItems.forEach(newItem => {
+        const tClean = String(newItem.texto || '').trim().toUpperCase();
+        if (tClean && !existingTexts.has(tClean)) {
+          existingItems.push(newItem);
+          existingTexts.add(tClean);
+        }
+      });
+      existing.novedad_items = existingItems;
     }
   });
   return Array.from(map.values());
 }
+const mergeUniqueUnits = deduplicateUnitsByInterno;
 
 function unitMatchesSearch(unit) {
   const q = (window._ptCurrentSearchQuery || '').toLowerCase().trim();
