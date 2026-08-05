@@ -1678,13 +1678,13 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
     const targetEstadoUnidad = req.body.estadoUnidad !== undefined ? req.body.estadoUnidad : existing.estadoUnidad;
     const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
 
-    const currentTasks = updates.tasks || existing.tasks || [];
-    const allTasksFinished = currentTasks.length > 0 && currentTasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada'));
-
-    if (req.body.archived === true || (isVerified && allTasksFinished && !isOutOfService)) {
+    const allTasksSynced = currentTasks.length > 0 && currentTasks.every(t => t && t.synced === true);
+    
+    // STRICT ARCHIVING RULE: Only archive if explicitly requested OR (OPERATIVO + 100% tasks finished + 100% tasks synced in Taxes)
+    if (req.body.archived === true || (req.body.archived !== false && !isOutOfService && allTasksFinished && allTasksSynced)) {
       updates.archived = true;
       updates.archivedAt = existing.archivedAt || new Date().toISOString();
-      if (isVerified) console.log(`[LocalSyncResult] Order ${req.params.id} verified and completed. Auto-archived to history.`);
+      console.log(`[LocalSyncResult] Order ${req.params.id} archived to history.`);
     } else {
       updates.archived = false;
       updates.archivedAt = null;

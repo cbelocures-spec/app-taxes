@@ -736,12 +736,11 @@ class LocalDB {
       if (!order.archived && order.deleted !== true && order.estadoUnidad !== 'fuera_de_servicio') {
         const hasOtNumber = order.taxesOrderNumber && String(order.taxesOrderNumber).trim() !== '';
         const tasks = order.tasks || [];
-        const isCompleted = tasks.length > 0 && tasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada'));
-        const isSyncSuccess = order.syncStatus === 'success';
-        const isManuallyUnarchived = order.unarchivedManually === true;
+        const allSynced = tasks.length > 0 && tasks.every(t => t && t.synced === true);
+        const isOperativo = order.estadoUnidad === 'operativo';
         
-        // STRICT RULE: Must have an assigned Taxes OT number AND all tasks finished AND syncStatus success AND NOT manually unarchived!
-        if (hasOtNumber && isCompleted && isSyncSuccess && !isManuallyUnarchived) {
+        // STRICT RULE: Must be OPERATIVO + valid Taxes OT + 100% tasks finished + 100% tasks synced + NOT manually unarchived!
+        if (hasOtNumber && isCompleted && allSynced && isOperativo && !isManuallyUnarchived) {
           order.archived = true;
           order.archivedAt = order.archivedAt || new Date().toISOString();
           count++;

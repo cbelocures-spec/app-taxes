@@ -799,13 +799,14 @@
       "verifiedStatus": "success",
       "verifiedError": null,
       "verifiedCount": 46,
-      "archived": true,
+      "archived": false,
       "deletedAt": "2026-07-31T13:18:41.933Z",
       "deleted": false,
       "archivedAt": null,
       "lastVerifyAttempt": "2026-07-29T19:11:48.030Z",
       "autoSyncRetryCount": 3,
-      "lastAutoSyncAttempt": "2026-07-30T09:21:16.769Z"
+      "lastAutoSyncAttempt": "2026-07-30T09:21:16.769Z",
+      "unarchivedManually": true
     },
     {
       "id": "1785235151490",
@@ -902,11 +903,12 @@
       "verifiedStatus": null,
       "archived": false,
       "deletedAt": "2026-07-31T13:18:42.010Z",
-      "deleted": true,
+      "deleted": false,
       "verifiedError": null,
       "verifiedCount": 13,
       "archivedAt": null,
-      "lastVerifyAttempt": "2026-07-29T16:40:54.717Z"
+      "lastVerifyAttempt": "2026-07-29T16:40:54.717Z",
+      "unarchivedManually": true
     },
     {
       "id": "1785240761941",
@@ -1200,7 +1202,8 @@
       "archivedAt": null,
       "verifiedError": null,
       "verifiedCount": 13,
-      "lastVerifyAttempt": "2026-07-29T16:39:18.777Z"
+      "lastVerifyAttempt": "2026-07-29T16:39:18.777Z",
+      "unarchivedManually": true
     },
     {
       "id": "1785267037975",
@@ -1923,13 +1926,14 @@
       "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
       "archived": false,
-      "deleted": true,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.055Z",
       "verifiedStatus": null,
       "archivedAt": null,
       "verifiedError": null,
       "verifiedCount": 9,
-      "lastVerifyAttempt": "2026-07-29T20:58:32.245Z"
+      "lastVerifyAttempt": "2026-07-29T20:58:32.245Z",
+      "unarchivedManually": true
     },
     {
       "id": "1785330025352",
@@ -3364,7 +3368,8 @@
       "archived": false,
       "archivedAt": null,
       "deleted": false,
-      "deletedAt": null
+      "deletedAt": null,
+      "unarchivedManually": true
     },
     {
       "id": "1785144522096",
@@ -3404,7 +3409,8 @@
       "deletedAt": "2026-07-31T13:18:41.819Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1785144522108",
@@ -3559,12 +3565,13 @@
       "taxesOrderNumber": "27087",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:41.827Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 6
+      "verifiedCount": 6,
+      "unarchivedManually": true
     },
     {
       "id": "1785144522190",
@@ -3923,7 +3930,8 @@
       "deletedAt": "2026-07-31T13:18:41.837Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1785149830117",
@@ -5146,12 +5154,13 @@
       "taxesOrderNumber": "27583",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:41.867Z",
       "verifiedStatus": null,
       "verifiedError": null,
-      "verifiedCount": 5
+      "verifiedCount": 5,
+      "unarchivedManually": true
     },
     {
       "id": "1785173582856",
@@ -5365,7 +5374,8 @@
       "deletedAt": "2026-07-31T13:18:41.871Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 2
+      "verifiedCount": 2,
+      "unarchivedManually": true
     },
     {
       "id": "1785175614887",
@@ -5667,12 +5677,13 @@
       "taxesOrderNumber": "27586",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:41.879Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 6
+      "verifiedCount": 6,
+      "unarchivedManually": true
     },
     {
       "id": "1785202545298",
@@ -7256,7 +7267,7 @@
       "interno": "118",
       "clasificacion": "Auxilio",
       "incidente": "",
-      "syncStatus": "success",
+      "syncStatus": "pending",
       "syncError": null,
       "syncDate": null,
       "createdAt": "2026-07-28T09:57:34.719Z",
@@ -7293,21 +7304,22 @@
               "timestamp": 1784210660442
             }
           ],
-          "synced": true,
+          "synced": false,
           "taxesRealizadaSynced": true,
           "needsHoursUpdate": false
         }
       ],
       "createdBy": null,
-      "taxesOrderNumber": "28275",
+      "taxesOrderNumber": null,
       "estadoUnidad": "operativo",
       "combustibleReset": null,
       "archived": false,
-      "deleted": true,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:41.911Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 5
+      "verifiedCount": 5,
+      "unarchivedManually": true
     },
     {
       "id": "1784210703687",
@@ -7518,9 +7530,10 @@
       "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
       "archived": false,
-      "deleted": true,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:41.915Z",
-      "verifiedStatus": "success"
+      "verifiedStatus": "success",
+      "unarchivedManually": true
     },
     {
       "id": "1784877134794",
@@ -8501,7 +8514,8 @@
       "deletedAt": "2026-07-31T13:18:41.965Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 245
+      "verifiedCount": 245,
+      "unarchivedManually": true
     },
     {
       "id": "1784984779184",
@@ -8545,7 +8559,8 @@
       "archived": false,
       "deleted": false,
       "deletedAt": "2026-07-31T13:18:41.966Z",
-      "verifiedStatus": "success"
+      "verifiedStatus": "success",
+      "unarchivedManually": true
     },
     {
       "id": "1784985391103",
@@ -8918,12 +8933,13 @@
       "taxesOrderNumber": "27034",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:41.983Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 8
+      "verifiedCount": 8,
+      "unarchivedManually": true
     },
     {
       "id": "1785144521472",
@@ -9040,7 +9056,8 @@
       "deletedAt": "2026-07-31T13:18:41.985Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 8
+      "verifiedCount": 8,
+      "unarchivedManually": true
     },
     {
       "id": "1785144521508",
@@ -9121,7 +9138,8 @@
       "deletedAt": "2026-07-31T13:18:41.986Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 2
+      "verifiedCount": 2,
+      "unarchivedManually": true
     },
     {
       "id": "1785144521532",
@@ -9281,7 +9299,8 @@
       "deletedAt": "2026-07-31T13:18:41.990Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 8
+      "verifiedCount": 8,
+      "unarchivedManually": true
     },
     {
       "id": "1785144521601",
@@ -9516,12 +9535,13 @@
       "taxesOrderNumber": "27053",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:41.995Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 7
+      "verifiedCount": 7,
+      "unarchivedManually": true
     },
     {
       "id": "1785144521700",
@@ -9879,12 +9899,13 @@
       "taxesOrderNumber": "27065",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:41.999Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 4
+      "verifiedCount": 4,
+      "unarchivedManually": true
     },
     {
       "id": "1785144521835",
@@ -10776,11 +10797,12 @@
       "estadoUnidad": "operativo",
       "combustibleReset": null,
       "archived": false,
-      "deleted": true,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.015Z",
       "verifiedStatus": null,
       "verifiedError": null,
-      "verifiedCount": 11
+      "verifiedCount": 11,
+      "unarchivedManually": true
     },
     {
       "id": "1785252257257",
@@ -10856,11 +10878,12 @@
       "estadoUnidad": "operativo",
       "combustibleReset": null,
       "archived": false,
-      "deleted": true,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.016Z",
       "verifiedStatus": null,
       "verifiedError": null,
-      "verifiedCount": 5
+      "verifiedCount": 5,
+      "unarchivedManually": true
     },
     {
       "id": "1785255327419",
@@ -11157,7 +11180,8 @@
       "deletedAt": "2026-07-31T13:18:42.020Z",
       "verifiedStatus": "idle",
       "verifiedError": null,
-      "verifiedCount": 12
+      "verifiedCount": 12,
+      "unarchivedManually": true
     },
     {
       "id": "1785257207959",
@@ -11205,12 +11229,13 @@
       "taxesOrderNumber": "27346",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.021Z",
       "verifiedStatus": null,
       "verifiedError": null,
-      "verifiedCount": 15
+      "verifiedCount": 15,
+      "unarchivedManually": true
     },
     {
       "id": "1785258024800",
@@ -11767,12 +11792,13 @@
       "taxesOrderNumber": "27929",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.027Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 2
+      "verifiedCount": 2,
+      "unarchivedManually": true
     },
     {
       "id": "1785261416280",
@@ -13056,12 +13082,13 @@
       "taxesOrderNumber": "27498",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-08-01T03:28:43.973Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 3
+      "verifiedCount": 3,
+      "unarchivedManually": true
     },
     {
       "id": "1785303605021",
@@ -13118,12 +13145,13 @@
       "taxesOrderNumber": "27650",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.045Z",
       "verifiedStatus": null,
       "verifiedError": null,
-      "verifiedCount": 9
+      "verifiedCount": 9,
+      "unarchivedManually": true
     },
     {
       "id": "1785311502609",
@@ -13222,12 +13250,13 @@
       "taxesOrderNumber": "27502",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.046Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 3
+      "verifiedCount": 3,
+      "unarchivedManually": true
     },
     {
       "id": "1785314945024",
@@ -13654,7 +13683,8 @@
       "deletedAt": "2026-07-31T13:18:42.051Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 2
+      "verifiedCount": 2,
+      "unarchivedManually": true
     },
     {
       "id": "1785322407692",
@@ -13696,8 +13726,9 @@
       "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
       "archived": false,
-      "deleted": true,
-      "deletedAt": "2026-07-31T13:18:42.052Z"
+      "deleted": false,
+      "deletedAt": "2026-07-31T13:18:42.052Z",
+      "unarchivedManually": true
     },
     {
       "id": "1785327882849",
@@ -13950,12 +13981,13 @@
       "taxesOrderNumber": "27694",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.060Z",
       "verifiedStatus": null,
       "verifiedError": null,
-      "verifiedCount": 4
+      "verifiedCount": 4,
+      "unarchivedManually": true
     },
     {
       "id": "1785336783864",
@@ -14007,12 +14039,13 @@
       "taxesOrderNumber": "27953",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.061Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 2
+      "verifiedCount": 2,
+      "unarchivedManually": true
     },
     {
       "id": "1785341308167",
@@ -14774,7 +14807,8 @@
       "deletedAt": "2026-07-31T13:18:42.073Z",
       "verifiedStatus": "idle",
       "verifiedError": null,
-      "verifiedCount": 11
+      "verifiedCount": 11,
+      "unarchivedManually": true
     },
     {
       "id": "1785357848168",
@@ -14842,12 +14876,13 @@
       "taxesOrderNumber": "27850",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.075Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 8
+      "verifiedCount": 8,
+      "unarchivedManually": true
     },
     {
       "id": "1785359896231",
@@ -14996,12 +15031,13 @@
       "taxesOrderNumber": "26382",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.077Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784344092055",
@@ -15076,12 +15112,13 @@
       "taxesOrderNumber": "26624",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.078Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784344092061",
@@ -15156,12 +15193,13 @@
       "taxesOrderNumber": "26629",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.079Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784344092069",
@@ -15596,12 +15634,13 @@
       "taxesOrderNumber": "26642",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.084Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784344092104",
@@ -15864,12 +15903,13 @@
       "taxesOrderNumber": "26553",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.088Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784481014974",
@@ -15904,12 +15944,13 @@
       "taxesOrderNumber": "26555",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.089Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784481014977",
@@ -16064,12 +16105,13 @@
       "taxesOrderNumber": "26561",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.092Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784481014990",
@@ -16224,12 +16266,13 @@
       "taxesOrderNumber": "26564",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.095Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784481015004",
@@ -16384,12 +16427,13 @@
       "taxesOrderNumber": "26537",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.097Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784481015019",
@@ -16544,12 +16588,13 @@
       "taxesOrderNumber": "26572",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.099Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784481015034",
@@ -17144,12 +17189,13 @@
       "taxesOrderNumber": "26407",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.116Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784481015114",
@@ -17532,12 +17578,13 @@
       "taxesOrderNumber": "26513",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.124Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784481015151",
@@ -17692,12 +17739,13 @@
       "taxesOrderNumber": "26519",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.127Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784481015173",
@@ -18172,12 +18220,13 @@
       "taxesOrderNumber": "26532",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.133Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784481015217",
@@ -18333,10 +18382,11 @@
       "estadoUnidad": "operativo",
       "combustibleReset": null,
       "archived": false,
-      "deleted": true,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.135Z",
       "verifiedStatus": "idle",
-      "verifiedError": null
+      "verifiedError": null,
+      "unarchivedManually": true
     },
     {
       "id": "1784559902606",
@@ -18730,12 +18780,13 @@
       "taxesOrderNumber": "26507",
       "estadoUnidad": "operativo",
       "combustibleReset": null,
-      "archived": true,
-      "deleted": true,
+      "archived": false,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.142Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 2
+      "verifiedCount": 2,
+      "unarchivedManually": true
     },
     {
       "id": "1784653376960",
@@ -18913,11 +18964,12 @@
       "estadoUnidad": "fuera_de_servicio",
       "combustibleReset": null,
       "archived": false,
-      "deleted": true,
+      "deleted": false,
       "deletedAt": "2026-07-31T13:18:42.143Z",
       "verifiedStatus": "success",
       "verifiedError": null,
-      "verifiedCount": 1
+      "verifiedCount": 1,
+      "unarchivedManually": true
     },
     {
       "id": "1784676426761",
@@ -19016,7 +19068,8 @@
       "archived": false,
       "taxesOrderNumber": "28372",
       "syncStatus": "success",
-      "syncError": null
+      "syncError": null,
+      "unarchivedManually": true
     }
   ],
   "catalogs": {
