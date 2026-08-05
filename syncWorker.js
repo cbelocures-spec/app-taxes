@@ -202,7 +202,9 @@ async function launchBrowser() {
   const launchOptions = {
     headless: process.env.PUPPETEER_HEADLESS === 'false' ? false : true,
     executablePath: execPath || undefined,
-    protocolTimeout: 90000,
+    // Was 90000 - under load (e.g. a burst of many queued syncs) that's easier to hit
+    // than Puppeteer's own default of 180000, which is what this now matches.
+    protocolTimeout: 180000,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -809,15 +811,18 @@ async function safeEvaluate(page, fn, ...args) {
       return await page.evaluate(fn, ...args);
     } catch (err) {
       const msg = err.message || '';
-      if (msg.includes('Execution context was destroyed') || msg.includes('detached Frame') || msg.includes('Target closed')) {
-        console.warn(`[safeEvaluate] Context/Frame error, waiting 1s before retry ${i + 1}/3...`);
+      // Also retry a hung CDP call (ProtocolError: Runtime.callFunctionOn timed out) -
+      // this can happen transiently under load (e.g. a burst of many queued syncs) and
+      // otherwise fails the whole step immediately with no retry at all.
+      if (msg.includes('Execution context was destroyed') || msg.includes('detached Frame') || msg.includes('Target closed') || msg.includes('timed out')) {
+        console.warn(`[safeEvaluate] Context/Frame/timeout error, waiting 1s before retry ${i + 1}/3...`);
         await delay(1000);
       } else {
         throw err;
       }
     }
   }
-  throw new Error("Page evaluation failed due to persistent context/frame destruction.");
+  throw new Error("Page evaluation failed due to persistent context/frame destruction or timeout.");
 }
 
 // Automate login to Taxes.com.ar
