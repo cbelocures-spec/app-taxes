@@ -13627,12 +13627,21 @@
       "createdAt": "2026-07-29T10:53:27.531Z",
       "tasks": [
         {
-          "id": "1785322407531-0",
+          "id": "task-112-1",
           "centroCosto": "15",
-          "empleado": "552",
+          "empleado": "Canaviri Fernandez, Jesús",
           "horasEstimadas": 1,
-          "descripcion": "Se quedó sin gas oil - Diagnóstico: Llevar gasoil",
+          "descripcion": "ventea motor 3 dias gastando aceite",
           "status": "Finalizada",
+          "synced": true
+        },
+        {
+          "id": "task-112-2",
+          "centroCosto": "15",
+          "empleado": "Morel, Luis Maximiliano",
+          "horasEstimadas": 1,
+          "descripcion": "Ay. Sacar cartel",
+          "status": "En Proceso",
           "synced": false
         }
       ],
