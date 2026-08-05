@@ -3419,13 +3419,30 @@ function createOrderCardHtml(order) {
       </div>
 
       <div class="order-card-footer">
-        <div class="tasks-summary" onclick="toggleTaskEmployees(event, '${order.id}')" style="cursor:pointer;" title="Ver personal asignado">
+        <div class="tasks-summary" onclick="toggleTaskEmployees(event, '${order.id}')" style="cursor:pointer; display:flex; align-items:center; gap:6px; flex:1;" title="Ver tareas y personal asignado">
           <span class="material-icons">format_list_bulleted</span>
           <span>${(order.tasks || []).filter(t => t !== null && t !== undefined).length} Tareas asignadas</span>
-          <span class="material-icons" style="font-size:14px; margin-left:2px; color:var(--text-muted);">expand_more</span>
+          <span class="material-icons" style="font-size:14px; color:var(--text-muted);">expand_more</span>
+          ${(() => {
+            const vTasks = (order.tasks || []).filter(t => t !== null && t !== undefined);
+            const sCount = vTasks.filter(t => t && t.synced === true).length;
+            if (sCount > 0) {
+              return `
+                <span style="margin-left:auto; background:#d1fae5; color:#065f46; border:1px solid #a7f3d0; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:3px;">
+                  <span class="material-icons" style="font-size:13px;">check_circle</span> ${sCount}/${vTasks.length} Sincronizadas
+                </span>
+              `;
+            }
+            return '';
+          })()}
         </div>
         <div class="task-employees-detail" id="task-emp-${order.id}" style="display:none; width:100%; margin-top:6px; padding:6px 8px; background:var(--bg-secondary); border-radius:6px; font-size:12px;"></div>
-        <div class="card-actions">
+        <div class="card-actions" style="margin-top:6px;">
+          ${!order.taxesOrderNumber ? `
+            <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); triggerExpressOtSync('${order.id}')" style="padding:3px 8px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:3px; background:linear-gradient(135deg,#059669,#047857); border:none; color:#fff; border-radius:6px; cursor:pointer;" title="Obtener N° de O.T. Express en Taxes">
+              <span class="material-icons" style="font-size:14px;">bolt</span> Obtener N° O.T.
+            </button>
+          ` : ''}
           <button class="icon-btn primary" onclick="viewOrder('${order.id}')" title="Ver Orden (Solo Lectura)">
             <span class="material-icons">visibility</span>
           </button>
@@ -3441,14 +3458,12 @@ function createOrderCardHtml(order) {
           ` : ''}
           ${(() => {
             if (order.syncStatus === 'success') {
-              // For synced orders: show Archive button (moves to history)
               return `
                 <button class="icon-btn" onclick="archiveOrder('${order.id}')" title="Archivar (pasa al Historial)" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;">
                   <span class="material-icons">archive</span>
                 </button>
               `;
             } else {
-              // For local/error orders: show Delete button
               return `
                 <button class="icon-btn danger" onclick="deleteOrder('${order.id}')" title="Eliminar Localmente">
                   <span class="material-icons">delete</span>
@@ -3486,12 +3501,29 @@ function toggleTaskEmployees(event, orderId) {
       ? cachedCatalogs.empleados.find(e => e.value === t.empleado)
       : null;
     const empName = empOpt ? empOpt.label : (t.empleado || 'Sin asignar');
-    const statusIcon = t.status === 'Finalizada' ? '✅' : (t.timerStart > 0 ? '⚡' : (t.timerStarted || (t.timerHistory && t.timerHistory.length > 0) ? '⏸' : '⏳'));
+    const isSynced = !!t.synced;
+    const statusIcon = isSynced ? '✔' : (t.status === 'Finalizada' ? '✅' : (t.timerStart > 0 ? '⚡' : '⏳'));
     const desc = t.descripcion ? t.descripcion.split('\n')[0].substring(0, 40) : 'Sin descripción';
-    html += `<div style="display:flex; align-items:center; gap:6px; padding:3px 0; border-bottom:1px solid var(--border-color);">
-      <span style="font-size:13px;">${statusIcon}</span>
-      <strong style="font-size:12px;">${empName}</strong>
-      <span style="color:var(--text-muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">— ${desc}</span>
+
+    html += `<div style="display:flex; align-items:center; justify-content:space-between; gap:6px; padding:4px 0; border-bottom:1px solid var(--border-color);">
+      <div style="display:flex; align-items:center; gap:6px; overflow:hidden;">
+        <span style="font-size:13px; font-weight:bold; color:${isSynced ? '#059669' : '#6b7280'};">${statusIcon}</span>
+        <strong style="font-size:12px;">${empName}</strong>
+        <span style="color:var(--text-muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">— ${desc}</span>
+      </div>
+      <div style="flex-shrink:0;">
+        ${isSynced ? `
+          <span style="background:#d1fae5; color:#065f46; border:1px solid #a7f3d0; padding:1px 6px; border-radius:10px; font-size:10px; font-weight:700; display:inline-flex; align-items:center; gap:2px;">
+            <span class="material-icons" style="font-size:11px;">check_circle</span> Sincronizada
+          </span>
+        ` : (order.taxesOrderNumber ? `
+          <button type="button" class="btn btn-sm btn-primary" onclick="event.stopPropagation(); triggerSingleTaskSync('${order.id}', ${idx})" style="padding:1px 6px; font-size:10px; font-weight:600; display:inline-flex; align-items:center; gap:2px; background:linear-gradient(135deg,#0284c7,#0369a1); border:none; color:#fff; border-radius:4px; cursor:pointer;" title="Sincronizar esta tarea a Taxes">
+            <span class="material-icons" style="font-size:11px;">bolt</span> Sincronizar Tarea
+          </button>
+        ` : `
+          <span style="color:var(--text-muted); font-size:10px; font-style:italic;">Pendiente O.T.</span>
+        `)}
+      </div>
     </div>`;
   });
 
