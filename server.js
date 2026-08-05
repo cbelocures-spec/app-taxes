@@ -1226,6 +1226,19 @@ app.delete('/api/orders/:id', (req, res) => {
   }
 });
 
+// Toggle automatic background sync on/off
+app.post('/api/settings/toggle-sync', (req, res) => {
+  try {
+    const current = db.getSettings();
+    const disabled = req.body && req.body.autoSyncDisabled !== undefined ? !!req.body.autoSyncDisabled : !current.autoSyncDisabled;
+    db.saveSettings({ autoSyncDisabled: disabled });
+    console.log(`[AutoSync] Background automatic sync is now ${disabled ? 'PAUSED' : 'ACTIVE'}.`);
+    res.json({ success: true, autoSyncDisabled: disabled });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get ALL orders (active + archived) — used by sync agent to reconcile complete database
 app.get('/api/orders/all', (req, res) => {
   try {

@@ -4422,6 +4422,13 @@ async function startWorker() {
 
   while (isWorkerRunning) {
     try {
+      const settings = db.getSettings();
+      if (settings.autoSyncDisabled === true) {
+        // Automatic background sync is PAUSED
+        await delay(10000);
+        continue;
+      }
+
       const orders = db.getSyncableOrders();
       const pendingOrder = orders.find(o => o.syncStatus === 'pending');
 
