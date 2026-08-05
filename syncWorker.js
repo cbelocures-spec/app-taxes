@@ -2518,16 +2518,8 @@ async function syncWorkOrder(orderId) {
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
     
     // Wait for the portal page catalogs/dropdowns to load completely
-    console.log("Waiting for filter selects to load on list page...");
     await page.waitForSelector('select', { timeout: 10000 }).catch(() => {});
-    
-    console.log("Waiting for catalog select options to populate on list page...");
-    await page.waitForFunction(() => {
-      const selects = Array.from(document.querySelectorAll('select'));
-      return selects.some(s => s.options.length > 50);
-    }, { timeout: 15000 }).catch(e => console.log("Timeout waiting for select options on list page: " + e.message));
-    
-    await delay(1000); // Small extra buffer to be absolutely sure Vue is ready
+    await delay(1000); // Small extra buffer to be sure Vue is ready
 
     // PRE-CREATION SAFEGUARD: Check if an OT already exists in Taxes for this Interno ON TODAY'S DATE before creating a new one!
     if (order.interno) {
@@ -4255,21 +4247,21 @@ async function verifyWorkOrder(orderId) {
   }
 }
 
-// Helper wrapper to execute verifyWorkOrder with a 3-minute global safety timeout
+// Helper wrapper to execute verifyWorkOrder with a 5-minute global safety timeout
 async function verifyWorkOrderWithTimeout(orderId) {
   let timeoutId;
   try {
     return await Promise.race([
       verifyWorkOrder(orderId),
       new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Timeout: verificación tardó más de 3 minutos')), 180 * 1000);
+        timeoutId = setTimeout(() => reject(new Error('Timeout: verificación tardó más de 5 minutos')), 300 * 1000);
       })
     ]);
   } catch (err) {
     console.error(`[VerifyWorkOrder Timeout Safety] Fallo o timeout en verificación de orden ID ${orderId}:`, err.message);
     abandonedSyncOrderIds.add(orderId);
     try {
-      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedError: err.message || 'Verificación cancelada por timeout de 3 minutos' });
+      db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedError: err.message || 'Verificación cancelada por timeout de 5 minutos' });
     } catch (dbErr) {
       console.error(`[VerifyWorkOrder Timeout Safety] Error al actualizar BD para orden ID ${orderId}:`, dbErr.message);
     }
@@ -4280,18 +4272,14 @@ async function verifyWorkOrderWithTimeout(orderId) {
   }
 }
 
-// Helper wrapper to execute syncWorkOrder with a 3-minute global safety timeout
+// Helper wrapper to execute syncWorkOrder with a 6-minute global safety timeout
 async function syncWorkOrderWithTimeout(orderId) {
   let timeoutId;
   try {
     await Promise.race([
       syncWorkOrder(orderId),
       new Promise((_, reject) => {
-        // Kept comfortably above protocolTimeout (180s, see launchBrowser) so a hung CDP
-        // call fails there first with a specific error - otherwise both fire at the same
-        // moment and every timeout looks identical and generic here, whether the real
-        // cause was a stuck evaluate() or a genuinely slow multi-task sync.
-        timeoutId = setTimeout(() => reject(new Error('Timeout: sincronización tardó más de 5 minutos')), 300 * 1000);
+        timeoutId = setTimeout(() => reject(new Error('Timeout: sincronización tardó más de 6 minutos')), 360 * 1000);
       })
     ]);
   } catch (err) {
@@ -4300,7 +4288,7 @@ async function syncWorkOrderWithTimeout(orderId) {
     try {
       db.updateWorkOrder(orderId, {
         syncStatus: 'error',
-        syncError: err.message || 'Sincronización cancelada por timeout de 3 minutos'
+        syncError: err.message || 'Sincronización cancelada por timeout de 6 minutos'
       });
     } catch (dbErr) {
       console.error(`[SyncWorker Timeout Safety] Error al actualizar BD para orden ID ${orderId}:`, dbErr.message);
