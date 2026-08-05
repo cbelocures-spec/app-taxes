@@ -400,12 +400,16 @@ async function fillSearchableSelect(page, labelText, searchValue) {
             interno: matching.interno || '',
             modelo: matching.modelo || ''
           };
-          if (rodadoInfo.patente) {
-            queriesToTry.push(rodadoInfo.patente.trim());
-          }
+          // Interno first: it's the most precise/unique identifier and always confirmed to
+          // work in Taxes' own search. Patente goes after it (some equipment - compactadores,
+          // equipos municipales - has no real patente or a stale/wrong catalog value, and
+          // trying that first can derail the whole match before we ever get to the interno).
           if (rodadoInfo.interno) {
             queriesToTry.push(rodadoInfo.interno.trim());
             queriesToTry.push(`Interno ${rodadoInfo.interno.trim()}`);
+          }
+          if (rodadoInfo.patente) {
+            queriesToTry.push(rodadoInfo.patente.trim());
           }
           if (rodadoInfo.modelo) {
             queriesToTry.push(rodadoInfo.modelo.trim());
