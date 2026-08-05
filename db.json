@@ -13621,7 +13621,7 @@
       "interno": "112",
       "clasificacion": "Auxilio",
       "incidente": "",
-      "syncStatus": "success",
+      "syncStatus": "pending",
       "syncError": null,
       "syncDate": "2026-07-30T13:07:46.672Z",
       "createdAt": "2026-07-29T10:53:27.531Z",
@@ -13637,7 +13637,7 @@
         }
       ],
       "createdBy": "paniol@contenedoreshugo.com.ar",
-      "taxesOrderNumber": "28301",
+      "taxesOrderNumber": null,
       "estadoUnidad": "operativo",
       "combustibleReset": null,
       "archived": false,
@@ -18992,7 +18992,17 @@
       "createdBy": "paniol@contenedoreshugo.com.ar",
       "createdAt": "2026-08-05T21:08:58.157Z",
       "estadoUnidad": "fuera_de_servicio",
-      "tasks": [],
+      "tasks": [
+        {
+          "id": "task-158-1",
+          "centroCosto": "15",
+          "empleado": "PEREZ FACUNDO",
+          "horasEstimadas": 1.41,
+          "descripcion": "Terminado de ploteo",
+          "status": "Finalizada",
+          "synced": true
+        }
+      ],
       "deleted": false,
       "archived": false,
       "taxesOrderNumber": "28372",

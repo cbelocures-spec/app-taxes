@@ -783,36 +783,6 @@ class LocalDB {
   createWorkOrder(orderData) {
     const db = this.read();
     const targetInterno = orderData.interno ? String(orderData.interno).trim() : null;
-
-    // Deduplication check: If an active order for this 'interno' with the SAME clasificacion
-    // ALREADY exists, merge tasks into it instead of creating a duplicate order! A different
-    // clasificacion (e.g. Correctivo vs Auxilio, or vs Preventivo/Herreria) always gets its own
-    // separate order — confirmed explicitly: "si tenes correctivo y queres crear auxilio te
-    // tiene que dejar, las clasificaciones son distintas" (2026-08-03).
-    const targetClasificacion = String(orderData.clasificacion || '').trim().toLowerCase();
-    if (targetInterno) {
-      const existingOrder = (db.workOrders || []).find(o =>
-        !o.archived && o.deleted !== true &&
-        String(o.interno).trim().toLowerCase() === targetInterno.toLowerCase() &&
-        String(o.clasificacion || '').trim().toLowerCase() === targetClasificacion
-      );
-      if (existingOrder) {
-        console.log(`[DB] Active order for Interno ${targetInterno} already exists (ID: ${existingOrder.id}). Merging tasks instead of duplicating.`);
-        const existingIds = new Set((existingOrder.tasks || []).map(t => t.id).filter(Boolean));
-        const newTasksWithIds = (orderData.tasks || []).map((t, idx) => {
-          let id = t.id;
-          if (!id || existingIds.has(id)) {
-            id = `${Date.now()}-${idx}`;
-          }
-          existingIds.add(id);
-          return { ...t, id };
-        });
-        return this.updateWorkOrder(existingOrder.id, {
-          tasks: [...(existingOrder.tasks || []), ...newTasksWithIds],
-          estadoUnidad: orderData.estadoUnidad !== undefined ? orderData.estadoUnidad : existingOrder.estadoUnidad
-        });
-      }
-    }
     
     const tasks = (orderData.tasks || []).map((t, idx) => ({
       id: t.id || `${Date.now()}-${idx}`,
