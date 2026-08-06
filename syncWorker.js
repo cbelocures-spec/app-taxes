@@ -234,6 +234,8 @@ async function launchBrowser() {
 }
 
 async function setupPage(page) {
+  global.paginaActivaParaStream = page;
+
   // Anti-bot detection avoidance
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
   await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-AR,es;q=0.9' });
@@ -1788,6 +1790,11 @@ async function syncWorkOrder(orderId) {
 
         try {
           console.log(`[Alta O.T.] Rellenando formulario por nodos de texto para Interno: ${order.interno}`);
+
+          // ANTES DE BUSCAR LA PALABRA 'RODADO', ESPERAMOS QUE APAREZCA EL FORMULARIO REAL
+          console.log("[Puppeteer] Esperando que el contenedor del formulario aparezca en Taxes...");
+          await page.waitForSelector('.form-group, fieldset, form', { visible: true, timeout: 15000 }).catch(() => {});
+          await delay(2000); // 2 segundos extra de cortesía para scripts lentos de Taxes
 
           // ==========================================
           // 1. COMPLETAR EL CAMPO: RODADO

@@ -1155,6 +1155,73 @@ app.post('/api/orders/finalize-tasks', async (req, res) => {
   }
 });
 
+// =====================================================================
+// API DE DESARROLLO: TRANSMISIÓN EN VIVO DEL NAVEGADOR (LIVE STREAM)
+// =====================================================================
+app.get('/api/dev/stream', async (req, res) => {
+  res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  console.log("[Stream] Cliente conectado para auditar el navegador visible...");
+
+  const intervalo = setInterval(async () => {
+    try {
+      if (global.paginaActivaParaStream && !global.paginaActivaParaStream.isClosed()) {
+        const buffer = await global.paginaActivaParaStream.screenshot({ 
+          type: 'jpeg', 
+          quality: 60 
+        });
+        
+        res.write(`--frame\r\n`);
+        res.write(`Content-Type: image/jpeg\r\n`);
+        res.write(`Content-Length: ${buffer.length}\r\n\r\n`);
+        res.write(buffer);
+        res.write(`\r\n`);
+      } else {
+        res.write(`--frame\r\nContent-Type: image/jpeg\r\n\r\n`);
+      }
+    } catch (err) {
+      // Ignore transient errors when browser navigates
+    }
+  }, 300);
+
+  req.on('close', () => {
+    clearInterval(intervalo);
+    console.log("[Stream] Cliente desconectado.");
+  });
+});
+
+app.get('/api/dev/live-view', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Auditoría en Vivo Puppeteer - Taxes</title>
+      <style>
+        body { background: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 16px; box-sizing: border-box; }
+        h2 { margin-bottom: 8px; color: #38bdf8; display: flex; align-items: center; gap: 10px; font-size: 20px; }
+        .live-badge { background: #ef4444; color: white; font-size: 12px; font-weight: bold; padding: 3px 10px; border-radius: 12px; animation: pulse 1.5s infinite; letter-spacing: 0.5px; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .stream-container { background: #1e293b; border: 2px solid #334155; border-radius: 12px; padding: 8px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); max-width: 100%; width: 1280px; overflow: hidden; }
+        img { width: 100%; height: auto; border-radius: 8px; display: block; }
+        p { color: #94a3b8; font-size: 14px; margin-top: 4px; margin-bottom: 16px; }
+      </style>
+    </head>
+    <body>
+      <h2><span class="live-badge">EN VIVO</span> Auditoría de Puppeteer</h2>
+      <p>Transmisión en directo desde el servidor de automatización Taxes</p>
+      <div class="stream-container">
+        <img src="/api/dev/stream" alt="Transmisión en vivo de Puppeteer" />
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 // Trigger Single Task Sync to /tms/produccion/tareas (Etapa 2 - per task)
 app.post('/api/orders/:id/tasks/:taskId/sync', async (req, res) => {
   try {
