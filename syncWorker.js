@@ -1838,10 +1838,49 @@ async function syncWorkOrder(orderId) {
         await delay(1000);
         console.log(`[Puppeteer] Vehículo asociado con éxito. Procediendo a guardar la cabecera vacía...`);
 
+        // 1. COMPLETAR OBLIGATORIAMENTE LOS CAMPOS COMPLEMENTARIOS DE LA CABECERA
+        console.log("[Puppeteer] Rellenando campos obligatorios de validación...");
+
         let targetResponsable = order.responsable || 'Belocures';
         let respFilled = await fillSearchableSelect(page, 'Responsable', targetResponsable);
         if (!respFilled) {
           respFilled = await fillSearchableSelect(page, 'Responsable', 'Belocures');
+        }
+
+        // Clasificación
+        const selectClasificacion = 'select[class*="clasificacion"], select[name*="clasificacion"], select';
+        await page.waitForSelector(selectClasificacion, { visible: true }).catch(() => {});
+        if (order.clasificacion) {
+          await safeEvaluate(page, (targetClasif) => {
+            const selects = Array.from(document.querySelectorAll('select'));
+            const clasSelect = selects.find(s => {
+              const name = (s.name || s.id || s.className || '').toLowerCase();
+              return name.includes('clasific') || name.includes('tipo') || name.includes('categoria');
+            }) || selects[1] || selects[0];
+
+            if (clasSelect && targetClasif) {
+              const clean = s => String(s || '').trim().toUpperCase();
+              const opt = Array.from(clasSelect.options).find(o => clean(o.textContent).includes(clean(targetClasif)));
+              if (opt) {
+                clasSelect.value = opt.value;
+                clasSelect.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+            }
+          }, order.clasificacion);
+        }
+        await delay(500);
+
+        // Campo de texto libre "Interno de la Unidad" (Si Taxes no lo autocompletó solo, lo forzamos)
+        const inputInternoUnidad = 'input[name*="interno"], input[class*="unidad"]'; 
+        const valorInternoActual = await safeEvaluate(page, (sel) => {
+          const el = document.querySelector(sel);
+          return el ? el.value : '';
+        }, inputInternoUnidad);
+
+        if (!valorInternoActual || valorInternoActual.trim() === "") {
+          console.log("[Puppeteer] Forzando escritura manual en Interno de la Unidad para asegurar validación.");
+          await page.click(inputInternoUnidad).catch(() => {});
+          await page.type(inputInternoUnidad, order.interno.toString()).catch(() => {});
         }
 
         // Set Fecha
@@ -1855,45 +1894,65 @@ async function syncWorkOrder(orderId) {
           }
         }, order.fechaEntrega || new Date().toISOString().split('T')[0]);
 
-        // Guardar la orden vacía (sin tareas)
-        const guardarBtnId = await safeEvaluate(page, () => {
-          const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
-          const b = btns.find(x => (x.textContent || x.value || '').trim().toLowerCase().includes('guardar'));
-          if (!b || b.dataset.clicked === 'true') return null;
-          b.dataset.clicked = 'true';
-          const id = 'tmp-guardar-express-' + Date.now();
-          b.id = id;
-          return id;
+        // 2. DARLE TIEMPO A TAXES PARA HABILITAR EL BOTÓN DE GUARDAR
+        await delay(2000); 
+
+        // 3. ESTRATEGIA DE GUARDADO BLINDADA (Simula scroll, foco y clic físico)
+        const botonGuardarSelector = 'button[class*="success"], .btn-guardar, button';
+        console.log("[Puppeteer] Ejecutando guardado mediante clic forzado del DOM...");
+
+        await safeEvaluate(page, (selector) => {
+          const botones = Array.from(document.querySelectorAll(selector));
+          const botonGuardar = botones.find(b => b.textContent.toLowerCase().includes('guardar'));
+          
+          if (botonGuardar) {
+            botonGuardar.scrollIntoView();
+            botonGuardar.focus();
+            botonGuardar.click();
+          } else {
+            throw new Error("No se encontró el botón de Guardar en la pantalla de Taxes.");
+          }
+        }, botonGuardarSelector);
+
+        // 4. ESPERAR RESPUESTA DEL SERVIDOR DE TAXES
+        console.log("[Puppeteer] Esperando navegación o confirmación de Taxes...");
+        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {
+          console.log("[Puppeteer] La página no navegó, verificando si se abrió un modal de confirmación o error.");
         });
 
-        if (guardarBtnId) {
-          await page.click(`#${guardarBtnId}`);
-          await safeEvaluate(page, (btnId) => {
-            const b = document.getElementById(btnId);
-            if (b) { b.disabled = true; b.style.pointerEvents = 'none'; }
-          }, guardarBtnId);
-          await delay(3000); // Esperar impacto
-        }
+        // 5. CAPTURA DEL NÚMERO DE O.T. GENERADO (Por URL o por DOM)
+        await delay(2000);
+        const urlActual = page.url();
+        const coincidenciaUrl = urlActual.match(/\d+$/);
+        numeroGenerado = coincidenciaUrl ? coincidenciaUrl[0] : null;
 
-        // Capturar el número de O.T. generado por Taxes
-        numeroGenerado = await safeEvaluate(page, (targetInterno) => {
-          const clean = s => (s || '').toString().trim();
-          const tables = Array.from(document.querySelectorAll('table'));
-          for (const table of tables) {
-            const rows = Array.from(table.querySelectorAll('tbody tr'));
-            for (const row of rows) {
-              const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
-              if (cells.length >= 3) {
-                const rowInterno = cells[1] || cells[0] || '';
-                const rowOt = cells[2] || cells[1] || '';
-                if (rowInterno.toUpperCase().includes(String(targetInterno).toUpperCase()) && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
-                  return rowOt.replace(/\D/g, '');
+        if (!numeroGenerado) {
+          numeroGenerado = await safeEvaluate(page, (targetInterno) => {
+            const elementos = Array.from(document.querySelectorAll('h1, h2, h3, .badge, span, td'));
+            for (const el of elementos) {
+              const txt = el.textContent.trim();
+              if ((txt.toLowerCase().includes('orden') || txt.toLowerCase().includes('o.t')) && txt.match(/\d+/)) {
+                return txt.match(/\d+/)[0];
+              }
+            }
+            const clean = s => (s || '').toString().trim();
+            const tables = Array.from(document.querySelectorAll('table'));
+            for (const table of tables) {
+              const rows = Array.from(table.querySelectorAll('tbody tr'));
+              for (const row of rows) {
+                const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
+                if (cells.length >= 3) {
+                  const rowInterno = cells[1] || cells[0] || '';
+                  const rowOt = cells[2] || cells[1] || '';
+                  if (rowInterno.toUpperCase().includes(String(targetInterno).toUpperCase()) && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
+                    return rowOt.replace(/\D/g, '');
+                  }
                 }
               }
             }
-          }
-          return null;
-        }, order.interno);
+            return null;
+          }, order.interno);
+        }
       }
 
       if (numeroGenerado) {
