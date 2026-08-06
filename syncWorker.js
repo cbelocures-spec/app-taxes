@@ -1806,38 +1806,20 @@ async function syncWorkOrder(orderId) {
         }
 
         try {
-          const diagFs = require('fs');
-          const diagPath = require('path');
-          const diagHtml = await page.content();
-          diagFs.writeFileSync(diagPath.join(__dirname, 'public', 'debug_ot_form2.html'), diagHtml);
-          const diagSnippets = await page.evaluate(() => {
-            const labels = Array.from(document.querySelectorAll('label, span, div, p'));
-            const out = {};
-            for (const key of ['Rodado', 'Responsable']) {
-              const lab = labels.find(el => (el.textContent || '').trim().toUpperCase().startsWith(key.toUpperCase()) && el.textContent.trim().length < 40);
-              if (lab) {
-                let container = lab.closest('.form-group') || lab.parentElement?.parentElement || lab.parentElement;
-                out[key] = container ? container.outerHTML.slice(0, 1500) : lab.outerHTML.slice(0, 1500);
-              } else {
-                out[key] = null;
-              }
-            }
-            return out;
-          });
-          diagFs.writeFileSync(diagPath.join(__dirname, 'public', 'debug_ot_snippets.json'), JSON.stringify(diagSnippets, null, 2));
-          console.log('[DEBUG-DIAG2] Saved debug_ot_form2.html and debug_ot_snippets.json');
-        } catch (diagErr) {
-          console.warn('[DEBUG-DIAG2] Failed to save diagnostics:', diagErr.message);
-        }
-
-        try {
           // =====================================================================
           // PARCHE DE ALTA: LLENADO POR SELECTORES CONTROLADOS (MODAL NUEVO)
           // =====================================================================
           console.log("[Puppeteer] Formulario abierto. Esperando que los campos del modal sean visibles...");
 
           // 1. ESPERAR EL INPUT DE RODADO (Aseguramos que el modal terminó de abrirse)
-          const inputRodadoReal = 'form input[type="text"], .modal-body input, .form-group input, input[type="text"]';
+          // Taxes deja montados (ocultos) los inputs de fecha/limite de la barra de
+          // filtros de la lista incluso en la vista de alta, y esos aparecen ANTES en
+          // el DOM que los campos reales. Un selector generico como input[type="text"]
+          // siempre matchea ese input oculto primero y Puppeteer nunca lo considera
+          // visible, haciendo que el wait expire aunque el campo real ya este' visible.
+          // input.searchable-input es la clase propia (y unica) del combo de Rodado/
+          // Responsable en Taxes, asi que evita esos decoys por completo.
+          const inputRodadoReal = 'input.searchable-input';
           await page.waitForSelector(inputRodadoReal, { visible: true, timeout: 20000 });
           await delay(1000); // 1 segundo de cortesía para que se habiliten los scripts de la web
 
@@ -1873,7 +1855,7 @@ async function syncWorkOrder(orderId) {
           // 4. PASO SIGUIENTE: RESPONSABLE Y CLASIFICACIÓN
           // =====================================================================
           console.log("[Puppeteer] Pasando al campo de Responsable...");
-          const inputsModal = await page.$$('form input[type="text"], .modal-body input, .form-group input');
+          const inputsModal = await page.$$('input.searchable-input');
           if (inputsModal.length >= 2) {
             const inputResponsableReal = inputsModal[1];
             await inputResponsableReal.click().catch(() => {});
