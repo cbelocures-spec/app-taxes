@@ -1788,28 +1788,21 @@ async function syncWorkOrder(orderId) {
         });
 
         if (nuevoBtnId) {
-          console.log("[Alta O.T.] Presionando botón 'NUEVO' y esperando 4s a que el formulario cargue...");
+          console.log("[Alta O.T.] Presionando botón 'NUEVO' y esperando a que la vista 'Nueva Orden de Trabajo' hidrate...");
           await page.click(`#${nuevoBtnId}`);
-          await delay(4000); // 4 segundos enteros para que Taxes inicialice el modal
-        }
 
-        try {
-          const diagFs = require('fs');
-          const diagPath = require('path');
-          const diagHtml = await page.content();
-          diagFs.writeFileSync(diagPath.join(__dirname, 'public', 'debug_ot_form.html'), diagHtml);
-          const diagFields = await page.evaluate(() => {
-            const els = Array.from(document.querySelectorAll('input, select, textarea, [role="combobox"], [class*="select"], [class*="autocomplete"], [class*="Select"], [class*="Autocomplete"], [contenteditable="true"]'));
-            return els.slice(0, 50).map(el => ({
-              tag: el.tagName, type: el.type || null, id: el.id || null, className: el.className || null,
-              placeholder: el.placeholder || null, name: el.name || null, role: el.getAttribute('role'),
-              visible: !!el.offsetParent, outerHTMLSnippet: el.outerHTML.slice(0, 300)
-            }));
-          });
-          diagFs.writeFileSync(diagPath.join(__dirname, 'public', 'debug_ot_fields.json'), JSON.stringify(diagFields, null, 2));
-          console.log('[DEBUG-DIAG] Saved debug_ot_form.html and debug_ot_fields.json with', diagFields.length, 'candidate fields');
-        } catch (diagErr) {
-          console.warn('[DEBUG-DIAG] Failed to save diagnostics:', diagErr.message);
+          // La SPA de Taxes puede demorar bastante en reemplazar el listado por el
+          // formulario de alta (medido en producción: hasta ~19s en Railway), muy por
+          // encima del delay fijo de 4s que se usaba antes y que causaba que el
+          // waitForSelector posterior expirara con el formulario todavía sin cargar.
+          // Por eso esperamos activamente por el título real de la vista, con margen amplio.
+          let formularioCargado = false;
+          for (let i = 0; i < 30; i++) {
+            formularioCargado = await safeEvaluate(page, () => document.body.innerText.includes('Nueva Orden de Trabajo'));
+            if (formularioCargado) break;
+            await delay(1000);
+          }
+          console.log(`[Alta O.T.] Vista 'Nueva Orden de Trabajo' ${formularioCargado ? 'detectada' : 'NO detectada tras 30s'}.`);
         }
 
         try {
@@ -1819,8 +1812,8 @@ async function syncWorkOrder(orderId) {
           console.log("[Puppeteer] Formulario abierto. Esperando que los campos del modal sean visibles...");
 
           // 1. ESPERAR EL INPUT DE RODADO (Aseguramos que el modal terminó de abrirse)
-          const inputRodadoReal = 'form input[type="text"], .modal-body input, .form-group input, input[type="text"]'; 
-          await page.waitForSelector(inputRodadoReal, { visible: true, timeout: 15000 });
+          const inputRodadoReal = 'form input[type="text"], .modal-body input, .form-group input, input[type="text"]';
+          await page.waitForSelector(inputRodadoReal, { visible: true, timeout: 20000 });
           await delay(1000); // 1 segundo de cortesía para que se habiliten los scripts de la web
 
           // 2. HACER CLIC Y TIPEAR EL INTERNO DE FORMA HUMANA
