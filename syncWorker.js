@@ -1855,43 +1855,74 @@ async function syncWorkOrder(orderId) {
       let numeroGenerado = existingTableOt;
 
       if (!numeroGenerado) {
-        // Clic directo e inmediato en el botón 'NUEVO'
-        console.log("[Alta O.T.] Presionando el botón 'NUEVO'...");
-        const clickResult = await safeEvaluate(page, () => {
-          const btns = Array.from(document.querySelectorAll('button, a, div, span'));
+        // Clic en el botón verde '+ NUEVO'
+        console.log("[Alta O.T.] Buscando y haciendo clic en el botón '+ NUEVO'...");
+        
+        const btnId = await safeEvaluate(page, () => {
+          const btns = Array.from(document.querySelectorAll('button, a, .btn, div, span'));
           const b = btns.find(x => {
             const txt = (x.textContent || '').trim().toUpperCase();
-            return txt === 'NUEVO' || txt.includes('NUEVO') || txt.includes('+ NUEVO');
+            return txt.includes('NUEVO');
           });
-          if (b) {
-            b.scrollIntoView();
-            b.focus();
-            b.click();
-            return true;
-          }
-          return false;
+          if (!b) return null;
+          const target = b.closest('button, a, .btn') || b;
+          const id = 'tmp-btn-nuevo-' + Date.now();
+          target.setAttribute('id', id);
+          return id;
         });
 
-        if (!clickResult) {
-          console.warn("[Alta O.T.] Reintentando clic directo en NUEVO por selector...");
-          const nuevoBtn = await page.$('button:has-text("NUEVO"), a:has-text("NUEVO")').catch(() => null);
-          if (nuevoBtn) await nuevoBtn.click();
+        if (btnId) {
+          console.log(`[Alta O.T.] Botón '+ NUEVO' localizado con ID #${btnId}. Ejecutando clic nativo...`);
+          
+          // Despachar eventos de ratón DOM
+          await safeEvaluate(page, (id) => {
+            const el = document.getElementById(id);
+            if (el) {
+              el.scrollIntoView();
+              el.focus();
+              ['mousedown', 'mouseup', 'click'].forEach(evtName => {
+                try {
+                  const evt = new MouseEvent(evtName, { bubbles: true, cancelable: true, view: window });
+                  el.dispatchEvent(evt);
+                } catch (_) {}
+              });
+            }
+          }, btnId);
+          await delay(300);
+
+          // Clic real de Puppeteer por coordenadas de pantalla
+          await page.click(`#${btnId}`).catch(err => {
+            console.warn("[Alta O.T.] Reintentando page.click en #tmp-btn-nuevo-...", err.message);
+          });
+        } else {
+          console.warn("[Alta O.T.] No se asignó ID a NUEVO. Intentando selector directo .btn-success / button...");
+          await clickByText(page, 'NUEVO', 'button').catch(() => {});
+          await clickByText(page, 'NUEVO', 'a').catch(() => {});
         }
 
-        // Esperar rápidamente (máximo 5s, chequeo cada 300ms) a que abra el modal
+        // Verificar que abrió el modal (esperar hasta 6s)
         let modalListo = false;
-        for (let i = 0; i < 15; i++) {
+        for (let i = 0; i < 20; i++) {
           modalListo = await safeEvaluate(page, () => {
-            return !!document.querySelector('input.searchable-input, input[name="titulo"]') || document.body.innerText.includes('Nueva Orden');
+            return !!document.querySelector('input.searchable-input, input[name="titulo"]') || 
+                   document.body.innerText.includes('Nueva Orden de Trabajo') || 
+                   document.body.innerText.includes('Nueva Orden');
           });
           if (modalListo) break;
+
+          // Re-intentar clic a los 1.8 segundos si el modal aún no se desplegó
+          if (i === 6 && btnId) {
+            console.log("[Alta O.T.] Re-intentando clic en el botón '+ NUEVO'...");
+            await page.click(`#${btnId}`).catch(() => {});
+          }
           await delay(300);
         }
-        console.log(`[Alta O.T.] Vista de formulario detectada (${modalListo ? 'rápido' : 'timeout 5s'}).`);
+
+        console.log(`[Alta O.T.] Formulario 'Nueva Orden de Trabajo' ${modalListo ? 'desplegado correctamente' : 'NO detectado tras 6s'}.`);
         await delay(500);
 
         try {
-          console.log("[Puppeteer] Formulario de Alta O.T. abierto. Cargando datos...");
+          console.log("[Puppeteer] Cargar datos en el formulario de Alta O.T...");
 
           // 1. ESPERAR EL INPUT DE RODADO (Aseguramos que el modal terminó de abrirse)
           const inputRodadoReal = 'input.searchable-input';
