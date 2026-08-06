@@ -200,16 +200,21 @@ async function launchBrowser() {
 
   console.log(`[Puppeteer] Launching browser executable: ${execPath || 'bundled default'}`);
 
+  const isHeadlessExplicitFalse = process.env.PUPPETEER_HEADLESS === 'false';
+  const isCloudEnv = !!process.env.RAILWAY_ENVIRONMENT;
+  const isHeadless = isHeadlessExplicitFalse ? false : (isCloudEnv ? 'new' : (process.env.PUPPETEER_HEADLESS === 'true' ? 'new' : false));
+
   const launchOptions = {
-    headless: process.env.PUPPETEER_HEADLESS === 'false' ? false : true,
     executablePath: execPath || undefined,
-    // Was 90000 - under load (e.g. a burst of many queued syncs) that's easier to hit
-    // than Puppeteer's own default of 180000, which is what this now matches.
+    headless: isHeadless,
+    slowMo: 50,
     protocolTimeout: 180000,
+    defaultViewport: null,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
+      '--window-size=1280,800',
       '--disable-gpu',
       '--no-first-run',
       '--no-zygote',
@@ -1814,32 +1819,48 @@ async function syncWorkOrder(orderId) {
           await delay(1000);
 
 
+          await page.screenshot({ path: 'public/paso1_rodado.png' }).catch(() => {});
+
           // ==========================================
-          // 2. COMPLETAR EL CAMPO: RESPONSABLE
+          // 2. COMPLETAR EL CAMPO: RESPONSABLE (PARCHE DEFINITIVO)
           // ==========================================
-          await safeEvaluate(page, (nombreResp) => {
+          await safeEvaluate(page, async () => {
             const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
             const etiquetaResponsable = etiquetas.find(el => el.textContent.trim().startsWith('Responsable'));
             
             if (!etiquetaResponsable) throw new Error("No se encontró la etiqueta 'Responsable' en Taxes.");
             
             const contenedor = etiquetaResponsable.closest('.form-group') || etiquetaResponsable.parentElement;
-            const input = contenedor.querySelector('input[type="text"]') || contenedor.querySelector('input');
             
-            if (input) {
-              input.focus();
-              input.click();
-              document.execCommand('insertText', false, nombreResp);
+            // Salvavidas: Si no hay un input clásico, buscamos cualquier div o control interactivo del componente dinámico
+            const elementoInteractivo = contenedor.querySelector('input, [role="combobox"], [class*="control"], div[class*="select"]');
+            
+            if (elementoInteractivo) {
+              elementoInteractivo.scrollIntoView();
+              elementoInteractivo.focus();
+              // Forzamos un evento de clic nativo del elemento
+              const evt = document.createEvent("MouseEvents");
+              evt.initMouseEvent("mousedown", true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+              elementoInteractivo.dispatchEvent(evt);
             } else {
-              throw new Error("No se encontró el cuadro de texto para ingresar el Responsable.");
+              throw new Error("No se encontró el elemento interactivo para el Responsable.");
             }
-          }, order.responsable || "GOMEZ MARCELO JAVIER");
+          });
 
+          // Esperamos que se abra el menú flotante en el navegador visible
+          await delay(1000);
+
+          // Tipeamos de forma global el nombre del responsable (Va directo al elemento que tiene el foco)
+          const nombreResp = order.responsable || "GOMEZ MARCELO JAVIER";
+          await page.keyboard.type(nombreResp, { delay: 100 });
           await delay(1500); 
+
+          // Confirmamos la opción con las teclas físicas
           await page.keyboard.press('ArrowDown');
           await delay(250);
           await page.keyboard.press('Enter');
           await delay(1000);
+          await page.screenshot({ path: 'public/paso2_responsable.png' }).catch(() => {});
 
 
           // ==========================================
