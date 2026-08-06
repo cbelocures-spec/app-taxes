@@ -1806,6 +1806,31 @@ async function syncWorkOrder(orderId) {
         }
 
         try {
+          const diagFs = require('fs');
+          const diagPath = require('path');
+          const diagHtml = await page.content();
+          diagFs.writeFileSync(diagPath.join(__dirname, 'public', 'debug_ot_form2.html'), diagHtml);
+          const diagSnippets = await page.evaluate(() => {
+            const labels = Array.from(document.querySelectorAll('label, span, div, p'));
+            const out = {};
+            for (const key of ['Rodado', 'Responsable']) {
+              const lab = labels.find(el => (el.textContent || '').trim().toUpperCase().startsWith(key.toUpperCase()) && el.textContent.trim().length < 40);
+              if (lab) {
+                let container = lab.closest('.form-group') || lab.parentElement?.parentElement || lab.parentElement;
+                out[key] = container ? container.outerHTML.slice(0, 1500) : lab.outerHTML.slice(0, 1500);
+              } else {
+                out[key] = null;
+              }
+            }
+            return out;
+          });
+          diagFs.writeFileSync(diagPath.join(__dirname, 'public', 'debug_ot_snippets.json'), JSON.stringify(diagSnippets, null, 2));
+          console.log('[DEBUG-DIAG2] Saved debug_ot_form2.html and debug_ot_snippets.json');
+        } catch (diagErr) {
+          console.warn('[DEBUG-DIAG2] Failed to save diagnostics:', diagErr.message);
+        }
+
+        try {
           // =====================================================================
           // PARCHE DE ALTA: LLENADO POR SELECTORES CONTROLADOS (MODAL NUEVO)
           // =====================================================================
