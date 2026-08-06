@@ -2094,22 +2094,21 @@ async function syncWorkOrder(orderId) {
       }
     }
 
-    // ====== FASE 2: EL HISTORIAL (Añadir las tareas a la orden que ya existe) ======
-    // La inserción de tareas en Taxes SOLO debe ejecutarse cuando el estado de la orden
-    // en nuestra base de datos cambie a 'Operativo' o 'Finalizado'.
+    // ====== FASE 2: INYECCIÓN DE TAREAS (SOLO CUANDO LA UNIDAD ESTÁ OPERATIVA) ======
+    // La inserción de tareas en Taxes ÚNICA y EXCLUSIVAMENTE se ejecuta cuando el estado
+    // de la unidad en nuestra app esté en 'Operativo' / 'Operativa'.
     if (order.taxesOrderNumber) {
-      const isOperativo = order.estadoUnidad === 'operativo' || order.estadoUnidad === 'operativa';
-      const isFinished = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t && (t.status === 'Finalizada' || t.status === 'Completada'));
+      const isOperativo = (order.estadoUnidad || '').trim().toLowerCase() === 'operativo' || (order.estadoUnidad || '').trim().toLowerCase() === 'operativa';
 
-      if (!isOperativo && !isFinished) {
-        console.log(`[Tareas O.T.] La orden #${order.taxesOrderNumber} (Interno ${order.interno}) sigue en 'Fuera de Servicio / En Curso'. Cabecera guardada vacía en Taxes. Las tareas se inyectarán cuando cambie a Operativo o Finalizado.`);
+      if (!isOperativo) {
+        console.log(`[Tareas O.T.] La orden #${order.taxesOrderNumber} (Interno ${order.interno}) está en estado '${order.estadoUnidad || 'Fuera de Servicio'}'. Cabecera registrada vacía en Taxes. Las tareas ÚNICAMENTE se cargarán cuando la unidad pase a Operativo.`);
         db.updateWorkOrder(orderId, { syncStatus: "success", syncError: null });
-        return { success: true, message: `Cabecera O.T. #${order.taxesOrderNumber} creada vacía. Tareas reservadas hasta pasar a Operativo o Finalizado.` };
+        return { success: true, message: `Cabecera O.T. #${order.taxesOrderNumber} reservada vacía. Tareas pausadas hasta estado Operativo.` };
       }
 
-      console.log(`[Tareas O.T.] Orden en estado Operativo/Finalizado. Entrando al historial de O.T. #${order.taxesOrderNumber} para inyectar tareas vía Lápiz...`);
+      console.log(`[Tareas O.T.] Unidad confirmada en estado OPERATIVO. Navegando a /tms/produccion/ot para buscar O.T. #${order.taxesOrderNumber} y presionar Lápiz (Editar)...`);
       const otNumClean = String(order.taxesOrderNumber).replace(/^#/, '');
-      console.log(`[Reconcile] OT ${otNumClean} exists. Opening edit form to reconcile...`);
+      console.log(`[Editar O.T.] Buscando O.T. #${otNumClean} para abrir formulario de tareas vía Lápiz...`);
 
       const cleanStr = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -2303,9 +2302,7 @@ async function syncWorkOrder(orderId) {
           );
           console.log(`[Reconcile] Table rows (first 35):`, JSON.stringify(rowsInfo));
         } catch(se) { console.warn('[Reconcile] Screenshot failed:', se.message); }
-        console.warn(`[Reconcile] Could not open pencil form in /tms/produccion/ot for OT ${otNumClean}. Falling back to task list verification & repair in /tms/produccion/tareas...`);
-        await verifyWorkOrderWithPage(page, orderId);
-        return { success: true, message: "Reconciled via tareas list" };
+        throw new Error(`No se pudo abrir el formulario de edición (Lápiz) para la O.T. #${otNumClean} en /tms/produccion/ot.`);
       }
 
 
