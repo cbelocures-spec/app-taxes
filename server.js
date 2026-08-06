@@ -1158,42 +1158,37 @@ app.post('/api/orders/finalize-tasks', async (req, res) => {
 // =====================================================================
 // API DE DESARROLLO: TRANSMISIÓN EN VIVO DEL NAVEGADOR (LIVE STREAM)
 // =====================================================================
-app.get('/api/dev/stream', async (req, res) => {
-  res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
+app.get('/api/dev/screenshot.jpg', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
 
-  console.log("[Stream] Cliente conectado para auditar el navegador visible...");
-
-  const intervalo = setInterval(async () => {
-    try {
-      if (global.paginaActivaParaStream && !global.paginaActivaParaStream.isClosed()) {
-        const buffer = await global.paginaActivaParaStream.screenshot({ 
-          type: 'jpeg', 
-          quality: 60 
-        });
-        
-        res.write(`--frame\r\n`);
-        res.write(`Content-Type: image/jpeg\r\n`);
-        res.write(`Content-Length: ${buffer.length}\r\n\r\n`);
-        res.write(buffer);
-        res.write(`\r\n`);
-      } else {
-        res.write(`--frame\r\nContent-Type: image/jpeg\r\n\r\n`);
-      }
-    } catch (err) {
-      // Ignore transient errors when browser navigates
+  try {
+    if (global.paginaActivaParaStream && !global.paginaActivaParaStream.isClosed()) {
+      const buffer = await global.paginaActivaParaStream.screenshot({ 
+        type: 'jpeg', 
+        quality: 65 
+      });
+      res.setHeader('Content-Type', 'image/jpeg');
+      return res.send(buffer);
     }
-  }, 300);
+  } catch (err) {
+    // transient frame/navigation error
+  }
 
-  req.on('close', () => {
-    clearInterval(intervalo);
-    console.log("[Stream] Cliente desconectado.");
-  });
+  // Standby SVG badge image when Puppeteer is idle
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+    <rect width="1280" height="720" fill="#0f172a"/>
+    <circle cx="640" cy="300" r="48" fill="#0284c7" opacity="0.2"/>
+    <path d="M640 280 v40 m-20-20 h40" stroke="#38bdf8" stroke-width="4" stroke-linecap="round"/>
+    <text x="640" y="390" fill="#38bdf8" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" text-anchor="middle">Navegador en Espera de Acción</text>
+    <text x="640" y="430" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="16" text-anchor="middle">Presione '⚡ Obtener N° O.T.' en la app para ver el robot interactuar con Taxes en directo</text>
+  </svg>`;
+  res.setHeader('Content-Type', 'image/svg+xml');
+  return res.send(svg);
 });
 
-app.get('/api/dev/live-view', (req, res) => {
+app.get(['/api/dev/stream', '/api/dev/live-view'], (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html lang="es">
@@ -1203,20 +1198,46 @@ app.get('/api/dev/live-view', (req, res) => {
       <title>Auditoría en Vivo Puppeteer - Taxes</title>
       <style>
         body { background: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 16px; box-sizing: border-box; }
-        h2 { margin-bottom: 8px; color: #38bdf8; display: flex; align-items: center; gap: 10px; font-size: 20px; }
-        .live-badge { background: #ef4444; color: white; font-size: 12px; font-weight: bold; padding: 3px 10px; border-radius: 12px; animation: pulse 1.5s infinite; letter-spacing: 0.5px; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        h2 { margin-bottom: 8px; color: #38bdf8; display: flex; align-items: center; gap: 10px; font-size: 22px; }
+        .live-badge { background: #10b981; color: white; font-size: 12px; font-weight: bold; padding: 3px 10px; border-radius: 12px; animation: pulse 1.5s infinite; letter-spacing: 0.5px; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         .stream-container { background: #1e293b; border: 2px solid #334155; border-radius: 12px; padding: 8px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); max-width: 100%; width: 1280px; overflow: hidden; }
-        img { width: 100%; height: auto; border-radius: 8px; display: block; }
+        img { width: 100%; height: auto; border-radius: 8px; display: block; background: #0f172a; }
         p { color: #94a3b8; font-size: 14px; margin-top: 4px; margin-bottom: 16px; }
+        .fps-counter { font-size: 11px; color: #64748b; margin-top: 8px; }
       </style>
     </head>
     <body>
-      <h2><span class="live-badge">EN VIVO</span> Auditoría de Puppeteer</h2>
-      <p>Transmisión en directo desde el servidor de automatización Taxes</p>
+      <h2><span class="live-badge" id="statusBadge">EN VIVO</span> Auditoría de Puppeteer</h2>
+      <p>Transmisión en directo del navegador desde Railway Cloud</p>
       <div class="stream-container">
-        <img src="/api/dev/stream" alt="Transmisión en vivo de Puppeteer" />
+        <img id="liveImg" src="/api/dev/screenshot.jpg" alt="Transmisión en vivo de Puppeteer" />
       </div>
+      <div class="fps-counter" id="fpsText">Actualizando 2.5 FPS ...</div>
+
+      <script>
+        const img = document.getElementById('liveImg');
+        const badge = document.getElementById('statusBadge');
+        let isRefreshing = false;
+
+        function refreshImage() {
+          if (isRefreshing) return;
+          isRefreshing = true;
+          const nextImg = new Image();
+          nextImg.onload = () => {
+            img.src = nextImg.src;
+            isRefreshing = false;
+            badge.style.backgroundColor = '#10b981';
+            badge.innerText = 'EN VIVO';
+          };
+          nextImg.onerror = () => {
+            isRefreshing = false;
+          };
+          nextImg.src = '/api/dev/screenshot.jpg?t=' + Date.now();
+        }
+
+        setInterval(refreshImage, 350);
+      </script>
     </body>
     </html>
   `);
