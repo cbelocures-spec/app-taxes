@@ -273,6 +273,44 @@ async function safeGoto(page, url, options = {}) {
   }
 }
 
+// Helper to guarantee navigation to the Órdenes de Trabajo page from home/inicio
+async function ensureOnOtPage(page, portalUrl) {
+  const targetUrl = `${portalUrl}/tms/produccion/ot`;
+  console.log(`[Navigation] Asegurando navegación a ${targetUrl}...`);
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const currentUrl = page.url().toLowerCase();
+    if (currentUrl.includes('/tms/produccion/ot')) {
+      console.log(`[Navigation] Confirmada vista /tms/produccion/ot.`);
+      return true;
+    }
+
+    console.log(`[Navigation] Intento ${attempt}: Navegando desde inicio (${currentUrl}) a /tms/produccion/ot...`);
+    await safeGoto(page, targetUrl, { timeout: 30000 }).catch(() => {});
+    await delay(1500);
+
+    const updatedUrl = page.url().toLowerCase();
+    if (!updatedUrl.includes('/tms/produccion/ot')) {
+      console.log(`[Navigation] Forzando navegación vía menú / script a /tms/produccion/ot...`);
+      await safeEvaluate(page, (target) => {
+        const links = Array.from(document.querySelectorAll('a, button, div, span'));
+        const otLink = links.find(l => {
+          const txt = (l.textContent || '').trim().toLowerCase();
+          return txt.includes('órdenes de trabajo') || txt.includes('ordenes de trabajo') || txt.includes('ordenes') || txt.includes('producción');
+        });
+        if (otLink) {
+          otLink.click();
+        } else {
+          window.location.href = target;
+        }
+      }, targetUrl);
+      await delay(2000);
+    }
+  }
+
+  return page.url().toLowerCase().includes('/tms/produccion/ot');
+}
+
 // Helper: Semantic text click in Puppeteer
 async function clickByText(page, text, elementType = '*') {
   const elements = await page.$$(elementType);
@@ -432,6 +470,16 @@ async function fillSearchableSelect(page, labelText, searchValue) {
       }
     }
 
+    if (labelText.toLowerCase().includes('responsable')) {
+      const targetLower = searchValue.toLowerCase();
+      if (targetLower.includes('belocures') || targetLower.includes('cesar')) {
+        queriesToTry.push('Belocures,');
+        queriesToTry.push('Belocures');
+        queriesToTry.push('Belocures, Cesar');
+        queriesToTry.push(searchValue);
+      }
+    }
+
     if (queriesToTry.length === 0) {
       // If it contains "Interno X", we try to search by the interno number FIRST as it is highly precise!
       const internoMatch = searchValue.match(/Interno\s+(\d+)/i);
@@ -501,7 +549,7 @@ async function fillSearchableSelect(page, labelText, searchValue) {
       await delay(2000); // Wait for dropdown to appear and filter
 
       // Click the first visible option in the dropdown that matches
-      const optionClicked = await safeEvaluate(page, (targetVal, rodadoInfo) => {
+      const optionClicked = await safeEvaluate(page, (targetVal, rodadoInfo, fieldLabel) => {
         // Find visible options inside portal dropdown containers (ID starts with "searchable-select-dropdown-")
         const dropdownContainers = Array.from(document.querySelectorAll('[id^="searchable-select-dropdown-"]'));
         
@@ -537,8 +585,34 @@ async function fillSearchableSelect(page, labelText, searchValue) {
 
         let matched = null;
 
+        // Regla específica para Responsable (ej. Belocures, Cesar / Belocures, --- al final de la lista)
+        if (fieldLabel && fieldLabel.toLowerCase().includes('responsable')) {
+          const targetLower = targetVal.toLowerCase();
+          if (targetLower.includes('belocures') || targetLower.includes('cesar')) {
+            // 1) Contiene tanto belocures como cesar
+            matched = filteredOptions.find(el => {
+              const txt = el.textContent.toLowerCase();
+              return txt.includes('belocures') && txt.includes('cesar');
+            });
+            // 2) Contiene belocures y "---" (ej: "Belocures, ---")
+            if (!matched) {
+              matched = filteredOptions.find(el => {
+                const txt = el.textContent.toLowerCase();
+                return txt.includes('belocures') && txt.includes('---');
+              });
+            }
+            // 3) Elegir la ÚLTIMA opción que coincida con Belocures en la lista desplegable
+            if (!matched) {
+              const belocuresOpts = filteredOptions.filter(el => el.textContent.toLowerCase().includes('belocures'));
+              if (belocuresOpts.length > 0) {
+                matched = belocuresOpts[belocuresOpts.length - 1];
+              }
+            }
+          }
+        }
+
         // A. Match by patent (highest priority for vehicles)
-        if (rodadoInfo && rodadoInfo.patente) {
+        if (!matched && rodadoInfo && rodadoInfo.patente) {
           const cleanPatent = clean(rodadoInfo.patente);
           if (cleanPatent) {
             matched = filteredOptions.find(el => clean(el.textContent).includes(cleanPatent));
@@ -603,7 +677,7 @@ async function fillSearchableSelect(page, labelText, searchValue) {
         }
 
         return { success: false };
-      }, searchValue, rodadoInfo);
+      }, searchValue, rodadoInfo, labelText);
 
       if (optionClicked.success) {
         console.log(`   ✓ Selected option for "${labelText}": "${optionClicked.text}"`);
@@ -1746,27 +1820,13 @@ async function syncWorkOrder(orderId) {
     if (!order.taxesOrderNumber) {
       console.log(`[Alta O.T.] Creando cabecera limpia para el interno ${order.interno} (${order.clasificacion})...`);
       
-      await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
+      await ensureOnOtPage(page, settings.portalUrl);
       await page.waitForSelector('table', { timeout: 10000 }).catch(() => {});
       await delay(1000);
 
-      // Esperar a que el filtro "Clasificación" de la lista termine de poblarse con las
-      // categorías reales (Preventivo/Auxilio/Correctivo/Herrería) antes de tocar "Nuevo".
-      // Según lo observado en la app: ese cuadro se ve chico/vacío mientras el catálogo de
-      // camiones todavía está cargando en el fondo, y crece un poco cuando ya está listo.
-      // Si se toca "Nuevo" antes de eso, el formulario de alta abre pero los combos de
-      // Rodado/Responsable quedan sin datos detrás y no encuentran nada al buscar.
-      let catalogoListo = false;
-      for (let i = 0; i < 20; i++) {
-        catalogoListo = await safeEvaluate(page, () => {
-          const selects = Array.from(document.querySelectorAll('select'));
-          const clasifSelect = selects.find(s => Array.from(s.options).some(o => /preventivo|correctivo|auxilio/i.test(o.textContent)));
-          return !!clasifSelect;
-        });
-        if (catalogoListo) break;
-        await delay(500);
-      }
-      console.log(`[Alta O.T.] Filtro de Clasificación ${catalogoListo ? 'poblado' : 'NO confirmado tras 10s'} antes de tocar Nuevo.`);
+      // Esperar 2 segundos para que el catálogo de camiones y la vista carguen completamente en segundo plano
+      console.log("[Alta O.T.] Esperando 2 segundos para la carga del catálogo de camiones en la vista...");
+      await delay(2000);
 
       // Pre-chequeo en la tabla de Taxes por si ya existe una O.T. reciente para este Interno y Clasificación
       const existingTableOt = await safeEvaluate(page, (targetInterno, targetClasif) => {
@@ -1795,58 +1855,51 @@ async function syncWorkOrder(orderId) {
       let numeroGenerado = existingTableOt;
 
       if (!numeroGenerado) {
-        // Clic en 'NUEVO'
-        const nuevoBtnId = await safeEvaluate(page, () => {
-          const btns = Array.from(document.querySelectorAll('button, a'));
-          const b = btns.find(x => (x.textContent || '').trim().toUpperCase().includes('NUEVO'));
-          if (!b) return null;
-          const id = 'tmp-nuevo-btn-' + Date.now();
-          b.id = id;
-          return id;
+        // Clic directo e inmediato en el botón 'NUEVO'
+        console.log("[Alta O.T.] Presionando el botón 'NUEVO'...");
+        const clickResult = await safeEvaluate(page, () => {
+          const btns = Array.from(document.querySelectorAll('button, a, div, span'));
+          const b = btns.find(x => {
+            const txt = (x.textContent || '').trim().toUpperCase();
+            return txt === 'NUEVO' || txt.includes('NUEVO') || txt.includes('+ NUEVO');
+          });
+          if (b) {
+            b.scrollIntoView();
+            b.focus();
+            b.click();
+            return true;
+          }
+          return false;
         });
 
-        if (nuevoBtnId) {
-          console.log("[Alta O.T.] Presionando botón 'NUEVO' y esperando a que la vista 'Nueva Orden de Trabajo' hidrate...");
-          await page.click(`#${nuevoBtnId}`);
-
-          // La SPA de Taxes puede demorar bastante en reemplazar el listado por el
-          // formulario de alta (medido en producción: hasta ~19s en Railway), muy por
-          // encima del delay fijo de 4s que se usaba antes y que causaba que el
-          // waitForSelector posterior expirara con el formulario todavía sin cargar.
-          // Por eso esperamos activamente por el título real de la vista, con margen amplio.
-          let formularioCargado = false;
-          for (let i = 0; i < 30; i++) {
-            formularioCargado = await safeEvaluate(page, () => document.body.innerText.includes('Nueva Orden de Trabajo'));
-            if (formularioCargado) break;
-            await delay(1000);
-          }
-          console.log(`[Alta O.T.] Vista 'Nueva Orden de Trabajo' ${formularioCargado ? 'detectada' : 'NO detectada tras 30s'}.`);
+        if (!clickResult) {
+          console.warn("[Alta O.T.] Reintentando clic directo en NUEVO por selector...");
+          const nuevoBtn = await page.$('button:has-text("NUEVO"), a:has-text("NUEVO")').catch(() => null);
+          if (nuevoBtn) await nuevoBtn.click();
         }
 
+        // Esperar rápidamente (máximo 5s, chequeo cada 300ms) a que abra el modal
+        let modalListo = false;
+        for (let i = 0; i < 15; i++) {
+          modalListo = await safeEvaluate(page, () => {
+            return !!document.querySelector('input.searchable-input, input[name="titulo"]') || document.body.innerText.includes('Nueva Orden');
+          });
+          if (modalListo) break;
+          await delay(300);
+        }
+        console.log(`[Alta O.T.] Vista de formulario detectada (${modalListo ? 'rápido' : 'timeout 5s'}).`);
+        await delay(500);
+
         try {
-          // =====================================================================
-          // PARCHE DE ALTA: LLENADO POR SELECTORES CONTROLADOS (MODAL NUEVO)
-          // =====================================================================
-          console.log("[Puppeteer] Formulario abierto. Esperando que los campos del modal sean visibles...");
+          console.log("[Puppeteer] Formulario de Alta O.T. abierto. Cargando datos...");
 
           // 1. ESPERAR EL INPUT DE RODADO (Aseguramos que el modal terminó de abrirse)
-          // Taxes deja montados (ocultos) los inputs de fecha/limite de la barra de
-          // filtros de la lista incluso en la vista de alta, y esos aparecen ANTES en
-          // el DOM que los campos reales. Un selector generico como input[type="text"]
-          // siempre matchea ese input oculto primero y Puppeteer nunca lo considera
-          // visible, haciendo que el wait expire aunque el campo real ya este' visible.
-          // input.searchable-input es la clase propia (y unica) del combo de Rodado/
-          // Responsable en Taxes, asi que evita esos decoys por completo.
           const inputRodadoReal = 'input.searchable-input';
-          await page.waitForSelector(inputRodadoReal, { visible: true, timeout: 20000 });
-          await delay(1000); // 1 segundo de cortesía para que se habiliten los scripts de la web
+          await page.waitForSelector(inputRodadoReal, { visible: true, timeout: 15000 }).catch(() => {});
+          await delay(500);
 
-          // 2. SELECCIONAR EL RODADO (reutiliza fillSearchableSelect, la misma función ya
-          // probada que usa la Fase 2 más abajo para inyectar tareas en órdenes existentes.
-          // Tipear solo el interno a secas -como hacía este bloque antes- puede no matchear
-          // nada en Taxes; fillSearchableSelect ya prueba patente, "Interno N" y nombre
-          // completo en secuencia antes de rendirse.)
-          console.log(`[Puppeteer] Seleccionando Rodado: ${order.rodado || order.interno}`);
+          // 2. CARGAR RODADO
+          console.log(`[Puppeteer] 1. Cargar Rodado: ${order.rodado || order.interno}`);
           let rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado || String(order.interno));
           if (!rodadoFilled && order.interno) {
             rodadoFilled = await fillSearchableSelect(page, 'Rodado', String(order.interno).trim());
@@ -1859,18 +1912,16 @@ async function syncWorkOrder(orderId) {
           if (!rodadoFilled) throw new Error("No se pudo seleccionar el Rodado en el alta de O.T.");
           await page.screenshot({ path: 'public/paso1_rodado.png' }).catch(() => {});
 
-          // =====================================================================
-          // 4. PASO SIGUIENTE: RESPONSABLE
-          // =====================================================================
-          // "AUTO" es un valor centinela (asignar al usuario logueado) y a veces queda
-          // guardado un email por error; ninguno de los dos es un nombre real que Taxes
-          // pueda encontrar, así que se resuelve a un nombre por defecto antes de buscar.
+          // 3. CARGAR RESPONSABLE (si es Belocures Cesar, lo buscará al final con "Belocures," / "Belocures, ---")
           let targetResponsableAlta = order.responsable;
           if (!targetResponsableAlta || targetResponsableAlta === 'AUTO' || targetResponsableAlta.includes('@')) {
             targetResponsableAlta = "Belocures, Cesar Hernán";
           }
-          console.log(`[Puppeteer] Seleccionando Responsable: ${targetResponsableAlta}`);
+          console.log(`[Puppeteer] 2. Cargar Responsable: ${targetResponsableAlta}`);
           let respFilledAlta = await fillSearchableSelect(page, 'Responsable', targetResponsableAlta);
+          if (!respFilledAlta) {
+            respFilledAlta = await fillSearchableSelect(page, 'Responsable', 'Belocures,');
+          }
           if (!respFilledAlta) {
             respFilledAlta = await fillSearchableSelect(page, 'Responsable', 'Belocures');
           }
@@ -1880,17 +1931,43 @@ async function syncWorkOrder(orderId) {
           if (!respFilledAlta) throw new Error("No se pudo seleccionar el Responsable en el alta de O.T.");
           await page.screenshot({ path: 'public/paso2_responsable.png' }).catch(() => {});
 
+          // 4. CARGAR TÍTULO (NÚMERO DE INTERNO)
+          console.log(`[Puppeteer] 3. Cargar Título (número de interno): ${order.interno}`);
+          await safeEvaluate(page, (interno) => {
+            let input = document.querySelector('input[name="titulo"]');
+            if (!input) {
+              const labels = Array.from(document.querySelectorAll('label, div, span'));
+              const lbl = labels.find(l => {
+                const txt = l.textContent.trim().toLowerCase();
+                return txt.startsWith('título') || txt.startsWith('titulo');
+              });
+              if (lbl) {
+                const parent = lbl.closest('.form-group') || lbl.closest('.taxes-form-group') || lbl.parentElement;
+                if (parent) input = parent.querySelector('input[type="text"], input');
+              }
+            }
+            if (input) {
+              input.focus();
+              const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+              nativeSetter.call(input, String(interno));
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }, order.interno);
+          await delay(500);
 
-          // ==========================================
-          // 3. COMPLETAR EL CAMPO: CLASIFICACIÓN
-          // ==========================================
+          // 5. CARGAR CLASIFICACIÓN
+          console.log(`[Puppeteer] 4. Cargar Clasificación: ${order.clasificacion}`);
           await safeEvaluate(page, (valorClasificacion) => {
             const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
-            const etiquetaClasif = etiquetas.find(el => el.textContent.trim().startsWith('Clasificación'));
+            const etiquetaClasif = etiquetas.find(el => {
+              const txt = el.textContent.trim().toLowerCase();
+              return txt.startsWith('clasificación') || txt.startsWith('clasificacion');
+            });
             
             if (etiquetaClasif) {
-              const contenedor = etiquetaClasif.closest('.form-group') || etiquetaClasif.parentElement;
-              const select = contenedor.querySelector('select');
+              const contenedor = etiquetaClasif.closest('.form-group') || etiquetaClasif.closest('.taxes-form-group') || etiquetaClasif.parentElement;
+              const select = contenedor ? contenedor.querySelector('select') : null;
               if (select && valorClasificacion) {
                 const clean = s => String(s || '').trim().toUpperCase();
                 const opt = Array.from(select.options).find(o => clean(o.textContent).includes(clean(valorClasificacion)));
@@ -1900,12 +1977,13 @@ async function syncWorkOrder(orderId) {
                   select.value = valorClasificacion;
                 }
                 select.dispatchEvent(new Event('change', { bubbles: true }));
+                select.dispatchEvent(new Event('input', { bubbles: true }));
               }
             }
           }, order.clasificacion);
           await delay(500);
 
-          // Set Fecha
+          // Cargar Fecha Entrega
           await safeEvaluate(page, (dateVal) => {
             const dateInput = document.querySelector('input[type="date"].taxes-datepicker');
             if (dateInput) {
@@ -1915,30 +1993,16 @@ async function syncWorkOrder(orderId) {
               dateInput.dispatchEvent(new Event('change', { bubbles: true }));
             }
           }, order.fechaEntrega || new Date().toISOString().split('T')[0]);
-
-          // Completar "Interno de la Unidad" (campo obligatorio real name="titulo").
-          // Este campo nunca se completaba: Taxes bloqueaba el guardado en silencio por
-          // validación propia, el botón Guardar no navegaba a ningún lado y por eso el
-          // paso de "capturar número de O.T." fallaba siempre después de Rodado/Responsable.
-          await safeEvaluate(page, (interno) => {
-            const input = document.querySelector('input[name="titulo"]');
-            if (input) {
-              const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-              nativeSetter.call(input, String(interno));
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-              input.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-          }, order.interno);
           await delay(500);
 
-          // ==========================================
-          // 4. HACER CLIC EN EL BOTÓN VERDE "GUARDAR"
-          // ==========================================
-          console.log("[Puppeteer] Buscando el botón superior verde de Guardar...");
-          
+          // 6. GUARDAR
+          console.log("[Puppeteer] 5. Guardar: Buscando el botón verde de Guardar...");
           const guardadoExitoso = await safeEvaluate(page, () => {
-            const botones = Array.from(document.querySelectorAll('button, div, span, a'));
-            const btnGuardarVerde = botones.find(b => b.textContent.trim() === 'Guardar' || b.textContent.toLowerCase().includes('guardar'));
+            const botones = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
+            const btnGuardarVerde = botones.find(b => {
+              const txt = b.textContent.trim().toLowerCase();
+              return txt === 'guardar' || txt.includes('guardar');
+            });
             
             if (btnGuardarVerde) {
               btnGuardarVerde.scrollIntoView();
