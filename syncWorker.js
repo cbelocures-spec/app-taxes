@@ -54,6 +54,7 @@ function initMockCatalogs() {
 
 // Background Worker state
 let isWorkerRunning = false;
+const candadoInternosActivos = new Set(); // Evita ejecuciones paralelas para el mismo camión
 let isScraping = false;
 let scrapeCatalogsAbandoned = false;
 
@@ -1641,13 +1642,24 @@ function resolveAndMapEmployee(task) {
   return { employeeLabel, finalDescription };
 }
 
-// 2. SYNCHRONIZE SINGLE WORK ORDER
+// 2. SYNCHRONIZE SINGLE WORK ORDER (REPARADO ANTI-DUPLICADOS VELOCES)
 async function syncWorkOrder(orderId) {
   let order = db.getWorkOrderById(orderId);
   if (!order) return { success: false, message: "Order not found" };
 
+  // CONTROL INTERNO EN MEMORIA (Rechazo instantáneo en menos de 1 milisegundo)
+  const claveCandado = `${order.interno}_${order.clasificacion}`;
+  if (candadoInternosActivos.has(claveCandado)) {
+    console.warn(`[Anti-Duplicado] 🛑 Petición duplicada veloz bloqueada para el camión: ${order.interno}`);
+    return { success: false, message: "Esta orden ya se está procesando o está en cola de espera." };
+  }
+
+  // Si pasó el control, bloqueamos el camión inmediatamente en memoria
+  candadoInternosActivos.add(claveCandado);
+
   if (order.syncStatus === 'syncing' && order.syncLockTime && (Date.now() - new Date(order.syncLockTime).getTime() < 120000)) {
     console.log(`[SyncLock] Order ID ${orderId} is ALREADY active in another sync process. Skipping duplicate run.`);
+    candadoInternosActivos.delete(claveCandado); // Liberamos antes de salir
     return { success: false, message: "Order is already syncing" };
   }
 
@@ -1663,43 +1675,41 @@ async function syncWorkOrder(orderId) {
       syncStatus: "error",
       syncError: "Faltan las credenciales en Ajustes. Configurá el usuario y contraseña de Taxes."
     });
+    candadoInternosActivos.delete(claveCandado); // Liberamos antes de salir
     return { success: false, message: "Missing credentials in settings" };
   }
-
-  await acquireBrowserLock(`syncWorkOrder(${orderId})`);
-
-  // RE-READ FRESH ORDER STATE AFTER ACQUIRING BROWSER LOCK
-  // This ensures if a previous run created the OT number while we were waiting in queue,
-  // we immediately detect taxesOrderNumber and NEVER create a duplicate OT!
-  order = db.getWorkOrderById(orderId);
-  if (!order) {
-    releaseBrowserLock();
-    return { success: false, message: "Order not found after lock" };
-  }
-
-  // Pre-check DB safeguard: If this order has no taxesOrderNumber yet, check if another active order for the same interno AND same clasificacion already generated an OT today!
-  if (!order.taxesOrderNumber && order.interno) {
-    const dbData = db.read();
-    const existingWithOt = (dbData.workOrders || []).find(o => 
-      String(o.id) !== String(orderId) && 
-      o.deleted !== true &&
-      String(o.interno).trim().toLowerCase() === String(order.interno).trim().toLowerCase() &&
-      String(o.clasificacion || '').trim().toLowerCase() === String(order.clasificacion || '').trim().toLowerCase() &&
-      o.taxesOrderNumber && String(o.taxesOrderNumber).trim() !== '' &&
-      (Date.now() - new Date(o.createdAt || o.syncDate || Date.now()).getTime() < 24 * 60 * 60 * 1000)
-    );
-    if (existingWithOt && existingWithOt.taxesOrderNumber) {
-      console.log(`[Pre-Check DB Safeguard] Order ${orderId} (Interno ${order.interno}, Clasificación ${order.clasificacion}) matched existing OT #${existingWithOt.taxesOrderNumber} in DB! Linking...`);
-      db.updateWorkOrder(orderId, { taxesOrderNumber: existingWithOt.taxesOrderNumber });
-      order.taxesOrderNumber = existingWithOt.taxesOrderNumber;
-    }
-  }
-
-  console.log(`\n=== Starting Background Sync for OT #${order.interno} (ID: ${order.id}) [taxesOrderNumber: ${order.taxesOrderNumber || 'NEW'}] ===`);
 
   let browser = null;
 
   try {
+    await acquireBrowserLock(`syncWorkOrder(${orderId})`);
+
+    // RE-READ FRESH ORDER STATE AFTER ACQUIRING BROWSER LOCK
+    order = db.getWorkOrderById(orderId);
+    if (!order) {
+      return { success: false, message: "Order not found after lock" };
+    }
+
+    // Pre-check DB safeguard: If this order has no taxesOrderNumber yet, check if another active order for the same interno AND same clasificacion already generated an OT today!
+    if (!order.taxesOrderNumber && order.interno) {
+      const dbData = db.read();
+      const existingWithOt = (dbData.workOrders || []).find(o => 
+        String(o.id) !== String(orderId) && 
+        o.deleted !== true &&
+        String(o.interno).trim().toLowerCase() === String(order.interno).trim().toLowerCase() &&
+        String(o.clasificacion || '').trim().toLowerCase() === String(order.clasificacion || '').trim().toLowerCase() &&
+        o.taxesOrderNumber && String(o.taxesOrderNumber).trim() !== '' &&
+        (Date.now() - new Date(o.createdAt || o.syncDate || Date.now()).getTime() < 24 * 60 * 60 * 1000)
+      );
+      if (existingWithOt && existingWithOt.taxesOrderNumber) {
+        console.log(`[Pre-Check DB Safeguard] Order ${orderId} (Interno ${order.interno}, Clasificación ${order.clasificacion}) matched existing OT #${existingWithOt.taxesOrderNumber} in DB! Linking...`);
+        db.updateWorkOrder(orderId, { taxesOrderNumber: existingWithOt.taxesOrderNumber });
+        order.taxesOrderNumber = existingWithOt.taxesOrderNumber;
+      }
+    }
+
+    console.log(`\n=== Starting Background Sync for OT #${order.interno} (ID: ${order.id}) [taxesOrderNumber: ${order.taxesOrderNumber || 'NEW'}] ===`);
+
     // Launch browser
     browser = await launchBrowser();
 
@@ -3293,7 +3303,6 @@ async function syncWorkOrder(orderId) {
       db.updateWorkOrder(orderId, { verifiedStatus: 'error', verifiedError: `Auto-control falló: ${verifyErr.message}` });
     }
 
-    await browser.close(); releaseBrowserLock();
     return { success: true, message: `Orden ${order.interno} sincronizada correctamente.` };
 
   } catch (error) {
@@ -3301,7 +3310,6 @@ async function syncWorkOrder(orderId) {
     if (abandonedSyncOrderIds.has(orderId)) {
       console.log(`[SyncWorker] Orden ${orderId} fue abandonada por timeout — ignorando resultado tardío, no se toca el lock ni la base.`);
       abandonedSyncOrderIds.delete(orderId);
-      if (browser) try { await browser.close(); } catch (_) {}
       return { success: false, message: 'Abandoned due to timeout' };
     }
     if (browser) {
@@ -3321,8 +3329,13 @@ async function syncWorkOrder(orderId) {
       autoSyncRetryCount: (order.autoSyncRetryCount || 0) + 1,
       lastAutoSyncAttempt: new Date().toISOString()
     });
-    if (browser) await browser.close(); releaseBrowserLock();
     return { success: false, message: error.message };
+  } finally {
+    // Liberar los candados pase lo que pase (éxito o falla)
+    const claveCandado = `${order.interno}_${order.clasificacion}`;
+    candadoInternosActivos.delete(claveCandado);
+    releaseBrowserLock();
+    if (browser) try { await browser.close(); } catch (_) {}
   }
 }
 
@@ -4633,21 +4646,30 @@ async function syncExpressOtHeader(orderId) {
     return { success: true, message: `O.T. ya existe (#${order.taxesOrderNumber})`, taxesOrderNumber: order.taxesOrderNumber };
   }
 
+  // CONTROL INTERNO EN MEMORIA (Rechazo instantáneo en menos de 1 milisegundo)
+  const claveCandado = `${order.interno}_${order.clasificacion}`;
+  if (candadoInternosActivos.has(claveCandado)) {
+    console.warn(`[Anti-Duplicado Express] 🛑 Petición duplicada veloz bloqueada para el camión: ${order.interno}`);
+    return { success: false, message: "Esta orden ya se está procesando o está en cola de espera." };
+  }
+
+  candadoInternosActivos.add(claveCandado);
+
   const settings = db.getSettings();
   const username = settings.username;
   const password = settings.password;
 
   if (!username || !password) {
     db.updateWorkOrder(orderId, { syncStatus: "error", syncError: "Faltan credenciales en Ajustes." });
+    candadoInternosActivos.delete(claveCandado);
     return { success: false, message: "Faltan credenciales" };
   }
 
-  await acquireBrowserLock(`syncExpressOtHeader(${orderId})`);
-
   let browser = null;
   try {
-    browser = await launchBrowser();
-    const page = await autoLogin(browser, username, password, settings.portalUrl);
+    await acquireBrowserLock(`syncExpressOtHeader(${orderId})`);
+
+    const page = await autoLogin(browser = await launchBrowser(), username, password, settings.portalUrl);
 
     console.log(`[Express OT] Creating OT header for Interno ${order.interno} (Clasificación: ${order.clasificacion})...`);
     await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
@@ -4681,7 +4703,6 @@ async function syncExpressOtHeader(orderId) {
     if (existingTableOt) {
       console.log(`[Express OT Pre-Check] Found pre-existing OT #${existingTableOt} in Taxes for Interno ${order.interno}! Linking immediately.`);
       db.updateWorkOrder(orderId, { taxesOrderNumber: existingTableOt, syncStatus: 'success', syncError: null });
-      await browser.close(); releaseBrowserLock();
       return { success: true, taxesOrderNumber: existingTableOt, preExisting: true };
     }
 
@@ -4777,16 +4798,17 @@ async function syncExpressOtHeader(orderId) {
     if (generatedOt) {
       console.log(`[Express OT] Generated OT #${generatedOt} for Interno ${order.interno} in 3 seconds!`);
       db.updateWorkOrder(orderId, { taxesOrderNumber: generatedOt, syncStatus: 'success', syncError: null });
-      await browser.close(); releaseBrowserLock();
       return { success: true, taxesOrderNumber: generatedOt };
     }
 
-    await browser.close(); releaseBrowserLock();
     return { success: false, message: "No se pudo leer el número de O.T. generado" };
   } catch (err) {
-    if (browser) try { await browser.close(); } catch (_) {}
-    releaseBrowserLock();
     return { success: false, message: err.message };
+  } finally {
+    const claveCandado = `${order.interno}_${order.clasificacion}`;
+    candadoInternosActivos.delete(claveCandado);
+    releaseBrowserLock();
+    if (browser) try { await browser.close(); } catch (_) {}
   }
 }
 
