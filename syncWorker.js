@@ -1731,10 +1731,141 @@ async function syncWorkOrder(orderId) {
     });
 
 
-    // 2. EXISTING OT — RECONCILIATION VIA OT EDIT FORM (pencil)
-    // Uses the OT edit form directly: reads task cards, deletes duplicates with red trash,
-    // fixes hours/realizada, then GUARDAR. Never touches /tms/produccion/tareas for existing OTs.
+    // ====== FASE 1: CREAR LA CABECERA TOTALMENTE VACÍA (SI ES ORDEN NUEVA) ======
+    if (!order.taxesOrderNumber) {
+      console.log(`[Alta O.T.] Creando cabecera limpia para el interno ${order.interno} (${order.clasificacion})...`);
+      
+      await safeGoto(page, `${settings.portalUrl}/tms/produccion/ot`, { timeout: 30000 });
+      await page.waitForSelector('table', { timeout: 10000 }).catch(() => {});
+      await delay(1000);
+
+      // Pre-chequeo en la tabla de Taxes por si ya existe una O.T. reciente para este Interno y Clasificación
+      const existingTableOt = await safeEvaluate(page, (targetInterno, targetClasif) => {
+        const clean = s => (s || '').toString().trim().toUpperCase();
+        const tables = Array.from(document.querySelectorAll('table'));
+        for (const table of tables) {
+          const rows = Array.from(table.querySelectorAll('tbody tr'));
+          for (const row of rows) {
+            const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
+            if (cells.length >= 3) {
+              const rowInterno = cells[1] || cells[0] || '';
+              const rowOt = cells[2] || cells[1] || '';
+              const rowClasif = cells[4] || cells[3] || '';
+              const intMatch = rowInterno.includes(clean(targetInterno));
+              const clasifMatch = !targetClasif || rowClasif.includes(clean(targetClasif));
+              const otNum = rowOt.replace(/\D/g, '');
+              if (intMatch && clasifMatch && /^\d+$/.test(otNum)) {
+                return otNum;
+              }
+            }
+          }
+        }
+        return null;
+      }, order.interno, order.clasificacion);
+
+      let numeroGenerado = existingTableOt;
+
+      if (!numeroGenerado) {
+        // Clic en 'NUEVO'
+        const nuevoBtnId = await safeEvaluate(page, () => {
+          const btns = Array.from(document.querySelectorAll('button, a'));
+          const b = btns.find(x => (x.textContent || '').trim().toUpperCase().includes('NUEVO'));
+          if (!b) return null;
+          const id = 'tmp-nuevo-btn-' + Date.now();
+          b.id = id;
+          return id;
+        });
+
+        if (nuevoBtnId) {
+          await page.click(`#${nuevoBtnId}`);
+          await delay(1500);
+        }
+
+        let targetResponsable = order.responsable || 'Belocures';
+
+        // Rellenar SOLO Rodado, Responsable y Clasificación (SIN AGREGAR TAREAS)
+        let rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado);
+        if (!rodadoFilled && order.interno) {
+          rodadoFilled = await fillSearchableSelect(page, 'Rodado', String(order.interno).trim());
+        }
+        if (!rodadoFilled) {
+          const catalogs = db.getCatalogs();
+          const firstRodado = (catalogs.rodados && catalogs.rodados.length > 0) ? (catalogs.rodados[0].label || catalogs.rodados[0].value) : "1";
+          rodadoFilled = await fillSearchableSelect(page, 'Rodado', firstRodado);
+        }
+        if (!rodadoFilled) throw new Error("No se pudo seleccionar el Rodado. Asegúrese de que el valor sea válido.");
+
+        let respFilled = await fillSearchableSelect(page, 'Responsable', targetResponsable);
+        if (!respFilled) {
+          respFilled = await fillSearchableSelect(page, 'Responsable', 'Belocures');
+        }
+
+        // Set Fecha
+        await safeEvaluate(page, (dateVal) => {
+          const dateInput = document.querySelector('input[type="date"].taxes-datepicker');
+          if (dateInput) {
+            const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+            nativeSetter.call(dateInput, dateVal);
+            dateInput.dispatchEvent(new Event('input', { bubbles: true }));
+            dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }, order.fechaEntrega || new Date().toISOString().split('T')[0]);
+
+        // Guardar la orden vacía (sin tareas)
+        const guardarBtnId = await safeEvaluate(page, () => {
+          const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+          const b = btns.find(x => (x.textContent || x.value || '').trim().toLowerCase().includes('guardar'));
+          if (!b || b.dataset.clicked === 'true') return null;
+          b.dataset.clicked = 'true';
+          const id = 'tmp-guardar-express-' + Date.now();
+          b.id = id;
+          return id;
+        });
+
+        if (guardarBtnId) {
+          await page.click(`#${guardarBtnId}`);
+          await safeEvaluate(page, (btnId) => {
+            const b = document.getElementById(btnId);
+            if (b) { b.disabled = true; b.style.pointerEvents = 'none'; }
+          }, guardarBtnId);
+          await delay(3000); // Esperar impacto
+        }
+
+        // Capturar el número de O.T. generado por Taxes
+        numeroGenerado = await safeEvaluate(page, (targetInterno) => {
+          const clean = s => (s || '').toString().trim();
+          const tables = Array.from(document.querySelectorAll('table'));
+          for (const table of tables) {
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
+            for (const row of rows) {
+              const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
+              if (cells.length >= 3) {
+                const rowInterno = cells[1] || cells[0] || '';
+                const rowOt = cells[2] || cells[1] || '';
+                if (rowInterno.toUpperCase().includes(String(targetInterno).toUpperCase()) && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
+                  return rowOt.replace(/\D/g, '');
+                }
+              }
+            }
+          }
+          return null;
+        }, order.interno);
+      }
+
+      if (numeroGenerado) {
+        db.updateWorkOrder(orderId, { taxesOrderNumber: numeroGenerado });
+        order.taxesOrderNumber = numeroGenerado;
+        console.log(`[Alta O.T.] Cabecera creada con éxito: #${numeroGenerado}. Pasando a fase de tareas...`);
+      } else {
+        throw new Error("No se pudo capturar el número de O.T. generado por Taxes.");
+      }
+    }
+
+    // ====== FASE 2: EL HISTORIAL (Añadir las tareas a la orden que ya existe) ======
+    // Al estar inmediatamente abajo, la orden nueva que acaba de recibir su número
+    // entra OBLIGATORIAMENTE en esta sección para cargar sus tareas usando el Lápiz.
     if (order.taxesOrderNumber) {
+      console.log(`[Tareas O.T.] Entrando al historial de la O.T. #${order.taxesOrderNumber} para inyectar tareas vía Lápiz...`);
       const otNumClean = String(order.taxesOrderNumber).replace(/^#/, '');
       console.log(`[Reconcile] OT ${otNumClean} exists. Opening edit form to reconcile...`);
 
