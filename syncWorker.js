@@ -1782,84 +1782,88 @@ async function syncWorkOrder(orderId) {
         }
 
         try {
-          console.log(`[Alta O.T.] Rellenando formulario básico para Interno: ${order.interno}`);
+          console.log(`[Alta O.T.] Rellenando formulario por nodos de texto para Interno: ${order.interno}`);
 
           // ==========================================
-          // 1. PASO 1: SELECCIONAR RODADO (POR INTERNO)
+          // 1. COMPLETAR EL CAMPO: RODADO
           // ==========================================
-          const selectorInputRodado = 'input[placeholder*="Seleccionar"], .searchable-input, .form-group input';
-          await page.waitForSelector(selectorInputRodado, { visible: true, timeout: 10000 }).catch(() => {});
-          
-          const rodadoInputId = await safeEvaluate(page, (sel) => {
-            const inputs = Array.from(document.querySelectorAll(sel));
-            const visibleInput = inputs.find(i => i.offsetParent !== null) || inputs[0];
-            if (!visibleInput) return null;
-            if (!visibleInput.id) visibleInput.id = 'tmp-rodado-input-' + Date.now();
-            visibleInput.value = '';
-            visibleInput.dispatchEvent(new Event('input', { bubbles: true }));
-            return visibleInput.id;
-          }, selectorInputRodado);
+          await safeEvaluate(page, (numInterno) => {
+            const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
+            const etiquetaRodado = etiquetas.find(el => el.textContent.trim().startsWith('Rodado'));
+            
+            if (!etiquetaRodado) throw new Error("No se encontró la etiqueta 'Rodado' en Taxes.");
+            
+            const contenedor = etiquetaRodado.closest('.form-group') || etiquetaRodado.parentElement;
+            const input = contenedor.querySelector('input[type="text"]') || contenedor.querySelector('input');
+            
+            if (input) {
+              input.focus();
+              input.click();
+              document.execCommand('insertText', false, numInterno.toString());
+            } else {
+              throw new Error("No se encontró el cuadro de texto para ingresar el Rodado.");
+            }
+          }, order.interno);
 
-          if (rodadoInputId) {
-            await page.click(`#${rodadoInputId}`).catch(() => {});
-            await page.type(`#${rodadoInputId}`, order.interno.toString(), { delay: 150 });
-          } else {
-            await page.type(selectorInputRodado, order.interno.toString(), { delay: 150 }).catch(() => {});
-          }
-          await delay(1500); // Esperamos a que Taxes busque en su servidor
-          
-          // Forzamos la selección de la primera sugerencia con el teclado físico
+          // Esperamos a que Taxes cargue las opciones flotantes en pantalla
+          await delay(1500); 
+          // Forzamos la selección de la primera sugerencia con el teclado
           await page.keyboard.press('ArrowDown');
-          await delay(200);
+          await delay(250);
           await page.keyboard.press('Enter');
           await delay(1000);
 
-          // ==========================================
-          // 2. PASO 2: SELECCIONAR RESPONSABLE
-          // ==========================================
-          console.log(`[Alta O.T.] Buscando Responsable: ${order.responsable || "Asignando por defecto"}`);
-          
-          const inputsSeleccionar = await page.$$('input[placeholder*="Seleccionar"]');
-          if (inputsSeleccionar.length >= 2) {
-            const inputResponsable = inputsSeleccionar[1];
-            await inputResponsable.click().catch(() => {});
-            
-            const nombreResponsable = order.responsable || "GOMEZ MARCELO JAVIER"; 
-            await inputResponsable.type(nombreResponsable, { delay: 100 }).catch(() => {});
-            await delay(1500);
-            
-            await page.keyboard.press('ArrowDown');
-            await delay(200);
-            await page.keyboard.press('Enter');
-            await delay(1000);
-          } else {
-            let targetResponsable = order.responsable || 'Belocures';
-            await fillSearchableSelect(page, 'Responsable', targetResponsable);
-          }
 
           // ==========================================
-          // 3. PASO 3: SELECCIONAR CLASIFICACIÓN
+          // 2. COMPLETAR EL CAMPO: RESPONSABLE
           // ==========================================
-          const selectClasificacionSelector = 'select[class*="clasificacion"], select[name*="clasificacion"], select';
-          await page.waitForSelector(selectClasificacionSelector, { visible: true }).catch(() => {});
-          if (order.clasificacion) {
-            await safeEvaluate(page, (sel, targetClasif) => {
-              const selects = Array.from(document.querySelectorAll(sel));
-              const clasSelect = selects.find(s => {
-                const name = (s.name || s.id || s.className || '').toLowerCase();
-                return name.includes('clasific') || name.includes('tipo') || name.includes('categoria');
-              }) || selects[1] || selects[0];
+          await safeEvaluate(page, (nombreResp) => {
+            const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
+            const etiquetaResponsable = etiquetas.find(el => el.textContent.trim().startsWith('Responsable'));
+            
+            if (!etiquetaResponsable) throw new Error("No se encontró la etiqueta 'Responsable' en Taxes.");
+            
+            const contenedor = etiquetaResponsable.closest('.form-group') || etiquetaResponsable.parentElement;
+            const input = contenedor.querySelector('input[type="text"]') || contenedor.querySelector('input');
+            
+            if (input) {
+              input.focus();
+              input.click();
+              document.execCommand('insertText', false, nombreResp);
+            } else {
+              throw new Error("No se encontró el cuadro de texto para ingresar el Responsable.");
+            }
+          }, order.responsable || "GOMEZ MARCELO JAVIER");
 
-              if (clasSelect && targetClasif) {
+          await delay(1500); 
+          await page.keyboard.press('ArrowDown');
+          await delay(250);
+          await page.keyboard.press('Enter');
+          await delay(1000);
+
+
+          // ==========================================
+          // 3. COMPLETAR EL CAMPO: CLASIFICACIÓN
+          // ==========================================
+          await safeEvaluate(page, (valorClasificacion) => {
+            const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
+            const etiquetaClasif = etiquetas.find(el => el.textContent.trim().startsWith('Clasificación'));
+            
+            if (etiquetaClasif) {
+              const contenedor = etiquetaClasif.closest('.form-group') || etiquetaClasif.parentElement;
+              const select = contenedor.querySelector('select');
+              if (select && valorClasificacion) {
                 const clean = s => String(s || '').trim().toUpperCase();
-                const opt = Array.from(clasSelect.options).find(o => clean(o.textContent).includes(clean(targetClasif)));
+                const opt = Array.from(select.options).find(o => clean(o.textContent).includes(clean(valorClasificacion)));
                 if (opt) {
-                  clasSelect.value = opt.value;
-                  clasSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                  select.value = opt.value;
+                } else {
+                  select.value = valorClasificacion;
                 }
+                select.dispatchEvent(new Event('change', { bubbles: true }));
               }
-            }, selectClasificacionSelector, order.clasificacion);
-          }
+            }
+          }, order.clasificacion);
           await delay(500);
 
           // Set Fecha
@@ -1873,14 +1877,15 @@ async function syncWorkOrder(orderId) {
             }
           }, order.fechaEntrega || new Date().toISOString().split('T')[0]);
 
+
           // ==========================================
-          // 4. PASO 4: CLIC EN EL BOTÓN VERDE "GUARDAR"
+          // 4. HACER CLIC EN EL BOTÓN VERDE "GUARDAR"
           // ==========================================
           console.log("[Puppeteer] Buscando el botón superior verde de Guardar...");
           
           const guardadoExitoso = await safeEvaluate(page, () => {
             const botones = Array.from(document.querySelectorAll('button, div, span, a'));
-            const btnGuardarVerde = botones.find(b => b.textContent.toLowerCase().includes('guardar'));
+            const btnGuardarVerde = botones.find(b => b.textContent.trim() === 'Guardar' || b.textContent.toLowerCase().includes('guardar'));
             
             if (btnGuardarVerde) {
               btnGuardarVerde.scrollIntoView();
@@ -1892,14 +1897,13 @@ async function syncWorkOrder(orderId) {
           });
 
           if (!guardadoExitoso) {
-            throw new Error("No se pudo interactuar con el botón superior derecho de Guardar.");
+            throw new Error("No se encontró el botón de Guardar en la pantalla de Taxes.");
           }
 
-          // 5. ESPERAR IMPACTO Y REDIRECCIÓN
-          console.log("[Puppeteer] Botón Guardar presionado con éxito. Esperando número de O.T...");
+          // 5. ESPERAR RESPUESTA DEL SERVIDOR
           await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
 
-          // Capturar número de O.T.
+          // Captura de número de O.T.
           await delay(2000);
           const urlActual = page.url();
           const coincidenciaUrl = urlActual.match(/\d+$/);
@@ -1934,8 +1938,8 @@ async function syncWorkOrder(orderId) {
           }
 
         } catch (error) {
-          await page.screenshot({ path: 'public/error_formulario_campos.png' }).catch(() => {});
-          console.error(`[Error en proceso de campos]: ${error.message}`);
+          await page.screenshot({ path: 'public/error_localizacion_campos.png' }).catch(() => {});
+          console.error(`[Falla del Formulario]: ${error.message}`);
           throw error;
         }
       }
