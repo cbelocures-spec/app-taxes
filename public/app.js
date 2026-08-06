@@ -2893,20 +2893,44 @@ function agregarCantidadesInsumos(btn) {
   showToast('Insumos agregados a la tarea ✓', 'success');
 }
 
-async function triggerExpressOtSync(orderId) {
+async function handleObtenerNumeroOT(orderId, botonElemento) {
+  if (botonElemento) {
+    botonElemento.disabled = true;
+    botonElemento.innerHTML = `<span class="material-icons spinner" style="font-size:14px;">autorenew</span> Sincronizando cabecera...`;
+  }
+
   try {
-    showToast("Generando N° de O.T. en Taxes...", "info");
-    const response = await fetch(`/api/orders/${orderId}/sync-header`, { method: 'POST' });
+    showToast("Generando N° de O.T. vacía en Taxes...", "info");
+    const response = await fetch('/api/orders/create-header', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId })
+    });
+    
     const data = await response.json();
-    if (data.success && data.taxesOrderNumber) {
-      showToast(`✅ N° de O.T. asignado: #${data.taxesOrderNumber}`, "success");
+    if (data.status === 'success' || data.success) {
+      const otNum = data.taxesOrderNumber || data.generatedNo;
+      showToast(`✅ Cabecera O.T. #${otNum} creada exitosamente en Taxes`, "success");
       loadOrders();
     } else {
       showToast(data.message || "No se pudo obtener el N° de O.T.", "danger");
+      if (botonElemento) {
+        botonElemento.disabled = false;
+        botonElemento.innerHTML = `<span class="material-icons" style="font-size:14px;">bolt</span> Obtener N° O.T.`;
+      }
     }
-  } catch (err) {
-    showToast(`Error al obtener O.T.: ${err.message}`, "danger");
+  } catch (error) {
+    console.error(error);
+    showToast(`Error al obtener O.T.: ${error.message}`, "danger");
+    if (botonElemento) {
+      botonElemento.disabled = false;
+      botonElemento.innerHTML = `<span class="material-icons" style="font-size:14px;">bolt</span> Obtener N° O.T.`;
+    }
   }
+}
+
+async function triggerExpressOtSync(orderId) {
+  return handleObtenerNumeroOT(orderId, null);
 }
 
 async function triggerSingleTaskSync(orderId, taskIndex) {
@@ -3408,7 +3432,7 @@ function createOrderCardHtml(order) {
         <div class="task-employees-detail" id="task-emp-${order.id}" style="display:none; width:100%; margin-top:6px; padding:6px 8px; background:var(--bg-secondary); border-radius:6px; font-size:12px;"></div>
         <div class="card-actions" style="margin-top:6px;">
           ${!order.taxesOrderNumber ? `
-            <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); triggerExpressOtSync('${order.id}')" style="padding:3px 8px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:3px; background:linear-gradient(135deg,#059669,#047857); border:none; color:#fff; border-radius:6px; cursor:pointer;" title="Obtener N° de O.T. Express en Taxes">
+            <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); handleObtenerNumeroOT('${order.id}', this)" style="padding:3px 8px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:3px; background:linear-gradient(135deg,#059669,#047857); border:none; color:#fff; border-radius:6px; cursor:pointer;" title="Obtener N° de O.T. Express en Taxes">
               <span class="material-icons" style="font-size:14px;">bolt</span> Obtener N° O.T.
             </button>
           ` : ''}

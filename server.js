@@ -1117,6 +1117,44 @@ app.post('/api/orders/:id/sync-header', async (req, res) => {
   }
 });
 
+// ==========================================
+// RUTA 1: MÓDULO ÓRDENES - ALTA DE CABECERA
+// ==========================================
+app.post('/api/orders/create-header', async (req, res) => {
+  const orderId = req.body.orderId || req.body.id;
+  try {
+    const result = await syncWorker.createCleanHeader(orderId);
+    if (result.success) {
+      return res.status(200).json({ 
+        status: "success", 
+        taxesOrderNumber: result.taxesOrderNumber,
+        message: "Cabecera creada en Taxes exitosamente." 
+      });
+    } else {
+      return res.status(500).json({ status: "error", message: result.message });
+    }
+  } catch (error) {
+    res.status(500).json({ status: "error", message: error.message });
+  }
+});
+
+// ==========================================
+// RUTA 2: MÓDULO INYECCIÓN AL FINALIZAR
+// ==========================================
+app.post('/api/orders/finalize-tasks', async (req, res) => {
+  const orderId = req.body.orderId || req.body.id;
+  try {
+    const result = await syncWorker.injectTasksToExistingOrder(orderId);
+    if (result.success) {
+      return res.status(200).json({ status: "success", message: "Tareas sincronizadas e historial cerrado." });
+    } else {
+      return res.status(500).json({ status: "error", message: result.message });
+    }
+  } catch (error) {
+    res.status(500).json({ status: "error", message: error.message });
+  }
+});
+
 // Trigger Single Task Sync to /tms/produccion/tareas (Etapa 2 - per task)
 app.post('/api/orders/:id/tasks/:taskId/sync', async (req, res) => {
   try {

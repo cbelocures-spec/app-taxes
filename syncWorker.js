@@ -5134,12 +5134,23 @@ async function syncCompletedTasksForOrder(orderId) {
   return { success: true, syncedAny };
 }
 
+// Alias functions matching the 2-phase API routes:
+async function createCleanHeader(orderId) {
+  return await syncExpressOtHeader(orderId);
+}
+
+async function injectTasksToExistingOrder(orderId) {
+  return await syncWorkOrder(orderId);
+}
+
 module.exports = {
   startWorker,
   stopWorker,
   syncWorkOrder,
   syncWorkOrderWithTimeout,
   syncExpressOtHeader,
+  createCleanHeader,
+  injectTasksToExistingOrder,
   syncSingleTaskToTareasForm,
   syncCompletedTasksForOrder,
   verifyWorkOrder,
