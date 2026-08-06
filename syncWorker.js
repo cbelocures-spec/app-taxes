@@ -1828,31 +1828,7 @@ async function syncWorkOrder(orderId) {
       console.log("[Alta O.T.] Esperando 2 segundos para la carga del catálogo de camiones en la vista...");
       await delay(2000);
 
-      // Pre-chequeo en la tabla de Taxes por si ya existe una O.T. reciente para este Interno y Clasificación
-      const existingTableOt = await safeEvaluate(page, (targetInterno, targetClasif) => {
-        const clean = s => (s || '').toString().trim().toUpperCase();
-        const tables = Array.from(document.querySelectorAll('table'));
-        for (const table of tables) {
-          const rows = Array.from(table.querySelectorAll('tbody tr'));
-          for (const row of rows) {
-            const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
-            if (cells.length >= 3) {
-              const rowInterno = cells[1] || cells[0] || '';
-              const rowOt = cells[2] || cells[1] || '';
-              const rowClasif = cells[4] || cells[3] || '';
-              const intMatch = rowInterno.includes(clean(targetInterno));
-              const clasifMatch = !targetClasif || rowClasif.includes(clean(targetClasif));
-              const otNum = rowOt.replace(/\D/g, '');
-              if (intMatch && clasifMatch && /^\d+$/.test(otNum)) {
-                return otNum;
-              }
-            }
-          }
-        }
-        return null;
-      }, order.interno, order.clasificacion);
-
-      let numeroGenerado = existingTableOt;
+      let numeroGenerado = null;
 
       if (!numeroGenerado) {
         // Clic en el botón verde '+ NUEVO'
