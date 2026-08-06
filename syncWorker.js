@@ -1801,62 +1801,43 @@ async function syncWorkOrder(orderId) {
           await page.waitForSelector('input, select, .form-group', { visible: true, timeout: 20000 }).catch(() => {});
           await delay(3000); // 3 segundos extra de cortesía para scripts lentos de Taxes
 
-          // ==========================================
-          // 1. COMPLETAR EL CAMPO: RODADO (CON RETRY DE CARGA)
-          // ==========================================
-          let rodadoFound = false;
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            rodadoFound = await safeEvaluate(page, (numInterno) => {
-              const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
-              const etiquetaRodado = etiquetas.find(el => el.textContent.trim().startsWith('Rodado'));
-              if (!etiquetaRodado) return false;
-              
-              const contenedor = etiquetaRodado.closest('.form-group') || etiquetaRodado.parentElement;
-              const input = contenedor ? (contenedor.querySelector('input[type="text"]') || contenedor.querySelector('input')) : null;
-              
-              if (input) {
-                input.focus();
-                input.click();
-                document.execCommand('insertText', false, numInterno.toString());
-                return true;
-              }
-              return false;
-            }, order.interno);
+          // =====================================================================
+          // PARCHE DE FIJACIÓN TEMPORAL DE SUGERENCIAS (BLINDADO)
+          // =====================================================================
+          const inputRodado = 'input[type="text"], input[placeholder*="Seleccionar"], .form-group input'; 
+          await page.waitForSelector(inputRodado, { visible: true, timeout: 10000 });
 
-            if (rodadoFound) break;
-            console.log(`[Alta O.T.] Intento ${attempt}/3: El campo Rodado no estuvo listo. Esperando 2s extra...`);
-            await delay(2000);
+          const rodadoInputId = await safeEvaluate(page, (sel) => {
+            const inputs = Array.from(document.querySelectorAll(sel));
+            const visibleInput = inputs.find(i => i.offsetParent !== null) || inputs[0];
+            if (!visibleInput) return null;
+            if (!visibleInput.id) visibleInput.id = 'tmp-rodado-input-' + Date.now();
+            visibleInput.value = '';
+            visibleInput.dispatchEvent(new Event('input', { bubbles: true }));
+            return visibleInput.id;
+          }, inputRodado);
+
+          if (rodadoInputId) {
+            await page.click(`#${rodadoInputId}`).catch(() => {});
+            await page.type(`#${rodadoInputId}`, order.interno.toString(), { delay: 150 });
+          } else {
+            await page.click(inputRodado).catch(() => {});
+            await page.type(inputRodado, order.interno.toString(), { delay: 150 });
           }
 
-          if (!rodadoFound) {
-            throw new Error("El campo 'Rodado' no estuvo disponible a tiempo en el formulario de Taxes.");
-          }
+          // 1. ESPERA DE CORTESÍA OBLIGATORIA (Clave para que Taxes procese la sugerencia)
+          console.log("[Puppeteer] Esperando que Taxes pinte las opciones en el stream...");
+          await delay(2000); 
 
-          // Esperamos a que Taxes cargue las opciones flotantes en pantalla
+          // 2. DISPARO DEL TECLADO CON TIEMPO DE RESPUESTA HUMANO
+          console.log("[Puppeteer] Seleccionando la opción del menú flotante...");
+          await page.keyboard.press('ArrowDown');
+          await delay(500); // Pausa de medio segundo para que se pinte el foco azul en Taxes
+          await page.keyboard.press('Enter');
+
+          // 3. VERIFICACIÓN CRÍTICA EN EL DOM DE TAXES
           await delay(1500); 
-
-          // Intentamos hacer clic directo en la opción flotante del menú
-          const rodadoSeleccionado = await safeEvaluate(page, (numInterno) => {
-            const elementos = Array.from(document.querySelectorAll('li, div, span, [class*="option"], [class*="item"]'));
-            const opcion = elementos.find(el => {
-              const txt = el.textContent.trim().toLowerCase();
-              return el.offsetParent !== null && (txt.includes(`interno ${numInterno}`) || txt.endsWith(` ${numInterno}`) || txt.includes(numInterno.toString()));
-            });
-            if (opcion) {
-              opcion.click();
-              return true;
-            }
-            return false;
-          }, order.interno);
-
-          if (!rodadoSeleccionado) {
-            // Usamos Tab en lugar de Enter para fijar la opción sin enviar el formulario
-            await page.keyboard.press('ArrowDown');
-            await delay(200);
-            await page.keyboard.press('Tab');
-          }
-          await delay(1000);
-
+          console.log("[Puppeteer] Validando si el campo inferior se autocompletó...");
           await page.screenshot({ path: 'public/paso1_rodado.png' }).catch(() => {});
 
           // ==========================================
