@@ -1819,12 +1819,28 @@ async function syncWorkOrder(orderId) {
 
           // Esperamos a que Taxes cargue las opciones flotantes en pantalla
           await delay(1500); 
-          // Forzamos la selección de la primera sugerencia con el teclado
-          await page.keyboard.press('ArrowDown');
-          await delay(250);
-          await page.keyboard.press('Enter');
-          await delay(1000);
 
+          // Intentamos hacer clic directo en la opción flotante del menú
+          const rodadoSeleccionado = await safeEvaluate(page, (numInterno) => {
+            const elementos = Array.from(document.querySelectorAll('li, div, span, [class*="option"], [class*="item"]'));
+            const opcion = elementos.find(el => {
+              const txt = el.textContent.trim().toLowerCase();
+              return el.offsetParent !== null && (txt.includes(`interno ${numInterno}`) || txt.endsWith(` ${numInterno}`) || txt.includes(numInterno.toString()));
+            });
+            if (opcion) {
+              opcion.click();
+              return true;
+            }
+            return false;
+          }, order.interno);
+
+          if (!rodadoSeleccionado) {
+            // Usamos Tab en lugar de Enter para fijar la opción sin enviar el formulario
+            await page.keyboard.press('ArrowDown');
+            await delay(200);
+            await page.keyboard.press('Tab');
+          }
+          await delay(1000);
 
           await page.screenshot({ path: 'public/paso1_rodado.png' }).catch(() => {});
 
@@ -1838,14 +1854,11 @@ async function syncWorkOrder(orderId) {
             if (!etiquetaResponsable) throw new Error("No se encontró la etiqueta 'Responsable' en Taxes.");
             
             const contenedor = etiquetaResponsable.closest('.form-group') || etiquetaResponsable.parentElement;
-            
-            // Salvavidas: Si no hay un input clásico, buscamos cualquier div o control interactivo del componente dinámico
             const elementoInteractivo = contenedor.querySelector('input, [role="combobox"], [class*="control"], div[class*="select"]');
             
             if (elementoInteractivo) {
               elementoInteractivo.scrollIntoView();
               elementoInteractivo.focus();
-              // Forzamos un evento de clic nativo del elemento
               const evt = document.createEvent("MouseEvents");
               evt.initMouseEvent("mousedown", true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
               elementoInteractivo.dispatchEvent(evt);
@@ -1857,15 +1870,27 @@ async function syncWorkOrder(orderId) {
           // Esperamos que se abra el menú flotante en el navegador visible
           await delay(1000);
 
-          // Tipeamos de forma global el nombre del responsable (Va directo al elemento que tiene el foco)
+          // Tipeamos de forma global el nombre del responsable
           const nombreResp = order.responsable || "GOMEZ MARCELO JAVIER";
           await page.keyboard.type(nombreResp, { delay: 100 });
           await delay(1500); 
 
-          // Confirmamos la opción con las teclas físicas
-          await page.keyboard.press('ArrowDown');
-          await delay(250);
-          await page.keyboard.press('Enter');
+          const respSeleccionado = await safeEvaluate(page, (nombreTarget) => {
+            const clean = s => String(s || '').trim().toUpperCase();
+            const elementos = Array.from(document.querySelectorAll('li, div, span, [class*="option"], [class*="item"]'));
+            const opcion = elementos.find(el => el.offsetParent !== null && clean(el.textContent).includes(clean(nombreTarget)));
+            if (opcion) {
+              opcion.click();
+              return true;
+            }
+            return false;
+          }, nombreResp);
+
+          if (!respSeleccionado) {
+            await page.keyboard.press('ArrowDown');
+            await delay(200);
+            await page.keyboard.press('Tab');
+          }
           await delay(1000);
           await page.screenshot({ path: 'public/paso2_responsable.png' }).catch(() => {});
 
