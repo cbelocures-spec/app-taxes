@@ -1794,6 +1794,25 @@ async function syncWorkOrder(orderId) {
         }
 
         try {
+          const diagFs = require('fs');
+          const diagPath = require('path');
+          const diagHtml = await page.content();
+          diagFs.writeFileSync(diagPath.join(__dirname, 'public', 'debug_ot_form.html'), diagHtml);
+          const diagFields = await page.evaluate(() => {
+            const els = Array.from(document.querySelectorAll('input, select, textarea, [role="combobox"], [class*="select"], [class*="autocomplete"], [class*="Select"], [class*="Autocomplete"], [contenteditable="true"]'));
+            return els.slice(0, 50).map(el => ({
+              tag: el.tagName, type: el.type || null, id: el.id || null, className: el.className || null,
+              placeholder: el.placeholder || null, name: el.name || null, role: el.getAttribute('role'),
+              visible: !!el.offsetParent, outerHTMLSnippet: el.outerHTML.slice(0, 300)
+            }));
+          });
+          diagFs.writeFileSync(diagPath.join(__dirname, 'public', 'debug_ot_fields.json'), JSON.stringify(diagFields, null, 2));
+          console.log('[DEBUG-DIAG] Saved debug_ot_form.html and debug_ot_fields.json with', diagFields.length, 'candidate fields');
+        } catch (diagErr) {
+          console.warn('[DEBUG-DIAG] Failed to save diagnostics:', diagErr.message);
+        }
+
+        try {
           // =====================================================================
           // PARCHE DE ALTA: LLENADO POR SELECTORES CONTROLADOS (MODAL NUEVO)
           // =====================================================================
