@@ -1781,20 +1781,64 @@ async function syncWorkOrder(orderId) {
           await delay(1500);
         }
 
+        console.log(`[Puppeteer] Buscando en Taxes por el número de Interno: ${order.interno}`);
+
+        // 1. Selector del input dinámico de "Rodado"
+        const inputRodadoSelector = 'input[placeholder*="Buscar"], .searchable-input, .form-group input';
+        await page.waitForSelector(inputRodadoSelector, { visible: true }).catch(() => {});
+
+        // 2. Hacer clic, limpiar e ingresar el número de interno de forma pausada
+        const rodadoInputId = await safeEvaluate(page, (sel) => {
+          const inputs = Array.from(document.querySelectorAll(sel));
+          const visibleInput = inputs.find(i => i.offsetParent !== null) || inputs[0];
+          if (!visibleInput) return null;
+          if (!visibleInput.id) visibleInput.id = 'tmp-rodado-input-' + Date.now();
+          visibleInput.value = '';
+          visibleInput.dispatchEvent(new Event('input', { bubbles: true }));
+          return visibleInput.id;
+        }, inputRodadoSelector);
+
+        if (rodadoInputId) {
+          await page.click(`#${rodadoInputId}`).catch(() => {});
+          await page.type(`#${rodadoInputId}`, order.interno.toString(), { delay: 150 });
+        } else {
+          let rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado);
+          if (!rodadoFilled && order.interno) {
+            rodadoFilled = await fillSearchableSelect(page, 'Rodado', String(order.interno).trim());
+          }
+        }
+
+        // 3. Esperar a que el buscador dinámico de Taxes muestre las opciones en pantalla
+        await delay(1500); 
+
+        // 4. SELECCIÓN INTELIGENTE ASINCRÓNICA:
+        const seleccionExitosa = await safeEvaluate(page, (numInterno) => {
+          const elementosLista = Array.from(document.querySelectorAll('li, div, span, [class*="option"], [class*="item"]'));
+          const opcionCorrecta = elementosLista.find(el => {
+            const texto = el.textContent.trim().toLowerCase();
+            return texto.includes(`interno ${numInterno}`) || texto.endsWith(` ${numInterno}`) || texto.startsWith(`${numInterno} -`);
+          });
+
+          if (opcionCorrecta) {
+            opcionCorrecta.click();
+            return true;
+          }
+          return false;
+        }, order.interno);
+
+        // 5. SALVAVIDAS POR TECLADO
+        if (!seleccionExitosa) {
+          console.log(`[Puppeteer] No se pudo hacer clic directo. Ejecutando salvavidas por emulación de teclado (ArrowDown + Enter).`);
+          await page.keyboard.press('ArrowDown');
+          await delay(200);
+          await page.keyboard.press('Enter');
+        }
+
+        // 6. VERIFICACIÓN DE SEGURIDAD
+        await delay(1000);
+        console.log(`[Puppeteer] Vehículo asociado con éxito. Procediendo a guardar la cabecera vacía...`);
+
         let targetResponsable = order.responsable || 'Belocures';
-
-        // Rellenar SOLO Rodado, Responsable y Clasificación (SIN AGREGAR TAREAS)
-        let rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado);
-        if (!rodadoFilled && order.interno) {
-          rodadoFilled = await fillSearchableSelect(page, 'Rodado', String(order.interno).trim());
-        }
-        if (!rodadoFilled) {
-          const catalogs = db.getCatalogs();
-          const firstRodado = (catalogs.rodados && catalogs.rodados.length > 0) ? (catalogs.rodados[0].label || catalogs.rodados[0].value) : "1";
-          rodadoFilled = await fillSearchableSelect(page, 'Rodado', firstRodado);
-        }
-        if (!rodadoFilled) throw new Error("No se pudo seleccionar el Rodado. Asegúrese de que el valor sea válido.");
-
         let respFilled = await fillSearchableSelect(page, 'Responsable', targetResponsable);
         if (!respFilled) {
           respFilled = await fillSearchableSelect(page, 'Responsable', 'Belocures');
