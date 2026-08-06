@@ -2016,41 +2016,75 @@ async function syncWorkOrder(orderId) {
             throw new Error("No se encontró el botón de Guardar en la pantalla de Taxes.");
           }
 
-          // 5. ESPERAR RESPUESTA DEL SERVIDOR
-          await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
+          // 5. ESPERAR RESPUESTA Y CAPTURAR NÚMERO DE O.T. GENERADO
+          await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {});
+          await delay(2500);
 
-          // Captura de número de O.T.
-          await delay(2000);
-          const urlActual = page.url();
-          const coincidenciaUrl = urlActual.match(/\d+$/);
-          numeroGenerado = coincidenciaUrl ? coincidenciaUrl[0] : null;
+          numeroGenerado = await safeEvaluate(page, (targetInterno) => {
+            const clean = s => (s || '').toString().trim();
+            
+            // A. Chequear si la URL cambió a la orden (ej: /ot/25550 o /ot?id=25550)
+            const currentUrl = window.location.href;
+            const urlMatch = currentUrl.match(/\/(?:ot|ordenes|orden)\/(\d+)/i) || currentUrl.match(/[\?&]id=(\d+)/i) || currentUrl.match(/\/(\d{4,6})$/);
+            if (urlMatch) return urlMatch[1];
 
-          if (!numeroGenerado) {
-            numeroGenerado = await safeEvaluate(page, (targetInterno) => {
-              const elementos = Array.from(document.querySelectorAll('h1, h2, h3, .badge, span, td'));
-              for (const el of elementos) {
-                const txt = el.textContent.trim();
-                if ((txt.toLowerCase().includes('orden') || txt.toLowerCase().includes('o.t')) && txt.match(/\d+/)) {
-                  return txt.match(/\d+/)[0];
-                }
+            // B. Chequear mensajes Toast / Alerta de confirmación de Vue/Bootstrap
+            const notificationEls = Array.from(document.querySelectorAll('.toast, .alert, .b-toaster, .swal2-container, .notification, div.v-toast'));
+            for (const el of notificationEls) {
+              const txt = el.textContent || '';
+              const match = txt.match(/(?:orden|o\.t\.?|n°|num|número)\s*[:#]?\s*(\d{4,6})/i) || txt.match(/\b(\d{4,6})\b/);
+              if (match) return match[1];
+            }
+
+            // C. Chequear títulos, Badges y encabezados
+            const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, .badge, .breadcrumb'));
+            for (const h of headings) {
+              const txt = h.textContent || '';
+              if (txt.toLowerCase().includes('orden') || txt.toLowerCase().includes('o.t')) {
+                const num = txt.match(/\b(\d{4,6})\b/);
+                if (num) return num[1];
               }
-              const clean = s => (s || '').toString().trim();
-              const tables = Array.from(document.querySelectorAll('table'));
-              for (const table of tables) {
-                const rows = Array.from(table.querySelectorAll('tbody tr'));
-                for (const row of rows) {
-                  const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
-                  if (cells.length >= 3) {
-                    const rowInterno = cells[1] || cells[0] || '';
-                    const rowOt = cells[2] || cells[1] || '';
-                    if (rowInterno.toUpperCase().includes(String(targetInterno).toUpperCase()) && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
-                      return rowOt.replace(/\D/g, '');
+            }
+
+            // D. Chequear filas de la tabla (primera fila o coincidencia con interno)
+            const tables = Array.from(document.querySelectorAll('table'));
+            for (const table of tables) {
+              const rows = Array.from(table.querySelectorAll('tbody tr'));
+              for (const row of rows) {
+                const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
+                if (cells.length >= 2) {
+                  const rowInterno = cells[1] || cells[0] || '';
+                  const rowOt = cells[2] || cells[1] || cells[0] || '';
+                  const otNum = rowOt.replace(/\D/g, '');
+                  if (/^\d{4,6}$/.test(otNum)) {
+                    if (!targetInterno || rowInterno.toUpperCase().includes(String(targetInterno).toUpperCase())) {
+                      return otNum;
                     }
                   }
                 }
               }
+            }
+
+            return null;
+          }, order.interno);
+
+          // Si aún no se capturó, re-intentar inspección de la primera fila de la tabla tras 2s
+          if (!numeroGenerado) {
+            await delay(2000);
+            numeroGenerado = await safeEvaluate(page, () => {
+              const tables = Array.from(document.querySelectorAll('table'));
+              for (const table of tables) {
+                const rows = Array.from(table.querySelectorAll('tbody tr'));
+                if (rows.length > 0) {
+                  const cells = Array.from(rows[0].querySelectorAll('td')).map(c => (c.textContent || '').trim());
+                  for (const c of cells) {
+                    const num = c.replace(/\D/g, '');
+                    if (/^\d{4,6}$/.test(num)) return num;
+                  }
+                }
+              }
               return null;
-            }, order.interno);
+            });
           }
 
         } catch (error) {
