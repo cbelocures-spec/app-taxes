@@ -407,12 +407,14 @@ async function fillSearchableSelect(page, labelText, searchValue) {
             // Look for any hidden input in the same container
             const hiddenInput = parent.querySelector('input[type="hidden"], input[name$="_id"], input[name="rodado_id"], input[name="syj_empleado_id"]');
             
-            if (searchInput && hiddenInput) {
-              // Give them temporary IDs for reliable selection
+            if (searchInput) {
               const searchId = 'tmp_search_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-              const hiddenId = 'tmp_hidden_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
               searchInput.setAttribute('id', searchId);
-              hiddenInput.setAttribute('id', hiddenId);
+              let hiddenId = null;
+              if (hiddenInput) {
+                hiddenId = 'tmp_hidden_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+                hiddenInput.setAttribute('id', hiddenId);
+              }
               return { searchId, hiddenId, found: true };
             }
           }
@@ -1831,70 +1833,55 @@ async function syncWorkOrder(orderId) {
       let numeroGenerado = null;
 
       if (!numeroGenerado) {
-        // Clic en el botón verde '+ NUEVO'
-        console.log("[Alta O.T.] Buscando y haciendo clic en el botón '+ NUEVO'...");
+        console.log("[Alta O.T.] Buscando y pulsando el botón verde '+ NUEVO'...");
         
-        const btnId = await safeEvaluate(page, () => {
-          const btns = Array.from(document.querySelectorAll('button, a, .btn, div, span'));
-          const b = btns.find(x => {
-            const txt = (x.textContent || '').trim().toUpperCase();
-            return txt.includes('NUEVO');
-          });
-          if (!b) return null;
-          const target = b.closest('button, a, .btn') || b;
-          const id = 'tmp-btn-nuevo-' + Date.now();
-          target.setAttribute('id', id);
-          return id;
-        });
-
-        if (btnId) {
-          console.log(`[Alta O.T.] Botón '+ NUEVO' localizado con ID #${btnId}. Ejecutando clic nativo...`);
-          
-          // Despachar eventos de ratón DOM
-          await safeEvaluate(page, (id) => {
-            const el = document.getElementById(id);
-            if (el) {
-              el.scrollIntoView();
-              el.focus();
-              ['mousedown', 'mouseup', 'click'].forEach(evtName => {
-                try {
-                  const evt = new MouseEvent(evtName, { bubbles: true, cancelable: true, view: window });
-                  el.dispatchEvent(evt);
-                } catch (_) {}
-              });
-            }
-          }, btnId);
-          await delay(300);
-
-          // Clic real de Puppeteer por coordenadas de pantalla
-          await page.click(`#${btnId}`).catch(err => {
-            console.warn("[Alta O.T.] Reintentando page.click en #tmp-btn-nuevo-...", err.message);
-          });
-        } else {
-          console.warn("[Alta O.T.] No se asignó ID a NUEVO. Intentando selector directo .btn-success / button...");
-          await clickByText(page, 'NUEVO', 'button').catch(() => {});
-          await clickByText(page, 'NUEVO', 'a').catch(() => {});
-        }
-
-        // Verificar que abrió el modal (esperar hasta 6s)
         let modalListo = false;
-        for (let i = 0; i < 20; i++) {
-          modalListo = await safeEvaluate(page, () => {
-            return !!document.querySelector('input.searchable-input, input[name="titulo"]') || 
-                   document.body.innerText.includes('Nueva Orden de Trabajo') || 
-                   document.body.innerText.includes('Nueva Orden');
+        for (let int = 1; int <= 8; int++) {
+          const btnId = await safeEvaluate(page, () => {
+            const btns = Array.from(document.querySelectorAll('button, a, .btn, div, span'));
+            const b = btns.find(x => {
+              const txt = (x.textContent || '').trim().toUpperCase();
+              const isGreen = x.classList.contains('btn-success') || (x.className && String(x.className).includes('success'));
+              return txt.includes('NUEVO') || isGreen;
+            });
+            if (!b) return null;
+            const target = b.closest('button, a, .btn') || b;
+            const id = 'tmp-btn-nuevo-' + Date.now();
+            target.setAttribute('id', id);
+            target.scrollIntoView();
+            target.focus();
+            try { target.click(); } catch (_) {}
+            ['mousedown', 'mouseup', 'click'].forEach(evtName => {
+              try {
+                const evt = new MouseEvent(evtName, { bubbles: true, cancelable: true, view: window });
+                target.dispatchEvent(evt);
+              } catch (_) {}
+            });
+            return id;
           });
-          if (modalListo) break;
 
-          // Re-intentar clic a los 1.8 segundos si el modal aún no se desplegó
-          if (i === 6 && btnId) {
-            console.log("[Alta O.T.] Re-intentando clic en el botón '+ NUEVO'...");
+          if (btnId) {
             await page.click(`#${btnId}`).catch(() => {});
+          } else {
+            await page.click('.btn-success, button.btn-success, a.btn-success, button:has-text("NUEVO")').catch(() => {});
           }
-          await delay(300);
+
+          await delay(800);
+          modalListo = await safeEvaluate(page, () => {
+            const hasRodadoInput = !!document.querySelector('input.searchable-input, input[name="titulo"]');
+            const hasModalText = document.body.innerText.includes('Nueva Orden de Trabajo') || 
+                                 document.body.innerText.includes('Nueva Orden') ||
+                                 document.body.innerText.includes('Rodado');
+            return hasRodadoInput || hasModalText;
+          });
+
+          if (modalListo) {
+            console.log(`[Alta O.T.] ¡Modal 'Nueva Orden de Trabajo' desplegado con éxito en intento ${int}!`);
+            break;
+          }
         }
 
-        console.log(`[Alta O.T.] Formulario 'Nueva Orden de Trabajo' ${modalListo ? 'desplegado correctamente' : 'NO detectado tras 6s'}.`);
+        console.log(`[Alta O.T.] Estado del formulario: ${modalListo ? 'Abierto' : 'Continuando a inspección de campos'}.`);
         await delay(500);
 
         try {
