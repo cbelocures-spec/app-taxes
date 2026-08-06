@@ -1750,6 +1750,24 @@ async function syncWorkOrder(orderId) {
       await page.waitForSelector('table', { timeout: 10000 }).catch(() => {});
       await delay(1000);
 
+      // Esperar a que el filtro "Clasificación" de la lista termine de poblarse con las
+      // categorías reales (Preventivo/Auxilio/Correctivo/Herrería) antes de tocar "Nuevo".
+      // Según lo observado en la app: ese cuadro se ve chico/vacío mientras el catálogo de
+      // camiones todavía está cargando en el fondo, y crece un poco cuando ya está listo.
+      // Si se toca "Nuevo" antes de eso, el formulario de alta abre pero los combos de
+      // Rodado/Responsable quedan sin datos detrás y no encuentran nada al buscar.
+      let catalogoListo = false;
+      for (let i = 0; i < 20; i++) {
+        catalogoListo = await safeEvaluate(page, () => {
+          const selects = Array.from(document.querySelectorAll('select'));
+          const clasifSelect = selects.find(s => Array.from(s.options).some(o => /preventivo|correctivo|auxilio/i.test(o.textContent)));
+          return !!clasifSelect;
+        });
+        if (catalogoListo) break;
+        await delay(500);
+      }
+      console.log(`[Alta O.T.] Filtro de Clasificación ${catalogoListo ? 'poblado' : 'NO confirmado tras 10s'} antes de tocar Nuevo.`);
+
       // Pre-chequeo en la tabla de Taxes por si ya existe una O.T. reciente para este Interno y Clasificación
       const existingTableOt = await safeEvaluate(page, (targetInterno, targetClasif) => {
         const clean = s => (s || '').toString().trim().toUpperCase();
