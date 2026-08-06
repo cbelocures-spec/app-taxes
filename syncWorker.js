@@ -1832,39 +1832,59 @@ async function syncWorkOrder(orderId) {
 
       let numeroGenerado = null;
 
-      // Pre-chequear en la tabla de Taxes por si YA EXISTE una O.T. reciente para este Interno
-      console.log(`[Alta O.T.] Inspeccionando tabla por si ya existe O.T. previa para el interno ${order.interno} (${order.clasificacion})...`);
-      
-      const existingTaxesOt = await safeEvaluate(page, (targetInterno, targetClasif) => {
-        const clean = s => (s || '').toString().trim().toUpperCase();
-        const todayStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        
-        const tables = Array.from(document.querySelectorAll('table'));
-        for (const table of tables) {
-          const rows = Array.from(table.querySelectorAll('tbody tr'));
-          for (const row of rows) {
-            const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
-            if (cells.length >= 3) {
-              const otCell = cells.find(c => /^\d{4,6}$/.test(c.replace(/^#/, '')));
-              const otNum = otCell ? otCell.replace(/^#/, '').trim() : '';
-              
-              const intMatch = cells.some(c => c.includes(clean(targetInterno)));
-              const dateMatch = cells.some(c => c.includes(clean(todayStr)));
+      // 1. Chequear si la orden actual en la BD local YA tiene su N° de O.T. asignado
+      const dbData = db.read();
+      const existingInDb = (dbData.workOrders || []).find(o => 
+        String(o.id) === String(orderId) && 
+        o.taxesOrderNumber && String(o.taxesOrderNumber).trim() !== ''
+      );
 
-              if (intMatch && dateMatch && otNum) {
-                return otNum;
+      if (existingInDb && existingInDb.taxesOrderNumber) {
+        console.log(`[Alta O.T.] La orden actual (${orderId}) ya cuenta con O.T. #${existingInDb.taxesOrderNumber} asignada en BD. Reutilizando...`);
+        numeroGenerado = existingInDb.taxesOrderNumber;
+        order.taxesOrderNumber = existingInDb.taxesOrderNumber;
+      } else {
+        // 2. Si es una orden nueva sin O.T., chequear si en Taxes hay una O.T. ABIERTA / EN PROCESO (NO cerrada/operativa) para esta misma orden en curso
+        console.log(`[Alta O.T.] Inspeccionando tabla por si existe una O.T. ABIERTA en proceso para el interno ${order.interno} (${order.clasificacion})...`);
+        
+        const existingOpenTaxesOt = await safeEvaluate(page, (targetInterno, targetClasif) => {
+          const clean = s => (s || '').toString().trim().toUpperCase();
+          const todayStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          
+          const tables = Array.from(document.querySelectorAll('table'));
+          for (const table of tables) {
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
+            for (const row of rows) {
+              const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
+              if (cells.length >= 3) {
+                const otCell = cells.find(c => /^\d{4,6}$/.test(c.replace(/^#/, '')));
+                const otNum = otCell ? otCell.replace(/^#/, '').trim() : '';
+                
+                const intMatch = cells.some(c => c.includes(clean(targetInterno)));
+                const dateMatch = cells.some(c => c.includes(clean(todayStr)));
+
+                // Verificar si la fila en Taxes NO está cerrada ni finalizada
+                const isClosedOrOperativo = cells.some(c => 
+                  c.includes('CERRAD') || c.includes('FINALIZAD') || c.includes('OPERATIV') || c.includes('COMPLETAD')
+                );
+
+                if (intMatch && dateMatch && otNum && !isClosedOrOperativo) {
+                  return otNum;
+                }
               }
             }
           }
-        }
-        return null;
-      }, order.interno, order.clasificacion);
+          return null;
+        }, order.interno, order.clasificacion);
 
-      if (existingTaxesOt) {
-        console.log(`[Alta O.T.] ¡O.T. #${existingTaxesOt} ya existente detectada en la tabla para Interno ${order.interno}! Vinculando sin duplicar.`);
-        numeroGenerado = existingTaxesOt;
-        db.updateWorkOrder(orderId, { taxesOrderNumber: existingTaxesOt, syncStatus: 'success', syncError: null });
-        order.taxesOrderNumber = existingTaxesOt;
+        if (existingOpenTaxesOt) {
+          console.log(`[Alta O.T.] O.T. abierta en proceso #${existingOpenTaxesOt} detectada para Interno ${order.interno}. Vinculando sin crear nueva...`);
+          numeroGenerado = existingOpenTaxesOt;
+          db.updateWorkOrder(orderId, { taxesOrderNumber: existingOpenTaxesOt, syncStatus: 'success', syncError: null });
+          order.taxesOrderNumber = existingOpenTaxesOt;
+        } else {
+          console.log(`[Alta O.T.] No se detectó O.T. abierta en proceso para Interno ${order.interno}. Se procederá a crear una NUEVA O.T. en Taxes.`);
+        }
       }
 
       if (!numeroGenerado) {
