@@ -1781,177 +1781,162 @@ async function syncWorkOrder(orderId) {
           await delay(1500);
         }
 
-        console.log(`[Puppeteer] Buscando en Taxes por el número de Interno: ${order.interno}`);
+        try {
+          console.log(`[Alta O.T.] Rellenando formulario básico para Interno: ${order.interno}`);
 
-        // 1. Selector del input dinámico de "Rodado"
-        const inputRodadoSelector = 'input[placeholder*="Buscar"], .searchable-input, .form-group input';
-        await page.waitForSelector(inputRodadoSelector, { visible: true }).catch(() => {});
+          // ==========================================
+          // 1. PASO 1: SELECCIONAR RODADO (POR INTERNO)
+          // ==========================================
+          const selectorInputRodado = 'input[placeholder*="Seleccionar"], .searchable-input, .form-group input';
+          await page.waitForSelector(selectorInputRodado, { visible: true, timeout: 10000 }).catch(() => {});
+          
+          const rodadoInputId = await safeEvaluate(page, (sel) => {
+            const inputs = Array.from(document.querySelectorAll(sel));
+            const visibleInput = inputs.find(i => i.offsetParent !== null) || inputs[0];
+            if (!visibleInput) return null;
+            if (!visibleInput.id) visibleInput.id = 'tmp-rodado-input-' + Date.now();
+            visibleInput.value = '';
+            visibleInput.dispatchEvent(new Event('input', { bubbles: true }));
+            return visibleInput.id;
+          }, selectorInputRodado);
 
-        // 2. Hacer clic, limpiar e ingresar el número de interno de forma pausada
-        const rodadoInputId = await safeEvaluate(page, (sel) => {
-          const inputs = Array.from(document.querySelectorAll(sel));
-          const visibleInput = inputs.find(i => i.offsetParent !== null) || inputs[0];
-          if (!visibleInput) return null;
-          if (!visibleInput.id) visibleInput.id = 'tmp-rodado-input-' + Date.now();
-          visibleInput.value = '';
-          visibleInput.dispatchEvent(new Event('input', { bubbles: true }));
-          return visibleInput.id;
-        }, inputRodadoSelector);
-
-        if (rodadoInputId) {
-          await page.click(`#${rodadoInputId}`).catch(() => {});
-          await page.type(`#${rodadoInputId}`, order.interno.toString(), { delay: 150 });
-        } else {
-          let rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado);
-          if (!rodadoFilled && order.interno) {
-            rodadoFilled = await fillSearchableSelect(page, 'Rodado', String(order.interno).trim());
+          if (rodadoInputId) {
+            await page.click(`#${rodadoInputId}`).catch(() => {});
+            await page.type(`#${rodadoInputId}`, order.interno.toString(), { delay: 150 });
+          } else {
+            await page.type(selectorInputRodado, order.interno.toString(), { delay: 150 }).catch(() => {});
           }
-        }
-
-        // 3. Esperar a que el buscador dinámico de Taxes muestre las opciones en pantalla
-        await delay(1500); 
-
-        // 4. SELECCIÓN INTELIGENTE ASINCRÓNICA:
-        const seleccionExitosa = await safeEvaluate(page, (numInterno) => {
-          const elementosLista = Array.from(document.querySelectorAll('li, div, span, [class*="option"], [class*="item"]'));
-          const opcionCorrecta = elementosLista.find(el => {
-            const texto = el.textContent.trim().toLowerCase();
-            return texto.includes(`interno ${numInterno}`) || texto.endsWith(` ${numInterno}`) || texto.startsWith(`${numInterno} -`);
-          });
-
-          if (opcionCorrecta) {
-            opcionCorrecta.click();
-            return true;
-          }
-          return false;
-        }, order.interno);
-
-        // 5. SALVAVIDAS POR TECLADO
-        if (!seleccionExitosa) {
-          console.log(`[Puppeteer] No se pudo hacer clic directo. Ejecutando salvavidas por emulación de teclado (ArrowDown + Enter).`);
+          await delay(1500); // Esperamos a que Taxes busque en su servidor
+          
+          // Forzamos la selección de la primera sugerencia con el teclado físico
           await page.keyboard.press('ArrowDown');
           await delay(200);
           await page.keyboard.press('Enter');
-        }
+          await delay(1000);
 
-        // 6. VERIFICACIÓN DE SEGURIDAD
-        await delay(1000);
-        console.log(`[Puppeteer] Vehículo asociado con éxito. Procediendo a guardar la cabecera vacía...`);
-
-        // 1. COMPLETAR OBLIGATORIAMENTE LOS CAMPOS COMPLEMENTARIOS DE LA CABECERA
-        console.log("[Puppeteer] Rellenando campos obligatorios de validación...");
-
-        let targetResponsable = order.responsable || 'Belocures';
-        let respFilled = await fillSearchableSelect(page, 'Responsable', targetResponsable);
-        if (!respFilled) {
-          respFilled = await fillSearchableSelect(page, 'Responsable', 'Belocures');
-        }
-
-        // Clasificación
-        const selectClasificacion = 'select[class*="clasificacion"], select[name*="clasificacion"], select';
-        await page.waitForSelector(selectClasificacion, { visible: true }).catch(() => {});
-        if (order.clasificacion) {
-          await safeEvaluate(page, (targetClasif) => {
-            const selects = Array.from(document.querySelectorAll('select'));
-            const clasSelect = selects.find(s => {
-              const name = (s.name || s.id || s.className || '').toLowerCase();
-              return name.includes('clasific') || name.includes('tipo') || name.includes('categoria');
-            }) || selects[1] || selects[0];
-
-            if (clasSelect && targetClasif) {
-              const clean = s => String(s || '').trim().toUpperCase();
-              const opt = Array.from(clasSelect.options).find(o => clean(o.textContent).includes(clean(targetClasif)));
-              if (opt) {
-                clasSelect.value = opt.value;
-                clasSelect.dispatchEvent(new Event('change', { bubbles: true }));
-              }
-            }
-          }, order.clasificacion);
-        }
-        await delay(500);
-
-        // Campo de texto libre "Interno de la Unidad" (Si Taxes no lo autocompletó solo, lo forzamos)
-        const inputInternoUnidad = 'input[name*="interno"], input[class*="unidad"]'; 
-        const valorInternoActual = await safeEvaluate(page, (sel) => {
-          const el = document.querySelector(sel);
-          return el ? el.value : '';
-        }, inputInternoUnidad);
-
-        if (!valorInternoActual || valorInternoActual.trim() === "") {
-          console.log("[Puppeteer] Forzando escritura manual en Interno de la Unidad para asegurar validación.");
-          await page.click(inputInternoUnidad).catch(() => {});
-          await page.type(inputInternoUnidad, order.interno.toString()).catch(() => {});
-        }
-
-        // Set Fecha
-        await safeEvaluate(page, (dateVal) => {
-          const dateInput = document.querySelector('input[type="date"].taxes-datepicker');
-          if (dateInput) {
-            const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-            nativeSetter.call(dateInput, dateVal);
-            dateInput.dispatchEvent(new Event('input', { bubbles: true }));
-            dateInput.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-        }, order.fechaEntrega || new Date().toISOString().split('T')[0]);
-
-        // 2. DARLE TIEMPO A TAXES PARA HABILITAR EL BOTÓN DE GUARDAR
-        await delay(2000); 
-
-        // 3. ESTRATEGIA DE GUARDADO BLINDADA (Simula scroll, foco y clic físico)
-        const botonGuardarSelector = 'button[class*="success"], .btn-guardar, button';
-        console.log("[Puppeteer] Ejecutando guardado mediante clic forzado del DOM...");
-
-        await safeEvaluate(page, (selector) => {
-          const botones = Array.from(document.querySelectorAll(selector));
-          const botonGuardar = botones.find(b => b.textContent.toLowerCase().includes('guardar'));
+          // ==========================================
+          // 2. PASO 2: SELECCIONAR RESPONSABLE
+          // ==========================================
+          console.log(`[Alta O.T.] Buscando Responsable: ${order.responsable || "Asignando por defecto"}`);
           
-          if (botonGuardar) {
-            botonGuardar.scrollIntoView();
-            botonGuardar.focus();
-            botonGuardar.click();
+          const inputsSeleccionar = await page.$$('input[placeholder*="Seleccionar"]');
+          if (inputsSeleccionar.length >= 2) {
+            const inputResponsable = inputsSeleccionar[1];
+            await inputResponsable.click().catch(() => {});
+            
+            const nombreResponsable = order.responsable || "GOMEZ MARCELO JAVIER"; 
+            await inputResponsable.type(nombreResponsable, { delay: 100 }).catch(() => {});
+            await delay(1500);
+            
+            await page.keyboard.press('ArrowDown');
+            await delay(200);
+            await page.keyboard.press('Enter');
+            await delay(1000);
           } else {
-            throw new Error("No se encontró el botón de Guardar en la pantalla de Taxes.");
+            let targetResponsable = order.responsable || 'Belocures';
+            await fillSearchableSelect(page, 'Responsable', targetResponsable);
           }
-        }, botonGuardarSelector);
 
-        // 4. ESPERAR RESPUESTA DEL SERVIDOR DE TAXES
-        console.log("[Puppeteer] Esperando navegación o confirmación de Taxes...");
-        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {
-          console.log("[Puppeteer] La página no navegó, verificando si se abrió un modal de confirmación o error.");
-        });
+          // ==========================================
+          // 3. PASO 3: SELECCIONAR CLASIFICACIÓN
+          // ==========================================
+          const selectClasificacionSelector = 'select[class*="clasificacion"], select[name*="clasificacion"], select';
+          await page.waitForSelector(selectClasificacionSelector, { visible: true }).catch(() => {});
+          if (order.clasificacion) {
+            await safeEvaluate(page, (sel, targetClasif) => {
+              const selects = Array.from(document.querySelectorAll(sel));
+              const clasSelect = selects.find(s => {
+                const name = (s.name || s.id || s.className || '').toLowerCase();
+                return name.includes('clasific') || name.includes('tipo') || name.includes('categoria');
+              }) || selects[1] || selects[0];
 
-        // 5. CAPTURA DEL NÚMERO DE O.T. GENERADO (Por URL o por DOM)
-        await delay(2000);
-        const urlActual = page.url();
-        const coincidenciaUrl = urlActual.match(/\d+$/);
-        numeroGenerado = coincidenciaUrl ? coincidenciaUrl[0] : null;
-
-        if (!numeroGenerado) {
-          numeroGenerado = await safeEvaluate(page, (targetInterno) => {
-            const elementos = Array.from(document.querySelectorAll('h1, h2, h3, .badge, span, td'));
-            for (const el of elementos) {
-              const txt = el.textContent.trim();
-              if ((txt.toLowerCase().includes('orden') || txt.toLowerCase().includes('o.t')) && txt.match(/\d+/)) {
-                return txt.match(/\d+/)[0];
+              if (clasSelect && targetClasif) {
+                const clean = s => String(s || '').trim().toUpperCase();
+                const opt = Array.from(clasSelect.options).find(o => clean(o.textContent).includes(clean(targetClasif)));
+                if (opt) {
+                  clasSelect.value = opt.value;
+                  clasSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
               }
+            }, selectClasificacionSelector, order.clasificacion);
+          }
+          await delay(500);
+
+          // Set Fecha
+          await safeEvaluate(page, (dateVal) => {
+            const dateInput = document.querySelector('input[type="date"].taxes-datepicker');
+            if (dateInput) {
+              const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+              nativeSetter.call(dateInput, dateVal);
+              dateInput.dispatchEvent(new Event('input', { bubbles: true }));
+              dateInput.dispatchEvent(new Event('change', { bubbles: true }));
             }
-            const clean = s => (s || '').toString().trim();
-            const tables = Array.from(document.querySelectorAll('table'));
-            for (const table of tables) {
-              const rows = Array.from(table.querySelectorAll('tbody tr'));
-              for (const row of rows) {
-                const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
-                if (cells.length >= 3) {
-                  const rowInterno = cells[1] || cells[0] || '';
-                  const rowOt = cells[2] || cells[1] || '';
-                  if (rowInterno.toUpperCase().includes(String(targetInterno).toUpperCase()) && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
-                    return rowOt.replace(/\D/g, '');
+          }, order.fechaEntrega || new Date().toISOString().split('T')[0]);
+
+          // ==========================================
+          // 4. PASO 4: CLIC EN EL BOTÓN VERDE "GUARDAR"
+          // ==========================================
+          console.log("[Puppeteer] Buscando el botón superior verde de Guardar...");
+          
+          const guardadoExitoso = await safeEvaluate(page, () => {
+            const botones = Array.from(document.querySelectorAll('button, div, span, a'));
+            const btnGuardarVerde = botones.find(b => b.textContent.toLowerCase().includes('guardar'));
+            
+            if (btnGuardarVerde) {
+              btnGuardarVerde.scrollIntoView();
+              btnGuardarVerde.focus();
+              btnGuardarVerde.click();
+              return true;
+            }
+            return false;
+          });
+
+          if (!guardadoExitoso) {
+            throw new Error("No se pudo interactuar con el botón superior derecho de Guardar.");
+          }
+
+          // 5. ESPERAR IMPACTO Y REDIRECCIÓN
+          console.log("[Puppeteer] Botón Guardar presionado con éxito. Esperando número de O.T...");
+          await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
+
+          // Capturar número de O.T.
+          await delay(2000);
+          const urlActual = page.url();
+          const coincidenciaUrl = urlActual.match(/\d+$/);
+          numeroGenerado = coincidenciaUrl ? coincidenciaUrl[0] : null;
+
+          if (!numeroGenerado) {
+            numeroGenerado = await safeEvaluate(page, (targetInterno) => {
+              const elementos = Array.from(document.querySelectorAll('h1, h2, h3, .badge, span, td'));
+              for (const el of elementos) {
+                const txt = el.textContent.trim();
+                if ((txt.toLowerCase().includes('orden') || txt.toLowerCase().includes('o.t')) && txt.match(/\d+/)) {
+                  return txt.match(/\d+/)[0];
+                }
+              }
+              const clean = s => (s || '').toString().trim();
+              const tables = Array.from(document.querySelectorAll('table'));
+              for (const table of tables) {
+                const rows = Array.from(table.querySelectorAll('tbody tr'));
+                for (const row of rows) {
+                  const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
+                  if (cells.length >= 3) {
+                    const rowInterno = cells[1] || cells[0] || '';
+                    const rowOt = cells[2] || cells[1] || '';
+                    if (rowInterno.toUpperCase().includes(String(targetInterno).toUpperCase()) && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
+                      return rowOt.replace(/\D/g, '');
+                    }
                   }
                 }
               }
-            }
-            return null;
-          }, order.interno);
+              return null;
+            }, order.interno);
+          }
+
+        } catch (error) {
+          await page.screenshot({ path: 'public/error_formulario_campos.png' }).catch(() => {});
+          console.error(`[Error en proceso de campos]: ${error.message}`);
+          throw error;
         }
       }
 
