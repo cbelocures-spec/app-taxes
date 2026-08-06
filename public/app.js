@@ -7228,15 +7228,51 @@ let currentUserPermissions = {
 
 async function loadUserPermissionsUI() {
   const currentUser = localStorage.getItem('currentUserUsername');
-  const sector = getSectorByUsername(currentUser);
+  const userSector = getSectorByUsername(currentUser);
   
   // Show all navigation tabs by default
   document.querySelectorAll('.nav-item').forEach(el => el.style.display = 'flex');
   const navHistorial = document.getElementById('nav-historial');
   if (navHistorial) navHistorial.style.display = 'flex';
 
-  const sectorTabs = document.getElementById('sector-tabs-bar');
-  if (sectorTabs) sectorTabs.style.display = 'flex';
+  const sectorTabsBar = document.getElementById('sector-tabs-bar');
+  if (sectorTabsBar) sectorTabsBar.style.display = 'flex';
+
+  const tabs = document.querySelectorAll('.sector-tab');
+  tabs.forEach(tab => {
+    const text = String(tab.textContent || '').trim().toLowerCase();
+    if (userSector === 'Admin') {
+      // Admin ve todas las pestañas de sectores
+      tab.style.display = 'inline-block';
+    } else if (userSector === 'Herrería') {
+      // Usuario de Herrería (ej: jcarmona) ve ÚNICAMENTE Herrería
+      if (text.includes('herrer')) {
+        tab.style.display = 'inline-block';
+      } else {
+        tab.style.display = 'none';
+      }
+    } else if (userSector === 'Edilicio') {
+      // Usuario de Edilicio ve ÚNICAMENTE Edilicio
+      if (text.includes('edilic')) {
+        tab.style.display = 'inline-block';
+      } else {
+        tab.style.display = 'none';
+      }
+    } else {
+      // Usuario de Taller ve ÚNICAMENTE Taller
+      if (text.includes('taller')) {
+        tab.style.display = 'inline-block';
+      } else {
+        tab.style.display = 'none';
+      }
+    }
+  });
+
+  if (userSector === 'Herrería' || userSector === 'Edilicio') {
+    switchSector(userSector);
+  } else if (userSector === 'Taller') {
+    switchSector('Taller');
+  }
 }
 
 let currentBackupData = [];
