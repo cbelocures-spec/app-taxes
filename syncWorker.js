@@ -1898,6 +1898,20 @@ async function syncWorkOrder(orderId) {
             }
           }, order.fechaEntrega || new Date().toISOString().split('T')[0]);
 
+          // Completar "Interno de la Unidad" (campo obligatorio real name="titulo").
+          // Este campo nunca se completaba: Taxes bloqueaba el guardado en silencio por
+          // validación propia, el botón Guardar no navegaba a ningún lado y por eso el
+          // paso de "capturar número de O.T." fallaba siempre después de Rodado/Responsable.
+          await safeEvaluate(page, (interno) => {
+            const input = document.querySelector('input[name="titulo"]');
+            if (input) {
+              const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+              nativeSetter.call(input, String(interno));
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }, order.interno);
+          await delay(500);
 
           // ==========================================
           // 4. HACER CLIC EN EL BOTÓN VERDE "GUARDAR"
