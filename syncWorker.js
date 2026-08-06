@@ -1794,19 +1794,18 @@ async function syncWorkOrder(orderId) {
         }
 
         try {
-          console.log(`[Alta O.T.] Rellenando formulario por nodos de texto para Interno: ${order.interno}`);
-
-          // ANTES DE BUSCAR LA PALABRA 'RODADO', ESPERAMOS QUE APAREZCA EL FORMULARIO REAL Y LOS INPUTS
-          console.log("[Puppeteer] Esperando que los campos del formulario aparezcan en Taxes...");
-          await page.waitForSelector('input, select, .form-group', { visible: true, timeout: 20000 }).catch(() => {});
-          await delay(3000); // 3 segundos extra de cortesía para scripts lentos de Taxes
-
           // =====================================================================
-          // PARCHE DE FIJACIÓN TEMPORAL DE SUGERENCIAS (BLINDADO)
+          // PARCHE DE ALTA: LLENADO POR SELECTORES CONTROLADOS (MODAL NUEVO)
           // =====================================================================
-          const inputRodado = 'input[type="text"], input[placeholder*="Seleccionar"], .form-group input'; 
-          await page.waitForSelector(inputRodado, { visible: true, timeout: 10000 });
+          console.log("[Puppeteer] Formulario abierto. Esperando que los campos del modal sean visibles...");
 
+          // 1. ESPERAR EL INPUT DE RODADO (Aseguramos que el modal terminó de abrirse)
+          const inputRodadoReal = 'form input[type="text"], .modal-body input, .form-group input, input[type="text"]'; 
+          await page.waitForSelector(inputRodadoReal, { visible: true, timeout: 15000 });
+          await delay(1000); // 1 segundo de cortesía para que se habiliten los scripts de la web
+
+          // 2. HACER CLIC Y TIPEAR EL INTERNO DE FORMA HUMANA
+          console.log(`[Puppeteer] Tipeando interno: ${order.interno}`);
           const rodadoInputId = await safeEvaluate(page, (sel) => {
             const inputs = Array.from(document.querySelectorAll(sel));
             const visibleInput = inputs.find(i => i.offsetParent !== null) || inputs[0];
@@ -1815,79 +1814,64 @@ async function syncWorkOrder(orderId) {
             visibleInput.value = '';
             visibleInput.dispatchEvent(new Event('input', { bubbles: true }));
             return visibleInput.id;
-          }, inputRodado);
+          }, inputRodadoReal);
 
           if (rodadoInputId) {
             await page.click(`#${rodadoInputId}`).catch(() => {});
             await page.type(`#${rodadoInputId}`, order.interno.toString(), { delay: 150 });
           } else {
-            await page.click(inputRodado).catch(() => {});
-            await page.type(inputRodado, order.interno.toString(), { delay: 150 });
+            await page.click(inputRodadoReal).catch(() => {});
+            await page.type(inputRodadoReal, order.interno.toString(), { delay: 150 });
           }
 
-          // 1. ESPERA DE CORTESÍA OBLIGATORIA (Clave para que Taxes procese la sugerencia)
-          console.log("[Puppeteer] Esperando que Taxes pinte las opciones en el stream...");
-          await delay(2000); 
-
-          // 2. DISPARO DEL TECLADO CON TIEMPO DE RESPUESTA HUMANO
-          console.log("[Puppeteer] Seleccionando la opción del menú flotante...");
+          // 3. ESPERA DE RENDERIZADO Y FIJACIÓN POR TECLADO
+          await delay(2000); // Esperamos a que aparezca la lista flotante en el stream
           await page.keyboard.press('ArrowDown');
-          await delay(500); // Pausa de medio segundo para que se pinte el foco azul en Taxes
+          await delay(400);
           await page.keyboard.press('Enter');
-
-          // 3. VERIFICACIÓN CRÍTICA EN EL DOM DE TAXES
-          await delay(1500); 
-          console.log("[Puppeteer] Validando si el campo inferior se autocompletó...");
+          await delay(1000);
           await page.screenshot({ path: 'public/paso1_rodado.png' }).catch(() => {});
 
-          // ==========================================
-          // 2. COMPLETAR EL CAMPO: RESPONSABLE (PARCHE DEFINITIVO)
-          // ==========================================
-          await safeEvaluate(page, async () => {
-            const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
-            const etiquetaResponsable = etiquetas.find(el => el.textContent.trim().startsWith('Responsable'));
-            
-            if (!etiquetaResponsable) throw new Error("No se encontró la etiqueta 'Responsable' en Taxes.");
-            
-            const contenedor = etiquetaResponsable.closest('.form-group') || etiquetaResponsable.parentElement;
-            const elementoInteractivo = contenedor.querySelector('input, [role="combobox"], [class*="control"], div[class*="select"]');
-            
-            if (elementoInteractivo) {
-              elementoInteractivo.scrollIntoView();
-              elementoInteractivo.focus();
-              const evt = document.createEvent("MouseEvents");
-              evt.initMouseEvent("mousedown", true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
-              elementoInteractivo.dispatchEvent(evt);
-            } else {
-              throw new Error("No se encontró el elemento interactivo para el Responsable.");
-            }
-          });
-
-          // Esperamos que se abra el menú flotante en el navegador visible
-          await delay(1000);
-
-          // Tipeamos de forma global el nombre del responsable
-          const nombreResp = order.responsable || "GOMEZ MARCELO JAVIER";
-          await page.keyboard.type(nombreResp, { delay: 100 });
-          await delay(1500); 
-
-          const respSeleccionado = await safeEvaluate(page, (nombreTarget) => {
-            const clean = s => String(s || '').trim().toUpperCase();
-            const elementos = Array.from(document.querySelectorAll('li, div, span, [class*="option"], [class*="item"]'));
-            const opcion = elementos.find(el => el.offsetParent !== null && clean(el.textContent).includes(clean(nombreTarget)));
-            if (opcion) {
-              opcion.click();
-              return true;
-            }
-            return false;
-          }, nombreResp);
-
-          if (!respSeleccionado) {
+          // =====================================================================
+          // 4. PASO SIGUIENTE: RESPONSABLE Y CLASIFICACIÓN
+          // =====================================================================
+          console.log("[Puppeteer] Pasando al campo de Responsable...");
+          const inputsModal = await page.$$('form input[type="text"], .modal-body input, .form-group input');
+          if (inputsModal.length >= 2) {
+            const inputResponsableReal = inputsModal[1];
+            await inputResponsableReal.click().catch(() => {});
+            const nombreResp = order.responsable || "GOMEZ MARCELO JAVIER";
+            await inputResponsableReal.type(nombreResp, { delay: 100 }).catch(() => {});
+            await delay(2000);
             await page.keyboard.press('ArrowDown');
-            await delay(200);
-            await page.keyboard.press('Tab');
+            await delay(400);
+            await page.keyboard.press('Enter');
+            await delay(1000);
+          } else {
+            await safeEvaluate(page, async () => {
+              const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
+              const etiquetaResponsable = etiquetas.find(el => el.textContent.trim().startsWith('Responsable'));
+              if (etiquetaResponsable) {
+                const contenedor = etiquetaResponsable.closest('.form-group') || etiquetaResponsable.parentElement;
+                const elementoInteractivo = contenedor.querySelector('input, [role="combobox"], [class*="control"], div[class*="select"]');
+                if (elementoInteractivo) {
+                  elementoInteractivo.scrollIntoView();
+                  elementoInteractivo.focus();
+                  const evt = document.createEvent("MouseEvents");
+                  evt.initMouseEvent("mousedown", true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+                  elementoInteractivo.dispatchEvent(evt);
+                }
+              }
+            });
+            await delay(1000);
+            const nombreResp = order.responsable || "GOMEZ MARCELO JAVIER";
+            await page.keyboard.type(nombreResp, { delay: 100 });
+            await delay(2000);
+            await page.keyboard.press('ArrowDown');
+            await delay(400);
+            await page.keyboard.press('Enter');
+            await delay(1000);
           }
-          await delay(1000);
           await page.screenshot({ path: 'public/paso2_responsable.png' }).catch(() => {});
 
 
