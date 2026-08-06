@@ -1788,38 +1788,49 @@ async function syncWorkOrder(orderId) {
         });
 
         if (nuevoBtnId) {
+          console.log("[Alta O.T.] Presionando botón 'NUEVO' y esperando 4s a que el formulario cargue...");
           await page.click(`#${nuevoBtnId}`);
-          await delay(1500);
+          await delay(4000); // 4 segundos enteros para que Taxes inicialice el modal
         }
 
         try {
           console.log(`[Alta O.T.] Rellenando formulario por nodos de texto para Interno: ${order.interno}`);
 
-          // ANTES DE BUSCAR LA PALABRA 'RODADO', ESPERAMOS QUE APAREZCA EL FORMULARIO REAL
-          console.log("[Puppeteer] Esperando que el contenedor del formulario aparezca en Taxes...");
-          await page.waitForSelector('.form-group, fieldset, form', { visible: true, timeout: 15000 }).catch(() => {});
-          await delay(2000); // 2 segundos extra de cortesía para scripts lentos de Taxes
+          // ANTES DE BUSCAR LA PALABRA 'RODADO', ESPERAMOS QUE APAREZCA EL FORMULARIO REAL Y LOS INPUTS
+          console.log("[Puppeteer] Esperando que los campos del formulario aparezcan en Taxes...");
+          await page.waitForSelector('input, select, .form-group', { visible: true, timeout: 20000 }).catch(() => {});
+          await delay(3000); // 3 segundos extra de cortesía para scripts lentos de Taxes
 
           // ==========================================
-          // 1. COMPLETAR EL CAMPO: RODADO
+          // 1. COMPLETAR EL CAMPO: RODADO (CON RETRY DE CARGA)
           // ==========================================
-          await safeEvaluate(page, (numInterno) => {
-            const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
-            const etiquetaRodado = etiquetas.find(el => el.textContent.trim().startsWith('Rodado'));
-            
-            if (!etiquetaRodado) throw new Error("No se encontró la etiqueta 'Rodado' en Taxes.");
-            
-            const contenedor = etiquetaRodado.closest('.form-group') || etiquetaRodado.parentElement;
-            const input = contenedor.querySelector('input[type="text"]') || contenedor.querySelector('input');
-            
-            if (input) {
-              input.focus();
-              input.click();
-              document.execCommand('insertText', false, numInterno.toString());
-            } else {
-              throw new Error("No se encontró el cuadro de texto para ingresar el Rodado.");
-            }
-          }, order.interno);
+          let rodadoFound = false;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            rodadoFound = await safeEvaluate(page, (numInterno) => {
+              const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
+              const etiquetaRodado = etiquetas.find(el => el.textContent.trim().startsWith('Rodado'));
+              if (!etiquetaRodado) return false;
+              
+              const contenedor = etiquetaRodado.closest('.form-group') || etiquetaRodado.parentElement;
+              const input = contenedor ? (contenedor.querySelector('input[type="text"]') || contenedor.querySelector('input')) : null;
+              
+              if (input) {
+                input.focus();
+                input.click();
+                document.execCommand('insertText', false, numInterno.toString());
+                return true;
+              }
+              return false;
+            }, order.interno);
+
+            if (rodadoFound) break;
+            console.log(`[Alta O.T.] Intento ${attempt}/3: El campo Rodado no estuvo listo. Esperando 2s extra...`);
+            await delay(2000);
+          }
+
+          if (!rodadoFound) {
+            throw new Error("El campo 'Rodado' no estuvo disponible a tiempo en el formulario de Taxes.");
+          }
 
           // Esperamos a que Taxes cargue las opciones flotantes en pantalla
           await delay(1500); 
