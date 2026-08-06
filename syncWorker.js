@@ -1862,10 +1862,19 @@ async function syncWorkOrder(orderId) {
     }
 
     // ====== FASE 2: EL HISTORIAL (Añadir las tareas a la orden que ya existe) ======
-    // Al estar inmediatamente abajo, la orden nueva que acaba de recibir su número
-    // entra OBLIGATORIAMENTE en esta sección para cargar sus tareas usando el Lápiz.
+    // La inserción de tareas en Taxes SOLO debe ejecutarse cuando el estado de la orden
+    // en nuestra base de datos cambie a 'Operativo' o 'Finalizado'.
     if (order.taxesOrderNumber) {
-      console.log(`[Tareas O.T.] Entrando al historial de la O.T. #${order.taxesOrderNumber} para inyectar tareas vía Lápiz...`);
+      const isOperativo = order.estadoUnidad === 'operativo' || order.estadoUnidad === 'operativa';
+      const isFinished = (order.tasks || []).length > 0 && (order.tasks || []).every(t => t && (t.status === 'Finalizada' || t.status === 'Completada'));
+
+      if (!isOperativo && !isFinished) {
+        console.log(`[Tareas O.T.] La orden #${order.taxesOrderNumber} (Interno ${order.interno}) sigue en 'Fuera de Servicio / En Curso'. Cabecera guardada vacía en Taxes. Las tareas se inyectarán cuando cambie a Operativo o Finalizado.`);
+        db.updateWorkOrder(orderId, { syncStatus: "success", syncError: null });
+        return { success: true, message: `Cabecera O.T. #${order.taxesOrderNumber} creada vacía. Tareas reservadas hasta pasar a Operativo o Finalizado.` };
+      }
+
+      console.log(`[Tareas O.T.] Orden en estado Operativo/Finalizado. Entrando al historial de O.T. #${order.taxesOrderNumber} para inyectar tareas vía Lápiz...`);
       const otNumClean = String(order.taxesOrderNumber).replace(/^#/, '');
       console.log(`[Reconcile] OT ${otNumClean} exists. Opening edit form to reconcile...`);
 
