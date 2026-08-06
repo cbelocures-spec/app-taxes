@@ -200,9 +200,13 @@ async function launchBrowser() {
 
   console.log(`[Puppeteer] Launching browser executable: ${execPath || 'bundled default'}`);
 
-  const isHeadlessExplicitFalse = process.env.PUPPETEER_HEADLESS === 'false';
-  const isCloudEnv = !!process.env.RAILWAY_ENVIRONMENT;
-  const isHeadless = isHeadlessExplicitFalse ? false : (isCloudEnv ? 'new' : (process.env.PUPPETEER_HEADLESS === 'true' ? 'new' : false));
+  // En Linux (Railway Cloud / Docker), SIEMPRE usar headless: 'new' para prevenir crashes por falta de X11
+  let isHeadless = 'new';
+  if (process.platform === 'win32') {
+    isHeadless = process.env.PUPPETEER_HEADLESS === 'true' ? 'new' : false;
+  } else {
+    isHeadless = process.env.PUPPETEER_HEADLESS === 'false' ? false : 'new';
+  }
 
   const launchOptions = {
     executablePath: execPath || undefined,
