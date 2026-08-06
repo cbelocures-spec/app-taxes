@@ -1823,74 +1823,43 @@ async function syncWorkOrder(orderId) {
           await page.waitForSelector(inputRodadoReal, { visible: true, timeout: 20000 });
           await delay(1000); // 1 segundo de cortesía para que se habiliten los scripts de la web
 
-          // 2. HACER CLIC Y TIPEAR EL INTERNO DE FORMA HUMANA
-          console.log(`[Puppeteer] Tipeando interno: ${order.interno}`);
-          const rodadoInputId = await safeEvaluate(page, (sel) => {
-            const inputs = Array.from(document.querySelectorAll(sel));
-            const visibleInput = inputs.find(i => i.offsetParent !== null) || inputs[0];
-            if (!visibleInput) return null;
-            if (!visibleInput.id) visibleInput.id = 'tmp-rodado-input-' + Date.now();
-            visibleInput.value = '';
-            visibleInput.dispatchEvent(new Event('input', { bubbles: true }));
-            return visibleInput.id;
-          }, inputRodadoReal);
-
-          if (rodadoInputId) {
-            await page.click(`#${rodadoInputId}`).catch(() => {});
-            await page.type(`#${rodadoInputId}`, order.interno.toString(), { delay: 150 });
-          } else {
-            await page.click(inputRodadoReal).catch(() => {});
-            await page.type(inputRodadoReal, order.interno.toString(), { delay: 150 });
+          // 2. SELECCIONAR EL RODADO (reutiliza fillSearchableSelect, la misma función ya
+          // probada que usa la Fase 2 más abajo para inyectar tareas en órdenes existentes.
+          // Tipear solo el interno a secas -como hacía este bloque antes- puede no matchear
+          // nada en Taxes; fillSearchableSelect ya prueba patente, "Interno N" y nombre
+          // completo en secuencia antes de rendirse.)
+          console.log(`[Puppeteer] Seleccionando Rodado: ${order.rodado || order.interno}`);
+          let rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado || String(order.interno));
+          if (!rodadoFilled && order.interno) {
+            rodadoFilled = await fillSearchableSelect(page, 'Rodado', String(order.interno).trim());
           }
-
-          // 3. ESPERA DE RENDERIZADO Y FIJACIÓN POR TECLADO
-          await delay(2000); // Esperamos a que aparezca la lista flotante en el stream
-          await page.keyboard.press('ArrowDown');
-          await delay(400);
-          await page.keyboard.press('Enter');
-          await delay(1000);
+          if (!rodadoFilled) {
+            const catalogs = db.getCatalogs();
+            const firstRodado = (catalogs.rodados && catalogs.rodados.length > 0) ? (catalogs.rodados[0].label || catalogs.rodados[0].value) : "1";
+            rodadoFilled = await fillSearchableSelect(page, 'Rodado', firstRodado);
+          }
+          if (!rodadoFilled) throw new Error("No se pudo seleccionar el Rodado en el alta de O.T.");
           await page.screenshot({ path: 'public/paso1_rodado.png' }).catch(() => {});
 
           // =====================================================================
-          // 4. PASO SIGUIENTE: RESPONSABLE Y CLASIFICACIÓN
+          // 4. PASO SIGUIENTE: RESPONSABLE
           // =====================================================================
-          console.log("[Puppeteer] Pasando al campo de Responsable...");
-          const inputsModal = await page.$$('input.searchable-input');
-          if (inputsModal.length >= 2) {
-            const inputResponsableReal = inputsModal[1];
-            await inputResponsableReal.click().catch(() => {});
-            const nombreResp = order.responsable || "GOMEZ MARCELO JAVIER";
-            await inputResponsableReal.type(nombreResp, { delay: 100 }).catch(() => {});
-            await delay(2000);
-            await page.keyboard.press('ArrowDown');
-            await delay(400);
-            await page.keyboard.press('Enter');
-            await delay(1000);
-          } else {
-            await safeEvaluate(page, async () => {
-              const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
-              const etiquetaResponsable = etiquetas.find(el => el.textContent.trim().startsWith('Responsable'));
-              if (etiquetaResponsable) {
-                const contenedor = etiquetaResponsable.closest('.form-group') || etiquetaResponsable.parentElement;
-                const elementoInteractivo = contenedor.querySelector('input, [role="combobox"], [class*="control"], div[class*="select"]');
-                if (elementoInteractivo) {
-                  elementoInteractivo.scrollIntoView();
-                  elementoInteractivo.focus();
-                  const evt = document.createEvent("MouseEvents");
-                  evt.initMouseEvent("mousedown", true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
-                  elementoInteractivo.dispatchEvent(evt);
-                }
-              }
-            });
-            await delay(1000);
-            const nombreResp = order.responsable || "GOMEZ MARCELO JAVIER";
-            await page.keyboard.type(nombreResp, { delay: 100 });
-            await delay(2000);
-            await page.keyboard.press('ArrowDown');
-            await delay(400);
-            await page.keyboard.press('Enter');
-            await delay(1000);
+          // "AUTO" es un valor centinela (asignar al usuario logueado) y a veces queda
+          // guardado un email por error; ninguno de los dos es un nombre real que Taxes
+          // pueda encontrar, así que se resuelve a un nombre por defecto antes de buscar.
+          let targetResponsableAlta = order.responsable;
+          if (!targetResponsableAlta || targetResponsableAlta === 'AUTO' || targetResponsableAlta.includes('@')) {
+            targetResponsableAlta = "Belocures, Cesar Hernán";
           }
+          console.log(`[Puppeteer] Seleccionando Responsable: ${targetResponsableAlta}`);
+          let respFilledAlta = await fillSearchableSelect(page, 'Responsable', targetResponsableAlta);
+          if (!respFilledAlta) {
+            respFilledAlta = await fillSearchableSelect(page, 'Responsable', 'Belocures');
+          }
+          if (!respFilledAlta) {
+            respFilledAlta = await fillSearchableSelect(page, 'Responsable', 'Cesar');
+          }
+          if (!respFilledAlta) throw new Error("No se pudo seleccionar el Responsable en el alta de O.T.");
           await page.screenshot({ path: 'public/paso2_responsable.png' }).catch(() => {});
 
 
