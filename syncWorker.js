@@ -1836,37 +1836,39 @@ async function syncWorkOrder(orderId) {
         console.log("[Alta O.T.] Buscando y pulsando el botón verde '+ NUEVO'...");
         
         let modalListo = false;
-        for (let int = 1; int <= 8; int++) {
-          const btnId = await safeEvaluate(page, () => {
-            const btns = Array.from(document.querySelectorAll('button, a, .btn, div, span'));
-            const b = btns.find(x => {
-              const txt = (x.textContent || '').trim().toUpperCase();
-              const isGreen = x.classList.contains('btn-success') || (x.className && String(x.className).includes('success'));
-              return txt.includes('NUEVO') || isGreen;
+        for (let int = 1; int <= 10; int++) {
+          const btnInfo = await safeEvaluate(page, () => {
+            // Filtrar exclusivamente etiquetas button o enlaces de tipo botón (a.btn) para evitar contenedores genéricos
+            const candidates = Array.from(document.querySelectorAll('button, a.btn, a, input[type="button"]'));
+            const match = candidates.find(b => {
+              const txt = (b.textContent || b.value || '').trim().toUpperCase();
+              return txt === '+ NUEVO' || txt === 'NUEVO' || txt.includes('+ NUEVO') || (txt.includes('NUEVO') && !txt.includes('NOVEDAD') && !txt.includes('MODULO'));
             });
-            if (!b) return null;
-            const target = b.closest('button, a, .btn') || b;
+            if (!match) return null;
+            const target = match.closest('button, a') || match;
             const id = 'tmp-btn-nuevo-' + Date.now();
             target.setAttribute('id', id);
-            target.scrollIntoView();
-            target.focus();
+            target.scrollIntoView({ block: 'center' });
+            try { target.focus(); } catch(_) {}
             try { target.click(); } catch (_) {}
             ['mousedown', 'mouseup', 'click'].forEach(evtName => {
               try {
-                const evt = new MouseEvent(evtName, { bubbles: true, cancelable: true, view: window });
-                target.dispatchEvent(evt);
+                target.dispatchEvent(new MouseEvent(evtName, { bubbles: true, cancelable: true, view: window }));
               } catch (_) {}
             });
-            return id;
+            return { id, text: target.textContent.trim(), tag: target.tagName, className: target.className };
           });
 
-          if (btnId) {
-            await page.click(`#${btnId}`).catch(() => {});
+          if (btnInfo && btnInfo.id) {
+            console.log(`[Alta O.T.] Intento ${int}: Botón localizado '<${btnInfo.tag} class="${btnInfo.className}"> "${btnInfo.text}"'. Ejecutando clic nativo...`);
+            await page.click(`#${btnInfo.id}`).catch(() => {});
           } else {
-            await page.click('.btn-success, button.btn-success, a.btn-success, button:has-text("NUEVO")').catch(() => {});
+            console.log(`[Alta O.T.] Intento ${int}: Intentando clic por selector .btn-success...`);
+            await page.click('.btn-success, button.btn-success, a.btn-success').catch(() => {});
           }
 
-          await delay(800);
+          await delay(1000);
+
           modalListo = await safeEvaluate(page, () => {
             const hasRodadoInput = !!document.querySelector('input.searchable-input, input[name="titulo"]');
             const hasModalText = document.body.innerText.includes('Nueva Orden de Trabajo') || 
@@ -1881,11 +1883,14 @@ async function syncWorkOrder(orderId) {
           }
         }
 
-        console.log(`[Alta O.T.] Estado del formulario: ${modalListo ? 'Abierto' : 'Continuando a inspección de campos'}.`);
-        await delay(500);
+        if (!modalListo) {
+          console.warn("[Alta O.T.] El modal de Nueva Orden no se detectó tras 10 intentos. Reintentando clic directo en .btn-success...");
+          await page.click('.btn-success').catch(() => {});
+          await delay(1500);
+        }
 
         try {
-          console.log("[Puppeteer] Cargar datos en el formulario de Alta O.T...");
+          console.log("[Puppeteer] Formulario 'Nueva Orden de Trabajo' desplegado. Cargando datos...");
 
           // 1. ESPERAR EL INPUT DE RODADO (Aseguramos que el modal terminó de abrirse)
           const inputRodadoReal = 'input.searchable-input';
