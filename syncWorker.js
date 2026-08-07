@@ -2294,10 +2294,18 @@ async function syncWorkOrder(orderId) {
         }
         // Confirm the edit form actually loaded before trusting the click.
         console.log(`[Reconcile] Waiting for edit form to confirm navigation...`);
-        pencilClicked = await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 10000 }).then(() => true).catch(() => pencilClicked);
+        const isEditFormLoaded = await safeEvaluate(page, () => {
+          const hasTaskInputs = !!document.querySelector('input[name="horas_estimadas"], textarea, select[name*="centro_costo"], select[id*="centro_costo"]');
+          const hasModalHeader = document.body.innerText.includes('Editar Orden') || document.body.innerText.includes('Orden de Trabajo') || document.body.innerText.includes('Editar');
+          const hasAddBtn = Array.from(document.querySelectorAll('button, a, input')).some(b => {
+            const txt = (b.textContent || b.value || '').toLowerCase();
+            return txt.includes('agregar') || txt.includes('tarea');
+          });
+          return hasTaskInputs || hasModalHeader || hasAddBtn;
+        });
+        pencilClicked = isEditFormLoaded || pencilClicked;
         console.log(`[Reconcile] Edit form loaded: ${pencilClicked}`);
       }
-
 
       // If not found, maybe search didn't apply — try pressing Enter in the Numero field and retry
       if (!pencilClicked && numInputId) {
@@ -2308,7 +2316,9 @@ async function syncWorkOrder(orderId) {
         const retryBtnId = await findAndTagPencil();
         if (retryBtnId) {
           try { await page.click(`#${retryBtnId}`); } catch (e) { /* likely navigated away */ }
-          pencilClicked = await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 10000 }).then(() => true).catch(() => false);
+          pencilClicked = await safeEvaluate(page, () => {
+            return document.body.innerText.includes('Editar') || !!document.querySelector('textarea, select');
+          });
         }
       }
 
@@ -2319,45 +2329,34 @@ async function syncWorkOrder(orderId) {
           const screenshotPath = path.join(__dirname, 'public', 'last_ot_search_debug.png');
           await page.screenshot({ path: screenshotPath, fullPage: false });
           console.log(`[Reconcile] Debug screenshot saved to: ${screenshotPath}`);
-          // Also log current URL and page title
-          console.log(`[Reconcile] Current URL: ${page.url()}`);
-          // Log all visible inputs and their values
-          const inputsInfo = await safeEvaluate(page, () =>
-            Array.from(document.querySelectorAll('input')).filter(i => i.offsetParent).map(i => ({
-              id: i.id, name: i.name, type: i.type, value: i.value, placeholder: i.placeholder
-            }))
-          );
-          console.log(`[Reconcile] Visible inputs:`, JSON.stringify(inputsInfo));
-          // Log table rows
-          const rowsInfo = await safeEvaluate(page, () =>
-            Array.from(document.querySelectorAll('table tbody tr')).slice(0, 35).map(r =>
-              Array.from(r.querySelectorAll('td')).map(c => c.textContent.trim()).join(' | ')
-            )
-          );
-          console.log(`[Reconcile] Table rows (first 35):`, JSON.stringify(rowsInfo));
         } catch(se) { console.warn('[Reconcile] Screenshot failed:', se.message); }
         throw new Error(`No se pudo abrir el formulario de edición (Lápiz) para la O.T. #${otNumClean} en /tms/produccion/ot.`);
       }
 
-
-      // 3. Wait for OT edit form to load (task cards)
-      await page.waitForSelector('input[name="horas_estimadas"]', { timeout: 8000 }).catch(() => {});
-      await delay(8000);
+      // 3. Wait 1.5 seconds for OT edit form animation & scroll directly to task section
+      await delay(1500);
+      await safeEvaluate(page, () => {
+        const btns = Array.from(document.querySelectorAll('button, a.btn, a, input[type="button"]'));
+        const addBtn = btns.find(b => {
+          const txt = (b.textContent || b.value || '').trim().toLowerCase();
+          return txt.includes('agregar') || txt.includes('tarea') || txt === '+' || txt.includes('+ tarea');
+        });
+        if (addBtn) {
+          addBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+      await delay(500);
 
       // 4. Read ALL task cards currently in the form
-      //    Each card has: empleado input/text, horas input, descripcion textarea, realizada checkbox, red trash button
       const readFormCards = async () => {
         return await safeEvaluate(page, () => {
           const clean = s => (s || '').trim();
-          // Each task card is a container with horas_estimadas or horas_X input
-          const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
-          const descTextareas = Array.from(document.querySelectorAll('textarea[id^="descripcion_"], textarea[placeholder*="Describe las actividades"]'));
-          const switches = Array.from(document.querySelectorAll('.custom-control.custom-switch'));
-          // Red trash/delete buttons — one per card
+          const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"], input[name*="horas"]'));
+          const descTextareas = Array.from(document.querySelectorAll('textarea[id^="descripcion_"], textarea[name*="descripcion"], textarea'));
+          const switches = Array.from(document.querySelectorAll('.custom-control.custom-switch, [class*="switch"]'));
           const trashBtns = Array.from(document.querySelectorAll('button.btn-danger, a.btn-danger, [class*="danger"]'))
             .filter(b => b.querySelector('.fa-trash, .fa-times, .fa-remove') || b.textContent.trim() === '' || b.title?.toLowerCase().includes('elim'));
 
-          // Get employee from display text/value
           const getEmpText = (i) => {
             const wrappers = Array.from(document.querySelectorAll('.searchable-select-wrapper, .multiselect'));
             if (wrappers[i]) {
@@ -2367,15 +2366,21 @@ async function syncWorkOrder(orderId) {
             return '';
           };
 
-          return horasInputs.map((inp, i) => ({
-            index: i,
-            hours: clean(inp.value),
-            employee: getEmpText(i),
-            description: descTextareas[i] ? clean(descTextareas[i].value) : '',
-            realizada: switches[i] ? (switches[i].querySelector('input[type="checkbox"]')?.checked || false) : false,
-            hasTrashBtn: !!trashBtns[i],
-            _debug: { emp: getEmpText(i), hrs: inp.value }
-          }));
+          const count = Math.max(horasInputs.length, descTextareas.length);
+          const cards = [];
+          for (let i = 0; i < count; i++) {
+            const inp = horasInputs[i];
+            cards.push({
+              index: i,
+              hours: inp ? clean(inp.value) : '',
+              employee: getEmpText(i),
+              description: descTextareas[i] ? clean(descTextareas[i].value) : '',
+              realizada: switches[i] ? (switches[i].querySelector('input[type="checkbox"]')?.checked || false) : false,
+              hasTrashBtn: !!trashBtns[i],
+              _debug: { emp: getEmpText(i), hrs: inp ? inp.value : '' }
+            });
+          }
+          return cards;
         });
       };
 
