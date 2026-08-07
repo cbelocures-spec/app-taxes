@@ -2347,12 +2347,21 @@ async function syncWorkOrder(orderId) {
       });
       await delay(500);
 
-      // 4. Read ALL task cards currently in the form
+      // 4. Read ALL task cards currently in the form (EXCLUDING Incidente o Requisito section)
       const readFormCards = async () => {
         return await safeEvaluate(page, () => {
           const clean = s => (s || '').trim();
           const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"], input[name*="horas"]'));
-          const descTextareas = Array.from(document.querySelectorAll('textarea[id^="descripcion_"], textarea[name*="descripcion"], textarea'));
+          
+          // Excluir el textarea del campo superior 'Incidente o Requisito'
+          const allTextareas = Array.from(document.querySelectorAll('textarea'));
+          const descTextareas = allTextareas.filter(ta => {
+            const parent = ta.closest('.card, .form-group, .row, div');
+            const isIncidenteText = parent && parent.innerText && parent.innerText.toLowerCase().includes('incidente');
+            const isIncidenteAttr = (ta.name || ta.id || '').toLowerCase().includes('incidente');
+            return !isIncidenteText && !isIncidenteAttr;
+          });
+
           const switches = Array.from(document.querySelectorAll('.custom-control.custom-switch, [class*="switch"]'));
           const trashBtns = Array.from(document.querySelectorAll('button.btn-danger, a.btn-danger, [class*="danger"]'))
             .filter(b => b.querySelector('.fa-trash, .fa-times, .fa-remove') || b.textContent.trim() === '' || b.title?.toLowerCase().includes('elim'));
@@ -2686,8 +2695,14 @@ async function syncWorkOrder(orderId) {
         if (descMismatch) {
           console.log(`[Reconcile] Card #${ci} description update required (Taxes: "${cleanDescTaxes}" → Target: "${cleanDescTarget}"). Writing...`);
           const descId = await safeEvaluate(page, (idx) => {
-            const textareas = Array.from(document.querySelectorAll('textarea, textarea[name*="descripcion"], textarea[id*="descripcion"], textarea[placeholder*="Describe"], input[name*="descripcion"]'));
-            const el = textareas[idx] || textareas[0];
+            const allTextareas = Array.from(document.querySelectorAll('textarea, textarea[name*="descripcion"], textarea[id*="descripcion"], textarea[placeholder*="Describe"], input[name*="descripcion"]'));
+            const taskTextareas = allTextareas.filter(ta => {
+              const parent = ta.closest('.card, .form-group, .row, div');
+              const isIncidenteText = parent && parent.innerText && parent.innerText.toLowerCase().includes('incidente');
+              const isIncidenteAttr = (ta.name || ta.id || '').toLowerCase().includes('incidente');
+              return !isIncidenteText && !isIncidenteAttr;
+            });
+            const el = taskTextareas[idx];
             if (!el) return null;
             if (!el.id) el.id = `rc-desc-${idx}-${Date.now()}`;
             return el.id;
