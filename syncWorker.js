@@ -367,16 +367,6 @@ async function fillInputByLabel(page, labelText, value) {
 // Puppeteer helper to fill custom searchable selects
 async function fillSearchableSelect(page, labelText, searchValue) {
 
-    if (labelText.toLowerCase().includes('rodado')) {
-      if (searchValue.toUpperCase().includes('REPARACIONES INTERNAS') || searchValue.toUpperCase().includes('TALLER')) {
-        console.log(`[Rodado] Special internal shop job detected ("${searchValue}"). Falling back to Interno 1...`);
-        const catalogs = db.getCatalogs();
-        const firstRodado = (catalogs.rodados && catalogs.rodados.length > 0) ? catalogs.rodados[0] : null;
-        if (firstRodado) {
-          searchValue = firstRodado.label || firstRodado.value || "1";
-        }
-      }
-    }
 
   console.log(`Searching for searchable select for: "${labelText}" with target value: "${searchValue}"`);
   try {
@@ -1958,12 +1948,10 @@ async function syncWorkOrder(orderId) {
           if (!rodadoFilled && order.interno) {
             rodadoFilled = await fillSearchableSelect(page, 'Rodado', String(order.interno).trim());
           }
-          if (!rodadoFilled) {
-            const catalogs = db.getCatalogs();
-            const firstRodado = (catalogs.rodados && catalogs.rodados.length > 0) ? (catalogs.rodados[0].label || catalogs.rodados[0].value) : "1";
-            rodadoFilled = await fillSearchableSelect(page, 'Rodado', firstRodado);
+          if (!rodadoFilled && order.interno) {
+            rodadoFilled = await fillSearchableSelect(page, 'Rodado', `Interno ${String(order.interno).trim()}`);
           }
-          if (!rodadoFilled) throw new Error("No se pudo seleccionar el Rodado en el alta de O.T.");
+          if (!rodadoFilled) throw new Error(`No se pudo localizar y seleccionar el Rodado '${order.rodado || order.interno}' en el alta de O.T.`);
           await page.screenshot({ path: 'public/paso1_rodado.png' }).catch(() => {});
 
           // 3. CARGAR RESPONSABLE (si es Belocures Cesar, lo buscará al final con "Belocures," / "Belocures, ---")
@@ -2884,8 +2872,14 @@ async function syncWorkOrder(orderId) {
       const guardarBtnId = await safeEvaluate(page, () => {
         let btn = document.querySelector('.taxes-btn-save');
         if (!btn) {
-          const buttons = Array.from(document.querySelectorAll('button'));
-          btn = buttons.find(b => b.textContent.trim() === 'Guardar' || b.textContent.toLowerCase().includes('guardar'));
+          const allBtns = Array.from(document.querySelectorAll('button, a.btn, input[type="submit"]'));
+          const candidates = allBtns.filter(b => {
+            const parentHeader = b.closest('header, .navbar, .user-menu, .nav-item, .dropdown-user, [class*="user"], [class*="profile"]');
+            if (parentHeader) return false;
+            const txt = (b.textContent || b.value || '').trim().toLowerCase();
+            return txt === 'guardar' || txt.includes('guardar');
+          });
+          btn = candidates.find(b => b.className.includes('btn-success') || b.className.includes('success')) || candidates[0];
         }
         if (!btn) {
           btn = document.querySelector('button[type="submit"]');
