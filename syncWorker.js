@@ -2429,39 +2429,52 @@ async function syncWorkOrder(orderId) {
       console.log(`[Reconcile] Form cards:`, JSON.stringify(formCards));
 
       // Add missing task cards if app has more tasks than form
-      const diff = order.tasks.length - formCards.length;
-      if (diff > 0) {
-        console.log(`[Reconcile] Form has ${formCards.length} cards, but app has ${order.tasks.length}. Clicking (+) AGREGAR TAREA ${diff} times...`);
-        for (let i = 0; i < diff; i++) {
-          const addedId = await safeEvaluate(page, () => {
+      if (formCards.length < order.tasks.length) {
+        const toAdd = order.tasks.length - formCards.length;
+        console.log(`[Reconcile] Form has ${formCards.length} cards, but app has ${order.tasks.length}. Clicking (+) AGREGAR TAREA ${toAdd} times...`);
+        for (let i = 0; i < toAdd; i++) {
+          const btnId = await safeEvaluate(page, () => {
             const btns = Array.from(document.querySelectorAll('button, a.btn, a, [role="button"], input[type="button"]'));
-            const addBtn = btns.find(b => {
-              const txt = (b.textContent || b.value || '').trim().toUpperCase();
+            const b = btns.find(x => {
+              const txt = (x.textContent || x.value || '').trim().toUpperCase();
               if (txt.includes('GUARDAR') || txt.includes('CANCELAR') || txt.includes('VOLVER')) return false;
-              return txt.includes('AGREGAR TAREA') || txt.includes('AGREGAR') || txt.includes('TAREA') || txt.includes('+');
+              return txt.includes('AGREGAR TAREA') || txt.includes('AGREGAR') || (txt.includes('TAREA') && !txt.includes('REALIZAR'));
             });
-            if (addBtn) {
-              const id = 'tmp-add-task-' + Date.now();
-              addBtn.id = id;
-              addBtn.scrollIntoView({ block: 'center' });
-              try { addBtn.focus(); } catch(_) {}
-              try { addBtn.click(); } catch (_) {}
-              ['mousedown', 'mouseup', 'click'].forEach(evtName => {
-                try { addBtn.dispatchEvent(new MouseEvent(evtName, { bubbles: true, cancelable: true, view: window })); } catch (_) {}
-              });
-              return id;
-            }
-            return null;
+            if (!b) return null;
+            const id = 'tmp-btn-add-task-' + Date.now();
+            b.id = id;
+            b.scrollIntoView({ block: 'center' });
+            return id;
           });
-          if (addedId) {
-            await page.click(`#${addedId}`).catch(() => {});
+
+          if (btnId) {
+            console.log(`[Reconcile] Clicking (+) AGREGAR TAREA button #${btnId}...`);
+            await page.click(`#${btnId}`).catch(() => {});
+            for (let retry = 1; retry <= 10; retry++) {
+              await delay(500);
+              const cardsNow = await readFormCards();
+              if (cardsNow.length > formCards.length) {
+                console.log(`[Reconcile] New task card confirmed in DOM after ${retry * 500}ms!`);
+                break;
+              }
+            }
           }
-          console.log(`[Reconcile] Added task card ${i + 1}: ${!!addedId}`);
-          await delay(2500); // Wait for the new card to render in DOM
         }
-        // Re-read form cards after adding
         formCards = await readFormCards();
         console.log(`[Reconcile] After adding missing tasks: ${formCards.length} cards now in form`);
+      }
+
+      // FALLBACK DE SEGURIDAD ABSOLUTO: Si la app tiene tareas pero formCards sigue en 0, forzar la lista de tarjetas
+      if (formCards.length === 0 && order.tasks.length > 0) {
+        console.warn(`[Reconcile] Fallback de Seguridad: Forzando ${order.tasks.length} tarjetas virtuales para garantizar la inyección de tareas.`);
+        formCards = order.tasks.map((_, idx) => ({
+          index: idx,
+          hours: '',
+          employee: '',
+          description: '',
+          realizada: false,
+          hasTrashBtn: false
+        }));
       }
 
       // Match cards <-> tasks by employee+description (strict pass, then loose pass).
