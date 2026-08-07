@@ -3015,7 +3015,8 @@ async function syncWorkOrder(orderId) {
 
       console.log(`[Reconcile] Pausing 4 seconds for user visual check before clicking GUARDAR...`);
       await delay(4000);
-      const guardarBtnId = await safeEvaluate(page, () => {
+
+      const findGuardarBtn = () => safeEvaluate(page, () => {
         let btn = document.querySelector('.taxes-btn-save');
         if (!btn) {
           const allBtns = Array.from(document.querySelectorAll('button, a.btn, input[type="submit"]'));
@@ -3035,17 +3036,29 @@ async function syncWorkOrder(orderId) {
         btn.id = id;
         return id;
       });
+
+      // Reintentar la búsqueda del botón Guardar unas veces antes de rendirse: puede fallar
+      // por timing (aún renderizando tras tocar los campos de la tarjeta) en vez de no existir.
+      let guardarBtnId = null;
+      for (let attempt = 1; attempt <= 3 && !guardarBtnId; attempt++) {
+        guardarBtnId = await findGuardarBtn();
+        if (!guardarBtnId) await delay(1000);
+      }
+
       let clickedOk = false;
       if (guardarBtnId) {
-        try { 
-          await page.click(`#${guardarBtnId}`); 
-          clickedOk = true; 
-        } catch (e) { 
-          console.warn(`[Reconcile] Native click on GUARDAR raised: ${e.message} (likely navigated away, treating as success)`); 
-          clickedOk = true; 
+        try {
+          await page.click(`#${guardarBtnId}`);
+          clickedOk = true;
+        } catch (e) {
+          console.warn(`[Reconcile] Native click on GUARDAR raised: ${e.message} (likely navigated away, treating as success)`);
+          clickedOk = true;
         }
       }
       console.log(`[Reconcile] Guardar button clicked: ${clickedOk}`);
+      if (!clickedOk) {
+        throw new Error("No se encontró el botón GUARDAR en el formulario de edición de la O.T. tras 3 intentos.");
+      }
       
       // Wait for backend processing and redirects
       await delay(5000);
