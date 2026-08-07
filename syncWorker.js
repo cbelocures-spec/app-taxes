@@ -767,8 +767,8 @@ async function fillTaskEmployeeSearchableSelect(page, index, employeeName) {
       await delay(300);
 
       // Type the query
-      await page.keyboard.type(query, { delay: 50 });
-      await delay(2000); // Wait for dropdown to filter
+      await page.keyboard.type(query, { delay: 30 });
+      await delay(600); // Wait for dropdown to filter
 
       // Select option
       const optionClicked = await safeEvaluate(page, (targetVal) => {
@@ -2579,6 +2579,17 @@ async function syncWorkOrder(orderId) {
         const appTask = order.tasks[appIdx];
         if (!appTask) continue;
 
+        // Desplazamiento instantáneo (scroll into view) hacia la tarjeta de tarea en la página
+        await safeEvaluate(page, (idx) => {
+          const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'));
+          const el = horasInputs[idx];
+          if (el) {
+            let card = el.closest('.card, .form-row, .row, [class*="col-12"]') || el.parentElement;
+            if (card) card.scrollIntoView({ behavior: 'auto', block: 'center' });
+          }
+        }, ci);
+        await delay(300);
+
         // 1. Fill/Fix Centro de Costo if empty
         const ccCatalog = db.getCatalogs().centrosCosto || [];
         const ccObj = ccCatalog.find(c => c.value === appTask.centroCosto);
@@ -2616,7 +2627,7 @@ async function syncWorkOrder(orderId) {
             }
           }
         }, ci, ccLabel);
-        await delay(1000);
+        await delay(300);
 
         // 2. Fill/Fix Employee if empty, placeholder, or mismatch
         const { employeeLabel } = resolveAndMapEmployee(appTask);
@@ -2636,11 +2647,14 @@ async function syncWorkOrder(orderId) {
           console.log(`[Reconcile] Card #${ci} employee update required. Current: "${formCards[ci].employee}". Target: "${employeeLabel}"...`);
           const empFilled = await fillTaskEmployeeSearchableSelect(page, ci, employeeLabel);
           console.log(`[Reconcile] Card #${ci} employee select result: ${empFilled}`);
-          await delay(2000);
+          await delay(500);
         }
 
         // 3. Fill/Fix Description if empty or doesn't match finalDescription (including diagnostico and insumos)
-        const { finalDescription } = resolveAndMapEmployee(appTask);
+        let { finalDescription } = resolveAndMapEmployee(appTask);
+        if (employeeLabel && !finalDescription.toLowerCase().includes(employeeLabel.toLowerCase().trim())) {
+          finalDescription = `${employeeLabel} - ${finalDescription}`;
+        }
         const cleanDescTaxes = (formCards[ci].description || '').trim();
         const cleanDescTarget = (finalDescription || '').trim();
         const descMismatch = (cleanDescTaxes !== cleanDescTarget);
