@@ -2370,8 +2370,12 @@ async function syncWorkOrder(orderId) {
       const readFormCards = async () => {
         return await safeEvaluate(page, () => {
           const clean = s => (s || '').trim();
-          const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"], input[name*="horas"]'));
           
+          // Si el formulario dice explícitamente "No hay tareas asignadas", hay 0 tarjetas
+          if (document.body && document.body.innerText.includes('No hay tareas asignadas')) {
+            return [];
+          }
+
           // Excluir el textarea del campo superior 'Incidente o Requisito'
           const allTextareas = Array.from(document.querySelectorAll('textarea'));
           const descTextareas = allTextareas.filter(ta => {
@@ -2380,6 +2384,14 @@ async function syncWorkOrder(orderId) {
             const isIncidenteAttr = (ta.name || ta.id || '').toLowerCase().includes('incidente');
             return !isIncidenteText && !isIncidenteAttr;
           });
+
+          // Buscar inputs de horas EXCLUSIVAMENTE dentro de tarjetas o contenedores de tareas
+          const horasInputs = Array.from(document.querySelectorAll('input[id^="horas_"], input[name="horas_estimadas"]'))
+            .filter(inp => {
+              const parent = inp.closest('.card, .form-group, .row, div');
+              const isIncidenteText = parent && parent.innerText && parent.innerText.toLowerCase().includes('incidente');
+              return !isIncidenteText;
+            });
 
           const switches = Array.from(document.querySelectorAll('.custom-control.custom-switch, [class*="switch"]'));
           const trashBtns = Array.from(document.querySelectorAll('button.btn-danger, a.btn-danger, [class*="danger"]'))
@@ -2419,14 +2431,14 @@ async function syncWorkOrder(orderId) {
       // Add missing task cards if app has more tasks than form
       const diff = order.tasks.length - formCards.length;
       if (diff > 0) {
-        console.log(`[Reconcile] Form has ${formCards.length} cards, but app has ${order.tasks.length}. Clicking AGREGAR TAREA ${diff} times...`);
+        console.log(`[Reconcile] Form has ${formCards.length} cards, but app has ${order.tasks.length}. Clicking (+) AGREGAR TAREA ${diff} times...`);
         for (let i = 0; i < diff; i++) {
           const addedId = await safeEvaluate(page, () => {
             const btns = Array.from(document.querySelectorAll('button, a.btn, a, [role="button"], input[type="button"]'));
             const addBtn = btns.find(b => {
-              const txt = (b.textContent || b.value || '').trim().toLowerCase();
-              if (txt.includes('guardar') || txt.includes('cancelar') || txt.includes('volver')) return false;
-              return txt.includes('agregar') || txt.includes('tarea') || txt === '+' || txt.includes('+ tarea');
+              const txt = (b.textContent || b.value || '').trim().toUpperCase();
+              if (txt.includes('GUARDAR') || txt.includes('CANCELAR') || txt.includes('VOLVER')) return false;
+              return txt.includes('AGREGAR TAREA') || txt.includes('AGREGAR') || txt.includes('TAREA') || txt.includes('+');
             });
             if (addBtn) {
               const id = 'tmp-add-task-' + Date.now();
@@ -2445,7 +2457,7 @@ async function syncWorkOrder(orderId) {
             await page.click(`#${addedId}`).catch(() => {});
           }
           console.log(`[Reconcile] Added task card ${i + 1}: ${!!addedId}`);
-          await delay(2000); // Wait for the new card to render in DOM
+          await delay(2500); // Wait for the new card to render in DOM
         }
         // Re-read form cards after adding
         formCards = await readFormCards();
