@@ -2441,19 +2441,28 @@ async function syncWorkOrder(orderId) {
               .find(el => (el.textContent || '').toUpperCase().includes('TAREAS A REALIZAR'));
 
             const btns = Array.from(document.querySelectorAll('button, a.btn, a, [role="button"], input[type="button"]'));
-            const candidates = btns.filter(x => {
-              const txt = (x.textContent || x.value || '').trim().toUpperCase();
-              if (txt.includes('GUARDAR') || txt.includes('CANCELAR') || txt.includes('VOLVER')) return false;
-              return txt.includes('AGREGAR TAREA') || txt.includes('AGREGAR') || (txt.includes('TAREA') && !txt.includes('REALIZAR'));
-            });
-            const debugCandidates = candidates.map(c => ({ text: (c.textContent || c.value || '').trim(), belowHeader: tareasHeader ? (tareasHeader.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 : null }));
+            const isBelow = (el) => tareasHeader ? (tareasHeader.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 : true;
+            const excluded = (txt) => txt.includes('GUARDAR') || txt.includes('CANCELAR') || txt.includes('VOLVER');
 
-            // Preferir el boton que aparece DESPUES del encabezado 'TAREAS A REALIZAR' (mismo
-            // criterio ya probado para aislar los textareas de descripcion de las tareas):
-            // si hay otro boton "Agregar..." mas arriba en la pagina (ej. archivos, servicios),
-            // el .find() original lo agarraba primero por estar antes en el DOM.
-            let b = tareasHeader ? candidates.find(x => (tareasHeader.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0) : null;
-            if (!b) b = candidates[0];
+            // Confirmado con logs reales: un filtro laxo ("contiene TAREA y no REALIZAR")
+            // matcheaba OTROS elementos como "Tareas OT" o "Tareas" que tambien estan debajo
+            // del encabezado y aparecen ANTES del boton real en el DOM, asi que .find() los
+            // agarraba a ellos en vez del boton "AGREGAR TAREA" -> nunca se creaba la tarjeta,
+            // y el codigo seguia de largo escribiendo en el indice 0 igual (que termina siendo
+            // el campo de Incidente o Requisito). Por eso ahora se prioriza estrictamente el
+            // texto que empieza con "AGREGAR", y solo se usa el criterio laxo si no hay ninguno.
+            const strictCandidates = btns.filter(x => {
+              const txt = (x.textContent || x.value || '').trim().toUpperCase();
+              return !excluded(txt) && txt.startsWith('AGREGAR') && isBelow(x);
+            });
+            const looseCandidates = btns.filter(x => {
+              const txt = (x.textContent || x.value || '').trim().toUpperCase();
+              return !excluded(txt) && txt.includes('TAREA') && !txt.includes('REALIZAR') && isBelow(x);
+            });
+            const candidates = strictCandidates.length > 0 ? strictCandidates : looseCandidates;
+            const debugCandidates = { strict: strictCandidates.map(c => (c.textContent || c.value || '').trim()), loose: looseCandidates.map(c => (c.textContent || c.value || '').trim()) };
+
+            let b = candidates[0];
             if (!b) return { id: null, debugCandidates };
             const id = 'tmp-btn-add-task-' + Date.now();
             b.id = id;
@@ -2480,17 +2489,15 @@ async function syncWorkOrder(orderId) {
         console.log(`[Reconcile] After adding missing tasks: ${formCards.length} cards now in form`);
       }
 
-      // FALLBACK DE SEGURIDAD ABSOLUTO: Si la app tiene tareas pero formCards sigue en 0, forzar la lista de tarjetas
+      // Si después de intentar clickear (+) AGREGAR TAREA la tarjeta real sigue sin existir,
+      // NO seguir de largo. Esto reemplaza un "fallback de seguridad" anterior que fabricaba
+      // tarjetas virtuales en este caso: como esos índices virtuales no corresponden a ningún
+      // elemento real del DOM, el llenado posterior (Centro/Empleado/Descripción/Horas) caía
+      // en el primer selector que encontraba algo -el textarea de Incidente o Requisito de la
+      // cabecera- y ahí quedaba escrita la descripción de la tarea por error, silenciosamente
+      // reportado como éxito. Mejor fallar fuerte y reintentar en la próxima corrida.
       if (formCards.length === 0 && order.tasks.length > 0) {
-        console.warn(`[Reconcile] Fallback de Seguridad: Forzando ${order.tasks.length} tarjetas virtuales para garantizar la inyección de tareas.`);
-        formCards = order.tasks.map((_, idx) => ({
-          index: idx,
-          hours: '',
-          employee: '',
-          description: '',
-          realizada: false,
-          hasTrashBtn: false
-        }));
+        throw new Error("No se pudo crear la tarjeta de tarea real en Taxes (el botón AGREGAR TAREA no generó ninguna tarjeta en el DOM).");
       }
 
       // Match cards <-> tasks by employee+description (strict pass, then loose pass).
@@ -2614,18 +2621,22 @@ async function syncWorkOrder(orderId) {
           const addedId = await safeEvaluate(page, () => {
             const tareasHeader = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, .card-header, div, span'))
               .find(el => (el.textContent || '').toUpperCase().includes('TAREAS A REALIZAR'));
+            const isBelow = (el) => tareasHeader ? (tareasHeader.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 : true;
             const btns = Array.from(document.querySelectorAll('button, a.btn, a, [role="button"], input[type="button"]'));
-            const candidates = btns.filter(b => {
+            const excluded = (txt) => txt.includes('guardar') || txt.includes('cancelar') || txt.includes('volver') || txt.includes('tareas a realizar');
+            // Igual que en el otro punto del Reconcile: priorizar estrictamente texto que
+            // empieza con "agregar" — un filtro laxo ("contiene tarea") tambien matchea otros
+            // elementos como "Tareas OT"/"Tareas" que aparecen antes del boton real en el DOM.
+            const strictCandidates = btns.filter(b => {
               const txt = (b.textContent || b.value || '').trim().toLowerCase();
-              if (txt.includes('guardar') || txt.includes('cancelar') || txt.includes('volver')) return false;
-              if (txt.includes('tareas a realizar')) return false;
-              return txt.includes('agregar') || txt.includes('tarea') || txt === '+' || txt.includes('+ tarea');
+              return !excluded(txt) && txt.startsWith('agregar') && isBelow(b);
             });
-            // Mismo criterio que el resto del Reconcile: preferir el boton que aparece
-            // DESPUES del encabezado 'TAREAS A REALIZAR' para no agarrar un boton
-            // "Agregar..." de otra seccion de la pagina (ej. archivos) que este antes en el DOM.
-            let addBtn = tareasHeader ? candidates.find(b => (tareasHeader.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0) : null;
-            if (!addBtn) addBtn = candidates[0];
+            const looseCandidates = btns.filter(b => {
+              const txt = (b.textContent || b.value || '').trim().toLowerCase();
+              return !excluded(txt) && (txt.includes('tarea') || txt === '+' || txt.includes('+ tarea')) && isBelow(b);
+            });
+            const candidates = strictCandidates.length > 0 ? strictCandidates : looseCandidates;
+            let addBtn = candidates[0];
             if (addBtn) {
               const id = 'tmp-add-task-2-' + Date.now();
               addBtn.id = id;
