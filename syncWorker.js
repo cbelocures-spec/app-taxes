@@ -2057,54 +2057,46 @@ async function syncWorkOrder(orderId) {
             throw new Error("No se encontró el botón de Guardar en la pantalla de Taxes.");
           }
 
-          // 5. ESPERAR CONFIRMACIÓN TOAST DE TAXES Y CAPTURAR NÚMERO GENERADO
-          // En Vue SPA, el cartel Toast "Orden de Trabajo N 28395 Creada con Éxito" aparece inmediatamente (dura ~4s)
-          console.log("[Puppeteer] Escaneando cartel Toast de confirmación de Taxes...");
+          // 5. ESPERAR CONFIRMACIÓN TOAST DE TAXES Y CAPTURAR NÚMERO GENERADO REAL (#28448)
+          console.log(`[Puppeteer] Escaneando confirmación Toast y tabla de Taxes para Interno ${order.interno}...`);
           
-          for (let check = 1; check <= 10; check++) {
-            await delay(400);
+          for (let check = 1; check <= 12; check++) {
+            await delay(600);
             numeroGenerado = await safeEvaluate(page, (targetInterno) => {
-              const clean = s => (s || '').toString().trim();
+              const clean = s => (s || '').toString().trim().toUpperCase();
+              const cleanTargetInt = clean(targetInterno);
 
-              // A. Carteles Toast / Alertas verdes (ej: "Orden de Trabajo N 28395 Creada con Éxito")
-              const notificationEls = Array.from(document.querySelectorAll('.toast, .b-toast, .b-toaster, .toast-body, .alert, [role="alert"], div'));
-              for (const el of notificationEls) {
+              // A. Carteles Toast / Alertas verdes oficiales (ej: "Orden de Trabajo N 28448 Creada con Éxito")
+              const toasts = Array.from(document.querySelectorAll('.toast, .b-toast, .b-toaster, .toast-body, .alert, [role="alert"]'));
+              for (const el of toasts) {
                 const txt = el.textContent || '';
-                if (txt.includes('Creada') || txt.includes('Exito') || txt.includes('Éxito') || txt.includes('Orden de Trabajo')) {
-                  const match = txt.match(/\b(\d{4,6})\b/);
+                if (txt.includes('Creada') || txt.includes('Exito') || txt.includes('Éxito')) {
+                  const match = txt.match(/\b(2\d{4})\b/); // Busca números de OT reales de 5 dígitos comenzando con 2
                   if (match) return match[1];
                 }
               }
 
-              // B. URL por si cambió
-              const currentUrl = window.location.href;
-              const urlMatch = currentUrl.match(/\/(?:ot|ordenes|orden)\/(\d+)/i) || currentUrl.match(/[\?&]id=(\d+)/i) || currentUrl.match(/\/(\d{4,6})$/);
-              if (urlMatch) return urlMatch[1];
-
-              // C. Encabezados o Badges
-              const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, .badge, .breadcrumb'));
-              for (const h of headings) {
-                const txt = h.textContent || '';
-                if (txt.toLowerCase().includes('orden') || txt.toLowerCase().includes('o.t')) {
-                  const num = txt.match(/\b(\d{4,6})\b/);
-                  if (num) return num[1];
-                }
-              }
-
-              // D. Filas de la tabla (coincidencia con interno o número en primera fila)
+              // B. Filas de la tabla oficial de Taxes para el Interno buscado (ej. Fila con Interno 5 -> O.T. #28448)
               const tables = Array.from(document.querySelectorAll('table'));
               for (const table of tables) {
                 const rows = Array.from(table.querySelectorAll('tbody tr'));
                 for (const row of rows) {
                   const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
-                  if (cells.length >= 2) {
-                    const rowInterno = cells[1] || cells[0] || '';
-                    const rowOt = cells[2] || cells[1] || cells[0] || '';
-                    const otNum = rowOt.replace(/\D/g, '');
-                    if (/^\d{4,6}$/.test(otNum)) {
-                      if (!targetInterno || rowInterno.toUpperCase().includes(String(targetInterno).toUpperCase())) {
-                        return otNum;
-                      }
+                  if (cells.length < 3) continue;
+
+                  // Verificar si alguna celda coincide exactamente con el interno (ej: "5" o "INTERNO 5")
+                  const rowMatchesInterno = cells.some(cellTxt => {
+                    if (!cleanTargetInt) return false;
+                    if (cellTxt === cleanTargetInt) return true;
+                    const words = cellTxt.split(/\s+/);
+                    return words.includes(cleanTargetInt) || cellTxt.includes(`INTERNO ${cleanTargetInt}`);
+                  });
+
+                  if (rowMatchesInterno) {
+                    // Extraer la celda que contiene la OT (ej: "#28448" o "28448")
+                    for (const cellTxt of cells) {
+                      const otMatch = cellTxt.match(/#?\b(2\d{4})\b/);
+                      if (otMatch) return otMatch[1];
                     }
                   }
                 }
@@ -2114,7 +2106,7 @@ async function syncWorkOrder(orderId) {
             }, order.interno);
 
             if (numeroGenerado) {
-              console.log(`[Alta O.T.] ¡Número de O.T. #${numeroGenerado} capturado exitosamente en intento ${check}!`);
+              console.log(`[Alta O.T.] ¡Número de O.T. #${numeroGenerado} capturado exitosamente para Interno ${order.interno} en intento ${check}!`);
               break;
             }
           }
@@ -2129,7 +2121,8 @@ async function syncWorkOrder(orderId) {
       if (numeroGenerado) {
         db.updateWorkOrder(orderId, { taxesOrderNumber: numeroGenerado });
         order.taxesOrderNumber = numeroGenerado;
-        console.log(`[Alta O.T.] Cabecera creada con éxito: #${numeroGenerado}. Pasando a fase de tareas...`);
+        console.log(`[Alta O.T.] Cabecera creada con éxito: #${numeroGenerado}. Pausando 3 segundos para verificación visual antes de cerrar...`);
+        await delay(3000);
       } else {
         throw new Error("No se pudo capturar el número de O.T. generado por Taxes.");
       }
