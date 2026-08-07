@@ -630,10 +630,9 @@ app.get('/api/orders', (req, res) => {
       if (allowed.some(s => isHerreria(s)) && effectivelyHerreria) return true;
       if (allowed.some(s => isEdilicio(s)) && effectivelyEdilicio) return true;
       if (allowed.some(s => s === 'Taller')) {
-        // Taller sees non-Herreria, non-Edilicio orders
+        // Taller sees only non-Herreria, non-Edilicio orders. Herrería orders are private to
+        // Herrería (and Admin) regardless of vehicle type — no cross-visibility exception.
         if (!effectivelyHerreria && !effectivelyEdilicio) return true;
-        // Taller ALSO sees Herrería orders for regular vehicles (e.g. Rodado 61), hiding only exclusive equipment (Foto 1)
-        if (effectivelyHerreria && !isExclusiveHerreriaEquipment) return true;
       }
       return false;
     });
