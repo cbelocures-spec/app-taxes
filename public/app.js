@@ -923,11 +923,31 @@ async function resolveUnitStatusModal(estado) {
 
   if (estado === 'operativo') {
     await reconcilePendingServicesAfterOperativo(interno, order);
-    showToast("Unidad marcada como Operativa", "success");
+    if (order && order.id) {
+      showToast("Sincronizando tareas en Taxes al pasar a Operativo...", "info");
+      try {
+        const res = await fetch('/api/orders/finalize-tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: order.id })
+        });
+        const data = await res.json();
+        if (data.status === 'success' || data.success) {
+          showToast("✅ Tareas sincronizadas con éxito en Taxes al pasar a Operativo", "success");
+        } else {
+          showToast(data.message || "Error al sincronizar tareas en Taxes", "warning");
+        }
+      } catch (err) {
+        console.error('[resolveUnitStatusModal] Error al sincronizar tareas al pasar a operativo:', err);
+      }
+    } else {
+      showToast("Unidad marcada como Operativa", "success");
+    }
   } else {
     await markPendingServiceEnProceso(interno);
     showToast("Unidad marcada como Fuera de servicio (En Proceso)", "warning");
   }
+  fetchOrders();
 }
 
 // Marks only the checklist items whose text matches a Finalizada task of THIS order
@@ -4006,6 +4026,26 @@ async function toggleOrderEstadoUnidad(event, orderId) {
     });
     if (!res.ok) throw new Error("Failed to update status");
     showToast(`Unidad marcada como ${newStatus === 'operativo' ? 'Operativa' : 'Fuera de Servicio'}`, "success");
+
+    if (newStatus === 'operativo') {
+      showToast("Sincronizando tareas en Taxes al pasar a Operativo...", "info");
+      try {
+        const syncRes = await fetch('/api/orders/finalize-tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId })
+        });
+        const syncData = await syncRes.json();
+        if (syncData.status === 'success' || syncData.success) {
+          showToast("✅ Tareas inyectadas con éxito en Taxes al pasar a Operativo", "success");
+        } else {
+          showToast(syncData.message || "Error al inyectar tareas en Taxes", "warning");
+        }
+      } catch (syncErr) {
+        console.error('[toggleOrderEstadoUnidad] Error al inyectar tareas:', syncErr);
+      }
+      fetchOrders();
+    }
   } catch (error) {
     console.error(error);
     showToast("Error al actualizar estado de la unidad", "danger");
