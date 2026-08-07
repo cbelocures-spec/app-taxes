@@ -2436,19 +2436,32 @@ async function syncWorkOrder(orderId) {
         const toAdd = order.tasks.length - formCards.length;
         console.log(`[Reconcile] Form has ${formCards.length} cards, but app has ${order.tasks.length}. Clicking (+) AGREGAR TAREA ${toAdd} times...`);
         for (let i = 0; i < toAdd; i++) {
-          const btnId = await safeEvaluate(page, () => {
+          const btnResult = await safeEvaluate(page, () => {
+            const tareasHeader = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, .card-header, div, span'))
+              .find(el => (el.textContent || '').toUpperCase().includes('TAREAS A REALIZAR'));
+
             const btns = Array.from(document.querySelectorAll('button, a.btn, a, [role="button"], input[type="button"]'));
-            const b = btns.find(x => {
+            const candidates = btns.filter(x => {
               const txt = (x.textContent || x.value || '').trim().toUpperCase();
               if (txt.includes('GUARDAR') || txt.includes('CANCELAR') || txt.includes('VOLVER')) return false;
               return txt.includes('AGREGAR TAREA') || txt.includes('AGREGAR') || (txt.includes('TAREA') && !txt.includes('REALIZAR'));
             });
-            if (!b) return null;
+            const debugCandidates = candidates.map(c => ({ text: (c.textContent || c.value || '').trim(), belowHeader: tareasHeader ? (tareasHeader.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 : null }));
+
+            // Preferir el boton que aparece DESPUES del encabezado 'TAREAS A REALIZAR' (mismo
+            // criterio ya probado para aislar los textareas de descripcion de las tareas):
+            // si hay otro boton "Agregar..." mas arriba en la pagina (ej. archivos, servicios),
+            // el .find() original lo agarraba primero por estar antes en el DOM.
+            let b = tareasHeader ? candidates.find(x => (tareasHeader.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0) : null;
+            if (!b) b = candidates[0];
+            if (!b) return { id: null, debugCandidates };
             const id = 'tmp-btn-add-task-' + Date.now();
             b.id = id;
             b.scrollIntoView({ block: 'center' });
-            return id;
+            return { id, debugCandidates };
           });
+          const btnId = btnResult ? btnResult.id : null;
+          console.log(`[Reconcile] AGREGAR TAREA button candidates:`, JSON.stringify(btnResult && btnResult.debugCandidates));
 
           if (btnId) {
             console.log(`[Reconcile] Clicking (+) AGREGAR TAREA button #${btnId}...`);
@@ -2599,12 +2612,20 @@ async function syncWorkOrder(orderId) {
         console.log(`[Reconcile] Form has ${currentLength} cards, but app has ${order.tasks.length}. Clicking AGREGAR TAREA ${toAdd} times...`);
         for (let i = 0; i < toAdd; i++) {
           const addedId = await safeEvaluate(page, () => {
+            const tareasHeader = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, .card-header, div, span'))
+              .find(el => (el.textContent || '').toUpperCase().includes('TAREAS A REALIZAR'));
             const btns = Array.from(document.querySelectorAll('button, a.btn, a, [role="button"], input[type="button"]'));
-            const addBtn = btns.find(b => {
+            const candidates = btns.filter(b => {
               const txt = (b.textContent || b.value || '').trim().toLowerCase();
               if (txt.includes('guardar') || txt.includes('cancelar') || txt.includes('volver')) return false;
+              if (txt.includes('tareas a realizar')) return false;
               return txt.includes('agregar') || txt.includes('tarea') || txt === '+' || txt.includes('+ tarea');
             });
+            // Mismo criterio que el resto del Reconcile: preferir el boton que aparece
+            // DESPUES del encabezado 'TAREAS A REALIZAR' para no agarrar un boton
+            // "Agregar..." de otra seccion de la pagina (ej. archivos) que este antes en el DOM.
+            let addBtn = tareasHeader ? candidates.find(b => (tareasHeader.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0) : null;
+            if (!addBtn) addBtn = candidates[0];
             if (addBtn) {
               const id = 'tmp-add-task-2-' + Date.now();
               addBtn.id = id;
