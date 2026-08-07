@@ -2388,17 +2388,31 @@ async function syncWorkOrder(orderId) {
       if (diff > 0) {
         console.log(`[Reconcile] Form has ${formCards.length} cards, but app has ${order.tasks.length}. Clicking AGREGAR TAREA ${diff} times...`);
         for (let i = 0; i < diff; i++) {
-          const added = await safeEvaluate(page, () => {
-            const btns = Array.from(document.querySelectorAll('button, a, [role="button"], .btn'));
-            const addBtn = btns.find(b => b.textContent.toLowerCase().includes('agregar tarea'));
+          const addedId = await safeEvaluate(page, () => {
+            const btns = Array.from(document.querySelectorAll('button, a.btn, a, [role="button"], input[type="button"]'));
+            const addBtn = btns.find(b => {
+              const txt = (b.textContent || b.value || '').trim().toLowerCase();
+              if (txt.includes('guardar') || txt.includes('cancelar') || txt.includes('volver')) return false;
+              return txt.includes('agregar') || txt.includes('tarea') || txt === '+' || txt.includes('+ tarea');
+            });
             if (addBtn) {
-              addBtn.click();
-              return true;
+              const id = 'tmp-add-task-' + Date.now();
+              addBtn.id = id;
+              addBtn.scrollIntoView({ block: 'center' });
+              try { addBtn.focus(); } catch(_) {}
+              try { addBtn.click(); } catch (_) {}
+              ['mousedown', 'mouseup', 'click'].forEach(evtName => {
+                try { addBtn.dispatchEvent(new MouseEvent(evtName, { bubbles: true, cancelable: true, view: window })); } catch (_) {}
+              });
+              return id;
             }
-            return false;
+            return null;
           });
-          console.log(`[Reconcile] Added task card ${i + 1}: ${added}`);
-          await delay(2500); // Wait for the new card to render
+          if (addedId) {
+            await page.click(`#${addedId}`).catch(() => {});
+          }
+          console.log(`[Reconcile] Added task card ${i + 1}: ${!!addedId}`);
+          await delay(2000); // Wait for the new card to render in DOM
         }
         // Re-read form cards after adding
         formCards = await readFormCards();
@@ -2523,17 +2537,31 @@ async function syncWorkOrder(orderId) {
         const toAdd = order.tasks.length - currentLength;
         console.log(`[Reconcile] Form has ${currentLength} cards, but app has ${order.tasks.length}. Clicking AGREGAR TAREA ${toAdd} times...`);
         for (let i = 0; i < toAdd; i++) {
-          const added = await safeEvaluate(page, () => {
-            const btns = Array.from(document.querySelectorAll('button, a, [role="button"], .btn'));
-            const addBtn = btns.find(b => b.textContent.toLowerCase().includes('agregar tarea'));
+          const addedId = await safeEvaluate(page, () => {
+            const btns = Array.from(document.querySelectorAll('button, a.btn, a, [role="button"], input[type="button"]'));
+            const addBtn = btns.find(b => {
+              const txt = (b.textContent || b.value || '').trim().toLowerCase();
+              if (txt.includes('guardar') || txt.includes('cancelar') || txt.includes('volver')) return false;
+              return txt.includes('agregar') || txt.includes('tarea') || txt === '+' || txt.includes('+ tarea');
+            });
             if (addBtn) {
-              addBtn.click();
-              return true;
+              const id = 'tmp-add-task-2-' + Date.now();
+              addBtn.id = id;
+              addBtn.scrollIntoView({ block: 'center' });
+              try { addBtn.focus(); } catch(_) {}
+              try { addBtn.click(); } catch (_) {}
+              ['mousedown', 'mouseup', 'click'].forEach(evtName => {
+                try { addBtn.dispatchEvent(new MouseEvent(evtName, { bubbles: true, cancelable: true, view: window })); } catch (_) {}
+              });
+              return id;
             }
-            return false;
+            return null;
           });
-          console.log(`[Reconcile] Added task card ${i + 1}: ${added}`);
-          await delay(2500);
+          if (addedId) {
+            await page.click(`#${addedId}`).catch(() => {});
+          }
+          console.log(`[Reconcile] Added task card ${i + 1}: ${!!addedId}`);
+          await delay(2000);
         }
         // Re-read form cards after adding
         formCards = await readFormCards();
