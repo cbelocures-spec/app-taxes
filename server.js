@@ -1397,6 +1397,38 @@ app.post('/api/orders/:id/force-resync', (req, res) => {
   }
 });
 
+// Clear a wrong/stale taxesOrderNumber so the next sync creates a brand-new O.T. in Taxes
+// instead of trying to re-open a header that doesn't really correspond to this order.
+app.post('/api/orders/:id/clear-ot-number', (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const previousOtNumber = order.taxesOrderNumber || null;
+    if (typeof worker.clearAbandoned === 'function') {
+      worker.clearAbandoned(req.params.id);
+    }
+    db.updateWorkOrder(req.params.id, {
+      taxesOrderNumber: null,
+      syncStatus: 'pending',
+      syncError: null,
+      syncLockTime: null,
+      autoSyncRetryCount: 0,
+      verifiedStatus: null,
+      verifiedError: null
+    });
+    setTimeout(() => {
+      if (typeof worker.syncWorkOrderWithTimeout === 'function') {
+        worker.syncWorkOrderWithTimeout(req.params.id).catch(e => console.error('[ClearOtNumber Worker] Error:', e.message));
+      }
+    }, 100);
+    console.log(`[Clear OT Number] Order ${req.params.id}: cleared taxesOrderNumber "${previousOtNumber}", will create a new O.T.`);
+    res.json({ success: true, previousOtNumber });
+  } catch (err) {
+    console.error('[Clear OT Number] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Delete a single task from an order
 app.delete('/api/orders/:id/tasks/:taskId', (req, res) => {
   try {
