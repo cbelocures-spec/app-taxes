@@ -3468,6 +3468,24 @@ async function syncWorkOrder(orderId) {
       
       await delay(1500); // Wait for task form to expand
 
+      try {
+        const diagFs = require('fs');
+        const diagPath = require('path');
+        const diagHtml = await page.content();
+        diagFs.writeFileSync(diagPath.join(__dirname, 'public', 'debug_task_card.html'), diagHtml);
+        const diagInfo = await safeEvaluate(page, () => {
+          const els = Array.from(document.querySelectorAll('select, textarea, input')).filter(el => {
+            const idn = (el.id || '') + (el.name || '');
+            return /costo|descripcion|horas|empleado|tarea/i.test(idn) || el.tagName === 'TEXTAREA';
+          });
+          return els.slice(0, 30).map(el => ({ tag: el.tagName, id: el.id || null, name: el.name || null, className: el.className || null }));
+        });
+        diagFs.writeFileSync(diagPath.join(__dirname, 'public', 'debug_task_card.json'), JSON.stringify(diagInfo, null, 2));
+        console.log('[DEBUG-TASKCARD] Saved debug_task_card.html/.json. clickedAddTask was:', clickedAddTask);
+      } catch (diagErr) {
+        console.warn('[DEBUG-TASKCARD] Failed:', diagErr.message);
+      }
+
       // 1. Select Centro de Costo
       console.log(`Setting Centro de Costo to: "${task.centroCosto}" (label: "${ccLabel}")`);
       const ccSelectSelector = `select#centro_costo_${i}`;
