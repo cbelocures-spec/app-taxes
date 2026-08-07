@@ -2773,10 +2773,11 @@ async function syncWorkOrder(orderId) {
         }
 
         // 3. Fill/Fix Description if empty or doesn't match finalDescription (including diagnostico and insumos)
+        // No se antepone el nombre del empleado acá: ya se muestra en el campo "Empleado
+        // Asignado" separado, y quedaba duplicado. El caso Vera (nombre real distinto al
+        // que se registra en Taxes) ya se resuelve dentro de resolveAndMapEmployee agregando
+        // "Realizó: <nombre real>" al FINAL de la descripción — eso se mantiene igual.
         let { finalDescription } = resolveAndMapEmployee(appTask);
-        if (employeeLabel && !finalDescription.toLowerCase().includes(employeeLabel.toLowerCase().trim())) {
-          finalDescription = `${employeeLabel} - ${finalDescription}`;
-        }
         const cleanDescTaxes = (formCards[ci].description || '').trim();
         const cleanDescTarget = (finalDescription || '').trim();
         const descMismatch = (cleanDescTaxes !== cleanDescTarget);
