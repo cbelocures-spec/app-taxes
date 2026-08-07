@@ -2247,23 +2247,37 @@ async function syncWorkOrder(orderId) {
       // browser's execution context waiting for a response that never comes.
       const findAndTagPencil = async () => {
         return await safeEvaluate(page, (otNum) => {
+          const clean = s => (s || '').replace(/#/g, '').replace(/\s+/g, ' ').trim();
           const rows = Array.from(document.querySelectorAll('table tbody tr'));
           for (const row of rows) {
             const cells = Array.from(row.querySelectorAll('td'));
-            // Check ALL cells: strip #, spaces, find our number
-            const hasOT = cells.some(c => {
-              const txt = c.textContent.replace(/#/g, '').replace(/\s+/g, ' ').trim();
-              return txt === otNum || txt.includes(otNum);
-            });
+            const hasOT = cells.some(c => clean(c.textContent).includes(otNum));
             if (hasOT) {
-              const lastCell = cells[cells.length - 1];
-              const allBtns = Array.from(lastCell?.querySelectorAll('a, button') || []);
-              // eye=index 0, pencil=index 1 (non-red), delete=last (red)
-              const editBtn = allBtns.find((b, i) => i > 0 && !b.className.includes('danger') && !b.className.includes('red'))
-                              || allBtns[1] || allBtns[0];
+              const allBtns = Array.from(row.querySelectorAll('a, button, [role="button"]'));
+              if (allBtns.length === 0) continue;
+
+              // 1. Icono o título explícito de edición
+              let editBtn = allBtns.find(b => {
+                const html = (b.innerHTML || '').toLowerCase();
+                const title = (b.title || b.getAttribute('aria-label') || '').toLowerCase();
+                const href = (b.href || b.getAttribute('href') || '').toLowerCase();
+                return title.includes('edit') || title.includes('pencil') || html.includes('pencil') || html.includes('edit') || html.includes('fa-pencil') || href.includes('edit');
+              });
+
+              // 2. Segundo botón en la lista de acciones (índice 1: el Lápiz al lado del Ojo)
+              if (!editBtn && allBtns.length >= 2) {
+                editBtn = allBtns[1];
+              }
+
+              // 3. Cualquier botón que no sea rojo/danger
+              if (!editBtn) {
+                editBtn = allBtns.find(b => !b.className.includes('danger') && !b.className.includes('red'));
+              }
+
               if (editBtn) {
                 const id = 'tmp-pencil-btn-' + Date.now();
                 editBtn.id = id;
+                editBtn.scrollIntoView({ block: 'center' });
                 return id;
               }
             }
@@ -2278,18 +2292,23 @@ async function syncWorkOrder(orderId) {
       console.log(`[Reconcile] Pencil button located: ${pencilBtnId ? pencilBtnId : 'NOT FOUND'}`);
       if (pencilBtnId) {
         try {
-          console.log(`[Reconcile] Clicking pencil button #${pencilBtnId} (native click)...`);
-          await Promise.race([
-            page.click(`#${pencilBtnId}`),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('native click timeout after 10s')), 10000))
-          ]);
-          console.log(`[Reconcile] Pencil click call returned normally.`);
+          console.log(`[Reconcile] Clicking pencil button #${pencilBtnId}...`);
+          await safeEvaluate(page, (id) => {
+            const b = document.getElementById(id);
+            if (b) {
+              b.scrollIntoView({ block: 'center' });
+              try { b.focus(); } catch(_) {}
+              try { b.click(); } catch (_) {}
+              ['mousedown', 'mouseup', 'click'].forEach(evtName => {
+                try { b.dispatchEvent(new MouseEvent(evtName, { bubbles: true, cancelable: true, view: window })); } catch (_) {}
+              });
+            }
+          }, pencilBtnId);
+
+          await page.click(`#${pencilBtnId}`).catch(() => {});
           pencilClicked = true;
         } catch (clickErr) {
-          // A "Node is detached" / navigation-related error here usually means
-          // the click succeeded and the page already navigated away — treat as success
-          // and let the waitForSelector below confirm it for real.
-          console.warn(`[Reconcile] Native click on pencil button raised/timed out: ${clickErr.message} (likely navigated away, treating as success)`);
+          console.warn(`[Reconcile] Native click on pencil button: ${clickErr.message}`);
           pencilClicked = true;
         }
         // Confirm the edit form actually loaded before trusting the click.
