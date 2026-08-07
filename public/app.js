@@ -2911,7 +2911,7 @@ async function handleObtenerNumeroOT(orderId, botonElemento) {
     if (data.status === 'success' || data.success) {
       const otNum = data.taxesOrderNumber || data.generatedNo;
       showToast(`✅ Cabecera O.T. #${otNum} creada exitosamente en Taxes`, "success");
-      loadOrders();
+      fetchOrders();
     } else {
       showToast(data.message || "No se pudo obtener el N° de O.T.", "danger");
       if (botonElemento) {
@@ -2940,7 +2940,7 @@ async function triggerSingleTaskSync(orderId, taskIndex) {
     const data = await response.json();
     if (data.success) {
       showToast(`✅ Tarea #${taskIndex + 1} sincronizada con éxito en Taxes (✔)!`, "success");
-      loadOrders();
+      fetchOrders();
     } else {
       showToast(data.message || "Error al sincronizar tarea", "danger");
     }
