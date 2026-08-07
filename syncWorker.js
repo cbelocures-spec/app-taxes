@@ -2377,8 +2377,18 @@ async function syncWorkOrder(orderId) {
           }
 
           // Excluir 100% el textarea superior 'Incidente o Requisito' seleccionando SOLO textareas ubicadas tras el encabezado 'TAREAS A REALIZAR'
-          const tareasHeader = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, .card-header, div, span'))
-            .find(el => (el.textContent || '').toUpperCase().includes('TAREAS A REALIZAR'));
+          const tareasHeader = (() => {
+            // .find() devolvía el PRIMER match, que en la práctica era un <div> contenedor
+            // grande que envuelve tanto "Incidente o Requisito" como "TAREAS A REALIZAR"
+            // (su textContent heredado también "incluye" la frase) -> compareDocumentPosition
+            // contra ese wrapper reportaba el textarea de Incidente como "posterior" al
+            // encabezado igual que las tarjetas reales, así que la exclusión no excluía nada.
+            // Los matches aparecen en orden de documento (ancestros antes que hijos), así que
+            // el ÚLTIMO match de la lista es el elemento más específico -el título real-.
+            const matches = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, .card-header, div, span'))
+              .filter(el => (el.textContent || '').toUpperCase().includes('TAREAS A REALIZAR'));
+            return matches[matches.length - 1] || null;
+          })();
           
           const allTextareas = Array.from(document.querySelectorAll('textarea'));
           const descTextareas = allTextareas.filter(ta => {
