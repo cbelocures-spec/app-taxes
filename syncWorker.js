@@ -2484,13 +2484,26 @@ async function syncWorkOrder(orderId) {
 
           if (btnId) {
             console.log(`[Reconcile] Clicking (+) AGREGAR TAREA button #${btnId}...`);
+            const countBefore = formCards.length;
             await page.click(`#${btnId}`).catch(() => {});
-            for (let retry = 1; retry <= 10; retry++) {
+            // Esperar hasta 15s (30 x 500ms) en vez de 5s: bajo carga (ej. "Resincronizar
+            // Todo" procesando varias ordenes) Taxes puede tardar mas en renderizar la
+            // tarjeta nueva. Si esta confirmacion no llega a tiempo, formCards.length se
+            // sigue viendo desactualizado despues del bucle, y el chequeo de mas abajo
+            // ("Add missing cards if needed") vuelve a agregar de mas -tarjetas vacias que
+            // nunca se llenan ni se borran y terminan disparando el error de Taxes "Faltan
+            // Completar Campos".
+            for (let retry = 1; retry <= 30; retry++) {
               await delay(500);
               const cardsNow = await readFormCards();
-              if (cardsNow.length > formCards.length) {
+              if (cardsNow.length > countBefore) {
                 console.log(`[Reconcile] New task card confirmed in DOM after ${retry * 500}ms!`);
+                formCards = cardsNow;
                 break;
+              }
+              if (retry === 30) {
+                console.warn(`[Reconcile] AGREGAR TAREA click #${i + 1} never confirmed in DOM after 15s (was ${countBefore} cards, still ${cardsNow.length}).`);
+                formCards = cardsNow;
               }
             }
           }
@@ -2622,7 +2635,11 @@ async function syncWorkOrder(orderId) {
         console.log(`[Reconcile] After deletion: ${formCards.length} cards remain`);
       }
 
-      // Add missing cards if needed (e.g. if we deleted unmatched ones and now have fewer cards than tasks)
+      // Add missing cards if needed (e.g. if we deleted unmatched ones and now have fewer cards than tasks).
+      // Re-leer una vez mas antes de decidir si faltan tarjetas, en vez de confiar en el
+      // valor que quedo del paso anterior: evita agregar de mas si ese valor quedo
+      // desactualizado (misma causa que el fix de mas arriba, por las dudas).
+      formCards = await readFormCards();
       let currentLength = formCards.length;
       if (currentLength < order.tasks.length) {
         const toAdd = order.tasks.length - currentLength;
