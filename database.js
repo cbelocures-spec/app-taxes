@@ -450,10 +450,8 @@ class LocalDB {
       settings.password = "Paniol2015";
     }
     if (settings.autoSyncDisabled === undefined) {
-      settings.autoSyncDisabled = true;
+      settings.autoSyncDisabled = false;
     }
-    // Forzar pausado de sincronizaciones automáticas en segundo plano para control manual paso a paso
-    settings.autoSyncDisabled = true;
     return settings;
   }
 
