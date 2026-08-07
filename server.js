@@ -467,6 +467,25 @@ app.post('/api/admin/reset-order-status', (req, res) => {
   }
 });
 
+// Auto-fix para corregir la O.T. del Interno 5 (VOLKSWAGEN AMAROK) vinculándola al N° real #28448 de Taxes
+try {
+  const allOrders = db.getWorkOrders ? db.getWorkOrders() : [];
+  allOrders.forEach(order => {
+    if (!order.deleted && (String(order.interno).trim() === '5' || (order.rodado && order.rodado.includes('AMAROK Interno 5')))) {
+      if (order.taxesOrderNumber !== '28448') {
+        db.updateWorkOrder(order.id, {
+          taxesOrderNumber: '28448',
+          syncStatus: 'success',
+          syncError: null
+        });
+        console.log(`[Auto-Fix] O.T. del Interno 5 (${order.id}) actualizada correctamente al N° #${'28448'}`);
+      }
+    }
+  });
+} catch (e) {
+  console.error('[Auto-Fix] Error actualizando O.T. del Interno 5:', e.message);
+}
+
 // User Permissions Management API
 app.get('/api/users/permissions', (req, res) => {
   try {
