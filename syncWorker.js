@@ -2376,13 +2376,16 @@ async function syncWorkOrder(orderId) {
             return [];
           }
 
-          // Excluir el textarea del campo superior 'Incidente o Requisito'
+          // Excluir 100% el textarea superior 'Incidente o Requisito' seleccionando SOLO textareas ubicadas tras el encabezado 'TAREAS A REALIZAR'
+          const tareasHeader = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, .card-header, div, span'))
+            .find(el => (el.textContent || '').toUpperCase().includes('TAREAS A REALIZAR'));
+          
           const allTextareas = Array.from(document.querySelectorAll('textarea'));
           const descTextareas = allTextareas.filter(ta => {
-            const parent = ta.closest('.card, .form-group, .row, div');
-            const isIncidenteText = parent && parent.innerText && parent.innerText.toLowerCase().includes('incidente');
-            const isIncidenteAttr = (ta.name || ta.id || '').toLowerCase().includes('incidente');
-            return !isIncidenteText && !isIncidenteAttr;
+            if (tareasHeader) {
+              return (tareasHeader.compareDocumentPosition(ta) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+            }
+            return ta !== allTextareas[0];
           });
 
           // Buscar inputs de horas EXCLUSIVAMENTE dentro de tarjetas o contenedores de tareas
@@ -2739,12 +2742,15 @@ async function syncWorkOrder(orderId) {
         if (descMismatch) {
           console.log(`[Reconcile] Card #${ci} description update required (Taxes: "${cleanDescTaxes}" → Target: "${cleanDescTarget}"). Writing...`);
           const descId = await safeEvaluate(page, (idx) => {
-            const allTextareas = Array.from(document.querySelectorAll('textarea, textarea[name*="descripcion"], textarea[id*="descripcion"], textarea[placeholder*="Describe"], input[name*="descripcion"]'));
+            const tareasHeader = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, .card-header, div, span'))
+              .find(el => (el.textContent || '').toUpperCase().includes('TAREAS A REALIZAR'));
+
+            const allTextareas = Array.from(document.querySelectorAll('textarea, textarea[name*="descripcion"], textarea[id*="descripcion"], textarea[placeholder*="Describe"]'));
             const taskTextareas = allTextareas.filter(ta => {
-              const parent = ta.closest('.card, .form-group, .row, div');
-              const isIncidenteText = parent && parent.innerText && parent.innerText.toLowerCase().includes('incidente');
-              const isIncidenteAttr = (ta.name || ta.id || '').toLowerCase().includes('incidente');
-              return !isIncidenteText && !isIncidenteAttr;
+              if (tareasHeader) {
+                return (tareasHeader.compareDocumentPosition(ta) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+              }
+              return ta !== allTextareas[0];
             });
             const el = taskTextareas[idx];
             if (!el) return null;
