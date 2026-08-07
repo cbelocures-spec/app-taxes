@@ -1883,10 +1883,11 @@ async function syncWorkOrder(orderId) {
         let modalListo = false;
         for (let int = 1; int <= 10; int++) {
           const btnInfo = await safeEvaluate(page, () => {
-            // Filtrar exclusivamente etiquetas button o enlaces de tipo botón (a.btn) para evitar contenedores genéricos
+            // Filtrar exclusivamente etiquetas button o enlaces de tipo botón (a.btn) excluyendo explícitamente el botón Guardar
             const candidates = Array.from(document.querySelectorAll('button, a.btn, a, input[type="button"]'));
             const match = candidates.find(b => {
               const txt = (b.textContent || b.value || '').trim().toUpperCase();
+              if (txt.includes('GUARDAR')) return false; // NUNCA tomar el botón Guardar como + NUEVO
               return txt === '+ NUEVO' || txt === 'NUEVO' || txt.includes('+ NUEVO') || (txt.includes('NUEVO') && !txt.includes('NOVEDAD') && !txt.includes('MODULO'));
             });
             if (!match) return null;
@@ -1908,8 +1909,7 @@ async function syncWorkOrder(orderId) {
             console.log(`[Alta O.T.] Intento ${int}: Botón localizado '<${btnInfo.tag} class="${btnInfo.className}"> "${btnInfo.text}"'. Ejecutando clic nativo...`);
             await page.click(`#${btnInfo.id}`).catch(() => {});
           } else {
-            console.log(`[Alta O.T.] Intento ${int}: Intentando clic por selector .btn-success...`);
-            await page.click('.btn-success, button.btn-success, a.btn-success').catch(() => {});
+            console.log(`[Alta O.T.] Intento ${int}: Esperando despliegue del modal de nueva orden...`);
           }
 
           await delay(1000);
@@ -1929,9 +1929,7 @@ async function syncWorkOrder(orderId) {
         }
 
         if (!modalListo) {
-          console.warn("[Alta O.T.] El modal de Nueva Orden no se detectó tras 10 intentos. Reintentando clic directo en .btn-success...");
-          await page.click('.btn-success').catch(() => {});
-          await delay(1500);
+          console.warn("[Alta O.T.] El modal de Nueva Orden no se detectó tras 10 intentos.");
         }
 
         try {
