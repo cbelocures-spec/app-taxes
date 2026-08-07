@@ -11538,7 +11538,8 @@ function ptCheckForDuplicateUnit() {
     document.getElementById('pt-unit-modal-title').textContent = `Editar Unidad #${searchInterno} (Ya registrada)`;
     document.getElementById('pt-unit-tipo').value = foundUnit.tipo || 'COMPACTADOR';
     document.getElementById('pt-unit-estado').value = foundList;
-    
+    ptOnEstadoChange();
+
     let rawNovedadText = '';
     if (Array.isArray(foundUnit.novedad_items)) {
       rawNovedadText = foundUnit.novedad_items.map(x => {
