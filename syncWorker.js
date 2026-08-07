@@ -4541,7 +4541,7 @@ async function syncCompletedTasksForOrder(orderId) {
 
 // Alias functions matching the 2-phase API routes:
 async function createCleanHeader(orderId) {
-  return await syncExpressOtHeader(orderId);
+  return await syncWorkOrder(orderId);
 }
 
 async function injectTasksToExistingOrder(orderId) {

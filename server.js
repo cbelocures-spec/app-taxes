@@ -1124,15 +1124,16 @@ app.post('/api/orders/:id/sync-header', async (req, res) => {
 app.post('/api/orders/create-header', async (req, res) => {
   const orderId = req.body.orderId || req.body.id;
   try {
-    const result = await syncWorker.createCleanHeader(orderId);
-    if (result.success) {
+    const result = await syncWorker.syncWorkOrder(orderId);
+    if (result && result.success) {
+      const order = db.getWorkOrderById(orderId);
       return res.status(200).json({ 
         status: "success", 
-        taxesOrderNumber: result.taxesOrderNumber,
+        taxesOrderNumber: (order ? order.taxesOrderNumber : null) || (result ? result.taxesOrderNumber : null),
         message: "Cabecera creada en Taxes exitosamente." 
       });
     } else {
-      return res.status(500).json({ status: "error", message: result.message });
+      return res.status(500).json({ status: "error", message: (result ? result.message : "Error al sincronizar O.T.") });
     }
   } catch (error) {
     res.status(500).json({ status: "error", message: error.message });
