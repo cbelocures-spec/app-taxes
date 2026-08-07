@@ -2770,6 +2770,7 @@ async function syncWorkOrder(orderId) {
         const cleanDescTaxes = (formCards[ci].description || '').trim();
         const cleanDescTarget = (finalDescription || '').trim();
         const descMismatch = (cleanDescTaxes !== cleanDescTarget);
+        console.log(`[Reconcile] Card #${ci} description check — Taxes: "${cleanDescTaxes}" | Target: "${cleanDescTarget}" | mismatch: ${descMismatch}`);
 
         if (descMismatch) {
           console.log(`[Reconcile] Card #${ci} description update required (Taxes: "${cleanDescTaxes}" → Target: "${cleanDescTarget}"). Writing...`);
