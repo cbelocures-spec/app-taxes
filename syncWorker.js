@@ -2785,8 +2785,18 @@ async function syncWorkOrder(orderId) {
         if (descMismatch) {
           console.log(`[Reconcile] Card #${ci} description update required (Taxes: "${cleanDescTaxes}" → Target: "${cleanDescTarget}"). Writing...`);
           const descId = await safeEvaluate(page, (idx) => {
-            const tareasHeader = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, .card-header, div, span'))
-              .find(el => (el.textContent || '').toUpperCase().includes('TAREAS A REALIZAR'));
+            // Confirmado con el inspector de Chrome sobre la pagina real: el textarea de
+            // descripcion de cada tarjeta tiene un id ESTABLE y predecible (descripcion_0,
+            // descripcion_1, ...) puesto por la propia Taxes. Usarlo directo evita depender
+            // de encontrar el encabezado correcto o de que el id no haya sido reasignado por
+            // un re-render de Vue (BootstrapVue le asigna un __BVID__ dinamico si en ese
+            // momento no tiene id, y eso cambiaba entre corridas).
+            const direct = document.querySelector(`#descripcion_${idx}`);
+            if (direct) return direct.id;
+
+            const matches = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, .card-header, div, span'))
+              .filter(el => (el.textContent || '').toUpperCase().includes('TAREAS A REALIZAR'));
+            const tareasHeader = matches[matches.length - 1] || null;
 
             const allTextareas = Array.from(document.querySelectorAll('textarea, textarea[name*="descripcion"], textarea[id*="descripcion"], textarea[placeholder*="Describe"]'));
             const taskTextareas = allTextareas.filter(ta => {
@@ -2803,46 +2813,28 @@ async function syncWorkOrder(orderId) {
 
           if (descId) {
             const sel = `#${descId}`;
-            console.log(`[Reconcile] Erasing and rewriting description textarea (${sel}) with: "${finalDescription}"`);
-            
+            console.log(`[Reconcile] Typing description textarea (${sel}) with: "${finalDescription}"`);
+
+            // Escribir con tecleo real en vez de manipular el DOM directamente: el manejo del
+            // valor via DOM + dispatchEvent no quedaba registrado por el v-model de Vue para
+            // este textarea en particular (a diferencia de Horas, que sí usa tecleo real y
+            // persiste bien) y el campo volvía a quedar vacío después de Guardar.
             await page.focus(sel).catch(() => {});
             await page.click(sel, { clickCount: 3 }).catch(() => {});
-
-            // 1. Force DOM flush & clear
-            await safeEvaluate(page, (s) => {
-              const el = document.querySelector(s);
-              if (el) {
-                el.value = '';
-                if (el.textContent !== undefined) el.textContent = '';
-                if (el.innerText !== undefined) el.innerText = '';
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-              }
-            }, sel);
-
-            // 2. Keyboard Control+A + Backspace + Delete
             await page.keyboard.down('Control');
             await page.keyboard.press('A');
             await page.keyboard.up('Control');
             await page.keyboard.press('Backspace');
-            await page.keyboard.press('Delete');
             await delay(200);
+            await page.type(sel, finalDescription, { delay: 15 });
+            await page.keyboard.press('Tab').catch(() => {});
+            await delay(500);
 
-            // 3. Set exact target string via DOM and dispatch events
-            await safeEvaluate(page, (s, val) => {
+            const verifyDesc = await safeEvaluate(page, (s) => {
               const el = document.querySelector(s);
-              if (el) {
-                el.value = val;
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-                el.dispatchEvent(new Event('blur', { bubbles: true }));
-              }
-            }, sel, finalDescription);
-
-            // 4. Trigger typing space + backspace to ensure Vue v-model updates binding
-            await page.type(sel, ' ', { delay: 30 }).catch(() => {});
-            await page.keyboard.press('Backspace').catch(() => {});
-            await delay(1000);
+              return el ? el.value : null;
+            }, sel).catch(() => null);
+            console.log(`[Reconcile] Description verify for card #${ci}: "${verifyDesc}"`);
           } else {
             console.warn(`[Reconcile] COULD NOT FIND description element for card #${ci}!`);
           }
