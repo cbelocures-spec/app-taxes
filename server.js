@@ -234,20 +234,18 @@ function resolveRodadoForInterno(interno, fallbackRodado) {
   return (match && match.label) ? match.label : fallbackRodado;
 }
 
+// These are generic Herreria job "buckets" in the rodados catalog (fabricacion/reparacion
+// de equipo, sin vehiculo real asociado) - always named with a "REP.", "FABRICACION" or
+// "FINALIZACION" prefix, or exactly "PRENSAS". Matching by that prefix (instead of loose
+// substrings like "VOLQUET" or "CAJA" anywhere in rodado+interno) avoids catching real fleet
+// vehicles that happen to share a word - e.g. "VOLQUETE NICO", a real dump truck serviced by
+// Taller, isn't one of these buckets and was wrongly force-routed to Herreria before this fix.
 function isHerreriaExclusiveEquipment(rodado, interno) {
-  const str = (String(rodado || '') + ' ' + String(interno || '')).toUpperCase();
-  const cleanStr = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  
-  // Check key substrings/prefixes to avoid issues with accents, spelling, and encoding typos (e.g. "Contenedor metlico")
-  if (cleanStr.includes('PRENSA')) return true;
-  if (cleanStr.includes('FABRIC')) return true; // covers FABRICACIÓN, FABRICACIN, etc.
-  if (cleanStr.includes('FINAL')) return true; // covers FINALIZACIÓN, FINALIZACIN, etc.
-  if (cleanStr.includes('CONTENE')) return true; // covers CONTENEDOR, CONTENEDORE, etc.
-  if (cleanStr.includes('CONT. MET') || cleanStr.includes('CONT.MET') || cleanStr.includes('CONT. PLAS') || cleanStr.includes('CONT.PLAS')) return true;
-  if (cleanStr.includes('CAJA') || cleanStr.includes('ROLL-OFF')) return true; // covers CAJA ROLL-OFF, REP. CAJA ROLL-OFF
-  if (cleanStr.includes('VOLQUET')) return true; // covers REP. VOLQUETE, VOLQUETES
-  if (cleanStr.includes('CANASTO')) return true; // covers CANASTO RECICLAJE
-  if (cleanStr.includes('10171')) return true;
+  const internoClean = String(interno || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  if (internoClean === 'PRENSAS') return true;
+  if (internoClean.startsWith('REP.') || internoClean.startsWith('REP ')) return true;
+  if (internoClean.startsWith('FABRIC')) return true;
+  if (internoClean.startsWith('FINALIZ')) return true;
   return false;
 }
 
@@ -755,9 +753,29 @@ app.post('/api/orders/bulk', (req, res) => {
     const sector = getSectorByUsername(createdBy);
     const createdOrders = [];
 
+    // Bulk creation (Carga Masiva) has no "submit" debounce on the client and the form tab
+    // stays mounted between uses, so a stray leftover task card or a manual re-click of
+    // "Generar" minutes later can resubmit the same batch. Dedupe here the same way the
+    // single-order endpoint does, but with a wider window since re-submitting a whole bulk
+    // batch by hand takes longer than a rapid double-click.
+    const BULK_DEDUPE_WINDOW_MS = 5 * 60 * 1000;
+    const existingOrdersForDedupe = db.getWorkOrders ? db.getWorkOrders() : [];
+    const nowForDedupe = Date.now();
+
     for (const orderData of orders) {
-      const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad } = orderData;
-      
+      const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, estadoUnidad } = orderData;
+
+      // Drop exact-duplicate tasks within this single order's own payload (e.g. a stale
+      // leftover task card left checked from a previous visit to the Carga Masiva tab).
+      const seenTaskKeys = new Set();
+      const tasks = (orderData.tasks || []).filter(t => {
+        if (!t) return false;
+        const key = [t.centroCosto, t.empleado, String(t.descripcion || '').trim()].join('||');
+        if (seenTaskKeys.has(key)) return false;
+        seenTaskKeys.add(key);
+        return true;
+      });
+
       if (!rodado || !responsable || !clasificacion) {
         return res.status(400).json({ error: `Campos obligatorios faltantes en orden. Rodado, responsable y clasificacion son requeridos.` });
       }
@@ -773,15 +791,35 @@ app.post('/api/orders/bulk', (req, res) => {
         }
       }
 
+      const resolvedRodado = resolveRodadoForInterno(interno, rodado);
+      const taskDescs = tasks.map(t => String(t.descripcion || '').trim()).join('|');
+      const duplicateOrder = existingOrdersForDedupe.find(o => {
+        if (o.archived || o.deleted) return false;
+        const createdTime = parseInt(o.id) || 0;
+        if (nowForDedupe - createdTime > BULK_DEDUPE_WINDOW_MS) return false;
+        const sameUser = (o.createdBy === createdBy);
+        const sameInterno = String(o.interno || '').trim().toUpperCase() === String(interno || '').trim().toUpperCase();
+        const sameRodado = String(o.rodado || '').trim().toUpperCase() === String(resolvedRodado || '').trim().toUpperCase();
+        const sameClasif = String(o.clasificacion || '').trim().toUpperCase() === String(finalClasificacion || '').trim().toUpperCase();
+        const sameTasks = (o.tasks || []).map(t => String(t.descripcion || '').trim()).join('|') === taskDescs;
+        return sameUser && sameInterno && sameRodado && sameClasif && sameTasks;
+      });
+
+      if (duplicateOrder) {
+        console.log(`[POST /api/orders/bulk] Deduplicated repeat batch submission for order ID ${duplicateOrder.id} (interno ${interno})`);
+        createdOrders.push(duplicateOrder);
+        continue;
+      }
+
       const newOrder = db.createWorkOrder({
-        rodado: resolveRodadoForInterno(interno, rodado),
+        rodado: resolvedRodado,
         responsable,
         fechaEntrega,
         horario,
         interno,
         clasificacion: finalClasificacion,
         incidente: incidente || '',
-        tasks: tasks || [],
+        tasks,
         createdBy,
         estadoUnidad: estadoUnidad || 'fuera_de_servicio',
         sector
@@ -789,6 +827,7 @@ app.post('/api/orders/bulk', (req, res) => {
 
       autoPauseConflictingTimers(newOrder.id, newOrder.tasks, null);
       createdOrders.push(newOrder);
+      existingOrdersForDedupe.push(newOrder);
     }
 
     // Respond INSTANTLY (sub-100ms) to the user UI

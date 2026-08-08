@@ -621,8 +621,15 @@ function switchView(viewId) {
 
     if (viewId === 'bulk') {
       try {
+        // Reset the task list every time this tab is opened, not just when empty - the tab
+        // stays mounted in the DOM between visits, so leftover task cards (or a preventivo
+        // type left "active" from a previous batch) would otherwise get resubmitted alongside
+        // a new selection, producing duplicate tasks inside every order of the new batch.
         const container = document.getElementById('bulk-tasks-container');
-        if (container && container.querySelectorAll('.bulk-task-item-card').length === 0) {
+        if (container) {
+          container.innerHTML = '';
+          activePreventivoTypes = new Set();
+          syncPreventivoButtons();
           addBulkTaskField();
         }
         renderBulkVehicleSelector();
@@ -1096,12 +1103,17 @@ async function submitPreOrderCheck() {
 
   let existingOrder = null;
   if (!isCarmona) {
-    // Only match existing order if it is fuera_de_servicio AND belongs to the SAME sector group
+    // Only match existing order if it is fuera_de_servicio, belongs to the SAME sector group,
+    // AND has the SAME clasificacion - a Correctivo/Preventivo/Auxilio for the same vehicle
+    // are separate jobs and must always get their own order, never get merged into whichever
+    // other job happens to already be open for that interno.
     existingOrder = activeOrders.find(o => {
       const isSameInterno = String(o.interno).trim() === String(interno);
       if (!isSameInterno) return false;
       if (o.estadoUnidad !== 'fuera_de_servicio') return false;
-      
+      const isSameClasif = String(o.clasificacion || '').trim().toLowerCase() === String(clasificacion || '').trim().toLowerCase();
+      if (!isSameClasif) return false;
+
       // Separate Herrería/Edilicio from Taller:
       const orderIsHerreria = isHerreriaOrder(o);
       const orderIsEdilicio = isEdilicioOrder(o);
@@ -4925,9 +4937,12 @@ function renderDashboard() {
           const cleanDesc = (task.descripcion || '').trim().toLowerCase();
           const cleanEmp = String(empLabel).trim().toLowerCase();
 
-          // Filtrar tareas de Herrería cuando se visualiza el sector Taller (y viceversa)
+          // Filtrar tareas de Herrería cuando se visualiza el sector Taller (y viceversa).
+          // Based only on the task's own centro de costo and the order's classification -
+          // not on who is assigned, which used to hide a Taller task from Taller's board
+          // just because its assignee's name fuzzy-matched a Herrería employee.
           const isHerreriaTab = (currentSelectedSector === 'Herrería');
-          const isHerreriaEmpOrTask = isHerreriaEmployee(empLabel) || (task.centroCosto && String(task.centroCosto).toUpperCase().includes('HERRER')) || isHerreriaOrder(order);
+          const isHerreriaEmpOrTask = (task.centroCosto && String(task.centroCosto).toUpperCase().includes('HERRER')) || isHerreriaOrder(order);
 
           if (!isHerreriaTab && isHerreriaEmpOrTask) {
             return; // Excluir personal/tareas de Herrería del tablero de Taller
@@ -7127,67 +7142,31 @@ function updateClassificationSelectOptions() {
   });
 }
 
-// Mirrors server.js's isHerreriaExclusiveEquipment(): equipment that is Herrer\u00eda-only
-// (fabricaci\u00f3n de cajas, prensa, contenedores, etc.) regardless of what 'clasificacion'
-// says on the order \u2014 some orders end up saved with a generic clasificacion like
-// "Correctivo" instead of "Herrer\u00eda" for this equipment, and without this check they
-// leak into the Taller tab / Inicio dashboard.
+// Mirrors server.js's isHerreriaExclusiveEquipment(): only the generic Herreria job
+// "buckets" in the rodados catalog (fabricacion/reparacion de equipo sin vehiculo real
+// asociado), identified by their Interno's "REP.", "FABRICACION"/"FINALIZACION" prefix or
+// being exactly "PRENSAS" - not a loose substring match, which used to catch real fleet
+// vehicles that happen to share a word (e.g. "VOLQUETE NICO", a real Taller dump truck).
 function isHerreriaExclusiveEquipmentClient(rodado, interno) {
-  const str = (String(rodado || '') + ' ' + String(interno || '')).toUpperCase();
-  const cleanStr = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (cleanStr.includes('PRENSA')) return true;
-  if (cleanStr.includes('FABRIC')) return true;
-  if (cleanStr.includes('FINAL')) return true;
-  if (cleanStr.includes('CONTENE')) return true;
-  if (cleanStr.includes('CONT. MET') || cleanStr.includes('CONT.MET') || cleanStr.includes('CONT. PLAS') || cleanStr.includes('CONT.PLAS')) return true;
-  if (cleanStr.includes('CAJA') || cleanStr.includes('ROLL-OFF')) return true;
-  if (cleanStr.includes('VOLQUET')) return true;
-  if (cleanStr.includes('CANASTO')) return true;
-  if (cleanStr.includes('10171')) return true;
+  const internoClean = String(interno || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  if (internoClean === 'PRENSAS') return true;
+  if (internoClean.startsWith('REP.') || internoClean.startsWith('REP ')) return true;
+  if (internoClean.startsWith('FABRIC')) return true;
+  if (internoClean.startsWith('FINALIZ')) return true;
   return false;
 }
 
-function isHerreriaEmployee(employeeName) {
-  if (!employeeName) return false;
-  const cleanName = (str) => String(str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const target = cleanName(employeeName);
-  if (!target) return false;
-
-  const herreriaNames = typeof getSectorEmployees === 'function' 
-    ? getSectorEmployees('Herrería')
-    : (typeof HERRERIA_EMPLOYEES !== 'undefined' ? HERRERIA_EMPLOYEES : []);
-
-  return herreriaNames.some(hName => {
-    const hClean = cleanName(hName);
-    if (!hClean) return false;
-    return target === hClean || (hClean.length >= 4 && target.includes(hClean)) || (target.length >= 4 && hClean.includes(target));
-  });
-}
 
 function isHerreriaOrder(order) {
   if (!order) return false;
   const cls = String(order.clasificacion || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const sec = String(order.sector || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const creator = String(order.createdBy || '').toLowerCase();
-  
-  if (cls.includes('herrer') || sec.includes('herrer') || creator.includes('carmona')) return true;
+  // Routing follows only clasificacion/sector/exclusive-equipment, matching the server's
+  // /api/orders filter exactly - never who created the order or who a task is assigned to.
+  // That used to pull whole Taller orders into Herreria just because one task's assignee
+  // fuzzy-matched a Herreria name, hiding every other task in the order from Taller.
+  if (cls.includes('herrer') || sec.includes('herrer')) return true;
   if (isHerreriaExclusiveEquipmentClient(order.rodado, order.interno)) return true;
-
-  // Si la orden contiene tareas asignadas a personal de Herrería o Centro de Costo de Herrería, es de Herrería
-  if (Array.isArray(order.tasks)) {
-    const hasHerreriaTask = order.tasks.some(t => {
-      if (!t) return false;
-      const ccOpt = (typeof cachedCatalogs !== 'undefined' && cachedCatalogs.centrosCosto) ? cachedCatalogs.centrosCosto.find(c => c.value === t.centroCosto) : null;
-      const ccLabel = ccOpt ? ccOpt.label.toUpperCase() : String(t.centroCosto || '').toUpperCase();
-      if (ccLabel.includes('HERRER')) return true;
-
-      const empOpt = (typeof cachedCatalogs !== 'undefined' && cachedCatalogs.empleados) ? cachedCatalogs.empleados.find(e => e.value === t.empleado) : null;
-      const empLabel = (empOpt ? empOpt.label : t.empleado) || '';
-      return isHerreriaEmployee(empLabel);
-    });
-    if (hasHerreriaTask) return true;
-  }
-
   return false;
 }
 
