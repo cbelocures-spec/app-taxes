@@ -696,7 +696,11 @@ function openPreOrderModal() {
   // Ensure classification options match the current selected sector tab
   updateClassificationSelectOptions();
 
-  // Set default classification (Correctivo for Taller, Herrería for Herrería, Edilicio for Edilicio)
+  // Set default classification (Herrería for Herrería, Edilicio for Edilicio). Taller is left
+  // blank on purpose - pedido explicito del usuario: auto-seleccionar "Correctivo" hacia que
+  // gente que en realidad necesitaba cargar un Auxilio se equivocara sin darse cuenta, porque
+  // el campo ya venia lleno. Ahora tiene que elegirlo a mano (submitPreOrderCheck ya bloquea
+  // continuar si queda vacio).
   const clsEl = document.getElementById('pre-form-clasificacion');
   if (clsEl) {
     const currentUser = localStorage.getItem('currentUserUsername');
@@ -706,7 +710,7 @@ function openPreOrderModal() {
     } else if (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio') {
       clsEl.value = 'Edilicio';
     } else {
-      clsEl.value = 'Correctivo';
+      clsEl.value = '';
     }
   }
 
