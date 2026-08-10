@@ -2,6 +2,7 @@ FROM node:20-slim
 
 # Install wget, gnupg, and Chrome dependencies
 RUN apt-get update && apt-get install -y \
+    tini \
     wget \
     gnupg \
     ca-certificates \
@@ -55,5 +56,12 @@ COPY . .
 # Expose the port
 EXPOSE 3000
 
-# Start the server
+# Run as PID 1 via tini instead of node directly - Puppeteer/Chrome spawns several child
+# processes (zygote, GPU, renderers), and when one gets killed abruptly (e.g. by this app's
+# own zombie-cleanup pkill/kill -9 in syncWorker.js) an orphan can get reparented to PID 1.
+# Node only reaps processes it spawned itself, not arbitrary reparented orphans, so those
+# became permanent zombies that no kill -9 can remove - they piled up until the container's
+# process table filled up ("fork: retry: Resource temporarily unavailable"). tini reaps any
+# orphan regardless of what killed its original parent.
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "server.js"]
