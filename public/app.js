@@ -183,10 +183,20 @@ const HERRERIA_EMPLOYEES = [
   "Luciano",
   ];
 
+const EDILICIO_EMPLOYEES = [
+  "Orosco, Damian Agustin",
+  "RODRIGUEZ CARLOS FERNANDO"
+];
+
 function getSectorEmployees(sector) {
   const isHerreria = (sector === 'Herrería');
-  const baseDefaults = isHerreria ? [...HERRERIA_EMPLOYEES, "Federico", "Luciano", "Digno"] : [...MECANICA_EMPLOYEES];
-  
+  const isEdilicio = (sector === 'Edilicio');
+  const baseDefaults = isHerreria
+    ? [...HERRERIA_EMPLOYEES, "Federico", "Luciano", "Digno"]
+    : isEdilicio
+      ? [...EDILICIO_EMPLOYEES]
+      : [...MECANICA_EMPLOYEES];
+
   const mapped = (currentEmployeeMappings && currentEmployeeMappings[sector]) ? currentEmployeeMappings[sector] : [];
   mapped.forEach(m => {
     if (m && m.appName && m.appName.trim()) {
@@ -2060,6 +2070,7 @@ function updateEmployeeDropdownForCard(card) {
     const selectedLabel = selectedOption ? String(selectedOption.textContent || '').trim().toUpperCase() : '';
     const isHerreriaCC = selectedLabel.includes('HERRER') || selectedCc === "HERRERIA" || selectedCc === "16" || userSector === 'Herrería';
     const isMecanicaCC = selectedLabel.includes('MECAN') || selectedCc === "15" || selectedCc === "MECANICA";
+    const isEdilicioCC = selectedLabel.includes('EDILIC') || selectedCc === "EDILICIO" || selectedCc === "8" || userSector === 'Edilicio';
 
     const cleanName = (str) => {
       if (typeof str !== 'string') return '';
@@ -2115,6 +2126,23 @@ function updateEmployeeDropdownForCard(card) {
       });
 
       filteredEmployees = matchedEmployees;
+    } else if (isEdilicioCC) {
+      const edilicioNames = getSectorEmployees('Edilicio');
+      const edilicioNamesCleaned = new Set(edilicioNames.map(name => cleanName(name)));
+      let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
+        if (!emp || !emp.label) return false;
+        const empCleaned = cleanName(emp.label);
+        return edilicioNamesCleaned.has(empCleaned);
+      });
+
+      edilicioNames.forEach(name => {
+        const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
+        if (!exists) {
+          matchedEmployees.push({ value: name, label: name });
+        }
+      });
+
+      filteredEmployees = matchedEmployees;
     }
 
     // Populate options
@@ -2123,8 +2151,8 @@ function updateEmployeeDropdownForCard(card) {
       if (!opt) return;
       const optVal = String(opt.value || "");
       const optLabel = String(opt.label || opt.value || "");
-      const isSelected = optVal === String(currentValue) || 
-                         optLabel === String(currentValue) || 
+      const isSelected = optVal === String(currentValue) ||
+                         optLabel === String(currentValue) ||
                          (typeof cleanName === 'function' && cleanName(optLabel) === cleanName(String(currentValue)));
       empOptions += `<option value="${optVal}" ${isSelected ? "selected" : ""}>${optLabel}</option>`;
     });
@@ -2217,6 +2245,11 @@ function addTaskField(taskData = null) {
       const herrOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "16" || opt.value === "HERRERIA" || (opt.label && String(opt.label).toLowerCase().includes("herrer"))));
       if (herrOpt) {
         defaultCcVal = herrOpt.value;
+      }
+    } else if (userSector === 'Edilicio') {
+      const ediOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "8" || opt.value === "EDILICIO" || (opt.label && String(opt.label).toLowerCase().includes("edilic"))));
+      if (ediOpt) {
+        defaultCcVal = ediOpt.value;
       }
     }
 
@@ -2440,6 +2473,7 @@ function addTaskField(taskData = null) {
       const ccLabelUpper = ccCatalogOpt && ccCatalogOpt.label ? String(ccCatalogOpt.label).trim().toUpperCase() : String(taskData.centroCosto || '').toUpperCase();
       const isHerreriaCC = ccLabelUpper.includes('HERRER');
       const isMecanicaCC = ccLabelUpper.includes('MECAN') || taskData.centroCosto === '15';
+      const isEdilicioCC = ccLabelUpper.includes('EDILIC') || taskData.centroCosto === '8';
 
       if (isMecanicaCC) {
         const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
@@ -2475,6 +2509,12 @@ function addTaskField(taskData = null) {
           }
         });
         filteredEmployees = matchedEmployees;
+      } else if (isEdilicioCC) {
+        const edilicioNamesCleaned = new Set(EDILICIO_EMPLOYEES.map(name => cleanName(name)));
+        filteredEmployees = (cachedCatalogs.empleados || []).filter(emp => {
+          if (!emp || !emp.label) return false;
+          return edilicioNamesCleaned.has(cleanName(emp.label));
+        });
       }
       let empOptions = `<option value="">Seleccionar Empleado...</option>`;
       filteredEmployees.forEach(opt => {
@@ -6089,6 +6129,7 @@ function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
     const selectedLabel = selectedOption ? selectedOption.textContent.trim().toUpperCase() : '';
     const isHerreriaCC = selectedLabel.includes('HERRER') || selectedCc === "HERRERIA" || selectedCc === "16" || userSector === 'Herrería';
     const isMecanicaCC = selectedLabel.includes('MECAN') || selectedCc === "15" || selectedCc === "MECANICA";
+    const isEdilicioCC = selectedLabel.includes('EDILIC') || selectedCc === "EDILICIO" || selectedCc === "8" || userSector === 'Edilicio';
 
     const cleanName = (str) => {
       if (typeof str !== 'string') return '';
@@ -6137,6 +6178,23 @@ function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
       });
 
       mecanicaNames.forEach(name => {
+        const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
+        if (!exists) {
+          matchedEmployees.push({ value: name, label: name });
+        }
+      });
+
+      filteredEmployees = matchedEmployees.length >= 1 ? matchedEmployees : (cachedCatalogs.empleados || []);
+    } else if (isEdilicioCC) {
+      const edilicioNames = getSectorEmployees('Edilicio');
+      const edilicioNamesCleaned = new Set(edilicioNames.map(name => cleanName(name)));
+      let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
+        if (!emp || !emp.label) return false;
+        const empCleaned = cleanName(emp.label);
+        return edilicioNamesCleaned.has(empCleaned);
+      });
+
+      edilicioNames.forEach(name => {
         const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
         if (!exists) {
           matchedEmployees.push({ value: name, label: name });
@@ -9317,6 +9375,7 @@ function setupAllFieldsForSector() {
   const preClasif = document.getElementById('pre-form-clasificacion') ? document.getElementById('pre-form-clasificacion').value : '';
   const formClasif = document.getElementById('form-clasificacion') ? document.getElementById('form-clasificacion').value : '';
   const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || preClasif === 'Herrería' || formClasif === 'Herrería');
+  const isEdilicio = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio' || preClasif === 'Edilicio' || formClasif === 'Edilicio');
 
   // 1. Main modal: Rodado
   const rodadoSelectGroup = document.getElementById('form-rodado-group-select');
@@ -9329,6 +9388,28 @@ function setupAllFieldsForSector() {
   if (rodadoSelect) rodadoSelect.setAttribute('required', 'true');
   if (rodadoText) rodadoText.removeAttribute('required');
 
+  // 1.5 Edilicio isn't about vehicles: restrict Rodado to the known buildings/properties
+  // catalog entries (modelo "Mantenimiento Edilicio"). Preserves whatever is currently
+  // selected across the repopulation so editing an existing order doesn't lose its value.
+  if (rodadoSelect) {
+    const currentRodadoValue = rodadoSelect.value;
+    const rodadoOptionsList = isEdilicio
+      ? (cachedCatalogs.rodados || []).filter(r => String(r.modelo || '').trim() === 'Mantenimiento Edilicio')
+      : (cachedCatalogs.rodados || []);
+    populateSelect('form-rodado', rodadoOptionsList, "Seleccionar Rodado...");
+    if (currentRodadoValue) {
+      const stillExists = Array.from(rodadoSelect.options).some(opt => opt.value === currentRodadoValue);
+      if (!stillExists) {
+        const customOpt = document.createElement('option');
+        customOpt.value = currentRodadoValue;
+        customOpt.textContent = currentRodadoValue;
+        rodadoSelect.appendChild(customOpt);
+      }
+      rodadoSelect.value = currentRodadoValue;
+    }
+    if (rodadoSelect.rebuildSearchable) rodadoSelect.rebuildSearchable();
+  }
+
   // 2. Pre-order modal ("Filtro de Unidad y Tipo"): Interno ALWAYS uses the searchable dropdown list
   const preInternoSelectGroup = document.getElementById('pre-form-interno-group-select');
   const preInternoTextGroup = document.getElementById('pre-form-interno-group-text');
@@ -9340,13 +9421,13 @@ function setupAllFieldsForSector() {
   if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
   if (preInternoText) preInternoText.removeAttribute('required');
 
-  // 3. Main modal ("Datos Generales"): Interno uses free text input box for Herrería
+  // 3. Main modal ("Datos Generales"): Interno uses free text input box for Herrería/Edilicio
   const internoSelectGroup = document.getElementById('form-interno-group-select');
   const internoTextGroup = document.getElementById('form-interno-group-text');
   const internoSelect = document.getElementById('form-interno');
   const internoText = document.getElementById('form-interno-text');
 
-  if (isHerreria) {
+  if (isHerreria || isEdilicio) {
     if (internoSelectGroup) internoSelectGroup.style.display = 'none';
     if (internoTextGroup) internoTextGroup.style.display = 'block';
     if (internoSelect) internoSelect.removeAttribute('required');
