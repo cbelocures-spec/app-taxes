@@ -2240,13 +2240,19 @@ function addTaskField(taskData = null) {
 
     const currentUser = localStorage.getItem('currentUserUsername');
     const userSector = getSectorByUsername(currentUser);
+    // Also honor the order's own Clasificación (not just the logged-in user's sector) -
+    // an Admin/Pañol account creating an Edilicio/Herrería order isn't detected as that
+    // sector by username, but the task should still default to its Centro de Costo.
+    const activeClasif = document.getElementById('form-clasificacion') ? document.getElementById('form-clasificacion').value : '';
+    const isHerreriaTask = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || activeClasif === 'Herrería');
+    const isEdilicioTask = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio' || activeClasif === 'Edilicio');
     let defaultCcVal = "15"; // default to MECANICA
-    if (userSector === 'Herrería') {
+    if (isHerreriaTask) {
       const herrOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "16" || opt.value === "HERRERIA" || (opt.label && String(opt.label).toLowerCase().includes("herrer"))));
       if (herrOpt) {
         defaultCcVal = herrOpt.value;
       }
-    } else if (userSector === 'Edilicio') {
+    } else if (isEdilicioTask) {
       const ediOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "8" || opt.value === "EDILICIO" || (opt.label && String(opt.label).toLowerCase().includes("edilic"))));
       if (ediOpt) {
         defaultCcVal = ediOpt.value;
@@ -9420,6 +9426,20 @@ function setupAllFieldsForSector() {
   if (preInternoTextGroup) preInternoTextGroup.style.display = 'none';
   if (preInternoSelect) preInternoSelect.setAttribute('required', 'true');
   if (preInternoText) preInternoText.removeAttribute('required');
+
+  // Same Edilicio restriction as Rodado above, applied to this modal's own unit picker.
+  if (preInternoSelect) {
+    const currentPreInternoValue = preInternoSelect.value;
+    const preInternoOptionsList = isEdilicio
+      ? (cachedCatalogs.rodados || []).filter(r => String(r.modelo || '').trim() === 'Mantenimiento Edilicio').map(r => ({ value: r.interno, label: r.label }))
+      : cachedInternoOptions;
+    populateSelect('pre-form-interno', preInternoOptionsList, "Seleccionar Rodado...");
+    if (currentPreInternoValue) {
+      const stillExists = Array.from(preInternoSelect.options).some(opt => opt.value === currentPreInternoValue);
+      if (stillExists) preInternoSelect.value = currentPreInternoValue;
+    }
+    if (preInternoSelect.rebuildSearchable) preInternoSelect.rebuildSearchable();
+  }
 
   // 3. Main modal ("Datos Generales"): Interno uses free text input box for Herrería/Edilicio
   const internoSelectGroup = document.getElementById('form-interno-group-select');
