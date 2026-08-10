@@ -9404,7 +9404,7 @@ function setupAllFieldsForSector() {
   if (rodadoSelect) {
     const currentRodadoValue = rodadoSelect.value;
     const rodadoOptionsList = isEdilicio
-      ? (cachedCatalogs.rodados || []).filter(r => String(r.modelo || '').trim() === 'Mantenimiento Edilicio')
+      ? (cachedCatalogs.rodados || []).filter(r => String(r.modelo || '').trim() === 'Mantenimiento Edilicio').map(r => ({ value: r.value, label: r.interno }))
       : (cachedCatalogs.rodados || []);
     populateSelect('form-rodado', rodadoOptionsList, "Seleccionar Rodado...");
     if (currentRodadoValue) {
@@ -9435,7 +9435,7 @@ function setupAllFieldsForSector() {
   if (preInternoSelect) {
     const currentPreInternoValue = preInternoSelect.value;
     const preInternoOptionsList = isEdilicio
-      ? (cachedCatalogs.rodados || []).filter(r => String(r.modelo || '').trim() === 'Mantenimiento Edilicio').map(r => ({ value: r.interno, label: r.label }))
+      ? (cachedCatalogs.rodados || []).filter(r => String(r.modelo || '').trim() === 'Mantenimiento Edilicio').map(r => ({ value: r.interno, label: r.interno }))
       : cachedInternoOptions;
     populateSelect('pre-form-interno', preInternoOptionsList, "Seleccionar Rodado...");
     if (currentPreInternoValue) {
