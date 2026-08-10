@@ -11938,7 +11938,10 @@ async function savePtUnit() {
 // ============================================================
 
 function getVerificationBadgeHtml(order) {
-  if (order.syncStatus !== 'success' && !(order.syncStatus === 'error' && order.taxesOrderNumber)) return '';
+  // Once an order has a real OT number in Taxes, the "Sin Controlar"/"Controlado" badge
+  // stops being relevant - pedido explicito del usuario.
+  if (order.taxesOrderNumber) return '';
+  if (order.syncStatus !== 'success') return '';
 
   const count = order.verifiedCount || 0;
 

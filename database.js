@@ -855,7 +855,26 @@ class LocalDB {
         delete cleanUpdates.taxesOrderNumber;
       }
 
+      const explicitArchiveOverride = Object.prototype.hasOwnProperty.call(cleanUpdates, 'archived');
       db.workOrders[idx] = { ...db.workOrders[idx], ...cleanUpdates };
+
+      // Auto-archive to Historial once every task is both Finalizada/Completada AND already
+      // synced to Taxes, and the unit is back in service. syncWorker.js/railway_sync_agent.js
+      // update orders directly through this method (not through server.js's PUT /api/orders/:id,
+      // which has its own copy of this same rule for manual edits) - without checking it here
+      // too, an order synced entirely in the background could sit "done" forever and never move
+      // to Historial. Skipped when this call itself explicitly sets `archived` (a manual
+      // archive/unarchive action, or the PUT route's own computed value) - that always wins.
+      if (!explicitArchiveOverride) {
+        const o = db.workOrders[idx];
+        const tasks = o.tasks || [];
+        const allDoneAndSynced = tasks.length > 0 && tasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada') && t.synced === true);
+        if (!o.archived && !o.deleted && o.estadoUnidad !== 'fuera_de_servicio' && allDoneAndSynced) {
+          o.archived = true;
+          o.archivedAt = o.archivedAt || new Date().toISOString();
+        }
+      }
+
       this.write(db);
       // Save backup snapshot automatically on every meaningful update
       this.saveBackupSnapshot(db.workOrders[idx]);

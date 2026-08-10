@@ -611,6 +611,21 @@ app.get('/api/orders', (req, res) => {
       }
     });
 
+    // Auto-archive orders that finished (all tasks Finalizada + synced) and are back in
+    // service, but never got re-checked because nothing edited them since syncing completed
+    // (see database.js's updateWorkOrder, which normally catches this - this sweep is only
+    // for orders that were already stuck before that fix existed).
+    orders.forEach(o => {
+      if (o.archived || o.deleted || o.estadoUnidad === 'fuera_de_servicio') return;
+      const tasks = o.tasks || [];
+      const allDoneAndSynced = tasks.length > 0 && tasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada') && t.synced === true);
+      if (allDoneAndSynced) {
+        console.log(`[Auto-Heal] Order ${o.id} finished and synced but never archived. Moving to Historial...`);
+        const updated = db.updateWorkOrder(o.id, {});
+        if (updated) { o.archived = updated.archived; o.archivedAt = updated.archivedAt; }
+      }
+    });
+
     // Filter orders based on user's authorized sectors
     const filtered = orders.filter(o => {
       const cls = o.clasificacion;
@@ -998,7 +1013,9 @@ app.put('/api/orders/:id', (req, res) => {
 
     const targetEstadoUnidad = estadoUnidad !== undefined ? estadoUnidad : existing.estadoUnidad;
     const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
-    const allTasksCompleted = finalTasksToSave.length > 0 && finalTasksToSave.every(t => t && (t.status === "Finalizada" || t.status === "Completada"));
+    // Requires synced === true too (not just Finalizada) - a task marked done locally but not
+    // yet pushed to Taxes shouldn't drop off into Historial before it's actually confirmed there.
+    const allTasksCompleted = finalTasksToSave.length > 0 && finalTasksToSave.every(t => t && (t.status === "Finalizada" || t.status === "Completada") && t.synced === true);
 
     const explicitUnarchive = (req.body.archived === false);
     // Only force a resync on an ordinary edit if the OT header hasn't been created in
