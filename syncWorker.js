@@ -52,6 +52,31 @@ function initMockCatalogs() {
   }
 }
 
+// Maps the LOCAL APP username that created an order to their real name in Taxes' Responsable
+// catalog. The Taxes login used by this bot is always the shared "paniol" account regardless
+// of who created the order in the app, so resolving Responsable by matching against THAT
+// login (as the code used to do) always fell through to "Belocures, Cesar Hernán" no matter
+// who actually did the work - pedido explicito del usuario (2026-08-10).
+const CREATOR_USERNAME_TO_RESPONSABLE = {
+  'jcarmona@contenedoreshugo.com.ar': 'Carmona González, Juan Manuel',
+  'a.brahim@contenedoreshugo.com.ar': 'Brahim, Hugo Adrian',
+  'sergios@contenedoreshugo.com.ar': 'Schirripa, Sergio Ricardo',
+  'n.rodriguez@contenedoreshugo.com.ar': 'RODRIGUEZ NICOLAS',
+  'paniol@contenedoreshugo.com.ar': 'Belocures, Cesar Hernán'
+};
+
+// Resolves who should be selected as "Responsable" in Taxes for a given order: the real
+// name already saved on the order wins if present; otherwise map whoever created it in the
+// app (order.createdBy) to their real name via the table above.
+function resolveResponsableFromCreator(order) {
+  const raw = order && order.responsable;
+  const isEmailOrAuto = !raw || raw === 'AUTO' || String(raw).includes('@');
+  if (!isEmailOrAuto) return raw;
+
+  const createdBy = String((order && order.createdBy) || '').toLowerCase().trim();
+  return CREATOR_USERNAME_TO_RESPONSABLE[createdBy] || null;
+}
+
 // Background Worker state
 let isWorkerRunning = false;
 const candadoInternosActivos = new Set(); // Evita ejecuciones paralelas para el mismo camión
@@ -1953,10 +1978,7 @@ async function syncWorkOrder(orderId) {
           await page.screenshot({ path: 'public/paso1_rodado.png' }).catch(() => {});
 
           // 3. CARGAR RESPONSABLE (si es Belocures Cesar, lo buscará al final con "Belocures," / "Belocures, ---")
-          let targetResponsableAlta = order.responsable;
-          if (!targetResponsableAlta || targetResponsableAlta === 'AUTO' || targetResponsableAlta.includes('@')) {
-            targetResponsableAlta = "Belocures, Cesar Hernán";
-          }
+          let targetResponsableAlta = resolveResponsableFromCreator(order) || "Belocures, Cesar Hernán";
           console.log(`[Puppeteer] 2. Cargar Responsable: ${targetResponsableAlta}`);
           let respFilledAlta = await fillSearchableSelect(page, 'Responsable', targetResponsableAlta);
           if (!respFilledAlta) {
@@ -1999,26 +2021,36 @@ async function syncWorkOrder(orderId) {
           // 5. CARGAR CLASIFICACIÓN
           console.log(`[Puppeteer] 4. Cargar Clasificación: ${order.clasificacion}`);
           await safeEvaluate(page, (valorClasificacion) => {
-            const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
-            const etiquetaClasif = etiquetas.find(el => {
-              const txt = el.textContent.trim().toLowerCase();
-              return txt.startsWith('clasificación') || txt.startsWith('clasificacion');
-            });
-            
-            if (etiquetaClasif) {
-              const contenedor = etiquetaClasif.closest('.form-group') || etiquetaClasif.closest('.taxes-form-group') || etiquetaClasif.parentElement;
-              const select = contenedor ? contenedor.querySelector('select') : null;
-              if (select && valorClasificacion) {
-                const clean = s => String(s || '').trim().toUpperCase();
-                const opt = Array.from(select.options).find(o => clean(o.textContent).includes(clean(valorClasificacion)));
-                if (opt) {
-                  select.value = opt.value;
-                } else {
-                  select.value = valorClasificacion;
-                }
-                select.dispatchEvent(new Event('change', { bubbles: true }));
-                select.dispatchEvent(new Event('input', { bubbles: true }));
+            const cleanForCompare = (str) => String(str || '').normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+            // Prefer the select's own name attribute (stable regardless of label markup) -
+            // matches how the full sync flow locates it. Only fall back to hunting for it by
+            // label text if that selector isn't present in this variant of the form. Options
+            // must also be accent-normalized when compared, or "Herrería" never matches "HERRERIA".
+            let select = document.querySelector('select[name="inv_ot_clasificacion_id"]');
+            if (!select) {
+              const etiquetas = Array.from(document.querySelectorAll('label, div, span'));
+              const etiquetaClasif = etiquetas.find(el => {
+                const txt = el.textContent.trim().toLowerCase();
+                return txt.startsWith('clasificación') || txt.startsWith('clasificacion');
+              });
+              const contenedor = etiquetaClasif ? (etiquetaClasif.closest('.form-group') || etiquetaClasif.closest('.taxes-form-group') || etiquetaClasif.parentElement) : null;
+              select = contenedor ? contenedor.querySelector('select') : null;
+            }
+
+            if (select && valorClasificacion) {
+              const cleanVal = cleanForCompare(valorClasificacion);
+              const opt = Array.from(select.options).find(o =>
+                cleanForCompare(o.textContent).includes(cleanVal) ||
+                cleanForCompare(o.value) === cleanVal
+              );
+              if (opt) {
+                select.value = opt.value;
+              } else {
+                select.value = valorClasificacion;
               }
+              select.dispatchEvent(new Event('change', { bubbles: true }));
+              select.dispatchEvent(new Event('input', { bubbles: true }));
             }
           }, order.clasificacion);
           await delay(500);
@@ -3303,6 +3335,17 @@ async function syncWorkOrder(orderId) {
     const isEmailOrAuto = !targetResponsable || targetResponsable === 'AUTO' || targetResponsable.includes('@');
     if (isEmailOrAuto) {
       console.log("Resolving Responsable automatically...");
+
+      // Prefer the LOCAL APP user who created the order over whoever is logged into Taxes -
+      // the Taxes login is always the shared "paniol" bot account regardless of who actually
+      // created the order, so matching against it (the fallback chain below) never resolves
+      // to the real responsible person.
+      const mappedFromCreator = resolveResponsableFromCreator(order);
+      if (mappedFromCreator) {
+        targetResponsable = mappedFromCreator;
+        console.log("Resolved Responsable from order.createdBy:", targetResponsable);
+      } else {
+
       const profileName = await safeEvaluate(page, () => {
         const el = document.querySelector('.user-profile-name, .user-profile-toggle, .user-profile-info, .profile-user, .user-profile, .user-name, .nav-item .nav-link span, .dropdown-toggle');
         return el ? el.textContent.trim() : '';
@@ -3311,7 +3354,7 @@ async function syncWorkOrder(orderId) {
 
       const list = db.getCatalogs().responsables || [];
       let matched = null;
-      
+
       const cleanText = (str) => {
         if (!str) return '';
         return str.normalize("NFD")
@@ -3370,6 +3413,7 @@ async function syncWorkOrder(orderId) {
         const defaultBelocures = list.find(r => r.label.toLowerCase().includes('belocures'));
         targetResponsable = defaultBelocures ? defaultBelocures.label : (list.length > 0 ? list[0].label : "Belocures, Cesar Hernán");
         console.log("Fallback to Belocures as default Responsable:", targetResponsable);
+      }
       }
     }
 
