@@ -188,6 +188,17 @@ const EDILICIO_EMPLOYEES = [
   "RODRIGUEZ CARLOS FERNANDO"
 ];
 
+// Mirrors syncWorker.js's CREATOR_USERNAME_TO_RESPONSABLE - used here only to pre-select the
+// "Responsable" dropdown with whoever is logged in, so the field shows the right name instead
+// of blank/whatever was left over from a previous order.
+const CREATOR_USERNAME_TO_RESPONSABLE = {
+  'jcarmona@contenedoreshugo.com.ar': 'Carmona González, Juan Manuel',
+  'a.brahim@contenedoreshugo.com.ar': 'Brahim, Hugo Adrian',
+  'sergios@contenedoreshugo.com.ar': 'Schirripa, Sergio Ricardo',
+  'n.rodriguez@contenedoreshugo.com.ar': 'RODRIGUEZ NICOLAS',
+  'paniol@contenedoreshugo.com.ar': 'Belocures, Cesar Hernán'
+};
+
 function getSectorEmployees(sector) {
   const isHerreria = (sector === 'Herrería');
   const isEdilicio = (sector === 'Edilicio');
@@ -1357,7 +1368,21 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
     const isHerreriaTabOrUser = isHerreria || currentSelectedSector === 'Herrería';
     clasificacionEl.value = presetClasificacion || (isHerreriaTabOrUser ? 'Herrería' : (userSector === 'Edilicio' ? 'Edilicio' : 'Correctivo'));
   }
-  
+
+  // 4.5 Pre-select Responsable with whoever is logged in - the payload used to always send
+  // the literal string "AUTO" regardless of what this field showed, so it never mattered what
+  // was selected here; now it does, so default it to the real person instead of leaving
+  // whatever was left selected from a previously edited order. Options are keyed by numeric
+  // catalog id, not by name, so match by the option's visible text.
+  const responsableSelectEl = document.getElementById('form-responsable');
+  if (responsableSelectEl) {
+    const mappedResponsable = CREATOR_USERNAME_TO_RESPONSABLE[String(localStorage.getItem('currentUserUsername') || '').toLowerCase().trim()];
+    const matchedOpt = mappedResponsable
+      ? Array.from(responsableSelectEl.options).find(opt => opt.textContent.trim() === mappedResponsable)
+      : null;
+    responsableSelectEl.value = matchedOpt ? matchedOpt.value : "";
+  }
+
   // Re-run setupAllFieldsForSector now that Clasificación has been populated!
   setupAllFieldsForSector();
   
@@ -3858,7 +3883,12 @@ async function submitWorkOrder() {
    
     const payload = {
       rodado: rodadoLabel,
-      responsable: "AUTO",
+      // The select's own value is a numeric catalog id (e.g. "507"), not a name - send the
+      // option's visible label text, which is what syncWorker.js actually matches against
+      // Taxes' Responsable field.
+      responsable: (responsableEl && responsableEl.value && responsableEl.selectedIndex >= 0)
+        ? responsableEl.options[responsableEl.selectedIndex].textContent.trim()
+        : "AUTO",
       interno: internoVal,
       clasificacion: clasificacionEl.value,
       fechaEntrega: fechaEl ? fechaEl.value : '',
