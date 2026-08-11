@@ -2942,26 +2942,58 @@ app.post('/api/active-mechanics', (req, res) => {
 });
 
 // --- PREVENTIVOS PROXY ENDPOINTS ---
+function applyOdometerOverrides(data) {
+  if (!Array.isArray(data)) return data;
+  const overrides = db.getOdometerOverrides();
+  if (Object.keys(overrides).length === 0) return data;
+
+  return data.map(item => {
+    const key = String(item.interno || '').trim();
+    const cleanNumKey = key.replace(/\D/g, '');
+    const ovKey = Object.keys(overrides).find(k => {
+      const cleanK = k.replace(/\D/g, '');
+      return k === key || (cleanNumKey && cleanK && cleanK === cleanNumKey);
+    });
+
+    const ov = ovKey ? overrides[ovKey] : null;
+    if (!ov) return item;
+
+    const patched = { ...item };
+    const overrideKm = (ov.km !== undefined && !isNaN(ov.km)) ? ov.km : (ov.hs !== undefined && !isNaN(ov.hs) ? ov.hs : undefined);
+    const overrideHs = (ov.hs !== undefined && !isNaN(ov.hs)) ? ov.hs : (ov.km !== undefined && !isNaN(ov.km) ? ov.km : undefined);
+
+    if (overrideKm !== undefined) patched.kmReales = overrideKm;
+    if (overrideHs !== undefined) patched.hsReales = overrideHs;
+
+    // Recalcular Faltante / Restantes y Alerta dinámicamente
+    const isHs = patched.unidadMedida === 'hs' || String(patched.serviFreq || '').toLowerCase().includes('hs');
+    const freqRaw = String(patched.serviFreq || '');
+    const freqNum = parseFloat(freqRaw.replace(/[^0-9\.]/g, '')) || 0;
+    const currentReading = isHs ? (patched.hsReales || patched.kmReales || 0) : (patched.kmReales || 0);
+
+    if (freqNum > 0) {
+      const rem = freqNum - (currentReading % freqNum);
+      const remaining = (rem < 0 || rem === freqNum) ? 0 : rem;
+      
+      patched.faltante = Math.round(remaining).toLocaleString('es-AR') + (isHs ? ' Hs' : ' km');
+      if (remaining <= 0 || currentReading >= freqNum) {
+        patched.alerta = 'Realizar Service';
+      } else {
+        patched.alerta = 'OK';
+      }
+    }
+
+    return patched;
+  });
+}
+
 let preventivosFlotaCache = null;
 let preventivosFlotaCacheTime = 0;
 
 app.get('/api/preventivos/flota', async (req, res) => {
   const now = Date.now();
   if (preventivosFlotaCache && (now - preventivosFlotaCacheTime < 5 * 60 * 1000) && !req.query.force) {
-    const overrides = db.getOdometerOverrides();
-    let data = preventivosFlotaCache;
-    if (Array.isArray(data) && Object.keys(overrides).length > 0) {
-      data = data.map(item => {
-        const key = String(item.interno || '').trim();
-        const ov = overrides[key];
-        if (!ov) return item;
-        const patched = { ...item };
-        if (ov.km !== undefined && !isNaN(ov.km)) patched.kmReales = ov.km;
-        if (ov.hs !== undefined && !isNaN(ov.hs)) patched.hsReales = ov.hs;
-        return patched;
-      });
-    }
-    return res.json(data);
+    return res.json(applyOdometerOverrides(preventivosFlotaCache));
   }
 
   const settings = db.getSettings();
@@ -2978,24 +3010,11 @@ app.get('/api/preventivos/flota', async (req, res) => {
     preventivosFlotaCache = data;
     preventivosFlotaCacheTime = now;
 
-    const overrides = db.getOdometerOverrides();
-    if (Array.isArray(data) && Object.keys(overrides).length > 0) {
-      data = data.map(item => {
-        const key = String(item.interno || '').trim();
-        const ov = overrides[key];
-        if (!ov) return item;
-        const patched = { ...item };
-        if (ov.km !== undefined && !isNaN(ov.km)) patched.kmReales = ov.km;
-        if (ov.hs !== undefined && !isNaN(ov.hs)) patched.hsReales = ov.hs;
-        return patched;
-      });
-    }
-
-    res.json(data);
+    res.json(applyOdometerOverrides(data));
   } catch (error) {
     console.error("Error fetching preventivos fleet:", error);
     if (preventivosFlotaCache) {
-      return res.json(preventivosFlotaCache);
+      return res.json(applyOdometerOverrides(preventivosFlotaCache));
     }
     res.status(500).json({ error: error.message });
   }
@@ -3083,21 +3102,7 @@ app.get('/api/preventivos/livianas', async (req, res) => {
 
     if (!data) data = defaultLivianas;
 
-    // Apply local odometer overrides
-    const overrides = db.getOdometerOverrides();
-    if (Array.isArray(data) && Object.keys(overrides).length > 0) {
-      data = data.map(item => {
-        const key = String(item.interno || '').trim();
-        const ov = overrides[key];
-        if (!ov) return item;
-        const patched = { ...item };
-        if (ov.km !== undefined && !isNaN(ov.km)) patched.kmReales = ov.km;
-        if (ov.hs !== undefined && !isNaN(ov.hs)) patched.hsReales = ov.hs;
-        return patched;
-      });
-    }
-
-    res.json(data);
+    res.json(applyOdometerOverrides(data));
   } catch (error) {
     console.error("Error fetching preventivos livianas:", error);
     res.status(500).json({ error: error.message });

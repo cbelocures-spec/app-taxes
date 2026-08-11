@@ -9664,7 +9664,9 @@ function prevFlotaOpenService(ri) {
 function prevFlotaOpenOdometer(ri) {
   const item = window._prevFlotaMap && window._prevFlotaMap[ri];
   if (!item) return;
-  openPrevOdometerModal(item.originalRowIndex, item.interno, item.modelo, item.kmReales || 0, item.hsReales || 0);
+  const isHs = item.unidadMedida === 'hs' || String(item.serviFreq || '').toLowerCase().includes('hs') || String(item.modelo || '').toLowerCase().includes('iveco');
+  const currentVal = isHs ? (item.hsReales || item.kmReales || 0) : (item.kmReales || 0);
+  openPrevOdometerModal(item.originalRowIndex, item.interno, item.modelo, isHs ? 0 : currentVal, isHs ? currentVal : 0, isHs);
 }
 
 async function fetchPrevCombustible() {
@@ -10132,22 +10134,31 @@ async function savePrevService() {
 
 // Modal KM/HS Actualizar Odometer
 let prevCurrentOdometerRow = null;
-function openPrevOdometerModal(rowIndex, interno, modelo, km, hs) {
+function openPrevOdometerModal(rowIndex, interno, modelo, km, hs, forceHs = false) {
   const isIveco = String(modelo || '').toLowerCase().includes('iveco');
-  prevCurrentOdometerRow = { rowIndex, interno, modelo, vehicleType: isIveco ? 'iveco' : 'km' };
-  document.getElementById('prev-odometer-modal-interno').textContent = `${interno} — ${modelo}`;
-  // Show/hide the relevant field
+  const isHs = forceHs || isIveco || Boolean(hs && !km);
+  prevCurrentOdometerRow = { rowIndex, interno, modelo, vehicleType: isHs ? 'iveco' : 'km', isHs };
+  
+  const labelEl = document.getElementById('prev-odometer-modal-interno');
+  if (labelEl) labelEl.textContent = `${interno} — ${modelo || 'Unidad'}`;
+
   const kmGroup = document.getElementById('prev-odometer-modal-km-group');
   const hsGroup = document.getElementById('prev-odometer-modal-hs-group');
-  if (kmGroup) kmGroup.style.display = isIveco ? 'none' : 'block';
-  if (hsGroup) hsGroup.style.display = isIveco ? 'block' : 'none';
-  document.getElementById('prev-odometer-modal-km').value = isIveco ? '' : (km || '');
-  document.getElementById('prev-odometer-modal-hs').value = isIveco ? (hs || '') : '';
-  document.getElementById('prev-odometer-modal').classList.add('open');
+
+  if (kmGroup) kmGroup.style.display = isHs ? 'none' : 'block';
+  if (hsGroup) hsGroup.style.display = isHs ? 'block' : 'none';
+
+  const kmInput = document.getElementById('prev-odometer-modal-km');
+  const hsInput = document.getElementById('prev-odometer-modal-hs');
+
+  if (kmInput) kmInput.value = isHs ? '' : (km || '');
+  if (hsInput) hsInput.value = isHs ? (hs || km || '') : '';
+
+  const modal = document.getElementById('prev-odometer-modal');
+  if (modal) modal.classList.add('open');
+
   setTimeout(() => {
-    const focusEl = isIveco
-      ? document.getElementById('prev-odometer-modal-hs')
-      : document.getElementById('prev-odometer-modal-km');
+    const focusEl = isHs ? hsInput : kmInput;
     if (focusEl) focusEl.focus();
   }, 100);
 }
@@ -10159,15 +10170,17 @@ function closePrevOdometerModal() {
 
 async function savePrevOdometer() {
   if (!prevCurrentOdometerRow) return;
-  const km = document.getElementById('prev-odometer-modal-km').value;
-  const hs = document.getElementById('prev-odometer-modal-hs').value;
   const btn = document.getElementById('btn-save-prev-odometer');
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons" style="animation:spin 1.5s linear infinite; font-size:16px; vertical-align:middle;">sync</span> Guardando...';
   try {
-    const isIveco = prevCurrentOdometerRow.vehicleType === 'iveco';
-    const km = isIveco ? '' : document.getElementById('prev-odometer-modal-km').value.trim();
-    const hs = isIveco ? document.getElementById('prev-odometer-modal-hs').value.trim() : '';
+    const isHs = prevCurrentOdometerRow.isHs || prevCurrentOdometerRow.vehicleType === 'iveco';
+    const kmVal = (document.getElementById('prev-odometer-modal-km')?.value || '').trim();
+    const hsVal = (document.getElementById('prev-odometer-modal-hs')?.value || '').trim();
+
+    const km = isHs ? (kmVal || hsVal) : kmVal;
+    const hs = isHs ? (hsVal || kmVal) : hsVal;
+
     const res = await fetch('/api/preventivos/odometer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -10176,7 +10189,7 @@ async function savePrevOdometer() {
         km,
         hs,
         interno: prevCurrentOdometerRow.interno,
-        vehicleType: isIveco ? 'iveco' : ''
+        vehicleType: isHs ? 'iveco' : ''
       })
     });
     if (!res.ok) {
@@ -10185,7 +10198,10 @@ async function savePrevOdometer() {
     }
     showToast(`Kilómetros/Horas actualizados para interno ${prevCurrentOdometerRow.interno} ✓`, 'success');
     closePrevOdometerModal();
-    await fetchPreventivoFlota();
+
+    // Refrescar ambas tablas para recalcular Restantes/Faltante en vivo
+    if (typeof fetchPreventivoFlota === 'function') await fetchPreventivoFlota();
+    if (typeof fetchPreventivosLivianas === 'function') await fetchPreventivosLivianas();
   } catch (error) {
     showToast(`Error al actualizar KM/HS: ${error.message}`, 'danger');
   } finally {
