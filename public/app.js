@@ -5004,7 +5004,7 @@ function renderDashboard() {
     }
 
     // Active tasks from all orders (including local, error, pending, syncing, success)
-    const activeLocalOrders = getFilteredActiveOrders();
+    const activeLocalOrders = getOrdersForDashboard();
 
     // Update Stats Dashboard Cards dynamically
     updateDashboardStats();
@@ -7329,6 +7329,30 @@ function getFilteredActiveOrders() {
     }
     // Taller tab: Includes all orders except explicit Herrería/Edilicio
     return !isHerreriaOrder(o) && !isEdilicioOrder(o);
+  });
+}
+
+// Same sector scoping as getFilteredActiveOrders(), but ALSO includes an order that isn't
+// itself classified as Herrería when it contains at least one task assigned to a Herrería
+// employee - some orders (e.g. the generic "REPARACIONES INTERNAS" bucket) are genuinely
+// shared: several people from different sectors each log their own task under the same OT.
+// Used only by the Inicio dashboard (one card per task), which then applies its own per-task
+// filter - without this, such an order never reaches that filter on the Herrería tab at all,
+// so those specific tasks end up invisible on BOTH tabs instead of showing on the right one.
+function getOrdersForDashboard() {
+  if (!activeOrders || !Array.isArray(activeOrders)) return [];
+  const sectorFilter = currentSelectedSector || 'Taller';
+  if (sectorFilter !== 'Herrería') return getFilteredActiveOrders();
+
+  return activeOrders.filter(o => {
+    if (o.status === 'Archivada' || o.status === 'Eliminada') return false;
+    if (isHerreriaOrder(o)) return true;
+    return (o.tasks || []).some(t => {
+      if (!t) return false;
+      const empOpt = (cachedCatalogs && cachedCatalogs.empleados) ? cachedCatalogs.empleados.find(e => e.value === t.empleado) : null;
+      const empLabel = (empOpt ? empOpt.label : t.empleado) || '';
+      return isHerreriaEmployeeName(empLabel);
+    });
   });
 }
 
