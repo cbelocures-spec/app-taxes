@@ -240,6 +240,16 @@ function isHerreriaEmployeeName(employeeName) {
   });
 }
 
+// A task's centroCosto is stored as a catalog code (e.g. "11", "16"), never the word
+// "Herreria" itself - that only appears in the catalog's LABEL for that code. Comparing the
+// raw code against "HERRER" (as this used to do) never matched real data.
+function isHerreriaCentroCosto(centroCosto) {
+  if (!centroCosto) return false;
+  const ccOpt = (cachedCatalogs && cachedCatalogs.centrosCosto) ? cachedCatalogs.centrosCosto.find(c => c && c.value === centroCosto) : null;
+  const ccLabel = ccOpt && ccOpt.label ? ccOpt.label : String(centroCosto);
+  return ccLabel.toUpperCase().includes('HERRER');
+}
+
 function populateDatalist(datalistId, options) {
   const el = document.getElementById(datalistId);
   if (!el) return;
@@ -5035,7 +5045,7 @@ function renderDashboard() {
           // assigned to - unlike the Órdenes tab, checking the assignee here can't hide an
           // entire order, only route that one task's own card to the right sector's board.
           const isHerreriaTab = (currentSelectedSector === 'Herrería');
-          const isHerreriaEmpOrTask = (task.centroCosto && String(task.centroCosto).toUpperCase().includes('HERRER'))
+          const isHerreriaEmpOrTask = isHerreriaCentroCosto(task.centroCosto)
             || isHerreriaOrder(order)
             || isHerreriaEmployeeName(empLabel);
 
@@ -7349,6 +7359,7 @@ function getOrdersForDashboard() {
     if (isHerreriaOrder(o)) return true;
     return (o.tasks || []).some(t => {
       if (!t) return false;
+      if (isHerreriaCentroCosto(t.centroCosto)) return true;
       const empOpt = (cachedCatalogs && cachedCatalogs.empleados) ? cachedCatalogs.empleados.find(e => e.value === t.empleado) : null;
       const empLabel = (empOpt ? empOpt.label : t.empleado) || '';
       return isHerreriaEmployeeName(empLabel);
