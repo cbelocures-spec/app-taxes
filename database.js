@@ -1027,6 +1027,21 @@ class LocalDB {
     return db.odometerOverrides[key];
   }
 
+  setServiceOverride(interno, km, hs) {
+    const db = this.read();
+    if (!db.odometerOverrides) db.odometerOverrides = {};
+    const key = String(interno).trim();
+    if (!db.odometerOverrides[key]) {
+      db.odometerOverrides[key] = { interno: key };
+    }
+    const val = Number(String(km || hs || 0).replace(',', '.'));
+    db.odometerOverrides[key].ultServiceKm = val;
+    db.odometerOverrides[key].ultServiceHs = val;
+    db.odometerOverrides[key].updatedAt = new Date().toISOString();
+    this.write(db);
+    return db.odometerOverrides[key];
+  }
+
   clearOdometerOverride(interno) {
     const db = this.read();
     if (db.odometerOverrides) {

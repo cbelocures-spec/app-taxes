@@ -2945,7 +2945,6 @@ app.post('/api/active-mechanics', (req, res) => {
 function applyOdometerOverrides(data) {
   if (!Array.isArray(data)) return data;
   const overrides = db.getOdometerOverrides();
-  if (Object.keys(overrides).length === 0) return data;
 
   return data.map(item => {
     const key = String(item.interno || '').trim();
@@ -2956,38 +2955,50 @@ function applyOdometerOverrides(data) {
     });
 
     const ov = ovKey ? overrides[ovKey] : null;
-    if (!ov) return item;
-
     const patched = { ...item };
-    const overrideKm = (ov.km !== undefined && !isNaN(ov.km)) ? ov.km : (ov.hs !== undefined && !isNaN(ov.hs) ? ov.hs : undefined);
-    const overrideHs = (ov.hs !== undefined && !isNaN(ov.hs)) ? ov.hs : (ov.km !== undefined && !isNaN(ov.km) ? ov.km : undefined);
 
-    if (overrideKm !== undefined) patched.kmReales = overrideKm;
-    if (overrideHs !== undefined) patched.hsReales = overrideHs;
+    if (ov) {
+      const overrideKm = (ov.km !== undefined && !isNaN(ov.km)) ? ov.km : (ov.hs !== undefined && !isNaN(ov.hs) ? ov.hs : undefined);
+      const overrideHs = (ov.hs !== undefined && !isNaN(ov.hs)) ? ov.hs : (ov.km !== undefined && !isNaN(ov.km) ? ov.km : undefined);
 
-    // Recalcular Faltante / Restantes y Alerta dinámicamente
-    const isHs = patched.unidadMedida === 'hs' || String(patched.serviFreq || '').toLowerCase().includes('hs') || String(patched.modelo || '').toLowerCase().includes('iveco');
+      if (overrideKm !== undefined) patched.kmReales = overrideKm;
+      if (overrideHs !== undefined) patched.hsReales = overrideHs;
+      if (ov.ultServiceKm !== undefined) patched.ultServiceKm = ov.ultServiceKm;
+      if (ov.ultServiceHs !== undefined) patched.ultServiceHs = ov.ultServiceHs;
+    }
+
+    // Determinar medida (Hs vs KM)
+    const isHs = patched.unidadMedida === 'hs' || 
+                 String(patched.serviFreq || '').toLowerCase().includes('hs') || 
+                 String(patched.modelo || '').toLowerCase().includes('iveco');
+
     const freqRaw = String(patched.serviFreq || '');
     const freqNum = parseFloat(freqRaw.replace(/[^0-9\.]/g, '')) || 0;
 
-    const initialFaltanteRaw = String(item.faltante || '');
-    const initialFaltante = parseFloat(initialFaltanteRaw.replace(/[^0-9\.]/g, '')) || 0;
+    const currentHs = parseFloat(String(patched.hsReales || 0).replace(/[^0-9\.]/g, '')) || 0;
+    const currentKm = parseFloat(String(patched.kmReales || 0).replace(/[^0-9\.]/g, '')) || 0;
 
-    const currentReading = isHs ? (patched.hsReales || patched.kmReales || 0) : (patched.kmReales || 0);
+    // Valores de Ultimo servicio (Col K/L/M de Google Sheets u override)
+    const ultHs = parseFloat(String(patched.ultServiceHs || patched.ultimoServicioHs || patched.ultServiceRealizadoHs || 0).replace(/[^0-9\.]/g, '')) || 0;
+    const ultKm = parseFloat(String(patched.ultServiceKm || patched.ultimoServicioKm || patched.ultServiceRealizadoKm || 0).replace(/[^0-9\.]/g, '')) || 0;
 
-    let remaining = 0;
-    if (freqNum > 0) {
-      const rem = freqNum - (currentReading % freqNum);
-      remaining = (rem < 0 || rem === freqNum) ? 0 : rem;
-    } else if (initialFaltante > 0) {
-      remaining = Math.max(0, initialFaltante - currentReading);
+    let pasaron = 0;
+    if (isHs) {
+      pasaron = (ultHs > 0 && currentHs >= ultHs) ? (currentHs - ultHs) : currentHs;
+    } else {
+      pasaron = (ultKm > 0 && currentKm >= ultKm) ? (currentKm - ultKm) : currentKm;
     }
 
-    patched.faltante = Math.round(remaining).toLocaleString('es-AR') + (isHs ? ' Hs' : ' km');
-    if (remaining <= 0 || (freqNum > 0 && currentReading >= freqNum)) {
-      patched.alerta = 'Realizar Service';
-    } else {
-      patched.alerta = 'OK';
+    if (freqNum > 0) {
+      const rem = freqNum - pasaron;
+      const remaining = Math.max(0, rem);
+
+      patched.faltante = Math.round(remaining).toLocaleString('es-AR') + (isHs ? ' Hs' : ' km');
+      if (remaining <= 0 || (pasaron >= freqNum && freqNum > 0)) {
+        patched.alerta = 'Realizar Service';
+      } else {
+        patched.alerta = 'OK';
+      }
     }
 
     return patched;
@@ -3113,6 +3124,75 @@ app.get('/api/preventivos/livianas', async (req, res) => {
   } catch (error) {
     console.error("Error fetching preventivos livianas:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/preventivos/historial', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  if (!scriptUrl) {
+    return res.status(400).json({ error: "URL del script de preventivos no configurada." });
+  }
+  try {
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=getHistoryData`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching preventivos history:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/preventivos/alertas', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  if (!scriptUrl) {
+    return res.status(400).json({ error: "URL del script de preventivos no configurada." });
+  }
+  try {
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=getAlertsData`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching preventivos alerts:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/preventivos/service', async (req, res) => {
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  const { rowIndex, km, hs, interno, vehicleType } = req.body;
+
+  if (interno) {
+    db.setServiceOverride(interno, km, hs);
+  }
+
+  if (!scriptUrl) {
+    return res.json({ ok: true, message: "Service actualizado localmente." });
+  }
+
+  try {
+    const params = new URLSearchParams({
+      accion: 'updateService',
+      rowIndex,
+      km: km || 0,
+      hs: hs || 0,
+      interno: interno || '',
+      vehicleType: vehicleType || ''
+    });
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${params.toString()}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("Error updating preventivos service:", error);
+    res.json({ ok: true, message: "Service actualizado localmente." });
   }
 });
 
