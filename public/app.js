@@ -2510,46 +2510,37 @@ function addTaskField(taskData = null) {
       const isMecanicaCC = ccLabelUpper.includes('MECAN') || taskData.centroCosto === '15';
       const isEdilicioCC = ccLabelUpper.includes('EDILIC') || taskData.centroCosto === '8';
 
+      // Uses getSectorEmployees() (same as updateEmployeeDropdownForCard, the live onchange
+      // filter for brand-new tasks) instead of the raw MECANICA_EMPLOYEES/HERRERIA_EMPLOYEES/
+      // EDILICIO_EMPLOYEES constants - those don't include names added in Ajustes > Mapeo de
+      // Empleados (currentEmployeeMappings), so a custom-mapped employee (e.g. "Aguilar
+      // Sebastian") showed up fine when assigning a brand-new task but disappeared from the
+      // dropdown when reopening an existing task to fix a wrong assignment.
+      const buildFilteredEmployees = (sectorName) => {
+        const names = getSectorEmployees(sectorName);
+        const namesCleaned = new Set(names.map(name => cleanName(name)));
+        const matched = (cachedCatalogs.empleados || []).filter(emp => {
+          if (!emp || !emp.label) return false;
+          const empCleaned = cleanName(emp.label);
+          if (namesCleaned.has(empCleaned)) return true;
+          for (const n of namesCleaned) {
+            if (empCleaned.includes(n) || n.includes(empCleaned)) return true;
+          }
+          return false;
+        });
+        names.forEach(name => {
+          const exists = matched.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
+          if (!exists) matched.push({ value: name, label: name });
+        });
+        return matched;
+      };
+
       if (isMecanicaCC) {
-        const mecanicaNamesCleaned = new Set(MECANICA_EMPLOYEES.map(name => cleanName(name)));
-        filteredEmployees = (cachedCatalogs.empleados || []).filter(emp => {
-          if (!emp || !emp.label) return false;
-          const empCleaned = cleanName(emp.label);
-          if (mecanicaNamesCleaned.has(empCleaned)) return true;
-          for (const mName of mecanicaNamesCleaned) {
-            if (empCleaned.includes(mName) || mName.includes(empCleaned)) {
-              return true;
-            }
-          }
-          return false;
-        });
+        filteredEmployees = buildFilteredEmployees('Taller');
       } else if (isHerreriaCC) {
-        const herreriaNamesCleaned = new Set(HERRERIA_EMPLOYEES.map(name => cleanName(name)));
-        let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
-          if (!emp || !emp.label) return false;
-          const empCleaned = cleanName(emp.label);
-          if (herreriaNamesCleaned.has(empCleaned)) return true;
-          for (const hName of herreriaNamesCleaned) {
-            if (empCleaned.includes(hName) || hName.includes(empCleaned)) {
-              return true;
-            }
-          }
-          return false;
-        });
-        const customHerreriaNames = ["Federico", "Luciano", "Digno"];
-        customHerreriaNames.forEach(name => {
-          const exists = matchedEmployees.some(emp => emp && emp.label && emp.label.toLowerCase().trim() === name.toLowerCase());
-          if (!exists) {
-            matchedEmployees.push({ value: name, label: name });
-          }
-        });
-        filteredEmployees = matchedEmployees;
+        filteredEmployees = buildFilteredEmployees('Herrería');
       } else if (isEdilicioCC) {
-        const edilicioNamesCleaned = new Set(EDILICIO_EMPLOYEES.map(name => cleanName(name)));
-        filteredEmployees = (cachedCatalogs.empleados || []).filter(emp => {
-          if (!emp || !emp.label) return false;
-          return edilicioNamesCleaned.has(cleanName(emp.label));
-        });
+        filteredEmployees = buildFilteredEmployees('Edilicio');
       }
       let empOptions = `<option value="">Seleccionar Empleado...</option>`;
       filteredEmployees.forEach(opt => {
