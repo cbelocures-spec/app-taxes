@@ -2957,20 +2957,20 @@ function applyOdometerOverrides(data) {
     const ov = ovKey ? overrides[ovKey] : null;
     const patched = { ...item };
 
-    if (ov) {
-      const overrideKm = (ov.km !== undefined && !isNaN(ov.km)) ? ov.km : (ov.hs !== undefined && !isNaN(ov.hs) ? ov.hs : undefined);
-      const overrideHs = (ov.hs !== undefined && !isNaN(ov.hs)) ? ov.hs : (ov.km !== undefined && !isNaN(ov.km) ? ov.km : undefined);
-
-      if (overrideKm !== undefined) patched.kmReales = overrideKm;
-      if (overrideHs !== undefined) patched.hsReales = overrideHs;
-      if (ov.ultServiceKm !== undefined) patched.ultServiceKm = ov.ultServiceKm;
-      if (ov.ultServiceHs !== undefined) patched.ultServiceHs = ov.ultServiceHs;
-    }
-
     // Determinar medida (Hs vs KM)
     const isHs = patched.unidadMedida === 'hs' || 
                  String(patched.serviFreq || '').toLowerCase().includes('hs') || 
                  String(patched.modelo || '').toLowerCase().includes('iveco');
+
+    if (ov) {
+      if (isHs) {
+        if (ov.hs !== undefined && !isNaN(ov.hs)) patched.hsReales = ov.hs;
+      } else {
+        if (ov.km !== undefined && !isNaN(ov.km)) patched.kmReales = ov.km;
+      }
+      if (ov.ultServiceKm !== undefined) patched.ultServiceKm = ov.ultServiceKm;
+      if (ov.ultServiceHs !== undefined) patched.ultServiceHs = ov.ultServiceHs;
+    }
 
     const freqRaw = String(patched.serviFreq || '');
     const freqNum = parseFloat(freqRaw.replace(/[^0-9\.]/g, '')) || 0;
@@ -4212,6 +4212,11 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   const localIP = getLocalIP();
   console.log(`[HTTP] Escuchando en http://localhost:${PORT}`);
   console.log(`[HTTP] Red local:      http://${localIP}:${PORT}`);
+
+  try {
+    db.clearAllOdometerOverrides();
+    console.log('[Preventivos] Sobrescrituras antiguas limpiadas para sincronizar directo con Google Sheets.');
+  } catch (e) {}
 
   const isRailway = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_STATIC_URL || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_SERVICE_ID);
 

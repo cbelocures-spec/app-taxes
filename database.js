@@ -1050,6 +1050,12 @@ class LocalDB {
     }
   }
 
+  clearAllOdometerOverrides() {
+    const db = this.read();
+    db.odometerOverrides = {};
+    this.write(db);
+  }
+
   // --- Insumos retirados (warehouse withdrawals) pending supervisor approval ---
   // Fed from a read-only CSV export of a sheet maintained by another sector (the
   // warehouse/pañol) - this app never writes to that sheet, only tracks approval
