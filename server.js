@@ -2984,16 +2984,18 @@ function applyOdometerOverrides(data) {
 
     let pasaron = 0;
     if (isHs) {
-      pasaron = (ultHs > 0 && currentHs >= ultHs) ? (currentHs - ultHs) : currentHs;
+      pasaron = (ultHs > 0 && currentHs >= ultHs) ? (currentHs - ultHs) : 0;
     } else {
-      pasaron = (ultKm > 0 && currentKm >= ultKm) ? (currentKm - ultKm) : currentKm;
+      pasaron = (ultKm > 0 && currentKm >= ultKm) ? (currentKm - ultKm) : 0;
     }
 
     if (freqNum > 0) {
       const rem = freqNum - pasaron;
       const remaining = Math.max(0, rem);
 
+      patched.restante = Math.round(remaining);
       patched.faltante = Math.round(remaining).toLocaleString('es-AR') + (isHs ? ' Hs' : ' km');
+
       if (remaining <= 0 || (pasaron >= freqNum && freqNum > 0)) {
         patched.alerta = 'Realizar Service';
       } else {
@@ -3010,7 +3012,7 @@ let preventivosFlotaCacheTime = 0;
 
 app.get('/api/preventivos/flota', async (req, res) => {
   const now = Date.now();
-  if (preventivosFlotaCache && (now - preventivosFlotaCacheTime < 5 * 60 * 1000) && !req.query.force) {
+  if (preventivosFlotaCache && (now - preventivosFlotaCacheTime < 15 * 1000) && !req.query.force) {
     return res.json(applyOdometerOverrides(preventivosFlotaCache));
   }
 

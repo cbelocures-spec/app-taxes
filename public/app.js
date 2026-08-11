@@ -9605,7 +9605,8 @@ function renderPrevFlotaTable() {
     const badgeText = isUrgente ? '⚠ Realizar Service' : '✓ Al Día';
     const km = item.kmReales ? Number(item.kmReales).toLocaleString('es-AR') : 0;
     const hs = item.hsReales ? Number(item.hsReales).toLocaleString('es-AR') : 0;
-    const rest = item.restante ? Number(item.restante).toLocaleString('es-AR') : 0;
+    const rawRest = item.restante !== undefined && item.restante !== null ? item.restante : item.faltante;
+    const rest = typeof rawRest === 'number' ? rawRest.toLocaleString('es-AR') : String(rawRest || 0).replace('Hs', '').replace('km', '').trim();
     const ri = item.originalRowIndex;
     return `<tr>
       <td><strong>${item.interno}</strong></td>
@@ -9634,6 +9635,9 @@ function renderPrevFlotaTable() {
       const badgeClass = isUrgente ? 'warning' : 'ok';
       const badgeText = isUrgente ? '⚠ Realizar Service' : '✓ Al Día';
       const ri = item.originalRowIndex;
+      const rawCardRest = item.restante !== undefined && item.restante !== null ? item.restante : item.faltante;
+      const cardRest = typeof rawCardRest === 'number' ? rawCardRest.toLocaleString('es-AR') : String(rawCardRest || 0).replace('Hs', '').replace('km', '').trim();
+
       return `<div class="prev-mobile-card">
         <div class="prev-mobile-card-header">
           <div><strong style="font-size:16px;">${item.interno}</strong><br><span style="font-size:12px; color:var(--text-muted);">${item.modelo}</span></div>
@@ -9641,7 +9645,7 @@ function renderPrevFlotaTable() {
         </div>
         <div class="prev-mobile-card-row"><span>KM Reales</span><strong>${Number(item.kmReales || 0).toLocaleString('es-AR')}</strong></div>
         <div class="prev-mobile-card-row"><span>Hs Reales</span><strong>${Number(item.hsReales || 0).toLocaleString('es-AR')}</strong></div>
-        <div class="prev-mobile-card-row"><span>Restante</span><strong>${Number(item.restante || 0).toLocaleString('es-AR')}</strong></div>
+        <div class="prev-mobile-card-row"><span>Restante</span><strong>${cardRest}</strong></div>
         <div style="display:flex; gap:8px; margin-top:8px;">
           <button class="btn btn-secondary btn-sm" onclick="prevFlotaOpenService(${ri})" style="flex:1; display:flex; justify-content:center; align-items:center; gap:4px;">
             <span class="material-icons" style="font-size:14px;">build</span> Service
