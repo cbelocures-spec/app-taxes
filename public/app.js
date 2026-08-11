@@ -179,6 +179,7 @@ const HERRERIA_EMPLOYEES = [
   "Montiel, Víctor David",
   "Peñalva, Cristian Germán",
   "Romero, Juan Manuel",
+  "Victor Lizarraga",
   "Federico",
   "Luciano",
   ];
@@ -219,6 +220,24 @@ function getSectorEmployees(sector) {
   });
 
   return baseDefaults;
+}
+
+// Used only by the Inicio dashboard board (one card per task) to route a task assigned to
+// a Herrería worker to Herrería's board even when the order it belongs to isn't itself
+// classified as Herrería - some orders (e.g. "REPARACIONES INTERNAS") are genuinely shared
+// across sectors, with each person logging their own task under the same OT. This must NOT
+// be reused to decide whole-order visibility (isHerreriaOrder) - that hid entire Taller
+// orders from Taller just because one task's assignee matched here.
+function isHerreriaEmployeeName(employeeName) {
+  if (!employeeName) return false;
+  const cleanName = (str) => String(str || '').normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const target = cleanName(employeeName);
+  if (!target) return false;
+  return getSectorEmployees('Herrería').some(hName => {
+    const hClean = cleanName(hName);
+    if (!hClean) return false;
+    return target === hClean || (hClean.length >= 4 && target.includes(hClean)) || (target.length >= 4 && hClean.includes(target));
+  });
 }
 
 function populateDatalist(datalistId, options) {
@@ -5009,11 +5028,16 @@ function renderDashboard() {
           const cleanEmp = String(empLabel).trim().toLowerCase();
 
           // Filtrar tareas de Herrería cuando se visualiza el sector Taller (y viceversa).
-          // Based only on the task's own centro de costo and the order's classification -
-          // not on who is assigned, which used to hide a Taller task from Taller's board
-          // just because its assignee's name fuzzy-matched a Herrería employee.
+          // Some orders (e.g. the generic "REPARACIONES INTERNAS" bucket) are genuinely
+          // shared: several people from different sectors each log their own task under the
+          // very same OT/order, which isn't itself classified as Herrería. For THIS board
+          // (one card per task, not per order) it's correct to also check who the task is
+          // assigned to - unlike the Órdenes tab, checking the assignee here can't hide an
+          // entire order, only route that one task's own card to the right sector's board.
           const isHerreriaTab = (currentSelectedSector === 'Herrería');
-          const isHerreriaEmpOrTask = (task.centroCosto && String(task.centroCosto).toUpperCase().includes('HERRER')) || isHerreriaOrder(order);
+          const isHerreriaEmpOrTask = (task.centroCosto && String(task.centroCosto).toUpperCase().includes('HERRER'))
+            || isHerreriaOrder(order)
+            || isHerreriaEmployeeName(empLabel);
 
           if (!isHerreriaTab && isHerreriaEmpOrTask) {
             return; // Excluir personal/tareas de Herrería del tablero de Taller
