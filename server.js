@@ -2966,21 +2966,28 @@ function applyOdometerOverrides(data) {
     if (overrideHs !== undefined) patched.hsReales = overrideHs;
 
     // Recalcular Faltante / Restantes y Alerta dinámicamente
-    const isHs = patched.unidadMedida === 'hs' || String(patched.serviFreq || '').toLowerCase().includes('hs');
+    const isHs = patched.unidadMedida === 'hs' || String(patched.serviFreq || '').toLowerCase().includes('hs') || String(patched.modelo || '').toLowerCase().includes('iveco');
     const freqRaw = String(patched.serviFreq || '');
     const freqNum = parseFloat(freqRaw.replace(/[^0-9\.]/g, '')) || 0;
+
+    const initialFaltanteRaw = String(item.faltante || '');
+    const initialFaltante = parseFloat(initialFaltanteRaw.replace(/[^0-9\.]/g, '')) || 0;
+
     const currentReading = isHs ? (patched.hsReales || patched.kmReales || 0) : (patched.kmReales || 0);
 
+    let remaining = 0;
     if (freqNum > 0) {
       const rem = freqNum - (currentReading % freqNum);
-      const remaining = (rem < 0 || rem === freqNum) ? 0 : rem;
-      
-      patched.faltante = Math.round(remaining).toLocaleString('es-AR') + (isHs ? ' Hs' : ' km');
-      if (remaining <= 0 || currentReading >= freqNum) {
-        patched.alerta = 'Realizar Service';
-      } else {
-        patched.alerta = 'OK';
-      }
+      remaining = (rem < 0 || rem === freqNum) ? 0 : rem;
+    } else if (initialFaltante > 0) {
+      remaining = Math.max(0, initialFaltante - currentReading);
+    }
+
+    patched.faltante = Math.round(remaining).toLocaleString('es-AR') + (isHs ? ' Hs' : ' km');
+    if (remaining <= 0 || (freqNum > 0 && currentReading >= freqNum)) {
+      patched.alerta = 'Realizar Service';
+    } else {
+      patched.alerta = 'OK';
     }
 
     return patched;

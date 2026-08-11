@@ -10178,8 +10178,9 @@ async function savePrevOdometer() {
     const kmVal = (document.getElementById('prev-odometer-modal-km')?.value || '').trim();
     const hsVal = (document.getElementById('prev-odometer-modal-hs')?.value || '').trim();
 
-    const km = isHs ? (kmVal || hsVal) : kmVal;
-    const hs = isHs ? (hsVal || kmVal) : hsVal;
+    const userEnteredVal = hsVal || kmVal;
+    const km = userEnteredVal;
+    const hs = userEnteredVal;
 
     const res = await fetch('/api/preventivos/odometer', {
       method: 'POST',
