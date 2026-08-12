@@ -255,8 +255,14 @@ function isHerreriaExclusiveEquipment(rodado, interno) {
 // sector's tasks have to live in that sector's own order). Mirrors getTaskCentroCostoSector in
 // public/app.js.
 function getCentroCostoSector(centroCosto, centrosCostoList) {
-  const ccOpt = (centrosCostoList || []).find(c => c && String(c.value) === String(centroCosto));
-  const ccLabel = (ccOpt && ccOpt.label ? ccOpt.label : String(centroCosto || '')).toUpperCase();
+  const cleanCc = String(centroCosto || '').trim();
+  // No centro de costo recorded - not enough evidence on its own to say this task belongs to
+  // a different sector than the order it's already in. Returning null here (rather than
+  // defaulting to 'Taller') keeps splitTasksBySector from ripping a Herrería/Edilicio task with
+  // a blank centro de costo out of its own order on every ordinary save (pause/resume/finish).
+  if (!cleanCc) return null;
+  const ccOpt = (centrosCostoList || []).find(c => c && String(c.value) === cleanCc);
+  const ccLabel = (ccOpt && ccOpt.label ? ccOpt.label : cleanCc).toUpperCase();
   if (ccLabel.includes('HERRER')) return 'Herrería';
   if (ccLabel.includes('EDIL')) return 'Edilicio';
   return 'Taller';
@@ -264,14 +270,16 @@ function getCentroCostoSector(centroCosto, centrosCostoList) {
 
 // Splits a task list into the ones that belong on `homeSector` and the rest, grouped by their
 // own sector - used by both order creation and editing to keep a mixed-sector submission from
-// ever landing in a single order (see routeForeignTasksToSiblingOrder).
+// ever landing in a single order (see routeForeignTasksToSiblingOrder). Only moves a task out
+// when its own centro de costo gives a clear, affirmative signal of a DIFFERENT sector - a task
+// with no centro de costo recorded always stays put.
 function splitTasksBySector(tasks, homeSector, centrosCostoList) {
   const own = [];
   const foreign = { 'Herrería': [], 'Edilicio': [], 'Taller': [] };
   (tasks || []).forEach(t => {
     if (!t) return;
     const sec = getCentroCostoSector(t.centroCosto, centrosCostoList);
-    if (sec === homeSector) own.push(t);
+    if (sec === null || sec === homeSector) own.push(t);
     else foreign[sec].push(t);
   });
   return { own, foreign };

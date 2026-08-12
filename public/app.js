@@ -124,6 +124,12 @@ let cachedCatalogs = { rodados: [], responsables: [], empleados: [], centrosCost
 let cachedInternoOptions = [];
 let cachedNovelties = [];
 let activeOrders = [];
+// Task ids with an optimistic dashboard change (pause/resume/finish) whose PUT save is still
+// in flight. The background 2s poll (fetchOrders) can otherwise land between the optimistic
+// local update and the server actually persisting it, momentarily overwriting the just-paused
+// (or just-finished) task with the server's still-stale pre-save state - which looks like the
+// task "resumed on its own". fetchOrders() keeps the local version for any id listed here.
+let pendingOptimisticTaskIds = new Set();
 let currentRetryOrderId = null;
 let currentEditingOrderId = null;
 // Real (already-saved) task IDs removed from the modal during this edit session. removeTaskField()
@@ -231,9 +237,15 @@ function getSectorEmployees(sector) {
 // a Taller employee - as Herrería just because Herrería's roster has an unrelated "Federico"
 // alias). A task's centroCosto is stored as a catalog code (e.g. "11"), never the word
 // "Herreria" itself - that only appears in the catalog's LABEL for that code.
-function getTaskCentroCostoSector(centroCosto) {
-  const ccOpt = (cachedCatalogs && cachedCatalogs.centrosCosto) ? cachedCatalogs.centrosCosto.find(c => c && c.value === centroCosto) : null;
-  const ccLabel = (ccOpt && ccOpt.label ? ccOpt.label : String(centroCosto || '')).toUpperCase();
+function getTaskCentroCostoSector(centroCosto, fallbackSector) {
+  const cleanCc = String(centroCosto || '').trim();
+  // No centro de costo recorded on the task itself - not enough evidence to say it belongs to
+  // a different sector than the order it's already in, so fall back to that instead of
+  // defaulting to Taller (which used to silently pull blank-CC Herrería/Edilicio tasks onto
+  // the Taller board).
+  if (!cleanCc) return fallbackSector || 'Taller';
+  const ccOpt = (cachedCatalogs && cachedCatalogs.centrosCosto) ? cachedCatalogs.centrosCosto.find(c => c && c.value === cleanCc) : null;
+  const ccLabel = (ccOpt && ccOpt.label ? ccOpt.label : cleanCc).toUpperCase();
   if (ccLabel.includes('HERRER')) return 'Herrería';
   if (ccLabel.includes('EDIL')) return 'Edilicio';
   return 'Taller';
@@ -3128,6 +3140,22 @@ async function fetchOrders() {
       });
     });
 
+    // Preserve the local (optimistic) version of any task whose own pause/resume/finish save
+    // is still in flight - otherwise this poll can land between that optimistic update and the
+    // server actually persisting it, and momentarily overwrite it with the stale pre-save state.
+    if (pendingOptimisticTaskIds.size > 0) {
+      const localTasksById = new Map();
+      (activeOrders || []).forEach(o => (o.tasks || []).forEach(t => { if (t && t.id) localTasksById.set(t.id, t); }));
+      (data || []).forEach(order => {
+        order.tasks = (order.tasks || []).map(t => {
+          if (t && t.id && pendingOptimisticTaskIds.has(t.id) && localTasksById.has(t.id)) {
+            return localTasksById.get(t.id);
+          }
+          return t;
+        });
+      });
+    }
+
     activeOrders = data;
     await resolveDatabaseConflicts();
     renderOrders();
@@ -5031,7 +5059,8 @@ function renderDashboard() {
           // shared: several people from different sectors each log their own task under the
           // very same OT/order, so the order's overall clasificacion/sector must not decide
           // where an individual task's card ends up - only that task's own centro de costo does.
-          const taskSector = getTaskCentroCostoSector(task.centroCosto);
+          const orderFallbackSector = isHerreriaOrder(order) ? 'Herrería' : (isEdilicioOrder(order) ? 'Edilicio' : 'Taller');
+          const taskSector = getTaskCentroCostoSector(task.centroCosto, orderFallbackSector);
           if ((currentSelectedSector || 'Taller') !== taskSector) {
             return; // Esta tarea pertenece al tablero de otro sector
           }
@@ -5266,12 +5295,16 @@ function addTimerEventToTask(task, type) {
 }
 
 async function toggleDashboardTaskTimer(orderId, taskId) {
-  const order = activeOrders.find(o => o.id === orderId);
+  let order = activeOrders.find(o => o.id === orderId);
   if (!order) return;
 
   // Find the actual task object inside order.tasks (by reference)
-  const task = order.tasks.find(t => t.id === taskId);
+  let task = order.tasks.find(t => t.id === taskId);
   if (!task) return;
+
+  // Shield this task from the background poll (fetchOrders) until this save round-trips -
+  // otherwise a poll landing mid-save can momentarily restore the pre-pause/pre-resume state.
+  pendingOptimisticTaskIds.add(taskId);
 
   const timerKey = `timer_start_${taskId}`;
   const localStart = localStorage.getItem(timerKey);
@@ -5301,6 +5334,15 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
         
         if (confirm(confirmMsg)) {
           await pauseTask(conflict);
+          // The background poll (fetchOrders) can replace `activeOrders` wholesale while we
+          // awaited pauseTask()'s own save - re-resolve so we mutate the CURRENT task object,
+          // not a detached one that a fresh render will never see.
+          order = activeOrders.find(o => o.id === orderId);
+          task = order ? order.tasks.find(t => t.id === taskId) : null;
+          if (!order || !task) {
+            showToast("La tarea ya no está disponible, reintentá.", "danger");
+            return;
+          }
         } else {
           return;
         }
@@ -5396,6 +5438,8 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
     }
     showToast(`Error al guardar el cronómetro: ${error.message}`, "danger");
     console.error(error);
+  } finally {
+    pendingOptimisticTaskIds.delete(taskId);
   }
 }
 
@@ -5433,13 +5477,13 @@ async function saveDashboardTaskHours(orderId, taskId) {
 }
 
 async function markDashboardTaskFinished(orderId, taskId) {
-  const order = activeOrders.find(o => o.id === orderId);
+  let order = activeOrders.find(o => o.id === orderId);
   if (!order) return;
 
   if (!confirm("¿Estás seguro de marcar esta tarea como FINALIZADA?")) return;
 
   // Find the actual task object inside order.tasks (by reference)
-  const task = order.tasks.find(t => t.id === taskId);
+  let task = order.tasks.find(t => t.id === taskId);
   if (!task) return;
 
   const empOpt = cachedCatalogs.empleados.find(e => e.value === task.empleado);
@@ -5460,6 +5504,18 @@ async function markDashboardTaskFinished(orderId, taskId) {
 
   // Prompt for optional diagnosis and insumos
   const result = await promptDiagnosis(taskInfo);
+
+  // The background poll (fetchOrders) can replace `activeOrders` wholesale while the diagnosis
+  // dialog was open (it has no timeout - the user can take as long as they want) - re-resolve
+  // so the mutations below land on the CURRENT task object, not a detached one that a fresh
+  // render will never see (which looked like "finalizing paused it instead").
+  order = activeOrders.find(o => o.id === orderId);
+  task = order ? order.tasks.find(t => t.id === taskId) : null;
+  if (!order || !task) {
+    showToast("La tarea ya no está disponible, reintentá.", "danger");
+    return;
+  }
+
   if (result) {
     let additions = [];
     if (result.diagnosis) additions.push('Diagnóstico: ' + result.diagnosis);
@@ -5473,7 +5529,15 @@ async function markDashboardTaskFinished(orderId, taskId) {
     }
   }
 
+  // Shield this task from the background poll until this save round-trips (see
+  // toggleDashboardTaskTimer for why).
+  pendingOptimisticTaskIds.add(taskId);
+
   task.timerStart = null;
+  // Also clear timerStarted - leaving it true (its value while running) made this task look
+  // like an active timer to the employee-conflict check on every later save (server-side
+  // autoPauseConflictingTimers, client-side getConflictForEmployee), forever after it finished.
+  task.timerStarted = false;
   clearLocalStorageTimerKeys(taskId);
 
   addTimerEventToTask(task, 'Fin');
@@ -5535,6 +5599,8 @@ async function markDashboardTaskFinished(orderId, taskId) {
   } catch (error) {
     showToast(`Error al finalizar la tarea: ${error.message}`, "danger");
     console.error(error);
+  } finally {
+    pendingOptimisticTaskIds.delete(taskId);
   }
 }
 
