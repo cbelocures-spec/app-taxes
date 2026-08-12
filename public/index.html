@@ -1319,8 +1319,8 @@
         <textarea id="diagnosis-text" placeholder="Ej: Batería sin carga, manguera rota..." rows="3" style="width: 100%; padding: 12px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; resize: vertical; font-family: inherit; margin-top: 6px; box-sizing: border-box;"></textarea>
       </div>
       
-      <!-- DESPLEGABLE DE INSUMOS UTILIZADOS -->
-      <div class="form-group" style="text-align: left; margin-bottom: 16px;">
+      <!-- DESPLEGABLE DE INSUMOS UTILIZADOS - hidden for Herrería/Edilicio (toggled in promptDiagnosis()); this list is Taller/Mecánica-specific (motor oil, coolant, etc.), irrelevant to blacksmith/building work. -->
+      <div id="diag-insumos-section" class="form-group" style="text-align: left; margin-bottom: 16px;">
         <div id="diag-insumos-header" onclick="toggleDiagInsumosCollapse()" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; user-select: none; transition: all 0.2s ease;">
           <div style="display: flex; align-items: center; gap: 8px;">
             <span class="material-icons" style="font-size: 18px; color: var(--primary);">inventory_2</span>

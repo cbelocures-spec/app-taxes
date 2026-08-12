@@ -818,6 +818,16 @@ function promptDiagnosis(taskInfo = null) {
       return;
     }
 
+    // This checklist (Aceite Motor, Refrigerante, Grasa Diferencial, etc.) is Taller/Mecánica
+    // specific - irrelevant to Herrería (blacksmith) or Edilicio (building maintenance) work.
+    // Both callers pass the task's own centro de costo LABEL (not raw code) here.
+    const insumosSectionEl = document.getElementById('diag-insumos-section');
+    if (insumosSectionEl) {
+      const ccLabel = String((taskInfo && taskInfo.centroCosto) || '').toUpperCase();
+      const isTallerIrrelevant = ccLabel.includes('HERRER') || ccLabel.includes('EDIL');
+      insumosSectionEl.style.display = isTallerIrrelevant ? 'none' : '';
+    }
+
     const summaryEl = document.getElementById('diagnosis-task-summary');
     if (summaryEl) {
       if (taskInfo) {
@@ -2337,6 +2347,17 @@ function addTaskField(taskData = null) {
       }
     }
 
+    // The "Insumos / Repuestos Utilizados" checklist (Aceite Motor, Refrigerante, etc.) is
+    // Taller/Mecánica-specific - irrelevant to Herrería/Edilicio work. When editing an existing
+    // task, go by ITS OWN centro de costo (most accurate); for a brand-new task, fall back to
+    // the current tab/user sector, matching the same signal defaultCcVal above just used.
+    const existingCcOpt = (taskData && taskData.centroCosto)
+      ? (cachedCatalogs.centrosCosto || []).find(opt => opt && opt.value === taskData.centroCosto)
+      : null;
+    const hideInsumosSection = existingCcOpt
+      ? /herrer|edil/i.test(String(existingCcOpt.label || ''))
+      : (isHerreriaTask || isEdilicioTask);
+
     // Build select option strings
     let ccOptions = `<option value="">Seleccionar Centro Costo...</option>`;
     (cachedCatalogs.centrosCosto || []).forEach(opt => {
@@ -2440,7 +2461,7 @@ function addTaskField(taskData = null) {
             <textarea placeholder="Describe las actividades a realizar..." rows="2" class="task-desc" ${lockedAttr}>${taskData ? taskData.descripcion || '' : ''}</textarea>
           </div>
 
-          <div class="form-group task-insumos-section" style="margin-top: 10px;">
+          <div class="form-group task-insumos-section" style="margin-top: 10px; ${hideInsumosSection ? 'display: none;' : ''}">
             <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Insumos / Repuestos Utilizados</label>
             <div class="insumos-checkbox-grid">
               <div class="insumo-row">
