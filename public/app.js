@@ -7520,6 +7520,20 @@ async function loadUserPermissionsUI() {
   } else if (userSector === 'Taller') {
     switchSector('Taller');
   }
+
+  // "Autorizaciones de Usuarios" (Ajustes) is Pañol/Admin-only and starts hidden in the HTML -
+  // nothing else ever un-hid it, so it was permanently unreachable regardless of who was
+  // logged in. Show it only for Admin, and populate it right away instead of waiting for some
+  // action inside it (create user / save permissions) to trigger the first render.
+  const userAuthSection = document.getElementById('user-authorizations-section');
+  if (userAuthSection) {
+    if (userSector === 'Admin') {
+      userAuthSection.style.display = 'block';
+      renderUserAuthorizationsTable();
+    } else {
+      userAuthSection.style.display = 'none';
+    }
+  }
 }
 
 let currentBackupData = [];
