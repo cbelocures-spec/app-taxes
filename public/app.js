@@ -12717,14 +12717,10 @@ async function sendHugoAIMessage() {
   messagesList.scrollTop = messagesList.scrollHeight;
 }
 
-
-
-// Auto-initialize app data on load
-document.addEventListener('DOMContentLoaded', () => {
-  console.log("Auto-initializing app data...");
-  checkUserSession();
-  fetchSettings();
-  fetchCatalogs();
-  fetchOrders();
-  fetchActiveMechanics();
-});
+// NOTE: app init (checkUserSession, fetchSettings/fetchCatalogs/fetchOrders/fetchActiveMechanics)
+// already happens in the main DOMContentLoaded handler near the top of this file, guarded behind
+// an actual logged-in check. A second, unconditional DOMContentLoaded handler used to duplicate
+// this here - besides fetching data even when logged out, it called checkUserSession() a second
+// time on every load, which consumed the one-shot post-logout flag before the user ever saw the
+// login screen long enough to use it, making "Cerrar Sesión" look like it logged back in on its
+// own after a few seconds.
