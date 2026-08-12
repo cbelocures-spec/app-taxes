@@ -566,6 +566,14 @@ class LocalDB {
         if (low.includes('taller')) return 'Taller';
         return s;
       });
+      // A Herrería/Edilicio user (identified by their own username, e.g. Toledo/Carmona) must
+      // always be able to see their own sector's orders, even if their stored allowedSectors
+      // is empty or was saved without it by mistake (e.g. via the Autorizaciones panel) -
+      // being locked out of your own work is worse than over-granting a view your role already
+      // implies.
+      if ((sector === 'Herrería' || sector === 'Edilicio') && !allowedSectors.some(s => s === sector)) {
+        allowedSectors = [...allowedSectors, sector];
+      }
       return {
         canDelete: userObj.permissions.canDelete !== undefined ? !!userObj.permissions.canDelete : defaults.canDelete,
         canSync: userObj.permissions.canSync !== undefined ? !!userObj.permissions.canSync : defaults.canSync,
