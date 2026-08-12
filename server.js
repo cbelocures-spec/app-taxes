@@ -1164,17 +1164,24 @@ app.put('/api/orders/:id', (req, res) => {
     // Taller and Herrería/Edilicio must never share one order - split off anything whose own
     // centro de costo doesn't match this order's sector into a sibling order for the same
     // interno, instead of leaving it mixed in here (see routeForeignTasksToSiblingOrder).
-    // Backfill `sector` the same way the actual save below does, since finalClasificacion alone
-    // can no longer tell Edilicio apart (see getOrderSector). If the stored sector isn't one of
-    // the three real ones (e.g. "Admin" - an order Pañol created before the client sent its own
-    // active tab as `sector`), the creator's own login-derived sector is no better ("Admin"
-    // again), so fall back to inferring it from what the order's own tasks actually are - this
-    // self-heals a mis-tagged order the next time it's saved.
+    // A task's own centro de costo is the most direct, ground-truth signal of what sector an
+    // order actually is - trust it over a stored `sector` that's merely "a valid-looking
+    // string" (e.g. "Taller", which is what an order got by default whenever it was created
+    // with no username header at all, well before the client sent its own active tab as
+    // `sector` or before this self-heal existed - "Taller" passed every earlier check here as
+    // already-valid, even when every one of its tasks was clearly Edilicio). Only fall back to
+    // the stored/creator sector when the tasks themselves give no non-Taller signal at all.
     const VALID_SECTORS = ['Taller', 'Herrería', 'Edilicio'];
-    const creatorSector = getSectorByUsername(createdBy);
-    const resolvedSectorField = VALID_SECTORS.includes(existing.sector)
-      ? existing.sector
-      : (VALID_SECTORS.includes(creatorSector) ? creatorSector : inferOrderSectorFromTasks(mergedTasks, centrosCostoList));
+    const inferredSector = inferOrderSectorFromTasks(mergedTasks, centrosCostoList);
+    let resolvedSectorField;
+    if (inferredSector !== 'Taller') {
+      resolvedSectorField = inferredSector;
+    } else if (VALID_SECTORS.includes(existing.sector)) {
+      resolvedSectorField = existing.sector;
+    } else {
+      const creatorSector = getSectorByUsername(createdBy);
+      resolvedSectorField = VALID_SECTORS.includes(creatorSector) ? creatorSector : 'Taller';
+    }
     const homeSector = getOrderSector(finalClasificacion, resolvedSectorField);
     const { own: finalTasksToSave, foreign: foreignTasksBySector } = splitTasksBySector(mergedTasks, homeSector, centrosCostoList);
 
