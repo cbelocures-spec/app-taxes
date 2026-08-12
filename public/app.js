@@ -4246,17 +4246,26 @@ async function resolveDatabaseConflicts() {
   activeOrders.forEach(order => {
     if (!order) return;
     (order.tasks || []).forEach(task => {
-      if (!task) return;
-      const localStart = localStorage.getItem(`timer_start_${task.id}`);
-      const isRunning = (localStart !== null) || (task.timerStart !== null && task.timerStart > 0);
+      // Skip tasks with no real id - a task without one is itself already broken data (from
+      // some earlier bug), and resending it in the PUT below would make the server mint it a
+      // brand-new id EVERY time this runs (every 2s poll), duplicating it forever instead of
+      // ever actually fixing it.
+      if (!task || !task.id) return;
+      // Trust the server's own signal (timerStarted/timerStart), same as renderDashboard() and
+      // getActiveRunningTasks() - a stale local timestamp left over on THIS device (e.g. from a
+      // task whose real id was never resolved locally) used to make this function "detect" a
+      // conflict that didn't actually exist server-side, pause it again, and PUT the same stale
+      // task back - which is exactly how a null/broken-id task got re-duplicated every poll.
+      const isRunning = task.timerStarted === true || task.timerStarted === 'true' || (task.timerStart !== null && task.timerStart > 0);
       if (isRunning && task.status !== 'Finalizada' && task.empleado) {
         if (!runningByEmployee[task.empleado]) {
           runningByEmployee[task.empleado] = [];
         }
+        const localStart = localStorage.getItem(`timer_start_${task.id}`);
         runningByEmployee[task.empleado].push({
           order: order,
           task: task,
-          timerStart: localStart ? parseInt(localStart) : task.timerStart
+          timerStart: (localStart && parseInt(localStart) > 0) ? parseInt(localStart) : task.timerStart
         });
       }
     });
@@ -4304,7 +4313,11 @@ async function resolveDatabaseConflicts() {
                                     // 'Pausó' entries every poll cycle.
         task.horasEstimadas = newHours;
 
-        const updatedTasks = order.tasks.map(t => {
+        // Drop any task with no real id before resending - the server mints a brand-new id for
+        // whatever arrives without one, so including a broken/unsaved task here would duplicate
+        // it (its properly-saved existing copy on the server is untouched either way, since it's
+        // simply absent from this PUT's task list, not marked deleted).
+        const updatedTasks = order.tasks.filter(t => t && t.id).map(t => {
           if (t.id === task.id) {
             return {
               ...t,
@@ -4320,7 +4333,10 @@ async function resolveDatabaseConflicts() {
         try {
           await fetch(`/api/orders/${order.id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-username': localStorage.getItem('currentUserUsername') || ''
+            },
             body: JSON.stringify({
               ...order,
               tasks: updatedTasks
@@ -4419,7 +4435,9 @@ async function pauseTask(taskInfo) {
         const hoursInput = card.querySelector('.task-hours');
         const updatedHours = hoursInput ? parseFloat(String(hoursInput.value).replace(',', '.')) : 0;
         
-        const tasks = order.tasks.map(t => {
+        // Drop any task with no real id before resending - see resolveDatabaseConflicts() for
+        // why (the server mints a brand-new id for it every time, duplicating it forever).
+        const tasks = order.tasks.filter(t => t && t.id).map(t => {
           if (t.id === taskId) {
             const history = JSON.parse(card.dataset.timerHistory || '[]');
             return {
@@ -4432,11 +4450,14 @@ async function pauseTask(taskInfo) {
           }
           return t;
         });
-        
+
         try {
           await fetch(`/api/orders/${taskInfo.orderId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-username': localStorage.getItem('currentUserUsername') || ''
+            },
             body: JSON.stringify({
               ...order,
               tasks: tasks
