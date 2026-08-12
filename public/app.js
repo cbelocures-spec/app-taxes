@@ -970,7 +970,9 @@ async function resolveUnitStatusModal(estado) {
           interno: order.interno,
           clasificacion: order.clasificacion,
           incidente: order.incidente,
-          tasks: order.tasks,
+          // Drop any task with no real id before resending - see resolveDatabaseConflicts()
+          // for why (the server mints a brand-new id for it every time, duplicating it forever).
+          tasks: (order.tasks || []).filter(t => t && t.id),
           estadoUnidad: estado,
           // Operativo = no more tasks coming, this is the moment to push everything to
           // Taxes in one shot. Fuera de servicio leaves the order open (job still going),
@@ -5468,7 +5470,9 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
         interno: order.interno,
         clasificacion: order.clasificacion,
         incidente: order.incidente,
-        tasks: order.tasks
+        // Drop any task with no real id before resending - see resolveDatabaseConflicts() for
+        // why (the server mints a brand-new id for it every time, duplicating it forever).
+        tasks: (order.tasks || []).filter(t => t && t.id)
       })
     });
 
@@ -5637,7 +5641,9 @@ async function markDashboardTaskFinished(orderId, taskId) {
         interno: order.interno,
         clasificacion: order.clasificacion,
         incidente: order.incidente,
-        tasks: order.tasks,
+        // Drop any task with no real id before resending - see resolveDatabaseConflicts() for
+        // why (the server mints a brand-new id for it every time, duplicating it forever).
+        tasks: (order.tasks || []).filter(t => t && t.id),
         estadoUnidad: order.estadoUnidad || 'operativo'
       })
     });
