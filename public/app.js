@@ -3955,7 +3955,12 @@ async function submitWorkOrder() {
       // Al editar una orden que ya estaba en Historial (archivada), no forzar su regreso a Activas:
       // solo las ediciones desde la vista Activa deben garantizar archived:false.
       archived: editingOrder ? !!editingOrder.archived : false,
-      syncStatus: 'pending'
+      syncStatus: 'pending',
+      // The active sector TAB, not who's logged in - a Pañol/Admin account creating an order
+      // on behalf of Edilicio/Herrería must have it land under that sector, not under "Admin"
+      // (which used to make it invisible to Edilicio/Herrería users, since the server otherwise
+      // only had the creator's own login-derived sector to go on).
+      sector: currentSelectedSector
     };
    
     const url = currentEditingOrderId ? `/api/orders/${currentEditingOrderId}` : '/api/orders';

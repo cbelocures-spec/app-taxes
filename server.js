@@ -759,14 +759,21 @@ app.get('/api/orders', (req, res) => {
 
 app.post('/api/orders', (req, res) => {
   try {
-    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset } = req.body;
-    
+    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset, sector: sectorFromClient } = req.body;
+
     if (!rodado || !responsable || !clasificacion) {
       return res.status(400).json({ error: "Faltan campos obligatorios: rodado, responsable y clasificacion son requeridos." });
     }
 
     const createdBy = req.headers['x-user-username'] || null;
-    const sector = getSectorByUsername(createdBy);
+    // Trust the client's active sector TAB over the creator's own login-derived sector - a
+    // Pañol/Admin account creating an order on behalf of Edilicio/Herrería must have it land
+    // under that sector, not under "Admin" (which used to make it invisible to Edilicio/
+    // Herrería users, since that's the only field they can see their own orders by).
+    const creatorSector = getSectorByUsername(createdBy);
+    const sector = (sectorFromClient === 'Herrería' || sectorFromClient === 'Edilicio' || sectorFromClient === 'Taller')
+      ? sectorFromClient
+      : creatorSector;
     const userPerms = db.getUserPermissions(createdBy);
     if (!userPerms.canCreateOrder) {
       return res.status(403).json({ error: "No tiene permiso configurado para crear órdenes." });
