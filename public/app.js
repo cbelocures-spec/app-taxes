@@ -4338,9 +4338,13 @@ function getActiveRunningTasks() {
       // If the task is currently open in the modal, skip it here so the modal's live version takes precedence
       if (document.getElementById(task.id)) return;
 
-      const localStart = localStorage.getItem(`timer_start_${task.id}`);
-      const isRunning = (localStart !== null) || (task.timerStart !== null && task.timerStart > 0);
-      if (isRunning && task.status !== 'Finalizada') {
+      // Trust the server's own signal (timerStarted/timerStart) for whether this task is
+      // actually running, same as renderDashboard() - a stale local timestamp left over after
+      // the server paused this task from a DIFFERENT device must not make it look like the
+      // employee is still busy with it here.
+      const isServerRunning = task.timerStarted === true || task.timerStarted === 'true' || (task.timerStart !== null && task.timerStart > 0);
+      if (isServerRunning && task.status !== 'Finalizada') {
+        const localStart = localStorage.getItem(`timer_start_${task.id}`);
         running.push({
           source: 'order',
           orderId: order.id,
@@ -4348,7 +4352,7 @@ function getActiveRunningTasks() {
           orderRodado: order.rodado,
           taskId: task.id,
           empleado: task.empleado,
-          timerStart: localStart ? parseInt(localStart) : task.timerStart
+          timerStart: (localStart && parseInt(localStart) > 0) ? parseInt(localStart) : task.timerStart
         });
       }
     });
@@ -5090,19 +5094,32 @@ function renderDashboard() {
 
           const timerKey = `timer_start_${task.id}`;
           const localTimerStart = localStorage.getItem(timerKey);
-          
-          let resolvedTimerStart = null;
-          if (task.timerStart !== null && task.timerStart > 0) {
-            resolvedTimerStart = task.timerStart;
-            localStorage.setItem(timerKey, String(task.timerStart));
-          } else if (localTimerStart !== null && parseInt(localTimerStart) > 0) {
-            resolvedTimerStart = parseInt(localTimerStart);
-          }
 
-          const isTimerRunning = resolvedTimerStart !== null || task.timerStarted === true || task.timerStarted === 'true';
-          if (isTimerRunning && !resolvedTimerStart) {
-            resolvedTimerStart = Date.now();
-            localStorage.setItem(timerKey, String(resolvedTimerStart));
+          // The server is the single source of truth across devices - whether the timer is
+          // running is decided by the server's own task.timerStarted/task.timerStart, never by
+          // this device's localStorage alone. localStorage only remembers the precise start
+          // timestamp for THIS device's live countdown. Without this guard, a task the server
+          // paused from a DIFFERENT device (e.g. its own auto-pause-on-conflict) kept showing
+          // as running here forever - even after a refresh - because the stale local timestamp
+          // never got cleared and this used to fall back to it whenever the server's timerStart
+          // was null, regardless of what task.timerStarted actually said.
+          const isTimerRunning = task.timerStarted === true || task.timerStarted === 'true' || (task.timerStart !== null && task.timerStart > 0);
+
+          let resolvedTimerStart = null;
+          if (isTimerRunning) {
+            if (task.timerStart !== null && task.timerStart > 0) {
+              resolvedTimerStart = task.timerStart;
+              localStorage.setItem(timerKey, String(task.timerStart));
+            } else if (localTimerStart !== null && parseInt(localTimerStart) > 0) {
+              resolvedTimerStart = parseInt(localTimerStart);
+            } else {
+              resolvedTimerStart = Date.now();
+              localStorage.setItem(timerKey, String(resolvedTimerStart));
+            }
+          } else if (localTimerStart !== null) {
+            // Server says this task is NOT running - drop the stale local timestamp so a
+            // refresh actually fixes the mismatch instead of perpetuating it.
+            clearLocalStorageTimerKeys(task.id);
           }
 
           // Label the card with the order's own clasificacion, except when the order carries a
