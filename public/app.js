@@ -738,19 +738,19 @@ function openPreOrderModal() {
   // Ensure classification options match the current selected sector tab
   updateClassificationSelectOptions();
 
-  // Set default classification (Herrería for Herrería, Edilicio for Edilicio). Taller is left
-  // blank on purpose - pedido explicito del usuario: auto-seleccionar "Correctivo" hacia que
-  // gente que en realidad necesitaba cargar un Auxilio se equivocara sin darse cuenta, porque
-  // el campo ya venia lleno. Ahora tiene que elegirlo a mano (submitPreOrderCheck ya bloquea
-  // continuar si queda vacio).
+  // Set default classification (Herrería for Herrería - it's a real Taxes value there).
+  // Taller AND Edilicio are left blank on purpose - pedido explicito del usuario: auto-
+  // seleccionar "Correctivo" hacia que gente que en realidad necesitaba cargar un Auxilio se
+  // equivocara sin darse cuenta, porque el campo ya venia lleno. Ahora tiene que elegirlo a
+  // mano (submitPreOrderCheck ya bloquea continuar si queda vacio). Edilicio no tiene un valor
+  // propio de clasificacion en Taxes - ese sector se identifica por el Centro de Costo de la
+  // tarea, no por este campo.
   const clsEl = document.getElementById('pre-form-clasificacion');
   if (clsEl) {
     const currentUser = localStorage.getItem('currentUserUsername');
     const userSector = getSectorByUsername(currentUser);
     if (userSector === 'Herrería' || currentSelectedSector === 'Herrería') {
       clsEl.value = 'Herrería';
-    } else if (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio') {
-      clsEl.value = 'Edilicio';
     } else {
       clsEl.value = '';
     }
@@ -1397,7 +1397,10 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
   const clasificacionEl = document.getElementById('form-clasificacion');
   if (clasificacionEl) {
     const isHerreriaTabOrUser = isHerreria || currentSelectedSector === 'Herrería';
-    clasificacionEl.value = presetClasificacion || (isHerreriaTabOrUser ? 'Herrería' : (userSector === 'Edilicio' ? 'Edilicio' : 'Correctivo'));
+    // Edilicio has no real Taxes clasificacion value (see server.js's getOrderSector) - that
+    // sector is identified by the task's Centro de Costo, not by this field, so it defaults
+    // to "Correctivo" same as Taller.
+    clasificacionEl.value = presetClasificacion || (isHerreriaTabOrUser ? 'Herrería' : 'Correctivo');
   }
 
   // 4.5 Pre-select Responsable with whoever is logged in - the payload used to always send
@@ -7296,12 +7299,11 @@ function updateClassificationSelectOptions() {
         <option value="Auxilio">Auxilio</option>
         <option value="Herrería" selected>Herrería</option>
       `;
-    } else if (sector === 'Edilicio') {
-      html = `
-        <option value="Edilicio" selected>Edilicio</option>
-      `;
     } else {
-      // Taller / Admin
+      // Taller / Admin / Edilicio - Taxes has no real "Edilicio" clasificacion value (only
+      // Correctivo/Preventivo/Auxilio, plus Herrería which genuinely exists there). Edilicio
+      // work is identified by the task's Centro de Costo, not by this field, so the Edilicio
+      // tab offers the exact same real options as Taller.
       html = `
         <option value="" selected disabled>${sel.defaultText}</option>
         <option value="Preventivo">Preventivo</option>

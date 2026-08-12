@@ -268,6 +268,17 @@ function getCentroCostoSector(centroCosto, centrosCostoList) {
   return 'Taller';
 }
 
+// Taxes has no real "Edilicio" clasificacion value (only Correctivo/Preventivo/Auxilio, plus
+// Herrería which genuinely exists there) - Edilicio work is identified by the order's `sector`
+// field and by each task's own centro de costo, never by writing "Edilicio" into clasificacion.
+// This resolves an order's sector checking BOTH clasificacion and sector, so it still recognizes
+// older orders that predate this fix and do have clasificacion === 'Edilicio' on file.
+function getOrderSector(clasificacion, sectorField) {
+  if (isHerreria(clasificacion) || isHerreria(sectorField)) return 'Herrería';
+  if (isEdilicio(sectorField) || isEdilicio(clasificacion)) return 'Edilicio';
+  return 'Taller';
+}
+
 // Splits a task list into the ones that belong on `homeSector` and the rest, grouped by their
 // own sector - used by both order creation and editing to keep a mixed-sector submission from
 // ever landing in a single order (see routeForeignTasksToSiblingOrder). Only moves a task out
@@ -293,18 +304,17 @@ function splitTasksBySector(tasks, homeSector, centrosCostoList) {
 function routeForeignTasksToSiblingOrder(sector, tasksForSector, ctx) {
   if (!tasksForSector || tasksForSector.length === 0) return null;
 
-  // Herrería/Edilicio orders carry their sector directly as `clasificacion`; a synthetic
-  // Taller sibling has no equivalent sector value there (Taller's clasificacion is a work
-  // type - Preventivo/Correctivo/Auxilio), so it defaults to "Correctivo" like a normal
-  // corrective job would.
-  const siblingClasificacion = sector === 'Herrería' ? 'Herrería' : (sector === 'Edilicio' ? 'Edilicio' : 'Correctivo');
+  // Herrería genuinely exists as a Taxes clasificacion value, so a Herrería sibling carries it
+  // directly. Edilicio does not (see getOrderSector) - an Edilicio sibling gets "Correctivo"
+  // here, same as a Taller sibling would, and is identified by its `sector` field instead.
+  const siblingClasificacion = sector === 'Herrería' ? 'Herrería' : 'Correctivo';
   const cleanInterno = String(ctx.interno || '').trim().toLowerCase();
 
   const sibling = cleanInterno ? (db.getSyncableOrders() || []).find(o =>
     o.id !== ctx.excludeOrderId &&
     o.archived !== true && o.deleted !== true &&
     String(o.interno || '').trim().toLowerCase() === cleanInterno &&
-    (sector === 'Herrería' ? isHerreria(o.clasificacion) : sector === 'Edilicio' ? isEdilicio(o.clasificacion) : (!isHerreria(o.clasificacion) && !isEdilicio(o.clasificacion)))
+    getOrderSector(o.clasificacion, o.sector) === sector
   ) : null;
 
   if (sibling) {
@@ -770,7 +780,9 @@ app.post('/api/orders', (req, res) => {
     if (isHerreria(clasificacion)) {
       finalClasificacion = 'Herrería';
     } else if (isEdilicio(clasificacion)) {
-      finalClasificacion = 'Edilicio';
+      // Taxes has no "Edilicio" clasificacion value - that sector is identified by `sector`
+      // below and by each task's own centro de costo, not by this field (see getOrderSector).
+      finalClasificacion = 'Correctivo';
     }
 
     const resolvedRodado = resolveRodadoForInterno(interno, rodado);
@@ -803,7 +815,7 @@ app.post('/api/orders', (req, res) => {
     // Taller and Herrería/Edilicio must never share one order, even if the tasks were all
     // submitted together on this same "Nueva Orden" form - split off anything whose own
     // centro de costo doesn't match this order's sector into a sibling order instead.
-    const homeSector = isHerreria(finalClasificacion) ? 'Herrería' : (isEdilicio(finalClasificacion) ? 'Edilicio' : 'Taller');
+    const homeSector = getOrderSector(finalClasificacion, sector);
     const centrosCostoForSplit = (db.read().catalogs || {}).centrosCosto || [];
     const { own: ownTasksForNewOrder, foreign: foreignTasksForNewOrder } = splitTasksBySector(tasks, homeSector, centrosCostoForSplit);
 
@@ -1051,14 +1063,16 @@ app.put('/api/orders/:id', (req, res) => {
     // Normalize accents/case only - a Herrería-sector user (e.g. Carmona) no longer gets
     // their clasificacion forced back to Herrería on every save; routing to the
     // Herrería view uses the order's `sector` field (set at creation), not this.
-    // Edilicio-only users still get theirs forced, unchanged.
+    // Edilicio-only users still get theirs forced too, but to "Correctivo" - Taxes has no
+    // real "Edilicio" clasificacion value (see getOrderSector); that sector is identified by
+    // `sector` and by each task's own centro de costo, not by this field.
     let finalClasificacion = clasificacion;
     const isEdilicioOnlyUser = sector === 'Edilicio' && !allowed.some(s => s === 'Taller');
 
     if (isHerreria(clasificacion)) {
       finalClasificacion = 'Herrería';
     } else if (isEdilicio(clasificacion) || isEdilicioOnlyUser) {
-      finalClasificacion = 'Edilicio';
+      finalClasificacion = 'Correctivo';
     }
 
     const createdBy = existing.createdBy || requester;
@@ -1131,7 +1145,10 @@ app.put('/api/orders/:id', (req, res) => {
     // Taller and Herrería/Edilicio must never share one order - split off anything whose own
     // centro de costo doesn't match this order's sector into a sibling order for the same
     // interno, instead of leaving it mixed in here (see routeForeignTasksToSiblingOrder).
-    const homeSector = isHerreria(finalClasificacion) ? 'Herrería' : (isEdilicio(finalClasificacion) ? 'Edilicio' : 'Taller');
+    // Backfill `sector` the same way the actual save below does, since finalClasificacion alone
+    // can no longer tell Edilicio apart (see getOrderSector).
+    const resolvedSectorField = existing.sector || getSectorByUsername(createdBy);
+    const homeSector = getOrderSector(finalClasificacion, resolvedSectorField);
     const { own: finalTasksToSave, foreign: foreignTasksBySector } = splitTasksBySector(mergedTasks, homeSector, centrosCostoList);
 
     ['Herrería', 'Edilicio', 'Taller'].forEach(foreignSector => {
@@ -1187,7 +1204,7 @@ app.put('/api/orders/:id', (req, res) => {
       combustibleReset: combustibleReset !== undefined ? combustibleReset : existing.combustibleReset,
       // Backfill `sector` for orders created before this field existed, based on
       // whoever originally created it (not whoever is editing it now).
-      sector: existing.sector || getSectorByUsername(createdBy),
+      sector: resolvedSectorField,
       tasks: finalTasksToSave,
       archived: isArchived,
       archivedAt: isArchived ? (existing.archivedAt || new Date().toISOString()) : null
