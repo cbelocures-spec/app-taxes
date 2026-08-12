@@ -1227,14 +1227,12 @@ async function submitPreOrderCheck() {
         });
       });
     } else {
-      // No item selected: don't make the user click "Agregar Tarea" for nothing.
-      addTaskField({
-        centroCosto: "",
-        empleado: "",
-        horasEstimadas: 0,
-        status: "Pendiente",
-        descripcion: ""
-      });
+      // No item selected: don't make the user click "Agregar Tarea" for nothing. Call with no
+      // taskData (not an object with blank fields) so addTaskField's own per-sector default
+      // (Taller->Mecánica, Herrería->Herrería, Edilicio->Edilicio) actually applies to Centro
+      // de Costo - passing an object with centroCosto:"" bypassed that default entirely, since
+      // addTaskField only uses it when taskData is exactly null.
+      addTaskField();
     }
   }
 }
@@ -1410,7 +1408,18 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
   // catalog id, not by name, so match by the option's visible text.
   const responsableSelectEl = document.getElementById('form-responsable');
   if (responsableSelectEl) {
-    const mappedResponsable = CREATOR_USERNAME_TO_RESPONSABLE[String(localStorage.getItem('currentUserUsername') || '').toLowerCase().trim()];
+    // The Edilicio/Herrería TAB decides the responsable here, not who happens to be logged
+    // in - someone using the shared device account can create an Edilicio order without
+    // logging in as Toledo specifically, and it still needs Toledo as responsable, not
+    // whoever's session it was created under.
+    let mappedResponsable;
+    if (currentSelectedSector === 'Edilicio') {
+      mappedResponsable = 'Toledo, Fernando Damián';
+    } else if (currentSelectedSector === 'Herrería') {
+      mappedResponsable = 'Carmona González, Juan Manuel';
+    } else {
+      mappedResponsable = CREATOR_USERNAME_TO_RESPONSABLE[String(localStorage.getItem('currentUserUsername') || '').toLowerCase().trim()];
+    }
     const matchedOpt = mappedResponsable
       ? Array.from(responsableSelectEl.options).find(opt => opt.textContent.trim() === mappedResponsable)
       : null;
@@ -2307,11 +2316,15 @@ function addTaskField(taskData = null) {
     // an Admin/Pañol account creating an Edilicio/Herrería order isn't detected as that
     // sector by username, but the task should still default to its Centro de Costo.
     const activeClasif = document.getElementById('form-clasificacion') ? document.getElementById('form-clasificacion').value : '';
+    // activeClasif === 'Herrería' still applies (that's a real Taxes clasificacion value), but
+    // activeClasif === 'Edilicio' never matches anymore - Taxes has no such clasificacion value,
+    // so Edilicio orders now carry "Correctivo" there too; currentSelectedSector/userSector
+    // alone decide isEdilicioTask.
     const isHerreriaTask = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || activeClasif === 'Herrería');
-    const isEdilicioTask = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio' || activeClasif === 'Edilicio');
+    const isEdilicioTask = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio');
     let defaultCcVal = "15"; // default to MECANICA
     if (isHerreriaTask) {
-      const herrOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "16" || opt.value === "HERRERIA" || (opt.label && String(opt.label).toLowerCase().includes("herrer"))));
+      const herrOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "11" || opt.value === "HERRERIA" || (opt.label && String(opt.label).toLowerCase().includes("herrer"))));
       if (herrOpt) {
         defaultCcVal = herrOpt.value;
       }
