@@ -34,6 +34,17 @@ function resolveUsableDbPath() {
 
 const DB_PATH = resolveUsableDbPath();
 
+// Mirrors server.js's isHerreria()/isEdilicio() classification checks (duplicated here since
+// database.js has no dependency on server.js) - used to keep Taller and Herrería/Edilicio
+// orders that happen to share the same generic `interno` (e.g. "REPARACIONES INTERNAS") from
+// being merged into one order by getWorkOrders()'s dedup below.
+function classifySectorFromClasificacion(clasificacion) {
+  const norm = String(clasificacion || '').toLowerCase();
+  if (norm.includes('herrer')) return 'Herreria';
+  if (norm.includes('edilic')) return 'Edilicio';
+  return 'Taller';
+}
+
 function normalizeEmail(email) {
   if (!email) return '';
   let normalized = String(email).trim().toLowerCase();
@@ -675,15 +686,20 @@ class LocalDB {
   }
 
   // --- Work Orders Methods ---
-  // Returns ACTIVE (non-archived) orders only — strictly deduplicated by internal ID ('interno') or 'id'
+  // Returns ACTIVE (non-archived) orders only — strictly deduplicated by internal ID ('interno')
+  // plus sector, or 'id'. Two orders can share the same generic `interno` (e.g. "REPARACIONES
+  // INTERNAS") while genuinely belonging to different sectors (Taller vs Herrería/Edilicio) -
+  // those must stay separate order cards, each with its own OT number, not merged into one.
   getWorkOrders() {
     const db = this.read();
     const active = (db.workOrders || []).filter(o => !o.archived && o.deleted !== true);
-    
+
     // Strict deduplication map
     const uniqueMap = new Map();
     active.forEach(order => {
-      const key = order.interno ? String(order.interno).trim().toLowerCase() : String(order.id);
+      const key = order.interno
+        ? `${String(order.interno).trim().toLowerCase()}::${classifySectorFromClasificacion(order.clasificacion)}`
+        : String(order.id);
       if (!uniqueMap.has(key)) {
         uniqueMap.set(key, { ...order });
       } else {

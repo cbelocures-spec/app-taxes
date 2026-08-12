@@ -222,32 +222,21 @@ function getSectorEmployees(sector) {
   return baseDefaults;
 }
 
-// Used only by the Inicio dashboard board (one card per task) to route a task assigned to
-// a Herrería worker to Herrería's board even when the order it belongs to isn't itself
-// classified as Herrería - some orders (e.g. "REPARACIONES INTERNAS") are genuinely shared
-// across sectors, with each person logging their own task under the same OT. This must NOT
-// be reused to decide whole-order visibility (isHerreriaOrder) - that hid entire Taller
-// orders from Taller just because one task's assignee matched here.
-function isHerreriaEmployeeName(employeeName) {
-  if (!employeeName) return false;
-  const cleanName = (str) => String(str || '').normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const target = cleanName(employeeName);
-  if (!target) return false;
-  return getSectorEmployees('Herrería').some(hName => {
-    const hClean = cleanName(hName);
-    if (!hClean) return false;
-    return target === hClean || (hClean.length >= 4 && target.includes(hClean)) || (target.length >= 4 && hClean.includes(target));
-  });
-}
-
-// A task's centroCosto is stored as a catalog code (e.g. "11", "16"), never the word
-// "Herreria" itself - that only appears in the catalog's LABEL for that code. Comparing the
-// raw code against "HERRER" (as this used to do) never matched real data.
-function isHerreriaCentroCosto(centroCosto) {
-  if (!centroCosto) return false;
+// Used only by the Inicio dashboard board (one card per task) to decide which sector's board
+// a given task belongs on. Orders can be legitimately shared across sectors (e.g. the generic
+// "REPARACIONES INTERNAS" bucket, where several people from different sectors each log their
+// own task under the same OT) - so this must go strictly by the TASK's own centro de costo,
+// never by the order's overall clasificacion/sector or by guessing from the employee's name
+// (name-based matching used to false-positive, e.g. flagging "PANETTA ALBARRACIN FEDERICO" -
+// a Taller employee - as Herrería just because Herrería's roster has an unrelated "Federico"
+// alias). A task's centroCosto is stored as a catalog code (e.g. "11"), never the word
+// "Herreria" itself - that only appears in the catalog's LABEL for that code.
+function getTaskCentroCostoSector(centroCosto) {
   const ccOpt = (cachedCatalogs && cachedCatalogs.centrosCosto) ? cachedCatalogs.centrosCosto.find(c => c && c.value === centroCosto) : null;
-  const ccLabel = ccOpt && ccOpt.label ? ccOpt.label : String(centroCosto);
-  return ccLabel.toUpperCase().includes('HERRER');
+  const ccLabel = (ccOpt && ccOpt.label ? ccOpt.label : String(centroCosto || '')).toUpperCase();
+  if (ccLabel.includes('HERRER')) return 'Herrería';
+  if (ccLabel.includes('EDIL')) return 'Edilicio';
+  return 'Taller';
 }
 
 function populateDatalist(datalistId, options) {
@@ -5037,23 +5026,14 @@ function renderDashboard() {
           const cleanDesc = (task.descripcion || '').trim().toLowerCase();
           const cleanEmp = String(empLabel).trim().toLowerCase();
 
-          // Filtrar tareas de Herrería cuando se visualiza el sector Taller (y viceversa).
-          // Some orders (e.g. the generic "REPARACIONES INTERNAS" bucket) are genuinely
+          // Route this task's card to a sector's board strictly by the TASK's own centro de
+          // costo. Some orders (e.g. the generic "REPARACIONES INTERNAS" bucket) are genuinely
           // shared: several people from different sectors each log their own task under the
-          // very same OT/order, which isn't itself classified as Herrería. For THIS board
-          // (one card per task, not per order) it's correct to also check who the task is
-          // assigned to - unlike the Órdenes tab, checking the assignee here can't hide an
-          // entire order, only route that one task's own card to the right sector's board.
-          const isHerreriaTab = (currentSelectedSector === 'Herrería');
-          const isHerreriaEmpOrTask = isHerreriaCentroCosto(task.centroCosto)
-            || isHerreriaOrder(order)
-            || isHerreriaEmployeeName(empLabel);
-
-          if (!isHerreriaTab && isHerreriaEmpOrTask) {
-            return; // Excluir personal/tareas de Herrería del tablero de Taller
-          }
-          if (isHerreriaTab && !isHerreriaEmpOrTask) {
-            return; // Excluir personal/tareas de Taller del tablero de Herrería
+          // very same OT/order, so the order's overall clasificacion/sector must not decide
+          // where an individual task's card ends up - only that task's own centro de costo does.
+          const taskSector = getTaskCentroCostoSector(task.centroCosto);
+          if ((currentSelectedSector || 'Taller') !== taskSector) {
+            return; // Esta tarea pertenece al tablero de otro sector
           }
 
           const taskUniqueKey = `${order.interno || ''}_${cleanEmp}_${cleanDesc}`;
@@ -5079,11 +5059,20 @@ function renderDashboard() {
             localStorage.setItem(timerKey, String(resolvedTimerStart));
           }
 
+          // Label the card with the order's own clasificacion, except when the order carries a
+          // sector-wide "Herrería"/"Edilicio" tag but this particular task's centro de costo
+          // says Taller - then showing the order's tag would misidentify this task's own sector.
+          const orderClsLower = String(order.clasificacion || '').toLowerCase();
+          const orderClsIsSectorLabel = orderClsLower.includes('herrer') || orderClsLower.includes('edil');
+          const displayClasificacion = (orderClsIsSectorLabel && taskSector === 'Taller')
+            ? 'Taller'
+            : (order.clasificacion || '');
+
           const taskInfo = {
             orderId: order.id,
             interno: order.interno || '',
             rodado: order.rodado || '',
-            clasificacion: order.clasificacion || '',
+            clasificacion: displayClasificacion,
             taskId: task.id,
             empleadoValue: task.empleado || '',
             empleadoLabel: empLabel,
@@ -7342,29 +7331,16 @@ function getFilteredActiveOrders() {
   });
 }
 
-// Same sector scoping as getFilteredActiveOrders(), but ALSO includes an order that isn't
-// itself classified as Herrería when it contains at least one task assigned to a Herrería
-// employee - some orders (e.g. the generic "REPARACIONES INTERNAS" bucket) are genuinely
-// shared: several people from different sectors each log their own task under the same OT.
-// Used only by the Inicio dashboard (one card per task), which then applies its own per-task
-// filter - without this, such an order never reaches that filter on the Herrería tab at all,
-// so those specific tasks end up invisible on BOTH tabs instead of showing on the right one.
+// Unlike getFilteredActiveOrders() (used by the Órdenes tab, which shows/hides whole orders),
+// the Inicio dashboard renders one card per TASK and routes each card by that task's own
+// centro de costo (see getTaskCentroCostoSector), never by the order's overall clasificacion.
+// Orders can be legitimately shared across sectors (e.g. the generic "REPARACIONES INTERNAS"
+// bucket), so this must hand every active order's tasks to that per-task filter rather than
+// pre-excluding whole orders by sector - excluding here previously hid an entire shared order's
+// Taller tasks from ever reaching the per-task filter on the Taller tab.
 function getOrdersForDashboard() {
   if (!activeOrders || !Array.isArray(activeOrders)) return [];
-  const sectorFilter = currentSelectedSector || 'Taller';
-  if (sectorFilter !== 'Herrería') return getFilteredActiveOrders();
-
-  return activeOrders.filter(o => {
-    if (o.status === 'Archivada' || o.status === 'Eliminada') return false;
-    if (isHerreriaOrder(o)) return true;
-    return (o.tasks || []).some(t => {
-      if (!t) return false;
-      if (isHerreriaCentroCosto(t.centroCosto)) return true;
-      const empOpt = (cachedCatalogs && cachedCatalogs.empleados) ? cachedCatalogs.empleados.find(e => e.value === t.empleado) : null;
-      const empLabel = (empOpt ? empOpt.label : t.empleado) || '';
-      return isHerreriaEmployeeName(empLabel);
-    });
-  });
+  return activeOrders.filter(o => o.status !== 'Archivada' && o.status !== 'Eliminada');
 }
 
 function getFilteredArchivedOrders() {

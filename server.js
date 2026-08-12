@@ -249,6 +249,87 @@ function isHerreriaExclusiveEquipment(rodado, interno) {
   return false;
 }
 
+// A task's own centro de costo (catalog code, e.g. "11") decides which sector it belongs to -
+// never the order's clasificacion/sector, since Taller and Herrería/Edilicio must never share
+// one order (they can share the same generic `interno`, e.g. "REPARACIONES INTERNAS", but each
+// sector's tasks have to live in that sector's own order). Mirrors getTaskCentroCostoSector in
+// public/app.js.
+function getCentroCostoSector(centroCosto, centrosCostoList) {
+  const ccOpt = (centrosCostoList || []).find(c => c && String(c.value) === String(centroCosto));
+  const ccLabel = (ccOpt && ccOpt.label ? ccOpt.label : String(centroCosto || '')).toUpperCase();
+  if (ccLabel.includes('HERRER')) return 'Herrería';
+  if (ccLabel.includes('EDIL')) return 'Edilicio';
+  return 'Taller';
+}
+
+// Splits a task list into the ones that belong on `homeSector` and the rest, grouped by their
+// own sector - used by both order creation and editing to keep a mixed-sector submission from
+// ever landing in a single order (see routeForeignTasksToSiblingOrder).
+function splitTasksBySector(tasks, homeSector, centrosCostoList) {
+  const own = [];
+  const foreign = { 'Herrería': [], 'Edilicio': [], 'Taller': [] };
+  (tasks || []).forEach(t => {
+    if (!t) return;
+    const sec = getCentroCostoSector(t.centroCosto, centrosCostoList);
+    if (sec === homeSector) own.push(t);
+    else foreign[sec].push(t);
+  });
+  return { own, foreign };
+}
+
+// Moves a group of same-sector "foreign" tasks (tasks whose centro de costo doesn't match the
+// order they were submitted on) into that sector's own order for the same `interno` - reusing
+// an existing open one if there is one, or creating a brand-new sibling order otherwise. Never
+// touches the order the tasks came from; the caller is responsible for excluding them from what
+// it saves there.
+function routeForeignTasksToSiblingOrder(sector, tasksForSector, ctx) {
+  if (!tasksForSector || tasksForSector.length === 0) return null;
+
+  // Herrería/Edilicio orders carry their sector directly as `clasificacion`; a synthetic
+  // Taller sibling has no equivalent sector value there (Taller's clasificacion is a work
+  // type - Preventivo/Correctivo/Auxilio), so it defaults to "Correctivo" like a normal
+  // corrective job would.
+  const siblingClasificacion = sector === 'Herrería' ? 'Herrería' : (sector === 'Edilicio' ? 'Edilicio' : 'Correctivo');
+  const cleanInterno = String(ctx.interno || '').trim().toLowerCase();
+
+  const sibling = cleanInterno ? (db.getSyncableOrders() || []).find(o =>
+    o.id !== ctx.excludeOrderId &&
+    o.archived !== true && o.deleted !== true &&
+    String(o.interno || '').trim().toLowerCase() === cleanInterno &&
+    (sector === 'Herrería' ? isHerreria(o.clasificacion) : sector === 'Edilicio' ? isEdilicio(o.clasificacion) : (!isHerreria(o.clasificacion) && !isEdilicio(o.clasificacion)))
+  ) : null;
+
+  if (sibling) {
+    const mergedTasksMap = new Map((sibling.tasks || []).map(t => [t.id, t]));
+    tasksForSector.forEach(t => mergedTasksMap.set(t.id, t));
+    const merged = db.updateWorkOrder(sibling.id, {
+      tasks: Array.from(mergedTasksMap.values()),
+      syncStatus: sibling.taxesOrderNumber ? sibling.syncStatus : 'pending'
+    });
+    console.log(`[Auto-Split] Movida(s) ${tasksForSector.length} tarea(s) de sector ${sector} a orden hermana existente ${sibling.id} (Interno ${ctx.interno}).`);
+    autoPauseConflictingTimers(sibling.id, tasksForSector, null);
+    return merged;
+  }
+
+  const created = db.createWorkOrder({
+    rodado: ctx.rodado,
+    responsable: ctx.responsable,
+    fechaEntrega: ctx.fechaEntrega,
+    horario: ctx.horario,
+    interno: ctx.interno,
+    clasificacion: siblingClasificacion,
+    incidente: ctx.incidente,
+    tasks: tasksForSector,
+    createdBy: ctx.createdBy,
+    estadoUnidad: ctx.estadoUnidad,
+    combustibleReset: ctx.combustibleReset,
+    sector: sector
+  });
+  console.log(`[Auto-Split] Creada orden hermana nueva ${created.id} para sector ${sector} (Interno ${ctx.interno}), ${tasksForSector.length} tarea(s) movida(s).`);
+  autoPauseConflictingTimers(created.id, created.tasks, null);
+  return created;
+}
+
 // 1. ENDPOINT DE LOGIN: Bloquea la entrada a la app si no existe el usuario o la contraseña es incorrecta
 app.post('/api/login', async (req, res) => {
   try {
@@ -711,6 +792,13 @@ app.post('/api/orders', (req, res) => {
       return res.status(200).json(duplicateOrder);
     }
 
+    // Taller and Herrería/Edilicio must never share one order, even if the tasks were all
+    // submitted together on this same "Nueva Orden" form - split off anything whose own
+    // centro de costo doesn't match this order's sector into a sibling order instead.
+    const homeSector = isHerreria(finalClasificacion) ? 'Herrería' : (isEdilicio(finalClasificacion) ? 'Edilicio' : 'Taller');
+    const centrosCostoForSplit = (db.read().catalogs || {}).centrosCosto || [];
+    const { own: ownTasksForNewOrder, foreign: foreignTasksForNewOrder } = splitTasksBySector(tasks, homeSector, centrosCostoForSplit);
+
     const newOrder = db.createWorkOrder({
       rodado: resolvedRodado,
       responsable,
@@ -719,7 +807,7 @@ app.post('/api/orders', (req, res) => {
       interno,
       clasificacion: finalClasificacion,
       incidente,
-      tasks,
+      tasks: ownTasksForNewOrder,
       createdBy,
       estadoUnidad: estadoUnidad || 'fuera_de_servicio',
       combustibleReset,
@@ -730,6 +818,22 @@ app.post('/api/orders', (req, res) => {
     // the "Nueva Orden" form was still open, before ever hitting the server) - check for
     // conflicts here too, not just on later edits.
     autoPauseConflictingTimers(newOrder.id, newOrder.tasks, null);
+
+    ['Herrería', 'Edilicio', 'Taller'].forEach(foreignSector => {
+      if (foreignSector === homeSector) return;
+      routeForeignTasksToSiblingOrder(foreignSector, foreignTasksForNewOrder[foreignSector], {
+        excludeOrderId: newOrder.id,
+        interno,
+        rodado: resolvedRodado,
+        responsable,
+        fechaEntrega,
+        horario,
+        incidente,
+        createdBy,
+        estadoUnidad: estadoUnidad || 'fuera_de_servicio',
+        combustibleReset
+      });
+    });
 
     // Respond immediately to the frontend so UI never freezes or hangs
     res.status(201).json(newOrder);
@@ -1004,15 +1108,40 @@ app.put('/api/orders/:id', (req, res) => {
       });
     });
 
-    const finalTasksToSave = Array.from(mergedTasksMap.values());
+    const mergedTasks = Array.from(mergedTasksMap.values());
 
     // Guard: a person can't physically work on two tasks at once (see
     // autoPauseConflictingTimers for why this has to be enforced server-side too).
     const previousTasksById = new Map((existing.tasks || []).map(et => [et.id, et]));
-    autoPauseConflictingTimers(existing.id, finalTasksToSave, previousTasksById);
+    autoPauseConflictingTimers(existing.id, mergedTasks, previousTasksById);
 
     const targetEstadoUnidad = estadoUnidad !== undefined ? estadoUnidad : existing.estadoUnidad;
     const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
+    const resolvedInterno = interno !== undefined ? interno : existing.interno;
+    const resolvedRodado = resolveRodadoForInterno(resolvedInterno, rodado !== undefined ? rodado : existing.rodado);
+
+    // Taller and Herrería/Edilicio must never share one order - split off anything whose own
+    // centro de costo doesn't match this order's sector into a sibling order for the same
+    // interno, instead of leaving it mixed in here (see routeForeignTasksToSiblingOrder).
+    const homeSector = isHerreria(finalClasificacion) ? 'Herrería' : (isEdilicio(finalClasificacion) ? 'Edilicio' : 'Taller');
+    const { own: finalTasksToSave, foreign: foreignTasksBySector } = splitTasksBySector(mergedTasks, homeSector, centrosCostoList);
+
+    ['Herrería', 'Edilicio', 'Taller'].forEach(foreignSector => {
+      if (foreignSector === homeSector) return;
+      routeForeignTasksToSiblingOrder(foreignSector, foreignTasksBySector[foreignSector], {
+        excludeOrderId: existing.id,
+        interno: resolvedInterno,
+        rodado: resolvedRodado,
+        responsable,
+        fechaEntrega,
+        horario,
+        incidente,
+        createdBy,
+        estadoUnidad: targetEstadoUnidad,
+        combustibleReset: combustibleReset !== undefined ? combustibleReset : existing.combustibleReset
+      });
+    });
+
     // Requires synced === true too (not just Finalizada) - a task marked done locally but not
     // yet pushed to Taxes shouldn't drop off into Historial before it's actually confirmed there.
     const allTasksCompleted = finalTasksToSave.length > 0 && finalTasksToSave.every(t => t && (t.status === "Finalizada" || t.status === "Completada") && t.synced === true);
@@ -1033,9 +1162,6 @@ app.put('/api/orders/:id', (req, res) => {
     // Hard gate: fuera de servicio NUNCA se archiva a Historial, ni siquiera si algo manda
     // explícitamente archived:true - no solo cuando se decide automáticamente.
     const isArchived = isOutOfService ? false : (explicitUnarchive ? false : ((req.body.archived === true) || autoArchive));
-
-    const resolvedInterno = interno !== undefined ? interno : existing.interno;
-    const resolvedRodado = resolveRodadoForInterno(resolvedInterno, rodado !== undefined ? rodado : existing.rodado);
 
     const updated = db.updateWorkOrder(req.params.id, {
       rodado: resolvedRodado,
