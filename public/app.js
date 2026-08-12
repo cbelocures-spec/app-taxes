@@ -8157,11 +8157,16 @@ async function submitLoginForm() {
 }
 
 function logoutUser() {
-  if (confirm("¿Está seguro que desea cerrar sesión?")) {
+  // No confirm() dialog here on purpose - on some mobile/PWA webviews window.confirm() gets
+  // silently blocked or auto-dismissed, which made this button look like it "did nothing".
+  // Logging out is trivially reversible (just log back in), so it doesn't need a gate anyway.
+  try {
     localStorage.removeItem('currentUserUsername');
     localStorage.removeItem('currentUserPassword');
-    location.reload();
+  } catch (e) {
+    console.error('Error al limpiar la sesión local:', e);
   }
+  location.reload();
 }
 
 // --- BULK SELECTION SYNC FUNCTIONS ---
