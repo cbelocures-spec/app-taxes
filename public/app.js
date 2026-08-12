@@ -108,6 +108,7 @@ window.fetch = async function(url, options = {}) {
       }
       
       console.warn('Could not recover session. Logging out...');
+      localStorage.setItem('userExplicitlyLoggedOut', '1');
       localStorage.removeItem('currentUserUsername');
       localStorage.removeItem('currentUserPassword');
       checkUserSession();
@@ -8002,13 +8003,29 @@ async function saveAllUserAuthorizations() {
 
 function checkUserSession() {
   let username = localStorage.getItem('currentUserUsername');
-  if (!username || username === 'Operador Móvil' || username === 'Operador Movil') {
+  // On a genuinely fresh device (never logged in) with no explicit logout on record, fall
+  // back to the shared "Pañol" account so the shop tablet doesn't need every worker to type
+  // credentials. But right after the user explicitly logs out, this same fallback used to
+  // silently re-create that session and hide the login screen before it ever appeared - the
+  // logout button looked like it "logged back in by itself". Skip it exactly once in that case.
+  const skipAutoProvision = localStorage.getItem('userExplicitlyLoggedOut') === '1';
+  if (!username && skipAutoProvision) {
+    localStorage.removeItem('userExplicitlyLoggedOut');
+  } else if (!username || username === 'Operador Móvil' || username === 'Operador Movil') {
     username = 'paniol@contenedoreshugo.com.ar';
     localStorage.setItem('currentUserUsername', username);
     localStorage.setItem('currentUserPassword', '123');
   }
 
   const loginOverlay = document.getElementById('login-overlay');
+  if (!username) {
+    // No session to resume - show the login screen instead of the main app.
+    if (loginOverlay) {
+      loginOverlay.classList.remove('hidden');
+      loginOverlay.style.removeProperty('display');
+    }
+    return;
+  }
   if (loginOverlay) {
     loginOverlay.classList.add('hidden');
     loginOverlay.style.setProperty('display', 'none', 'important');
@@ -8063,6 +8080,7 @@ async function manejarLogin(username, password) {
     localStorage.setItem('usuarioLogueado', JSON.stringify(usuarioObj));
     localStorage.setItem('currentUserUsername', usuarioObj.username);
     localStorage.setItem('currentUserPassword', password);
+    localStorage.removeItem('userExplicitlyLoggedOut');
 
     // FORCIBLY HIDE LOGIN OVERLAY IMMEDIATELY
     if (overlay) {
@@ -8083,6 +8101,7 @@ async function manejarLogin(username, password) {
     // FAILSAFE: EVEN ON FETCH ERROR, DISMISS OVERLAY AND LOG IN
     localStorage.setItem('currentUserUsername', username);
     localStorage.setItem('currentUserPassword', password);
+    localStorage.removeItem('userExplicitlyLoggedOut');
     if (overlay) {
       overlay.classList.add('hidden');
       overlay.style.setProperty('display', 'none', 'important');
@@ -8161,6 +8180,9 @@ function logoutUser() {
   // silently blocked or auto-dismissed, which made this button look like it "did nothing".
   // Logging out is trivially reversible (just log back in), so it doesn't need a gate anyway.
   try {
+    // Tells checkUserSession() (which runs right after reload) to actually show the login
+    // screen instead of silently falling back to the shared "Pañol" account.
+    localStorage.setItem('userExplicitlyLoggedOut', '1');
     localStorage.removeItem('currentUserUsername');
     localStorage.removeItem('currentUserPassword');
   } catch (e) {
