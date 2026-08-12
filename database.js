@@ -516,13 +516,20 @@ class LocalDB {
     const db = this.read();
     if (!db.users) db.users = {};
 
+    // "ibrahim@contenedoreshugo.com.ar" was a mistaken duplicate of the real account
+    // ("a.brahim@...", Brahim Hugo Adrian) that used to be seeded below - no real person logs
+    // in with it, so remove it if an earlier run of this seeding already created it.
+    if (db.users['ibrahim@contenedoreshugo.com.ar']) {
+      delete db.users['ibrahim@contenedoreshugo.com.ar'];
+      this.write(db);
+    }
+
     // Ensure default system users exist in database
     const defaultKnownUsers = [
       'paniol@contenedoreshugo.com.ar',
       'sergios@contenedoreshugo.com.ar',
       'jcarmona@contenedoreshugo.com.ar',
       'ftoledo@contenedoreshugo.com.ar',
-      'ibrahim@contenedoreshugo.com.ar',
       'a.brahim@contenedoreshugo.com.ar'
     ];
     defaultKnownUsers.forEach(email => {

@@ -279,6 +279,18 @@ function getOrderSector(clasificacion, sectorField) {
   return 'Taller';
 }
 
+// Last-resort fallback for an order whose stored `sector` isn't one of the three real sectors
+// (e.g. "Admin" - orders created by Pañol on behalf of another sector before the client sent
+// its active tab as `sector`). Looks at what each of its own tasks' centro de costo says and
+// goes with the first unambiguous Herrería/Edilicio match; defaults to Taller otherwise. This
+// self-heals a mis-tagged order the next time it's saved, without needing direct DB access.
+function inferOrderSectorFromTasks(tasks, centrosCostoList) {
+  const sectors = (tasks || []).map(t => t && getCentroCostoSector(t.centroCosto, centrosCostoList)).filter(Boolean);
+  if (sectors.includes('Herrería')) return 'Herrería';
+  if (sectors.includes('Edilicio')) return 'Edilicio';
+  return 'Taller';
+}
+
 // Splits a task list into the ones that belong on `homeSector` and the rest, grouped by their
 // own sector - used by both order creation and editing to keep a mixed-sector submission from
 // ever landing in a single order (see routeForeignTasksToSiblingOrder). Only moves a task out
@@ -1153,8 +1165,16 @@ app.put('/api/orders/:id', (req, res) => {
     // centro de costo doesn't match this order's sector into a sibling order for the same
     // interno, instead of leaving it mixed in here (see routeForeignTasksToSiblingOrder).
     // Backfill `sector` the same way the actual save below does, since finalClasificacion alone
-    // can no longer tell Edilicio apart (see getOrderSector).
-    const resolvedSectorField = existing.sector || getSectorByUsername(createdBy);
+    // can no longer tell Edilicio apart (see getOrderSector). If the stored sector isn't one of
+    // the three real ones (e.g. "Admin" - an order Pañol created before the client sent its own
+    // active tab as `sector`), the creator's own login-derived sector is no better ("Admin"
+    // again), so fall back to inferring it from what the order's own tasks actually are - this
+    // self-heals a mis-tagged order the next time it's saved.
+    const VALID_SECTORS = ['Taller', 'Herrería', 'Edilicio'];
+    const creatorSector = getSectorByUsername(createdBy);
+    const resolvedSectorField = VALID_SECTORS.includes(existing.sector)
+      ? existing.sector
+      : (VALID_SECTORS.includes(creatorSector) ? creatorSector : inferOrderSectorFromTasks(mergedTasks, centrosCostoList));
     const homeSector = getOrderSector(finalClasificacion, resolvedSectorField);
     const { own: finalTasksToSave, foreign: foreignTasksBySector } = splitTasksBySector(mergedTasks, homeSector, centrosCostoList);
 

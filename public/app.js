@@ -7476,11 +7476,39 @@ let currentUserPermissions = {
 async function loadUserPermissionsUI() {
   const currentUser = localStorage.getItem('currentUserUsername');
   const userSector = getSectorByUsername(currentUser);
-  
+
   // Show all navigation tabs by default
   document.querySelectorAll('.nav-item').forEach(el => el.style.display = 'flex');
   const navHistorial = document.getElementById('nav-historial');
   if (navHistorial) navHistorial.style.display = 'flex';
+
+  // Fetch this user's own saved permissions (from Ajustes > Autorizaciones de Usuarios) and
+  // actually apply them - the checkboxes there were being saved but nothing ever read them
+  // back to hide the corresponding nav tab, so toggling them off had no visible effect.
+  try {
+    const permsRes = await originalFetch('/api/my-permissions', {
+      headers: { 'x-user-username': currentUser || '' }
+    });
+    if (permsRes.ok) {
+      currentUserPermissions = await permsRes.json();
+    }
+  } catch (e) {
+    console.error('Error loading user permissions:', e);
+  }
+
+  const navPermGates = [
+    { id: 'nav-historial', flag: 'canViewHistory' },
+    { id: 'nav-bulk', flag: 'canViewMasivas' },
+    { id: 'nav-preventivos', flag: 'canViewPreventivos' },
+    { id: 'nav-partetaller', flag: 'canViewParteTaller' },
+    { id: 'nav-settings', flag: 'canViewSettings' }
+  ];
+  navPermGates.forEach(({ id, flag }) => {
+    const el = document.getElementById(id);
+    if (el && currentUserPermissions[flag] === false) {
+      el.style.display = 'none';
+    }
+  });
 
   const sectorTabsBar = document.getElementById('sector-tabs-bar');
   if (sectorTabsBar) sectorTabsBar.style.display = 'flex';
