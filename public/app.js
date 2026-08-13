@@ -2301,49 +2301,26 @@ function updateEmployeeDropdownForCard(card) {
   }
 }
 
-// Timeline track labels for the Inicio dashboard (one card per task, timeline layout).
-function getTimelineStartLabel(timerHistory, timerStart) {
+// Timeline track label for the Inicio dashboard (one card per task, timeline layout) - shows
+// every Inició/Pausó/Reanudó event in order, one per line, not just the most recent pair, so a
+// task paused/resumed several times still shows its whole history.
+function getTimelineFullHistoryLabel(timerHistory, timerStart) {
+  const lines = [];
   if (Array.isArray(timerHistory)) {
-    const start = timerHistory.find(h => String(h.type || '').toLowerCase().startsWith('inici'));
-    if (start && start.formatted) return start.formatted;
-  }
-  if (timerStart) {
-    return new Date(timerStart).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
-  }
-  return '';
-}
-
-function getTimelinePausedLabel(timerHistory) {
-  if (!Array.isArray(timerHistory)) return '';
-  for (let i = timerHistory.length - 1; i >= 0; i--) {
-    const h = timerHistory[i];
-    const type = String(h.type || '').toLowerCase();
-    if (type.startsWith('paus') && h.formatted) return h.formatted;
-  }
-  return '';
-}
-
-// For a currently-working task, show both the Pausó and Reanudó times of its most recent
-// pause/resume cycle (if it has one) instead of just the original Inició time - a task that
-// was paused and resumed needs both to make sense of where the current running segment
-// actually started.
-function getTimelineWorkingLabel(timerHistory, timerStart) {
-  if (Array.isArray(timerHistory)) {
-    for (let i = timerHistory.length - 1; i >= 0; i--) {
-      const type = String(timerHistory[i].type || '').toLowerCase();
-      if (type.startsWith('reanud')) {
-        for (let j = i - 1; j >= 0; j--) {
-          const prevType = String(timerHistory[j].type || '').toLowerCase();
-          if (prevType.startsWith('paus') && timerHistory[j].formatted && timerHistory[i].formatted) {
-            return `<span style="color: var(--warning);">${timerHistory[j].formatted}</span><br>${timerHistory[i].formatted}`;
-          }
-        }
-        break;
+    timerHistory.forEach(h => {
+      if (!h || !h.formatted) return;
+      const type = String(h.type || '').toLowerCase();
+      if (type.startsWith('paus')) {
+        lines.push(`<span style="color: var(--warning);">${h.formatted}</span>`);
+      } else if (type.startsWith('inici') || type.startsWith('reanud')) {
+        lines.push(h.formatted);
       }
-      if (type.startsWith('inici')) break; // no resume yet - just the original start
-    }
+    });
   }
-  return getTimelineStartLabel(timerHistory, timerStart);
+  if (lines.length === 0 && timerStart) {
+    lines.push(new Date(timerStart).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }));
+  }
+  return lines.join('<br>');
 }
 
 function renderTimerHistoryHtml(history) {
@@ -5311,7 +5288,7 @@ function renderDashboard() {
         const mm = Math.floor((elapsedSeconds % 3600) / 60);
         const ss = elapsedSeconds % 60;
         const displayTime = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
-        const startLabel = getTimelineWorkingLabel(t.timerHistory, t.timerStart);
+        const startLabel = getTimelineFullHistoryLabel(t.timerHistory, t.timerStart);
         const isLast = idx === workingTasks.length - 1;
 
         return `
@@ -5370,13 +5347,12 @@ function renderDashboard() {
           const totalSeconds = calculateTotalElapsedSeconds(t.timerHistory, null);
           displayHours = minutesToHmm(Math.round(totalSeconds / 60));
         }
-        const startLabel = getTimelineStartLabel(t.timerHistory, t.timerStart);
-        const pausedLabel = getTimelinePausedLabel(t.timerHistory);
+        const startLabel = getTimelineFullHistoryLabel(t.timerHistory, t.timerStart);
         const isLast = idx === pausedTasks.length - 1;
         return `
           <div class="timeline-item paused">
             <div class="timeline-track">
-              <div class="timeline-time">${startLabel}${pausedLabel ? `<br>${pausedLabel}` : ''}</div>
+              <div class="timeline-time">${startLabel}</div>
               <span class="timeline-dot"><span class="material-icons">pause</span></span>
               ${isLast ? '' : '<span class="timeline-line"></span>'}
             </div>
