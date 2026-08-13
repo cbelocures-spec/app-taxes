@@ -616,10 +616,41 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// SIDEBAR MENU (replaces the old bottom nav bar - opened via the hamburger button in the header)
+function openSidebarMenu() {
+  const menu = document.getElementById('sidebar-menu');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (menu) menu.classList.add('open');
+  if (overlay) overlay.classList.add('open');
+}
+
+function closeSidebarMenu() {
+  const menu = document.getElementById('sidebar-menu');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (menu) menu.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function toggleSidebarMenu() {
+  const menu = document.getElementById('sidebar-menu');
+  if (menu && menu.classList.contains('open')) {
+    closeSidebarMenu();
+  } else {
+    openSidebarMenu();
+  }
+}
+window.openSidebarMenu = openSidebarMenu;
+window.closeSidebarMenu = closeSidebarMenu;
+window.toggleSidebarMenu = toggleSidebarMenu;
+
 // 1. SPA ROUTING
 function switchView(viewId) {
   console.log("Switching view to:", viewId);
   try {
+    // Picking any item from the sidebar menu should also close it - it's an off-canvas
+    // overlay now (see SIDEBAR MENU above), not a bar that stays on screen.
+    closeSidebarMenu();
+
     // Deactivate all views
     document.querySelectorAll('.app-view').forEach(v => {
       v.classList.remove('active');

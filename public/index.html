@@ -28,15 +28,15 @@
 
   <!-- App Header -->
   <header class="app-header">
+    <span class="material-icons sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebarMenu()" title="Abrir menú" translate="no">menu</span>
     <div class="header-logo">
       <img src="logo.jpg" alt="Contenedores Hugo" class="header-logo-img">
     </div>
-    
+
     <div class="header-center">
       <span class="header-middle-title">Gestión de Mantenimiento</span>
       <small class="header-middle-user" id="current-user">paniol@contenedoreshugo.com.ar</small>
     </div>    <div class="header-actions" style="display: flex; align-items: center; gap: 6px;">
-      <span class="material-icons logout-btn" id="header-logout-btn" onclick="logoutUser()" title="Cerrar Sesión" style="margin-right: 4px;" translate="no">logout</span>
       <span class="material-icons refresh-btn" id="header-refresh-btn" onclick="location.reload()" title="Refrescar Pantalla" translate="no">refresh</span>
       <span class="material-icons sync-indicator idle" id="global-sync-icon" translate="no">sync</span>
     </div>
@@ -1084,38 +1084,53 @@
 
   </main>
 
-  <!-- Bottom Navigation Bar -->
-  <nav class="bottom-nav">
-    <button class="nav-item active" onclick="switchView('home')" id="nav-home">
-      <span class="material-icons">home</span>
-      <span>Inicio</span>
-    </button>
-    <button class="nav-item" onclick="switchView('orders')" id="nav-orders">
-      <span class="material-icons">assignment</span>
-      <span>Órdenes</span>
-    </button>
-    <button class="nav-item" onclick="switchView('bulk')" id="nav-bulk">
-      <span class="material-icons">content_copy</span>
-      <span>Masiva</span>
-    </button>
-    <button class="nav-item" onclick="switchView('preventivos')" id="nav-preventivos">
-      <span class="material-icons">build_circle</span>
-      <span>Preventivos</span>
-    </button>
-    <button class="nav-item" onclick="switchView('partetaller')" id="nav-partetaller">
-      <span class="material-icons">engineering</span>
-      <span>Parte Taller</span>
-    </button>
-    <button class="nav-item" onclick="switchView('settings')" id="nav-settings">
-      <span class="material-icons">settings</span>
-      <span>Ajustes</span>
-    </button>
-    <!-- Historial: solo visible para Admin (Pañol/Taller) -->
-    <button class="nav-item" onclick="switchView('historial')" id="nav-historial" style="display:none;">
-      <span class="material-icons">archive</span>
-      <span>Historial</span>
-    </button>
-  </nav>
+  <!-- Sidebar Menu (replaces the old bottom nav bar) -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebarMenu()"></div>
+  <aside class="sidebar-menu" id="sidebar-menu">
+    <div class="sidebar-menu-header">
+      <img src="logo.jpg" alt="Contenedores Hugo" class="sidebar-menu-logo">
+      <span class="material-icons sidebar-close-btn" onclick="closeSidebarMenu()" title="Cerrar menú" translate="no">close</span>
+    </div>
+    <div class="sidebar-menu-title">MENÚ PRINCIPAL</div>
+    <nav class="sidebar-menu-nav">
+      <button class="nav-item active" onclick="switchView('home')" id="nav-home">
+        <span class="material-icons">home</span>
+        <span>Inicio</span>
+      </button>
+      <button class="nav-item" onclick="switchView('orders')" id="nav-orders">
+        <span class="material-icons">assignment</span>
+        <span>Órdenes</span>
+      </button>
+      <button class="nav-item" onclick="switchView('bulk')" id="nav-bulk">
+        <span class="material-icons">content_copy</span>
+        <span>Masiva</span>
+      </button>
+      <button class="nav-item" onclick="switchView('preventivos')" id="nav-preventivos">
+        <span class="material-icons">build_circle</span>
+        <span>Preventivos</span>
+      </button>
+      <button class="nav-item" onclick="switchView('partetaller')" id="nav-partetaller">
+        <span class="material-icons">engineering</span>
+        <span>Parte Taller</span>
+      </button>
+      <button class="nav-item" onclick="switchView('settings')" id="nav-settings">
+        <span class="material-icons">settings</span>
+        <span>Ajustes</span>
+      </button>
+      <!-- Historial: solo visible para Admin (Pañol/Taller) -->
+      <button class="nav-item" onclick="switchView('historial')" id="nav-historial" style="display:none;">
+        <span class="material-icons">archive</span>
+        <span>Historial</span>
+      </button>
+    </nav>
+    <div class="sidebar-menu-footer">
+      <button class="sidebar-logout-btn" onclick="logoutUser()">
+        <span class="material-icons">logout</span>
+        <span>Cerrar sesión</span>
+      </button>
+      <div class="sidebar-version">Versión 1.0.0</div>
+    </div>
+  </aside>
 
   <!-- FLOATING VOICE BUTTON (DEACTIVATED) -->
   <button class="voice-fab" id="voice-fab" onclick="openVoiceModal()" title="Crear orden por voz" style="display: none;">
