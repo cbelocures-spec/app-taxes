@@ -2335,7 +2335,7 @@ function getTimelineWorkingLabel(timerHistory, timerStart) {
         for (let j = i - 1; j >= 0; j--) {
           const prevType = String(timerHistory[j].type || '').toLowerCase();
           if (prevType.startsWith('paus') && timerHistory[j].formatted && timerHistory[i].formatted) {
-            return `${timerHistory[j].formatted}<br>${timerHistory[i].formatted}`;
+            return `<span style="color: var(--warning);">${timerHistory[j].formatted}</span><br>${timerHistory[i].formatted}`;
           }
         }
         break;
