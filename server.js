@@ -1217,10 +1217,18 @@ app.put('/api/orders/:id', (req, res) => {
     // todavía hay tareas en curso, o esa orden desaparece de Órdenes sin estar terminada.
     // No importa si todavía falta sincronizar o controlar con Taxes — eso lo sigue
     // resolviendo el worker de fondo aunque la orden ya esté archivada.
-    const autoArchive = !isOutOfService && allTasksCompleted && !explicitUnarchive;
+    // existing.unarchivedManually: once a user explicitly pulls an order back out of
+    // Historial (PATCH .../unarchive) to fix something, it must NOT auto-archive itself right
+    // back on the very next save just because its tasks were already marked done+synced from
+    // before - only an explicit archive (the Archive button, or req.body.archived === true)
+    // should send it back.
+    const autoArchive = !isOutOfService && allTasksCompleted && !explicitUnarchive && !existing.unarchivedManually;
     // Hard gate: fuera de servicio NUNCA se archiva a Historial, ni siquiera si algo manda
     // explícitamente archived:true - no solo cuando se decide automáticamente.
     const isArchived = isOutOfService ? false : (explicitUnarchive ? false : ((req.body.archived === true) || autoArchive));
+    // A deliberate re-archive (explicit or auto) supersedes the earlier manual un-archive -
+    // otherwise it would stay permanently exempt from auto-archiving forever.
+    const clearedUnarchiveFlag = isArchived ? false : existing.unarchivedManually;
 
     const updated = db.updateWorkOrder(req.params.id, {
       rodado: resolvedRodado,
@@ -1241,7 +1249,8 @@ app.put('/api/orders/:id', (req, res) => {
       sector: resolvedSectorField,
       tasks: finalTasksToSave,
       archived: isArchived,
-      archivedAt: isArchived ? (existing.archivedAt || new Date().toISOString()) : null
+      archivedAt: isArchived ? (existing.archivedAt || new Date().toISOString()) : null,
+      unarchivedManually: clearedUnarchiveFlag
     });
 
     // Respond immediately to the frontend so UI modal never hangs

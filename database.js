@@ -806,6 +806,8 @@ class LocalDB {
     
     order.archived = true;
     order.archivedAt = new Date().toISOString();
+    // A deliberate manual (re-)archive supersedes any earlier manual un-archive.
+    order.unarchivedManually = false;
     this.write(db);
     return true;
   }
@@ -900,7 +902,12 @@ class LocalDB {
         const o = db.workOrders[idx];
         const tasks = o.tasks || [];
         const allDoneAndSynced = tasks.length > 0 && tasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada') && t.synced === true);
-        if (!o.archived && !o.deleted && o.estadoUnidad !== 'fuera_de_servicio' && allDoneAndSynced) {
+        // unarchivedManually is set by the manual "un-archive" action (PATCH .../unarchive) so a
+        // user can pull an order back out of Historial to fix something - without checking it
+        // here, the very next background save (syncWorker/railway_sync_agent, or even just an
+        // unrelated field update) saw the same already-synced tasks and immediately sent it
+        // right back to Historial, since nothing else in this codebase ever read this flag.
+        if (!o.archived && !o.deleted && !o.unarchivedManually && o.estadoUnidad !== 'fuera_de_servicio' && allDoneAndSynced) {
           o.archived = true;
           o.archivedAt = o.archivedAt || new Date().toISOString();
         }
