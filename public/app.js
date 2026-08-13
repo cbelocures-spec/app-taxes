@@ -5292,7 +5292,7 @@ function renderDashboard() {
           <div class="timeline-item working">
             <div class="timeline-track">
               <div class="timeline-time">${startLabel}</div>
-              <span class="timeline-dot"></span>
+              <span class="timeline-dot"><span class="material-icons">play_arrow</span></span>
               ${isLast ? '' : '<span class="timeline-line"></span>'}
             </div>
             <div class="dashboard-card working" id="dash-card-${t.taskId}">
@@ -5314,9 +5314,6 @@ function renderDashboard() {
               <div style="font-size: 11px; font-weight: 700; color: #38bdf8; margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">
                 <span class="material-icons" style="font-size: 13px; color: #38bdf8;">timer</span>
                 <span>Tiempo Estimado: ${getEstimatedTaskHoursMax(t.descripcion, t.empleadoLabel)}</span>
-              </div>
-              <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
-                ${renderTimerHistoryHtml(t.timerHistory)}
               </div>
               <div class="dashboard-card-timer" id="dash-timer-${t.taskId}">${displayTime}</div>
               <div class="dashboard-card-actions">
@@ -5354,7 +5351,7 @@ function renderDashboard() {
           <div class="timeline-item paused">
             <div class="timeline-track">
               <div class="timeline-time">${startLabel}${pausedLabel ? `<br>${pausedLabel}` : ''}</div>
-              <span class="timeline-dot"></span>
+              <span class="timeline-dot"><span class="material-icons">pause</span></span>
               ${isLast ? '' : '<span class="timeline-line"></span>'}
             </div>
             <div class="dashboard-card paused">
@@ -5376,9 +5373,6 @@ function renderDashboard() {
               <div style="font-size: 11px; font-weight: 700; color: #38bdf8; margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">
                 <span class="material-icons" style="font-size: 13px; color: #38bdf8;">timer</span>
                 <span>Tiempo Estimado: ${getEstimatedTaskHoursMax(t.descripcion, t.empleadoLabel)}</span>
-              </div>
-              <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
-                ${renderTimerHistoryHtml(t.timerHistory)}
               </div>
               <div class="dashboard-card-timer" style="display:flex; align-items:center; gap:6px;">
                 <input
