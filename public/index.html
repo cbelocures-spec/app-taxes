@@ -46,9 +46,9 @@
   <main class="app-container">
     <!-- Sector Tabs (Visible only for Admin users) -->
     <div id="sector-tabs-bar" class="sector-tabs-bar" style="display: none;">
-      <button type="button" class="sector-tab active" onclick="switchSector('Taller')">Taller</button>
-      <button type="button" class="sector-tab" onclick="switchSector('Herrería')">Herrería</button>
-      <button type="button" class="sector-tab" onclick="switchSector('Edilicio')">Edilicio</button>
+      <button type="button" class="sector-tab active" onclick="switchSector('Taller')"><span class="material-icons">directions_car</span>Taller</button>
+      <button type="button" class="sector-tab" onclick="switchSector('Herrería')"><span class="material-icons">construction</span>Herrería</button>
+      <button type="button" class="sector-tab" onclick="switchSector('Edilicio')"><span class="material-icons">apartment</span>Edilicio</button>
     </div>
 
     <!-- VIEW 1: HOME (INICIO) -->
@@ -75,21 +75,25 @@
       <!-- PAÑOL/MANTENIMIENTO STATS DASHBOARD -->
       <div id="stats-dashboard-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 18px;">
         <div class="stat-card" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;">
+          <span class="stat-card-icon" style="background: var(--primary-light); color: var(--primary);"><span class="material-icons">directions_car</span></span>
           <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Unidades Fuera de Servicio</div>
           <div style="font-size: 24px; font-weight: 800; color: var(--primary); margin: 6px 0;" id="stat-total-taller">0</div>
           <div style="font-size: 10px; color: var(--text-muted);" id="stat-sub-taller">0 trabajando</div>
         </div>
         <div class="stat-card" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;">
+          <span class="stat-card-icon" style="background: var(--warning-light); color: var(--warning);"><span class="material-icons">build</span></span>
           <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Unidades en Reparación</div>
           <div style="font-size: 24px; font-weight: 800; color: #f59e0b; margin: 6px 0;" id="stat-active-orders">0</div>
           <div style="font-size: 10px; color: var(--text-muted);" id="stat-sub-active">0 unidades trabajando</div>
         </div>
         <div class="stat-card" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;">
+          <span class="stat-card-icon" style="background: var(--danger-light); color: var(--danger);"><span class="material-icons">event_busy</span></span>
           <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Preventivos Vencidos</div>
           <div style="font-size: 24px; font-weight: 800; color: #ef4444; margin: 6px 0;" id="stat-overdue-prev">0</div>
           <div style="font-size: 10px; color: var(--text-muted);" id="stat-sub-prev">0 este mes</div>
         </div>
         <div class="stat-card" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;">
+          <span class="stat-card-icon" style="background: var(--success-light); color: var(--success);"><span class="material-icons">trending_up</span></span>
           <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Eficiencia Sincro</div>
           <div style="font-size: 24px; font-weight: 800; color: #10b981; margin: 6px 0;" id="stat-sync-rate">100%</div>
           <div style="font-size: 10px; color: var(--text-muted);" id="stat-sub-sync">Taxes online</div>
@@ -106,9 +110,12 @@
         </div>
 
         <!-- Section: En Proceso (Trabajando) -->
-        <div class="dashboard-sub-title">
-          <span class="indicator working"></span>
-          <span>Trabajando en el Taller (<span id="count-working">0</span>)</span>
+        <div class="dashboard-sub-title" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="indicator working"></span>
+            <span>Trabajando en el Taller (<span id="count-working">0</span>)</span>
+          </div>
+          <a href="javascript:void(0)" class="dashboard-see-all-link" onclick="switchView('orders')">Ver todas</a>
         </div>
         <div class="dashboard-grid working" id="grid-working">
           <!-- Square cards for working tasks -->
@@ -116,9 +123,12 @@
         </div>
 
         <!-- Section: En Pausa -->
-        <div class="dashboard-sub-title" style="margin-top: 20px;">
-          <span class="indicator paused"></span>
-          <span>Tareas en Pausa (<span id="count-paused">0</span>)</span>
+        <div class="dashboard-sub-title" style="margin-top: 20px; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="indicator paused"></span>
+            <span>Tareas en Pausa (<span id="count-paused">0</span>)</span>
+          </div>
+          <a href="javascript:void(0)" class="dashboard-see-all-link" onclick="switchView('orders')">Ver todas</a>
         </div>
         <div class="dashboard-grid paused" id="grid-paused">
           <!-- Square cards for paused tasks -->

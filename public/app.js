@@ -2301,6 +2301,28 @@ function updateEmployeeDropdownForCard(card) {
   }
 }
 
+// Timeline track labels for the Inicio dashboard (one card per task, timeline layout).
+function getTimelineStartLabel(timerHistory, timerStart) {
+  if (Array.isArray(timerHistory)) {
+    const start = timerHistory.find(h => String(h.type || '').toLowerCase().startsWith('inici'));
+    if (start && start.formatted) return start.formatted;
+  }
+  if (timerStart) {
+    return new Date(timerStart).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  return '';
+}
+
+function getTimelinePausedLabel(timerHistory) {
+  if (!Array.isArray(timerHistory)) return '';
+  for (let i = timerHistory.length - 1; i >= 0; i--) {
+    const h = timerHistory[i];
+    const type = String(h.type || '').toLowerCase();
+    if (type.startsWith('paus') && h.formatted) return h.formatted;
+  }
+  return '';
+}
+
 function renderTimerHistoryHtml(history) {
   if (!Array.isArray(history) || history.length === 0) return '';
   return history.map(item => {
@@ -5257,39 +5279,54 @@ function renderDashboard() {
     if (workingTasks.length === 0) {
       gridWorking.innerHTML = `<div class="empty-dashboard-state">No hay operarios trabajando actualmente.</div>`;
     } else {
-      gridWorking.innerHTML = workingTasks.map(t => {
+      gridWorking.innerHTML = workingTasks.map((t, idx) => {
         const elapsedSeconds = calculateTotalElapsedSeconds(t.timerHistory, t.timerStart);
         const hh = Math.floor(elapsedSeconds / 3600);
         const mm = Math.floor((elapsedSeconds % 3600) / 60);
         const ss = elapsedSeconds % 60;
         const displayTime = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+        const startLabel = getTimelineStartLabel(t.timerHistory, t.timerStart);
+        const isLast = idx === workingTasks.length - 1;
 
         return `
-          <div class="dashboard-card working" id="dash-card-${t.taskId}">
-            <button type="button" class="dashboard-card-add-task-btn" onclick="editOrder('${t.orderId}')" title="Agregar tarea a esta orden">
-              <span class="material-icons" style="font-size:18px;">add</span>
-            </button>
-            <div class="dashboard-card-ot-badge" style="font-size: 11px; font-weight: 700; color: var(--primary); margin-bottom: 4px;">
-              ${t.taxesOrderNumber ? `<span class="badge-status success" style="padding: 2px 6px; font-size: 11px; font-weight: 700;">OT Taxes: #${t.taxesOrderNumber}</span>` : `<span class="badge-status warning" style="padding: 2px 6px; font-size: 11px;">OT Pendiente Taxes (Interno #${t.interno})</span>`}
+          <div class="timeline-item working">
+            <div class="timeline-track">
+              <div class="timeline-time">${startLabel}</div>
+              <span class="timeline-dot"></span>
+              ${isLast ? '' : '<span class="timeline-line"></span>'}
             </div>
-            <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
-            <div class="dashboard-card-subtitle">Interno ${t.interno} ${t.clasificacion ? ' - ' + t.clasificacion : ''}</div>
-            <div class="dashboard-card-desc">${t.descripcion}</div>
-            <div style="font-size: 11px; font-weight: 700; color: #38bdf8; margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">
-              <span class="material-icons" style="font-size: 13px; color: #38bdf8;">timer</span>
-              <span>Tiempo Estimado: ${getEstimatedTaskHoursMax(t.descripcion, t.empleadoLabel)}</span>
-            </div>
-            <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
-              ${renderTimerHistoryHtml(t.timerHistory)}
-            </div>
-            <div class="dashboard-card-timer" id="dash-timer-${t.taskId}">${displayTime}</div>
-            <div class="dashboard-card-actions">
-              <button type="button" class="btn btn-warning btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')">
-                <span class="material-icons" style="font-size:14px;">pause</span> Pausar
+            <div class="dashboard-card working" id="dash-card-${t.taskId}">
+              <button type="button" class="dashboard-card-add-task-btn" onclick="editOrder('${t.orderId}')" title="Agregar tarea a esta orden">
+                <span class="material-icons" style="font-size:18px;">add</span>
               </button>
-              <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
-                <span class="material-icons" style="font-size:14px;">check</span> Fin
-              </button>
+              <div class="timeline-top-row">
+                <span class="interno-chip working">
+                  <span class="interno-chip-label">INTERNO</span>
+                  <span class="interno-chip-number">${t.interno}</span>
+                </span>
+                <div class="timeline-top-right">
+                  ${t.clasificacion ? `<span class="badge-tag">${t.clasificacion}</span>` : ''}
+                  ${t.taxesOrderNumber ? `<span class="badge-status success" style="padding: 2px 6px; font-size: 11px; font-weight: 700;">OT Taxes: #${t.taxesOrderNumber}</span>` : `<span class="badge-status warning" style="padding: 2px 6px; font-size: 11px;">OT Pendiente Taxes (Interno #${t.interno})</span>`}
+                </div>
+              </div>
+              <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
+              <div class="dashboard-card-desc">${t.descripcion}</div>
+              <div style="font-size: 11px; font-weight: 700; color: #38bdf8; margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">
+                <span class="material-icons" style="font-size: 13px; color: #38bdf8;">timer</span>
+                <span>Tiempo Estimado: ${getEstimatedTaskHoursMax(t.descripcion, t.empleadoLabel)}</span>
+              </div>
+              <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
+                ${renderTimerHistoryHtml(t.timerHistory)}
+              </div>
+              <div class="dashboard-card-timer" id="dash-timer-${t.taskId}">${displayTime}</div>
+              <div class="dashboard-card-actions">
+                <button type="button" class="btn btn-warning btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')">
+                  <span class="material-icons" style="font-size:14px;">pause</span> Pausar
+                </button>
+                <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
+                  <span class="material-icons" style="font-size:14px;">check</span> Fin
+                </button>
+              </div>
             </div>
           </div>
         `;
@@ -5304,52 +5341,68 @@ function renderDashboard() {
     if (pausedTasks.length === 0) {
       gridPaused.innerHTML = `<div class="empty-dashboard-state">No hay tareas en pausa.</div>`;
     } else {
-      gridPaused.innerHTML = pausedTasks.map(t => {
+      gridPaused.innerHTML = pausedTasks.map((t, idx) => {
         let displayHours = parseFloat(String(t.horasEstimadas || 0).replace(',', '.')) || 0;
         if (Array.isArray(t.timerHistory) && t.timerHistory.length > 0) {
           const totalSeconds = calculateTotalElapsedSeconds(t.timerHistory, null);
           displayHours = minutesToHmm(Math.round(totalSeconds / 60));
         }
+        const startLabel = getTimelineStartLabel(t.timerHistory, t.timerStart);
+        const pausedLabel = getTimelinePausedLabel(t.timerHistory);
+        const isLast = idx === pausedTasks.length - 1;
         return `
-          <div class="dashboard-card paused">
-            <button type="button" class="dashboard-card-add-task-btn" onclick="editOrder('${t.orderId}')" title="Agregar tarea a esta orden">
-              <span class="material-icons" style="font-size:18px;">add</span>
-            </button>
-            <div class="dashboard-card-ot-badge" style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px;">
-              ${t.taxesOrderNumber ? `<span class="badge-status success" style="padding: 2px 6px; font-size: 11px; font-weight: 700;">OT Taxes: #${t.taxesOrderNumber}</span>` : `<span class="badge-status warning" style="padding: 2px 6px; font-size: 11px;">OT Pendiente Taxes (Interno #${t.interno})</span>`}
+          <div class="timeline-item paused">
+            <div class="timeline-track">
+              <div class="timeline-time">${startLabel}${pausedLabel ? `<br>${pausedLabel}` : ''}</div>
+              <span class="timeline-dot"></span>
+              ${isLast ? '' : '<span class="timeline-line"></span>'}
             </div>
-            <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
-            <div class="dashboard-card-subtitle">Interno ${t.interno} ${t.clasificacion ? ' - ' + t.clasificacion : ''}</div>
-            <div class="dashboard-card-desc">${t.descripcion}</div>
-            <div style="font-size: 11px; font-weight: 700; color: #38bdf8; margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">
-              <span class="material-icons" style="font-size: 13px; color: #38bdf8;">timer</span>
-              <span>Tiempo Estimado: ${getEstimatedTaskHoursMax(t.descripcion, t.empleadoLabel)}</span>
-            </div>
-            <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
-              ${renderTimerHistoryHtml(t.timerHistory)}
-            </div>
-            <div class="dashboard-card-timer" style="display:flex; align-items:center; gap:6px;">
-              <input
-                type="number"
-                id="dash-hours-input-${t.taskId}"
-                value="${displayHours.toFixed(2)}"
-                step="0.05"
-                min="0"
-                style="width:80px; font-size:16px; font-weight:700; text-align:center; border:1.5px solid var(--primary); border-radius:6px; padding:2px 4px; background:var(--card-bg); color:var(--text); outline:none;"
-                title="Podés escribir las horas manualmente (ej: 1.30 = 1h 30min)"
-              />
-              <span style="font-size:13px; color:var(--text-muted);">hrs</span>
-              <button type="button" onclick="saveDashboardTaskHours('${t.orderId}','${t.taskId}')" title="Guardar horas" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:13px;">
-                <span class="material-icons" style="font-size:15px;vertical-align:middle;">save</span>
+            <div class="dashboard-card paused">
+              <button type="button" class="dashboard-card-add-task-btn" onclick="editOrder('${t.orderId}')" title="Agregar tarea a esta orden">
+                <span class="material-icons" style="font-size:18px;">add</span>
               </button>
-            </div>
-            <div class="dashboard-card-actions">
-              <button type="button" class="btn btn-primary btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
-                <span class="material-icons" style="font-size:14px;">play_arrow</span> Reanudar
-              </button>
-              <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
-                <span class="material-icons" style="font-size:14px;">check</span> Fin
-              </button>
+              <div class="timeline-top-row">
+                <span class="interno-chip paused">
+                  <span class="interno-chip-label">INTERNO</span>
+                  <span class="interno-chip-number">${t.interno}</span>
+                </span>
+                <div class="timeline-top-right">
+                  ${t.clasificacion ? `<span class="badge-tag">${t.clasificacion}</span>` : ''}
+                  ${t.taxesOrderNumber ? `<span class="badge-status success" style="padding: 2px 6px; font-size: 11px; font-weight: 700;">OT Taxes: #${t.taxesOrderNumber}</span>` : `<span class="badge-status warning" style="padding: 2px 6px; font-size: 11px;">OT Pendiente Taxes (Interno #${t.interno})</span>`}
+                </div>
+              </div>
+              <div class="dashboard-card-title" title="${t.empleadoLabel}">${t.empleadoLabel}</div>
+              <div class="dashboard-card-desc">${t.descripcion}</div>
+              <div style="font-size: 11px; font-weight: 700; color: #38bdf8; margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">
+                <span class="material-icons" style="font-size: 13px; color: #38bdf8;">timer</span>
+                <span>Tiempo Estimado: ${getEstimatedTaskHoursMax(t.descripcion, t.empleadoLabel)}</span>
+              </div>
+              <div class="dashboard-card-history" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
+                ${renderTimerHistoryHtml(t.timerHistory)}
+              </div>
+              <div class="dashboard-card-timer" style="display:flex; align-items:center; gap:6px;">
+                <input
+                  type="number"
+                  id="dash-hours-input-${t.taskId}"
+                  value="${displayHours.toFixed(2)}"
+                  step="0.05"
+                  min="0"
+                  style="width:80px; font-size:16px; font-weight:700; text-align:center; border:1.5px solid var(--primary); border-radius:6px; padding:2px 4px; background:var(--card-bg); color:var(--text); outline:none;"
+                  title="Podés escribir las horas manualmente (ej: 1.30 = 1h 30min)"
+                />
+                <span style="font-size:13px; color:var(--text-muted);">hrs</span>
+                <button type="button" onclick="saveDashboardTaskHours('${t.orderId}','${t.taskId}')" title="Guardar horas" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:13px;">
+                  <span class="material-icons" style="font-size:15px;vertical-align:middle;">save</span>
+                </button>
+              </div>
+              <div class="dashboard-card-actions">
+                <button type="button" class="btn btn-primary btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
+                  <span class="material-icons" style="font-size:14px;">play_arrow</span> Reanudar
+                </button>
+                <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
+                  <span class="material-icons" style="font-size:14px;">check</span> Fin
+                </button>
+              </div>
             </div>
           </div>
         `;
