@@ -926,26 +926,15 @@ class LocalDB {
     let cleanedCount = 0;
     (db.workOrders || []).forEach(order => {
       if (!order.deleted && !order.archived && Array.isArray(order.tasks) && order.tasks.length > 0) {
-        const targetInt = String(order.interno || '').trim();
-
-        // 1. Interno 112 custom clean: remove 'gas oil' task, keep ventea motor & sacar cartel
-        if (targetInt === '112') {
-          order.tasks = order.tasks.filter(t => t && !String(t.descripcion || '').toLowerCase().includes('gas oil'));
-        }
-        // 2. Interno 158 custom clean: keep only ploteo
-        if (targetInt === '158') {
-          order.tasks = order.tasks.filter(t => t && String(t.descripcion || '').toLowerCase().includes('ploteo'));
-          if (order.tasks.length === 0) {
-            order.tasks = [{ id: '158-1', centroCosto: '15', empleado: 'PEREZ FACUNDO', horasEstimadas: 1.41, descripcion: 'Terminado de ploteo', status: 'Finalizada', synced: true }];
-          }
-        }
-        // 3. Interno 155 custom clean: keep only cambiar filtros
-        if (targetInt === '155') {
-          order.tasks = order.tasks.filter(t => t && String(t.descripcion || '').toLowerCase().includes('filtros'));
-          if (order.tasks.length === 0) {
-            order.tasks = [{ id: '155-1', centroCosto: '15', empleado: 'PANETTA ALBARRACIN FEDERICO', horasEstimadas: 1, descripcion: 'cambiar filtros. - Diagnóstico: se cambiaron todos los filtros de motor y chasis.', status: 'Finalizada', synced: true }];
-          }
-        }
+        // NOTE: this used to also run three hardcoded, interno-specific filters here (112, 158,
+        // 155) that deleted any task NOT matching a specific description substring, replacing
+        // an empty result with a single synthetic placeholder task. Those were one-off fixes for
+        // a specific historical data problem, but this whole function runs automatically on
+        // EVERY server startup (see the "Auto-clean duplicate tasks" call in server.js) - so
+        // they kept permanently wiping out any *new*, real task added later for those same
+        // internos on every restart/redeploy (confirmed: this deleted a running-timer task for
+        // Ojeda Fernández, Miguel on Interno 158). Removed - a one-off cleanup belongs in a
+        // one-off script, never in code that runs unconditionally on every boot.
 
         // Generic deduplication by clean description + employee
         const seen = new Set();
