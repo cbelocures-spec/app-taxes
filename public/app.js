@@ -2459,6 +2459,9 @@ function addTaskField(taskData = null) {
 
     const isSynced = !!(taskData && taskData.synced === true);
     const taskDateVal = taskData && taskData.date ? taskData.date.split('T')[0] : new Date().toISOString().split('T')[0];
+    // Once a task is opened (already exists) its date is frozen for good, even if the day
+    // rolls over while it's still running - only a brand-new task lets you pick the date.
+    const dateLockedAttr = (isLocked || !isNew) ? 'disabled' : '';
 
     const cardHtml = `
       <div class="task-item-card ${isNew ? 'new-task' : ''}" id="${taskId}" data-timer-started="${timerStarted}" data-timer-history='${timerHistoryJson}'>
@@ -2485,7 +2488,7 @@ function addTaskField(taskData = null) {
           <div class="form-row">
             <div class="form-group col-6">
               <label>Fecha Tarea</label>
-              <input type="date" class="task-date" value="${taskDateVal}" ${lockedAttr}>
+              <input type="date" class="task-date" value="${taskDateVal}" ${dateLockedAttr}>
             </div>
             <div class="form-group col-6">
               <label>Centro de Costo *</label>

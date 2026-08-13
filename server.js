@@ -212,7 +212,7 @@ function autoPauseConflictingTimers(currentOrderId, tasksToCheck, previousTasksB
         const lastEvent = history.length > 0 ? history[history.length - 1] : null;
         const lastType = lastEvent ? String(lastEvent.type || lastEvent.event || '').trim().toLowerCase() : '';
         if (!(lastType.startsWith('paus') || lastType.startsWith('fin'))) {
-          history.push({ type: 'Pausó', formatted: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }), timestamp: Date.now() });
+          history.push({ type: 'Pausó', formatted: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' }), timestamp: Date.now() });
         }
         return { ...t, timerStart: null, timerStarted: false, horasEstimadas: newHours, timerHistory: history };
       });
@@ -1130,6 +1130,11 @@ app.put('/api/orders/:id', (req, res) => {
 
       mergedTasksMap.set(tId, {
         id: tId,
+        // Once a task already has a date, it's frozen forever - it can never move to a
+        // different day even if the client re-sends a different value (e.g. the calendar day
+        // rolling over while the task is still open). Only a brand-new task (or legacy data
+        // with no date yet) takes the client's value.
+        date: (existingTask && existingTask.date) ? existingTask.date : (t.date !== undefined ? t.date : null),
         centroCosto: t.centroCosto !== undefined ? t.centroCosto : (existingTask ? existingTask.centroCosto : ""),
         empleado: t.empleado !== undefined ? t.empleado : (existingTask ? existingTask.empleado : ""),
         horasEstimadas: t.horasEstimadas !== undefined ? parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0 : (existingTask ? existingTask.horasEstimadas : 0),
@@ -3927,7 +3932,7 @@ async function sendHistoricalOrderToGoogleSheet(order, step) {
     const ccObj = (catalogs.centrosCosto || []).find(c => String(c.value) === ccVal || c.label === ccVal);
     const ccName = ccObj ? ccObj.label : (order.clasificacion || "MECANICA");
 
-    const nowStr = new Date().toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
+    const nowStr = new Date().toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
 
     let payload = {};
     if (step === 'crear') {
