@@ -2323,6 +2323,29 @@ function getTimelinePausedLabel(timerHistory) {
   return '';
 }
 
+// For a currently-working task, show both the Pausó and Reanudó times of its most recent
+// pause/resume cycle (if it has one) instead of just the original Inició time - a task that
+// was paused and resumed needs both to make sense of where the current running segment
+// actually started.
+function getTimelineWorkingLabel(timerHistory, timerStart) {
+  if (Array.isArray(timerHistory)) {
+    for (let i = timerHistory.length - 1; i >= 0; i--) {
+      const type = String(timerHistory[i].type || '').toLowerCase();
+      if (type.startsWith('reanud')) {
+        for (let j = i - 1; j >= 0; j--) {
+          const prevType = String(timerHistory[j].type || '').toLowerCase();
+          if (prevType.startsWith('paus') && timerHistory[j].formatted && timerHistory[i].formatted) {
+            return `${timerHistory[j].formatted}<br>${timerHistory[i].formatted}`;
+          }
+        }
+        break;
+      }
+      if (type.startsWith('inici')) break; // no resume yet - just the original start
+    }
+  }
+  return getTimelineStartLabel(timerHistory, timerStart);
+}
+
 function renderTimerHistoryHtml(history) {
   if (!Array.isArray(history) || history.length === 0) return '';
   return history.map(item => {
@@ -5285,7 +5308,7 @@ function renderDashboard() {
         const mm = Math.floor((elapsedSeconds % 3600) / 60);
         const ss = elapsedSeconds % 60;
         const displayTime = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
-        const startLabel = getTimelineStartLabel(t.timerHistory, t.timerStart);
+        const startLabel = getTimelineWorkingLabel(t.timerHistory, t.timerStart);
         const isLast = idx === workingTasks.length - 1;
 
         return `
