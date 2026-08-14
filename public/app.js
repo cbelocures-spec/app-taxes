@@ -644,9 +644,18 @@ window.closeSidebarMenu = closeSidebarMenu;
 window.toggleSidebarMenu = toggleSidebarMenu;
 
 // 1. SPA ROUTING
+let parteTallerAutoRefreshInterval = null;
+
 function switchView(viewId) {
   console.log("Switching view to:", viewId);
   try {
+    // Parte Taller needs to stay in sync with live task starts/pauses and the Google Sheet
+    // reconciliation without someone manually hitting "Actualizar" - only poll while this
+    // specific view is actually on screen, not in the background from every other tab.
+    if (parteTallerAutoRefreshInterval) {
+      clearInterval(parteTallerAutoRefreshInterval);
+      parteTallerAutoRefreshInterval = null;
+    }
     // Picking any item from the sidebar menu should also close it - it's an off-canvas
     // overlay now (see SIDEBAR MENU above), not a bar that stays on screen.
     closeSidebarMenu();
@@ -725,6 +734,9 @@ function switchView(viewId) {
 
     if (viewId === 'partetaller') {
       try { fetchParteTallerEstado(); } catch(e) {}
+      parteTallerAutoRefreshInterval = setInterval(() => {
+        try { fetchParteTallerEstado(); } catch(e) {}
+      }, 60000);
     }
 
     if (viewId === 'historial') {
@@ -10969,6 +10981,18 @@ function adjustPtStateLists(state) {
     return tasks.filter(taskMatchesSector).some(
       t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0))
     );
+  });
+
+  // Backfill: units already being worked on before this sync existed (or whose sync got
+  // missed for any reason) never reach the sheet just by sitting there - reconcile them here
+  // too, not only at the exact moment a timer starts. syncTaskStartToParteTaller already
+  // no-ops if the sheet already has this task's description, so repeat renders stay cheap.
+  activeRepairOrders.forEach(o => {
+    (o.tasks || []).filter(taskMatchesSector).filter(t => t.status !== 'Finalizada').forEach(t => {
+      if (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0)) {
+        syncTaskStartToParteTaller(o.interno, t.centroCosto, o.sector, t.descripcion);
+      }
+    });
   });
 
   // Drop any unit already sitting in fuera_de_servicio/reparacion whose order is now
