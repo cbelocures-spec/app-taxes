@@ -2435,7 +2435,17 @@ function addTaskField(taskData = null) {
     const lockedAttr = isLocked ? 'disabled' : '';
 
     const isSynced = !!(taskData && taskData.synced === true);
-    const taskDateVal = taskData && taskData.date ? taskData.date.split('T')[0] : new Date().toISOString().split('T')[0];
+    // Tasks created before the "Fecha Tarea" field existed have no stored date - defaulting
+    // those to "today" (the day someone happens to reopen/resave them) was baking in the wrong
+    // day forever once the date-lock below freezes it. Derive it from when the timer actually
+    // started instead; only a genuinely brand-new task (no history yet) falls back to today.
+    const derivedDateFromHistory = (taskData && Array.isArray(taskData.timerHistory) && taskData.timerHistory.length > 0)
+      ? (() => {
+          const timestamps = taskData.timerHistory.map(h => h && h.timestamp).filter(ts => typeof ts === 'number' && ts > 0);
+          return timestamps.length > 0 ? new Date(Math.min(...timestamps)).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }) : null;
+        })()
+      : null;
+    const taskDateVal = (taskData && taskData.date) ? taskData.date.split('T')[0] : (derivedDateFromHistory || new Date().toISOString().split('T')[0]);
     // Once a task is opened (already exists) its date is frozen for good, even if the day
     // rolls over while it's still running - only a brand-new task lets you pick the date.
     const dateLockedAttr = (isLocked || !isNew) ? 'disabled' : '';

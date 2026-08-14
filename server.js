@@ -1011,6 +1011,16 @@ app.post('/api/orders/bulk', (req, res) => {
   }
 });
 
+// Legacy tasks created before the "Fecha Tarea" field existed have no stored date. If one gets
+// resaved with no date yet, the real day it happened is the day its timer actually started, not
+// whatever day someone happens to reopen/resave it - that's what this derives, in Argentina time.
+function deriveTaskDateFromHistory(timerHistory) {
+  if (!Array.isArray(timerHistory)) return null;
+  const timestamps = timerHistory.map(h => h && h.timestamp).filter(ts => typeof ts === 'number' && ts > 0);
+  if (timestamps.length === 0) return null;
+  return new Date(Math.min(...timestamps)).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+}
+
 // Update a work order
 app.put('/api/orders/:id', (req, res) => {
   try {
@@ -1132,9 +1142,12 @@ app.put('/api/orders/:id', (req, res) => {
         id: tId,
         // Once a task already has a date, it's frozen forever - it can never move to a
         // different day even if the client re-sends a different value (e.g. the calendar day
-        // rolling over while the task is still open). Only a brand-new task (or legacy data
-        // with no date yet) takes the client's value.
-        date: (existingTask && existingTask.date) ? existingTask.date : (t.date !== undefined ? t.date : null),
+        // rolling over while the task is still open). A legacy task with no date yet is backfilled
+        // from its own timer history (the day it really started), not from whatever the client
+        // sent - only a genuinely brand-new task (no history at all) takes the client's value.
+        date: (existingTask && existingTask.date)
+          ? existingTask.date
+          : (deriveTaskDateFromHistory(existingTask ? existingTask.timerHistory : t.timerHistory) || (t.date !== undefined ? t.date : null)),
         centroCosto: t.centroCosto !== undefined ? t.centroCosto : (existingTask ? existingTask.centroCosto : ""),
         empleado: t.empleado !== undefined ? t.empleado : (existingTask ? existingTask.empleado : ""),
         horasEstimadas: t.horasEstimadas !== undefined ? parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0 : (existingTask ? existingTask.horasEstimadas : 0),
