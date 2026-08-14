@@ -10865,7 +10865,9 @@ function adjustPtStateLists(state) {
         ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(order.interno).trim())
         : null;
       if (rodadoOpt) {
-        const labelUpper = String(rodadoOpt.label || '').toUpperCase();
+        // "equipo" (e.g. "COMPACTADOR 3 EJES") is the real vehicle type - "label" is brand/model
+        // ("MERCEDES BENZ ATEGO 1725 Interno 101") and rarely contains any of these keywords.
+        const labelUpper = String(rodadoOpt.equipo || rodadoOpt.label || '').toUpperCase();
         if (labelUpper.includes('VOLQ')) unitType = 'VOLQUETE';
         else if (labelUpper.includes('ROLL') || labelUpper.includes('OFF')) unitType = 'ROLL - OFF';
         else if (labelUpper.includes('PLANCHA')) unitType = 'PLANCHA';
@@ -10909,6 +10911,30 @@ function adjustPtStateLists(state) {
     return tasks.filter(taskMatchesSector).some(
       t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0))
     );
+  });
+
+  // Drop any unit already sitting in fuera_de_servicio/reparacion whose order is now
+  // "operativo" - this covers units that were put back in service through the order's own
+  // status toggle (not through a Parte Taller checklist action), which otherwise leaves a
+  // stale entry behind forever since nothing else ever removes it.
+  const operativoInternos = new Set();
+  activeOrders.forEach(o => {
+    if (o.estadoUnidad === 'operativo') {
+      const taxInt = String(o.interno || '').trim().toUpperCase();
+      if (taxInt) operativoInternos.add(taxInt);
+    }
+  });
+  function matchesOperativoOrder(internoPT) {
+    const ptIntUpper = String(internoPT || '').trim().toUpperCase();
+    if (operativoInternos.has(ptIntUpper)) return true;
+    if (ptIntUpper.includes('IRINEO') && operativoInternos.has('IRINEO GRAL.')) return true;
+    if ((ptIntUpper.includes('NICO') || ptIntUpper.startsWith('NICO')) && operativoInternos.has('VOLQUETE NICO')) return true;
+    return false;
+  }
+  ['fuera_de_servicio', 'reparacion'].forEach(listName => {
+    if (Array.isArray(state[listName])) {
+      state[listName] = state[listName].filter(unit => !matchesOperativoOrder(unit.interno));
+    }
   });
 
   // Keep track of which internos are forced into "reparacion"
@@ -11004,7 +11030,9 @@ function adjustPtStateLists(state) {
       ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(order.interno).trim())
       : null;
     if (rodadoOpt) {
-      const labelUpper = String(rodadoOpt.label || '').toUpperCase();
+      // "equipo" (e.g. "COMPACTADOR 3 EJES") is the real vehicle type - "label" is brand/model
+      // ("MERCEDES BENZ ATEGO 1725 Interno 101") and rarely contains any of these keywords.
+      const labelUpper = String(rodadoOpt.equipo || rodadoOpt.label || '').toUpperCase();
       if (labelUpper.includes('VOLQ')) unitType = 'VOLQUETE';
       else if (labelUpper.includes('ROLL') || labelUpper.includes('OFF')) unitType = 'ROLL - OFF';
       else if (labelUpper.includes('PLANCHA')) unitType = 'PLANCHA';
