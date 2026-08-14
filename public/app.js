@@ -10970,6 +10970,25 @@ function adjustPtStateLists(state) {
   // TALLER MODE: Standard logic - move units with active tasks to "En Reparación"
   // ============================================================
 
+  // Ground truth for what an interno actually is comes from Base_Datos' own "equipo" column,
+  // not keyword-guessing off the rodado label (brand/model). Only these 4 equipo values are
+  // real fleet categories tracked by the stat cards; HERRERIA/EDILICIO internos are internal
+  // work buckets for those OTHER sectors and must never show up here at all ("solo Taller");
+  // everything else real (CAMIONETA, AUTOELEVADOR, IRINEO, REP. INT., etc.) still shows in the
+  // tables but as "Otro", uncounted in the Compactador/Volquete/Roll-Off/Plancha totals.
+  function resolveFleetTypeFromInterno(internoVal) {
+    const rodadoOpt = cachedCatalogs.rodados
+      ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(internoVal || '').trim())
+      : null;
+    const equipo = String(rodadoOpt ? rodadoOpt.equipo || '' : '').trim().toUpperCase();
+    if (equipo === 'COMPACTADOR') return 'COMPACTADOR';
+    if (equipo === 'VOLQUETE') return 'VOLQUETE';
+    if (equipo === 'ROLL OFF') return 'ROLL - OFF';
+    if (equipo === 'PLANCHA') return 'PLANCHA';
+    if (equipo === 'HERRERIA' || equipo === 'EDILICIO') return null;
+    return 'Otro';
+  }
+
   // 1. Find all open orders with active or paused sector-matching tasks. A unit already
   // marked "operativo" is excluded no matter what its task history looks like - that field is
   // the real-world signal that the unit is back in service, not leftover task state.
@@ -10977,6 +10996,7 @@ function adjustPtStateLists(state) {
     const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
     if (isClosed) return false;
     if (o.estadoUnidad === 'operativo') return false;
+    if (resolveFleetTypeFromInterno(o.interno) === null) return false;
     const tasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
     return tasks.filter(taskMatchesSector).some(
       t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0))
@@ -11122,25 +11142,10 @@ function adjustPtStateLists(state) {
   for (const [taxInt, order] of repairInternos.entries()) {
     let internoLabel = order.interno;
     
-    let unitType = 'COMPACTADOR';
-    const rodadoOpt = cachedCatalogs.rodados
-      ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(order.interno).trim())
-      : null;
-    if (rodadoOpt) {
-      // "equipo" (e.g. "COMPACTADOR 3 EJES") is the real vehicle type - "label" is brand/model
-      // ("MERCEDES BENZ ATEGO 1725 Interno 101") and rarely contains any of these keywords.
-      const labelUpper = String(rodadoOpt.equipo || rodadoOpt.label || '').toUpperCase();
-      if (labelUpper.includes('VOLQ')) unitType = 'VOLQUETE';
-      else if (labelUpper.includes('ROLL') || labelUpper.includes('OFF')) unitType = 'ROLL - OFF';
-      else if (labelUpper.includes('PLANCHA')) unitType = 'PLANCHA';
-      else if (labelUpper.includes('COMPAC')) unitType = 'COMPACTADOR';
-      else if (labelUpper.includes('CONTENEDOR') || labelUpper.includes('CAJITA') || labelUpper.includes('CAJA')) unitType = 'CONTENEDOR';
-      else if (labelUpper.includes('CAMION') || labelUpper.includes('CAMIÓN') || labelUpper.includes('TRACTO')) unitType = 'CAMIÓN';
-      else if (labelUpper.includes('SEMI')) unitType = 'SEMI';
-      else unitType = 'UNIDAD';
-    } else {
-      if (isNaN(Number(String(order.interno || '').trim()))) unitType = 'UNIDAD';
-    }
+    // HERRERIA/EDILICIO internos were already filtered out of activeRepairOrders above, so this
+    // never resolves to null here - "Otro" covers every real but non-fleet-tracked equipo
+    // (CAMIONETA, AUTOELEVADOR, IRINEO, REP. INT., etc.).
+    const unitType = resolveFleetTypeFromInterno(order.interno) || 'Otro';
 
     const activeTasks = (order.tasks || [])
       .filter(t => t.status !== 'Finalizada')
