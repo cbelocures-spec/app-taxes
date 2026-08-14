@@ -5518,9 +5518,11 @@ async function syncTaskStartToParteTaller(internoRaw, centroCosto, orderSector, 
     });
     if (alreadyThere) return;
 
-    // Send the resolved display name (e.g. "Rodriguez Nicolas"), not the raw login username
-    // (e.g. "paniol@contenedoreshugo.com.ar") - the sheet's Responsable cell expects a name.
-    const responsableName = resolveCurrentSupervisor() || (localStorage.getItem('currentUserUsername') || '');
+    // Send the canonical display name (e.g. "Rodriguez Nicolas") the sheet's Responsable
+    // dropdown actually accepts - not the raw login username, and not the order's raw
+    // "Apellido, Nombre" text either (a Data Validation dropdown set to reject invalid input
+    // silently discards a non-matching write, leaving the old value in place with no error).
+    const responsableName = normalizeToCanonicalSupervisor(resolveCurrentSupervisor()) || '';
     await fetch('/api/parte-taller/novedad', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -11706,7 +11708,7 @@ function renderParteTallerDashboard(state) {
 // people use), but the "Responsable" of whichever order was created most recently reflects who
 // is genuinely at the wheel at this moment.
 const SUPERVISOR_USERNAME_MAP = {
-  'paniol@contenedoreshugo.com.ar': 'Belocures César Hernán',
+  'paniol@contenedoreshugo.com.ar': 'Belocures Cèsar Hernàn',
   'a.brahim@contenedoreshugo.com.ar': 'Brahim Adrian',
   'sergios@contenedoreshugo.com.ar': 'Schirripa Sergio',
   'n.rodriguez@contenedoreshugo.com.ar': 'Rodriguez Nicolas'
@@ -11731,6 +11733,23 @@ function resolveSupervisorFromLatestOrder() {
 
 function resolveCurrentSupervisor() {
   return resolveSupervisorFromLatestOrder() || resolveSupervisorFromUsername();
+}
+
+// An order's Responsable is stored as "Apellido, Nombre" (e.g. "Brahim, Hugo Adrian"), which
+// doesn't match the sheet's dropdown value ("Brahim Adrian") character-for-character - a
+// Data Validation dropdown set to reject invalid input silently discards a non-matching write,
+// which is exactly why the cell kept showing the old name after a successful-looking sync.
+// This maps any raw name to the one the dropdown actually accepts, or null if it isn't one of
+// the 4 known supervisors at all (in which case the sheet sync should just skip, not overwrite
+// it with something the dropdown will reject anyway).
+function normalizeToCanonicalSupervisor(rawName) {
+  const clean = String(rawName || '').toUpperCase();
+  if (!clean) return null;
+  if (clean.includes('BELOCURES')) return 'Belocures Cèsar Hernàn';
+  if (clean.includes('BRAHIM')) return 'Brahim Adrian';
+  if (clean.includes('SCHIRRIPA')) return 'Schirripa Sergio';
+  if (clean.includes('RODRIGUEZ') && clean.includes('NICOLAS')) return 'Rodriguez Nicolas';
+  return null;
 }
 
 // Keeps the supervisor selector in sync with whoever is actually working - only falls back
@@ -11763,13 +11782,13 @@ function autoSetPtSupervisorSelect() {
 let lastSyncedResponsable = null;
 async function syncResponsableToParteTaller() {
   try {
-    const resolved = resolveCurrentSupervisor();
-    if (!resolved || resolved === lastSyncedResponsable) return;
-    lastSyncedResponsable = resolved;
+    const canonical = normalizeToCanonicalSupervisor(resolveCurrentSupervisor());
+    if (!canonical || canonical === lastSyncedResponsable) return;
+    lastSyncedResponsable = canonical;
     await fetch('/api/parte-taller/novedad', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accion: 'actualizar_responsable', responsable: resolved })
+      body: JSON.stringify({ accion: 'actualizar_responsable', responsable: canonical })
     });
   } catch (e) {
     console.error('Error sincronizando responsable a Parte Taller:', e);
