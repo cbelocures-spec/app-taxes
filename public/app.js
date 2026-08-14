@@ -10931,9 +10931,24 @@ function adjustPtStateLists(state) {
     if ((ptIntUpper.includes('NICO') || ptIntUpper.startsWith('NICO')) && operativoInternos.has('VOLQUETE NICO')) return true;
     return false;
   }
+  // A unit whose order already closed (no longer in activeOrders at all) can't be matched
+  // against anything above - but if it has zero items left pending, it has nothing left to
+  // show here regardless of why, so drop it too instead of leaving a permanent empty husk.
+  function hasNoOutstandingItems(unit) {
+    if (Array.isArray(unit.novedad_items) && unit.novedad_items.length > 0) {
+      return unit.novedad_items.every(x => x.hecho);
+    }
+    if (unit.novedad) {
+      return !unit.novedad.split('\n').some(line => {
+        const l = line.trim();
+        return l && !l.startsWith('[X]') && !l.startsWith('[x]');
+      });
+    }
+    return true;
+  }
   ['fuera_de_servicio', 'reparacion'].forEach(listName => {
     if (Array.isArray(state[listName])) {
-      state[listName] = state[listName].filter(unit => !matchesOperativoOrder(unit.interno));
+      state[listName] = state[listName].filter(unit => !matchesOperativoOrder(unit.interno) && !hasNoOutstandingItems(unit));
     }
   });
 
