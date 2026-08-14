@@ -5518,7 +5518,9 @@ async function syncTaskStartToParteTaller(internoRaw, centroCosto, orderSector, 
     });
     if (alreadyThere) return;
 
-    const currentUser = localStorage.getItem('currentUserUsername') || '';
+    // Send the resolved display name (e.g. "Rodriguez Nicolas"), not the raw login username
+    // (e.g. "paniol@contenedoreshugo.com.ar") - the sheet's Responsable cell expects a name.
+    const responsableName = resolveCurrentSupervisor() || (localStorage.getItem('currentUserUsername') || '');
     await fetch('/api/parte-taller/novedad', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5527,7 +5529,7 @@ async function syncTaskStartToParteTaller(internoRaw, centroCosto, orderSector, 
         interno: internoVal,
         estado: 'reparacion',
         motivo: descripcion || 'Tarea sin descripción',
-        responsable: currentUser,
+        responsable: responsableName,
         sector: 'taller'
       })
     });
