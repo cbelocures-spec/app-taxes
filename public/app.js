@@ -11133,6 +11133,11 @@ function adjustPtStateLists(state) {
       return { texto, hecho };
     });
 
+    // This unit may have been sitting in the sheet with a stale/wrong tipo since before the
+    // equipo-based resolver existed (e.g. hardcoded to "COMPACTADOR" at creation time) -
+    // re-resolve it every time instead of trusting whatever was already stored.
+    unit.tipo = resolveFleetTypeFromInterno(matchingOrder.interno) || 'Otro';
+
     state.reparacion.push(unit);
     const taxInt = String(matchingOrder.interno || '').trim().toUpperCase();
     repairInternos.delete(taxInt);
