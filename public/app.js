@@ -10981,11 +10981,14 @@ function adjustPtStateLists(state) {
       ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(internoVal || '').trim())
       : null;
     const equipo = String(rodadoOpt ? rodadoOpt.equipo || '' : '').trim().toUpperCase();
-    if (equipo === 'COMPACTADOR') return 'COMPACTADOR';
-    if (equipo === 'VOLQUETE') return 'VOLQUETE';
-    if (equipo === 'ROLL OFF') return 'ROLL - OFF';
-    if (equipo === 'PLANCHA') return 'PLANCHA';
     if (equipo === 'HERRERIA' || equipo === 'EDILICIO') return null;
+    // startsWith, not exact match - many real units carry a suffix in Base_Datos
+    // ("COMPACTADOR 3 EJES", "COMPACTADOR 2 EJES") that would otherwise miss an exact check.
+    // "VOLQ. NICO"/"REP. INT."/etc don't start with any of these, so this stays safe.
+    if (equipo.startsWith('COMPACTADOR')) return 'COMPACTADOR';
+    if (equipo.startsWith('VOLQUETE')) return 'VOLQUETE';
+    if (equipo.startsWith('ROLL OFF')) return 'ROLL - OFF';
+    if (equipo.startsWith('PLANCHA')) return 'PLANCHA';
     return 'Otro';
   }
 
