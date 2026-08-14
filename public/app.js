@@ -11697,9 +11697,11 @@ function renderParteTallerDashboard(state) {
   }
 }
 
-// Which real person is logged in as - drives the "Supervisor de Taller" field on the PDF
-// automatically instead of picking it by hand every time. paniol@ is the shared pañol login,
-// mapped to whoever actually mans that station.
+// Which real person is actually working right now - drives the "Supervisor de Taller" field
+// on the PDF automatically instead of picking it by hand every time. The logged-in browser
+// account isn't a reliable signal here (paniol@ is a shared pañol login several different
+// people use), but the "Responsable" of whichever order was created most recently reflects who
+// is genuinely at the wheel at this moment.
 const SUPERVISOR_USERNAME_MAP = {
   'paniol@contenedoreshugo.com.ar': 'Belocures César Hernán',
   'a.brahim@contenedoreshugo.com.ar': 'Brahim Adrian',
@@ -11712,12 +11714,28 @@ function resolveSupervisorFromUsername() {
   return SUPERVISOR_USERNAME_MAP[username] || null;
 }
 
-// Keeps the supervisor selector in sync with whoever is actually logged in - only falls back
-// to leaving it on manual selection when the current user isn't one of the mapped logins.
+function resolveSupervisorFromLatestOrder() {
+  if (!Array.isArray(activeOrders) || activeOrders.length === 0) return null;
+  let latest = null;
+  activeOrders.forEach(o => {
+    if (!o || !o.createdAt || !o.responsable) return;
+    if (!latest || new Date(o.createdAt).getTime() > new Date(latest.createdAt).getTime()) {
+      latest = o;
+    }
+  });
+  return latest ? latest.responsable : null;
+}
+
+function resolveCurrentSupervisor() {
+  return resolveSupervisorFromLatestOrder() || resolveSupervisorFromUsername();
+}
+
+// Keeps the supervisor selector in sync with whoever is actually working - only falls back
+// to leaving it on manual selection when neither signal above resolves to anything.
 function autoSetPtSupervisorSelect() {
   const select = document.getElementById('pt-supervisor-select');
   if (!select) return;
-  const resolved = resolveSupervisorFromUsername();
+  const resolved = resolveCurrentSupervisor();
   if (resolved) select.value = resolved;
 }
 
@@ -11745,7 +11763,7 @@ async function generarPdfParteTaller() {
     const statCardsEl = document.querySelector('.pt-stat-grid');
     const statCardsHtml = statCardsEl ? statCardsEl.outerHTML : '';
     const supervisorSelect = document.getElementById('pt-supervisor-select');
-    const supervisorName = resolveSupervisorFromUsername() || (supervisorSelect ? supervisorSelect.value : '');
+    const supervisorName = resolveCurrentSupervisor() || (supervisorSelect ? supervisorSelect.value : '');
 
     function sectionHtml(title, badgeColor, tbodyId, countBadgeId) {
       const tbody = document.getElementById(tbodyId);
