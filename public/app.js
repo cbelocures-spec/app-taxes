@@ -11627,16 +11627,30 @@ async function generarPdfParteTaller() {
     const supervisorSelect = document.getElementById('pt-supervisor-select');
     const supervisorName = supervisorSelect ? supervisorSelect.value : '';
 
-    function sectionHtml(title, badgeColor, tbodyId) {
+    function sectionHtml(title, badgeColor, tbodyId, countBadgeId) {
       const tbody = document.getElementById(tbodyId);
       const table = tbody ? tbody.closest('table') : null;
       if (!table) return '';
-      const count = tbody.querySelectorAll('tr').length;
+      // Read the already-correct count off the section's own badge instead of counting <tr>
+      // elements in the tbody - an empty list still renders one "No hay unidades..." row,
+      // which would otherwise get counted as if it were a real item.
+      const countBadge = countBadgeId ? document.getElementById(countBadgeId) : null;
+      const count = countBadge ? countBadge.textContent.trim() : tbody.querySelectorAll('tr').length;
+
+      // Clone (not mutate the live table) and paint the header row in the section's own
+      // accent color - the cloned prev-table markup otherwise inherits the app's plain
+      // light-gray header, which reads flat on a printed report.
+      const tableClone = table.cloneNode(true);
+      tableClone.querySelectorAll('thead th').forEach(th => {
+        th.style.background = badgeColor;
+        th.style.color = '#ffffff';
+      });
+
       return `
         <h3 style="font-size:14px; font-weight:700; margin:18px 0 8px; display:flex; align-items:center; gap:8px;">
           ${title} <span style="background:${badgeColor}; color:white; font-size:11px; padding:2px 8px; border-radius:10px;">${count}</span>
         </h3>
-        ${table.outerHTML}`;
+        ${tableClone.outerHTML}`;
     }
 
     const now = new Date();
@@ -11663,10 +11677,10 @@ async function generarPdfParteTaller() {
         </tr>
       </table>
       ${statCardsHtml}
-      ${sectionHtml('En Tránsito', '#2563eb', 'pt-transito-tbody')}
-      ${sectionHtml('Fuera de Servicio', '#ef4444', 'pt-fuera-tbody')}
-      ${sectionHtml('En Reparación', '#f97316', 'pt-reparacion-tbody')}
-      ${sectionHtml('Unidades en Preparación', '#f59e0b', 'pt-inversiones-tbody')}
+      ${sectionHtml('En Tránsito', '#2563eb', 'pt-transito-tbody', 'pt-trans-count')}
+      ${sectionHtml('Fuera de Servicio', '#ef4444', 'pt-fuera-tbody', 'pt-out-count')}
+      ${sectionHtml('En Reparación', '#f97316', 'pt-reparacion-tbody', 'pt-rep-count')}
+      ${sectionHtml('Unidades en Preparación', '#f59e0b', 'pt-inversiones-tbody', 'pt-inversiones-count')}
     `;
 
     const fullHtml = `<!doctype html><html><head><meta charset="utf-8"><style>
