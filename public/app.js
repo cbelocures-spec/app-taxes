@@ -4621,6 +4621,16 @@ async function toggleTaskTimer(taskId) {
     btn.querySelector('.material-icons').textContent = 'stop';
     btn.querySelector('.btn-text').textContent = 'Detener';
     showToast("Cronómetro iniciado", "info");
+
+    const internoEl = document.getElementById('form-interno');
+    const ccEl = card ? card.querySelector('.task-cc') : null;
+    const descEl = card ? card.querySelector('.task-desc') : null;
+    syncTaskStartToParteTaller(
+      internoEl ? internoEl.value : '',
+      ccEl ? ccEl.value : '',
+      currentSelectedSector,
+      descEl ? descEl.value : ''
+    );
   } else {
     // Stop stopwatch
     const startTime = parseInt(localStorage.getItem(timerKey));
@@ -5467,6 +5477,53 @@ function addTimerEventToTask(task, type) {
   task.timerHistory.push({ type, formatted, timestamp: Date.now() });
 }
 
+// Fire-and-forget: the moment a mechanic starts (or resumes) working on a truck, push that
+// unit into the Parte Taller Google Sheet's "Reparacion" list - today the app only computes
+// this live (in adjustPtStateLists) for its own screen, so the sheet itself never learns a
+// unit is being worked on unless someone manually adds it there.
+async function syncTaskStartToParteTaller(internoRaw, centroCosto, orderSector, descripcion) {
+  try {
+    const sector = getTaskCentroCostoSector(centroCosto, orderSector);
+    if (sector !== 'Taller') return; // Herrería/Edilicio track their own live state, not this sheet
+
+    const internoVal = String(internoRaw || '').trim();
+    if (!internoVal) return;
+
+    const stateRes = await fetch('/api/parte-taller/estado');
+    const stateData = await stateRes.json();
+    const state = stateData.state || stateData;
+    const cleanDesc = String(descripcion || '').trim().toUpperCase();
+    if (!cleanDesc) return;
+
+    // Don't re-push the same task description every time it's paused/resumed - the sheet
+    // side just appends new lines onto whatever's already there for this interno.
+    const alreadyThere = ['reparacion', 'fuera_de_servicio'].some(listName => {
+      const unit = (state[listName] || []).find(u => String(u.interno).trim().toUpperCase() === internoVal.toUpperCase());
+      if (!unit) return false;
+      const items = Array.isArray(unit.novedad_items) ? unit.novedad_items.map(x => String(x.texto || '').trim().toUpperCase()) : [];
+      return items.includes(cleanDesc) || String(unit.novedad || '').toUpperCase().includes(cleanDesc);
+    });
+    if (alreadyThere) return;
+
+    const currentUser = localStorage.getItem('currentUserUsername') || '';
+    await fetch('/api/parte-taller/novedad', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accion: 'actualizar_estado_flota',
+        interno: internoVal,
+        estado: 'reparacion',
+        motivo: descripcion || 'Tarea sin descripción',
+        responsable: currentUser,
+        sector: 'taller'
+      })
+    });
+    if (typeof fetchParteTallerEstado === 'function') fetchParteTallerEstado();
+  } catch (e) {
+    console.error('Error sincronizando inicio de tarea a Parte Taller:', e);
+  }
+}
+
 async function toggleDashboardTaskTimer(orderId, taskId) {
   let order = activeOrders.find(o => o.id === orderId);
   if (!order) return;
@@ -5535,6 +5592,7 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
     task.timerStart = Date.now();
     localStorage.setItem(timerKey, task.timerStart);
     showToast("Cronómetro iniciado", "info");
+    syncTaskStartToParteTaller(order.interno, task.centroCosto, order.sector, task.descripcion);
   } else {
     // --- PAUSE TIMER ---
     const startTime = (task.timerStart !== null && task.timerStart > 0) ? task.timerStart : (localStart ? parseInt(localStart) : Date.now());
