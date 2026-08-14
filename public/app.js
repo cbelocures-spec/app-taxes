@@ -11736,7 +11736,18 @@ function autoSetPtSupervisorSelect() {
   const select = document.getElementById('pt-supervisor-select');
   if (!select) return;
   const resolved = resolveCurrentSupervisor();
-  if (resolved) select.value = resolved;
+  if (!resolved) return;
+  // The order's Responsable can be anyone, not just the 4 hardcoded options - setting
+  // select.value to a name with no matching <option> silently deselects everything (blank
+  // dropdown), so add it as an option first if it isn't already one of the fixed 4.
+  const hasOption = Array.from(select.options).some(opt => opt.value === resolved);
+  if (!hasOption) {
+    const opt = document.createElement('option');
+    opt.value = resolved;
+    opt.textContent = resolved;
+    select.appendChild(opt);
+  }
+  select.value = resolved;
 }
 
 // Builds a print-ready copy of the currently-rendered dashboard cards + Transito/Fuera de
