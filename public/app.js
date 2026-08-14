@@ -10870,6 +10870,7 @@ async function fetchParteTallerEstado() {
     const state = (data && data.state) ? data.state : ((data && (data.servicios_pendientes || data.fuera_de_servicio || data.reparacion || data.transito)) ? data : null);
     if (!state && data.ok === false) throw new Error(data.msg || 'Error al leer estado');
     renderParteTallerDashboard(state || data);
+    syncResponsableToParteTaller();
   } catch (error) {
     console.error('Error fetching parte taller estado:', error);
     if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}. Configure la URL del script en Ajustes.</td></tr>`;
@@ -11750,6 +11751,29 @@ function autoSetPtSupervisorSelect() {
     select.appendChild(opt);
   }
   select.value = resolved;
+}
+
+// Pushes the resolved supervisor to the Google Sheet's Responsable cell independent of any
+// task/novedad activity - syncTaskStartToParteTaller only fires (and only carries a
+// responsable) when a task's description isn't already recorded there, which meant an order
+// from a different person than last time never refreshed this if its task text happened to
+// match something already synced. actualizar_responsable only touches that one cell, so it's
+// safe to call on every Parte Taller refresh (including the 60s auto-refresh) without risk of
+// duplicating or disturbing any novedad.
+let lastSyncedResponsable = null;
+async function syncResponsableToParteTaller() {
+  try {
+    const resolved = resolveCurrentSupervisor();
+    if (!resolved || resolved === lastSyncedResponsable) return;
+    lastSyncedResponsable = resolved;
+    await fetch('/api/parte-taller/novedad', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accion: 'actualizar_responsable', responsable: resolved })
+    });
+  } catch (e) {
+    console.error('Error sincronizando responsable a Parte Taller:', e);
+  }
 }
 
 // Builds a print-ready copy of the currently-rendered dashboard cards + Transito/Fuera de
