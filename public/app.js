@@ -733,6 +733,7 @@ function switchView(viewId) {
     }
 
     if (viewId === 'partetaller') {
+      try { autoSetPtSupervisorSelect(); } catch(e) {}
       try { fetchParteTallerEstado(); } catch(e) {}
       parteTallerAutoRefreshInterval = setInterval(() => {
         try { fetchParteTallerEstado(); } catch(e) {}
@@ -11696,6 +11697,30 @@ function renderParteTallerDashboard(state) {
   }
 }
 
+// Which real person is logged in as - drives the "Supervisor de Taller" field on the PDF
+// automatically instead of picking it by hand every time. paniol@ is the shared pañol login,
+// mapped to whoever actually mans that station.
+const SUPERVISOR_USERNAME_MAP = {
+  'paniol@contenedoreshugo.com.ar': 'Belocures César Hernán',
+  'a.brahim@contenedoreshugo.com.ar': 'Brahim Adrian',
+  'sergios@contenedoreshugo.com.ar': 'Schirripa Sergio',
+  'n.rodriguez@contenedoreshugo.com.ar': 'Rodriguez Nicolas'
+};
+
+function resolveSupervisorFromUsername() {
+  const username = String(localStorage.getItem('currentUserUsername') || '').trim().toLowerCase();
+  return SUPERVISOR_USERNAME_MAP[username] || null;
+}
+
+// Keeps the supervisor selector in sync with whoever is actually logged in - only falls back
+// to leaving it on manual selection when the current user isn't one of the mapped logins.
+function autoSetPtSupervisorSelect() {
+  const select = document.getElementById('pt-supervisor-select');
+  if (!select) return;
+  const resolved = resolveSupervisorFromUsername();
+  if (resolved) select.value = resolved;
+}
+
 // Builds a print-ready copy of the currently-rendered dashboard cards + Transito/Fuera de
 // Servicio/Reparacion/En Preparacion tables (Servicios Pendientes is deliberately left out -
 // it's an operative-unit annotator, not part of what goes out of service) and sends it to the
@@ -11720,7 +11745,7 @@ async function generarPdfParteTaller() {
     const statCardsEl = document.querySelector('.pt-stat-grid');
     const statCardsHtml = statCardsEl ? statCardsEl.outerHTML : '';
     const supervisorSelect = document.getElementById('pt-supervisor-select');
-    const supervisorName = supervisorSelect ? supervisorSelect.value : '';
+    const supervisorName = resolveSupervisorFromUsername() || (supervisorSelect ? supervisorSelect.value : '');
 
     function sectionHtml(title, badgeColor, tbodyId, countBadgeId) {
       const tbody = document.getElementById(tbodyId);
