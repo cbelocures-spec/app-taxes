@@ -845,46 +845,77 @@
             <span class="material-icons" style="font-size: 16px;">refresh</span>
             <span>Actualizar</span>
           </button>
+          <button class="btn btn-primary btn-sm" id="pt-download-pdf-btn" onclick="generarPdfParteTaller()" style="display: flex; align-items: center; gap: 4px; background-color: #16a34a; border-color: #16a34a; color: white;">
+            <span class="material-icons" style="font-size: 16px;">picture_as_pdf</span>
+            <span>Descargar PDF</span>
+          </button>
         </div>
       </div>
 
       <!-- Totales Table (Compactador, Volquete, Roll-off, Plancha) -->
-      <div class="partetaller-dashboard-card">
-        <div class="partetaller-title-row">
-          <h3 style="font-size: 14px; font-weight: 600; margin: 0;">Resumen de Unidades Operativas y Fuera de Servicio</h3>
+      <div class="pt-stat-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:12px; margin-bottom:20px;">
+        <div class="pt-stat-card" data-pt-type="comp" style="background:#1e293b; border:1px solid #334155; border-radius:14px; padding:16px 18px; border-left:4px solid #3b82f6;">
+          <div style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:3px 10px; border-radius:20px; margin-bottom:12px; background:rgba(59,130,246,.15); color:#60a5fa; border:1px solid rgba(59,130,246,.25);">🗜️ COMPACTADOR</div>
+          <div style="display:flex; gap:18px; align-items:flex-end;">
+            <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase;">Operativos</div><div style="font-size:32px; font-weight:800; color:#22c55e; line-height:1;" id="pt-op-comp">0</div></div>
+            <div><div style="font-size:11px; color:#f97316; text-transform:uppercase;">En Rep.</div><div style="font-size:20px; font-weight:700; color:#f97316;" id="pt-rep-comp">0</div></div>
+            <div><div style="font-size:11px; color:#ef4444; text-transform:uppercase;">Fuera Serv.</div><div style="font-size:20px; font-weight:700; color:#ef4444;" id="pt-fs-comp">0</div></div>
+          </div>
+          <div style="background:rgba(245,158,11,0.08); border:1.5px dashed #f59e0b; border-radius:8px; padding:6px 12px; margin-top:8px; display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:11px; font-weight:700; color:#fbbf24; text-transform:uppercase;">🏗️ En preparación</span>
+            <span id="pt-inv-comp" style="background:rgba(245,158,11,0.25); color:#fbbf24; border:1.5px solid rgba(245,158,11,0.5); border-radius:14px; font-size:16px; font-weight:800; padding:1px 12px;">0</span>
+          </div>
+          <div style="margin-top:10px; padding-top:8px; border-top:1px solid #334155; font-size:12px; color:#94a3b8; display:flex; justify-content:space-between;">
+            <span>Flota Total: <b style="color:#f1f5f9;" id="pt-tot-comp">0</b></span>
+            <span>Disponibilidad: <b style="color:#f1f5f9;" id="pt-pct-comp">0%</b></span>
+          </div>
         </div>
-        <div class="partetaller-grid-4">
-          <div class="partetaller-totals-card">
-            <h5>Compactador</h5>
-            <div class="partetaller-totals-val">
-              <span class="op" id="pt-op-comp">0</span>
-              <span style="color: var(--text-muted);">/</span>
-              <span class="fs" id="pt-out-comp">0</span>
-            </div>
+        <div class="pt-stat-card" data-pt-type="volq" style="background:#1e293b; border:1px solid #334155; border-radius:14px; padding:16px 18px; border-left:4px solid #8b5cf6;">
+          <div style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:3px 10px; border-radius:20px; margin-bottom:12px; background:rgba(139,92,246,.15); color:#a78bfa; border:1px solid rgba(139,92,246,.25);">🚛 VOLQUETE</div>
+          <div style="display:flex; gap:18px; align-items:flex-end;">
+            <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase;">Operativos</div><div style="font-size:32px; font-weight:800; color:#22c55e; line-height:1;" id="pt-op-volq">0</div></div>
+            <div><div style="font-size:11px; color:#f97316; text-transform:uppercase;">En Rep.</div><div style="font-size:20px; font-weight:700; color:#f97316;" id="pt-rep-volq">0</div></div>
+            <div><div style="font-size:11px; color:#ef4444; text-transform:uppercase;">Fuera Serv.</div><div style="font-size:20px; font-weight:700; color:#ef4444;" id="pt-fs-volq">0</div></div>
           </div>
-          <div class="partetaller-totals-card">
-            <h5>Volquete</h5>
-            <div class="partetaller-totals-val">
-              <span class="op" id="pt-op-volq">0</span>
-              <span style="color: var(--text-muted);">/</span>
-              <span class="fs" id="pt-out-volq">0</span>
-            </div>
+          <div style="background:rgba(245,158,11,0.08); border:1.5px dashed #f59e0b; border-radius:8px; padding:6px 12px; margin-top:8px; display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:11px; font-weight:700; color:#fbbf24; text-transform:uppercase;">🏗️ En preparación</span>
+            <span id="pt-inv-volq" style="background:rgba(245,158,11,0.25); color:#fbbf24; border:1.5px solid rgba(245,158,11,0.5); border-radius:14px; font-size:16px; font-weight:800; padding:1px 12px;">0</span>
           </div>
-          <div class="partetaller-totals-card">
-            <h5>Roll - Off</h5>
-            <div class="partetaller-totals-val">
-              <span class="op" id="pt-op-roll">0</span>
-              <span style="color: var(--text-muted);">/</span>
-              <span class="fs" id="pt-out-roll">0</span>
-            </div>
+          <div style="margin-top:10px; padding-top:8px; border-top:1px solid #334155; font-size:12px; color:#94a3b8; display:flex; justify-content:space-between;">
+            <span>Flota Total: <b style="color:#f1f5f9;" id="pt-tot-volq">0</b></span>
+            <span>Disponibilidad: <b style="color:#f1f5f9;" id="pt-pct-volq">0%</b></span>
           </div>
-          <div class="partetaller-totals-card">
-            <h5>Plancha</h5>
-            <div class="partetaller-totals-val">
-              <span class="op" id="pt-op-plancha">0</span>
-              <span style="color: var(--text-muted);">/</span>
-              <span class="fs" id="pt-out-plancha">0</span>
-            </div>
+        </div>
+        <div class="pt-stat-card" data-pt-type="roll" style="background:#1e293b; border:1px solid #334155; border-radius:14px; padding:16px 18px; border-left:4px solid #06b6d4;">
+          <div style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:3px 10px; border-radius:20px; margin-bottom:12px; background:rgba(6,182,212,.15); color:#22d3ee; border:1px solid rgba(6,182,212,.25);">🔄 ROLL - OFF</div>
+          <div style="display:flex; gap:18px; align-items:flex-end;">
+            <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase;">Operativos</div><div style="font-size:32px; font-weight:800; color:#22c55e; line-height:1;" id="pt-op-roll">0</div></div>
+            <div><div style="font-size:11px; color:#f97316; text-transform:uppercase;">En Rep.</div><div style="font-size:20px; font-weight:700; color:#f97316;" id="pt-rep-roll">0</div></div>
+            <div><div style="font-size:11px; color:#ef4444; text-transform:uppercase;">Fuera Serv.</div><div style="font-size:20px; font-weight:700; color:#ef4444;" id="pt-fs-roll">0</div></div>
+          </div>
+          <div style="background:rgba(245,158,11,0.08); border:1.5px dashed #f59e0b; border-radius:8px; padding:6px 12px; margin-top:8px; display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:11px; font-weight:700; color:#fbbf24; text-transform:uppercase;">🏗️ En preparación</span>
+            <span id="pt-inv-roll" style="background:rgba(245,158,11,0.25); color:#fbbf24; border:1.5px solid rgba(245,158,11,0.5); border-radius:14px; font-size:16px; font-weight:800; padding:1px 12px;">0</span>
+          </div>
+          <div style="margin-top:10px; padding-top:8px; border-top:1px solid #334155; font-size:12px; color:#94a3b8; display:flex; justify-content:space-between;">
+            <span>Flota Total: <b style="color:#f1f5f9;" id="pt-tot-roll">0</b></span>
+            <span>Disponibilidad: <b style="color:#f1f5f9;" id="pt-pct-roll">0%</b></span>
+          </div>
+        </div>
+        <div class="pt-stat-card" data-pt-type="plancha" style="background:#1e293b; border:1px solid #334155; border-radius:14px; padding:16px 18px; border-left:4px solid #f97316;">
+          <div style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:3px 10px; border-radius:20px; margin-bottom:12px; background:rgba(249,115,22,.15); color:#f97316; border:1px solid rgba(249,115,22,.25);">🛞 PLANCHA</div>
+          <div style="display:flex; gap:18px; align-items:flex-end;">
+            <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase;">Operativos</div><div style="font-size:32px; font-weight:800; color:#22c55e; line-height:1;" id="pt-op-plancha">0</div></div>
+            <div><div style="font-size:11px; color:#f97316; text-transform:uppercase;">En Rep.</div><div style="font-size:20px; font-weight:700; color:#f97316;" id="pt-rep-plancha">0</div></div>
+            <div><div style="font-size:11px; color:#ef4444; text-transform:uppercase;">Fuera Serv.</div><div style="font-size:20px; font-weight:700; color:#ef4444;" id="pt-fs-plancha">0</div></div>
+          </div>
+          <div style="background:rgba(245,158,11,0.08); border:1.5px dashed #f59e0b; border-radius:8px; padding:6px 12px; margin-top:8px; display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:11px; font-weight:700; color:#fbbf24; text-transform:uppercase;">🏗️ En preparación</span>
+            <span id="pt-inv-plancha" style="background:rgba(245,158,11,0.25); color:#fbbf24; border:1.5px solid rgba(245,158,11,0.5); border-radius:14px; font-size:16px; font-weight:800; padding:1px 12px;">0</span>
+          </div>
+          <div style="margin-top:10px; padding-top:8px; border-top:1px solid #334155; font-size:12px; color:#94a3b8; display:flex; justify-content:space-between;">
+            <span>Flota Total: <b style="color:#f1f5f9;" id="pt-tot-plancha">0</b></span>
+            <span>Disponibilidad: <b style="color:#f1f5f9;" id="pt-pct-plancha">0%</b></span>
           </div>
         </div>
       </div>
@@ -1009,6 +1040,37 @@
           <tbody id="pt-pendientes-tbody">
             <tr>
               <td colspan="5" style="text-align: center; padding: 20px;">No hay servicios pendientes.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('inversiones')">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3 style="font-size: 14px; font-weight: 700; margin: 0;">🏗️ Unidades en Preparación</h3>
+          <span class="badge" style="background-color: #f59e0b; color: white;" id="pt-inversiones-count">0</span>
+        </div>
+        <span class="material-icons" id="pt-inversiones-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
+      </div>
+      <div id="pt-inversiones-mobile-cards" class="pt-mobile-cards-list">
+        <!-- Mobile dynamic -->
+      </div>
+
+      <div class="prev-table-container">
+        <table class="prev-table">
+          <thead>
+            <tr>
+              <th>Interno</th>
+              <th>Tipo</th>
+              <th>Detalles de Preparación (Seleccionar)</th>
+              <th>Orden de Trabajo</th>
+              <th>Días Prep.</th>
+              <th>Ingresó El</th>
+            </tr>
+          </thead>
+          <tbody id="pt-inversiones-tbody">
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 20px;">No hay unidades en preparación.</td>
             </tr>
           </tbody>
         </table>
@@ -1138,7 +1200,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.1.2</div>
+      <div class="sidebar-version">Versión 1.2.0</div>
     </div>
   </aside>
 
@@ -1951,6 +2013,7 @@
             <option value="servicios_pendientes">📋 Servicios Pendientes (unidad operativa)</option>
             <option value="reparacion">🔧 En Reparación (unidad inactiva)</option>
             <option value="fuera_de_servicio">❌ Fuera de Servicio (unidad inactiva)</option>
+            <option value="inversiones">🏗️ En Preparación (unidad recién comprada)</option>
           </select>
         </div>
         <div class="form-group" id="pt-unit-destino-container" style="display: block; margin-top: 14px; background: rgba(56, 189, 248, 0.08); padding: 14px; border-radius: 8px; border: 1.5px dashed #38bdf8;">
@@ -2052,6 +2115,6 @@
     }
   </style>
 
-  <script src="app.js?v=99"></script>
+  <script src="app.js?v=101"></script>
 </body>
 </html>

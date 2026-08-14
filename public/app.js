@@ -10831,10 +10831,13 @@ function adjustPtStateLists(state) {
     state.reparacion = [];
     state.servicios_pendientes = [];
 
-    // Find all open Herrería orders with active/paused tasks
+    // Find all open Herrería orders with active/paused tasks. A unit already marked
+    // "operativo" is out of here no matter what its task history looks like - that field is
+    // the real-world signal that the unit is back in service, not leftover task state.
     const herreriaOrders = activeOrders.filter(o => {
       const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
       if (isClosed) return false;
+      if (o.estadoUnidad === 'operativo') return false;
       const tasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
       return tasks.filter(taskMatchesSector).some(
         t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0))
@@ -10895,10 +10898,13 @@ function adjustPtStateLists(state) {
   // TALLER MODE: Standard logic - move units with active tasks to "En Reparación"
   // ============================================================
 
-  // 1. Find all open orders with active or paused sector-matching tasks
+  // 1. Find all open orders with active or paused sector-matching tasks. A unit already
+  // marked "operativo" is excluded no matter what its task history looks like - that field is
+  // the real-world signal that the unit is back in service, not leftover task state.
   const activeRepairOrders = activeOrders.filter(o => {
     const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
     if (isClosed) return false;
+    if (o.estadoUnidad === 'operativo') return false;
     const tasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
     return tasks.filter(taskMatchesSector).some(
       t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0))
@@ -11039,21 +11045,27 @@ function adjustPtStateLists(state) {
     state.reparacion.push(tempUnit);
   }
 
-  // 5. Recalculate totals
+  // 5. Recalculate totals - split "fuera" into reparacion/fuera_de_servicio separately, and
+  // factor in inversiones (units in preparation): they reduce operativos but the base fleet
+  // total stays fixed (it comes from Base_Datos, not from how many units happen to be down).
   const totales = (state.resumen || {}).totales || {};
   const types = ['COMPACTADOR', 'VOLQUETE', 'ROLL - OFF', 'PLANCHA'];
   types.forEach(t => {
     const origOp = parseInt((totales[t] || {}).operativos || '0') || 0;
     const origFs = parseInt((totales[t] || {}).fuera || '0') || 0;
-    const totalFleet = origOp + origFs;
+    const totalFleet = totales[t] && totales[t].total !== undefined ? parseInt(totales[t].total) || 0 : (origOp + origFs);
 
-    const newFsCount = 
-      (state.fuera_de_servicio || []).filter(u => String(u.tipo).trim().toUpperCase() === t).length +
-      (state.reparacion || []).filter(u => String(u.tipo).trim().toUpperCase() === t).length;
+    const fsCount = (state.fuera_de_servicio || []).filter(u => String(u.tipo).trim().toUpperCase() === t).length;
+    const repCount = (state.reparacion || []).filter(u => String(u.tipo).trim().toUpperCase() === t).length;
+    const invCount = (state.inversiones || []).filter(u => String(u.tipo).trim().toUpperCase() === t).length;
 
     if (!totales[t]) totales[t] = {};
-    totales[t].fuera = newFsCount;
-    totales[t].operativos = Math.max(0, totalFleet - newFsCount);
+    totales[t].fuera = fsCount + repCount;
+    totales[t].reparacion = repCount;
+    totales[t].fueraServicio = fsCount;
+    totales[t].inversiones = invCount;
+    totales[t].total = totalFleet;
+    totales[t].operativos = Math.max(0, totalFleet - fsCount - repCount - invCount);
   });
 }
 
@@ -11088,14 +11100,24 @@ function renderParteTallerDashboard(state) {
 
   // Fill totals for each vehicle type
   const types = [
-    { key: 'COMPACTADOR', opId: 'pt-op-comp', fsId: 'pt-out-comp' },
-    { key: 'VOLQUETE',    opId: 'pt-op-volq', fsId: 'pt-out-volq' },
-    { key: 'ROLL - OFF',   opId: 'pt-op-roll', fsId: 'pt-out-roll' },
-    { key: 'PLANCHA',    opId: 'pt-op-plancha', fsId: 'pt-out-plancha' }
+    { key: 'COMPACTADOR', suffix: 'comp' },
+    { key: 'VOLQUETE',    suffix: 'volq' },
+    { key: 'ROLL - OFF',  suffix: 'roll' },
+    { key: 'PLANCHA',     suffix: 'plancha' }
   ];
   types.forEach(t => {
-    if (el(t.opId)) el(t.opId).textContent = parseCount(t.key, 'operativos');
-    if (el(t.fsId)) el(t.fsId).textContent = parseCount(t.key, 'fuera');
+    const op = parseCount(t.key, 'operativos');
+    const rep = parseCount(t.key, 'reparacion');
+    const fs = parseCount(t.key, 'fueraServicio');
+    const inv = parseCount(t.key, 'inversiones');
+    const tot = parseCount(t.key, 'total');
+    const pct = tot > 0 ? Math.round((op / tot) * 100) : 0;
+    if (el(`pt-op-${t.suffix}`)) el(`pt-op-${t.suffix}`).textContent = op;
+    if (el(`pt-rep-${t.suffix}`)) el(`pt-rep-${t.suffix}`).textContent = rep;
+    if (el(`pt-fs-${t.suffix}`)) el(`pt-fs-${t.suffix}`).textContent = fs;
+    if (el(`pt-inv-${t.suffix}`)) el(`pt-inv-${t.suffix}`).textContent = inv;
+    if (el(`pt-tot-${t.suffix}`)) el(`pt-tot-${t.suffix}`).textContent = tot;
+    if (el(`pt-pct-${t.suffix}`)) el(`pt-pct-${t.suffix}`).textContent = `${pct}%`;
   });
 
   // Checklist helper
@@ -11134,6 +11156,45 @@ function renderParteTallerDashboard(state) {
       </div>`;
     }
     return '<span style="color:var(--text-muted); font-size:12px;">Sin ítems pendientes</span>';
+  }
+
+  // Same idea as getChecklistHtml, but for "En Preparación": shows every item (done or not)
+  // plus a progress bar - a unit being prepped needs to see how far along the checklist is,
+  // not just what's left.
+  function getChecklistHtmlWithProgress(item, internoPT) {
+    const items = Array.isArray(item.novedad_items) ? item.novedad_items : [];
+    if (items.length === 0) {
+      return '<span style="color:var(--text-muted); font-size:12px;">Sin ítems pendientes</span>';
+    }
+    const doneCount = items.filter(x => x.hecho).length;
+    const pct = Math.round((doneCount / items.length) * 100);
+    return `<div style="display:flex; flex-direction:column; gap:5px;">
+      ${items.map((x, idx) => {
+        if (x.hecho) {
+          return `<div style="display:flex; align-items:flex-start; gap:6px; font-size:12px;">
+            <span class="material-icons" style="font-size:14px; color:var(--success); margin-top:1px;">check_circle</span>
+            <span style="color:var(--text-muted); text-decoration:line-through;">${x.texto}</span>
+          </div>`;
+        }
+        const safeId = `ptckprep_${internoPT}_${idx}`;
+        const safeTxt = String(x.texto || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+        return `<label style="display:flex; align-items:flex-start; gap:6px; font-size:12px; cursor:pointer;">
+          <input type="checkbox" class="pt-item-checkbox" data-interno="${internoPT}" value="${safeTxt}"
+            id="${safeId}" style="margin-top:2px; accent-color:var(--primary); flex-shrink:0;">
+          <span>${x.texto}</span>
+        </label>`;
+      }).join('')}
+      <div style="display:flex; align-items:center; gap:8px; margin-top:2px;">
+        <div style="flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; max-width:90px;">
+          <div style="height:100%; background:var(--success); border-radius:2px; width:${pct}%;"></div>
+        </div>
+        <span style="font-size:10px; color:var(--text-muted); font-weight:700; text-transform:uppercase;">${doneCount}/${items.length} hechas</span>
+      </div>
+      ${doneCount < items.length ? `<button class="btn btn-secondary btn-xs" onclick="ptAsignarSeleccionados('${internoPT}')"
+        style="margin-top:2px; font-size:11px; display:inline-flex; align-items:center; gap:3px; align-self:flex-start;">
+        <span class="material-icons" style="font-size:13px;">assignment</span> Asignar Seleccionados
+      </button>` : ''}
+    </div>`;
   }
 
   // Resolve the real Taxes interno from a Parte Taller interno (e.g. "Irineo 27" -> "IRINEO GRAL.")
@@ -11448,6 +11509,131 @@ function renderParteTallerDashboard(state) {
           </div>`;
         }).join('');
   }
+
+  // 4. En Preparación (unidades recién compradas, todavía no tocaron la calle)
+  const enPreparacion = (displayState.inversiones || []).filter(matchesPtSector).filter(unitMatchesSearch).sort((a, b) => getDaysValue(b) - getDaysValue(a));
+  if (el('pt-inversiones-count')) el('pt-inversiones-count').textContent = enPreparacion.length;
+  if (el('pt-inversiones-tbody')) {
+    if (enPreparacion.length === 0) {
+      el('pt-inversiones-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades en preparación.</td></tr>';
+    } else {
+      el('pt-inversiones-tbody').innerHTML = enPreparacion.map(item => {
+        const internoPT = String(item.interno || '');
+        const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
+        return `<tr>
+          <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${getEditBtnHtml(internoPT, 'inversiones')} <strong>${internoPT}</strong></div></td>
+          <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
+          <td style="min-width:220px;">${getChecklistHtmlWithProgress(item, internoPT)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
+          <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
+          <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+  // Mobile cards for En Preparación
+  const invMobile = el('pt-inversiones-mobile-cards');
+  if (invMobile) {
+    invMobile.innerHTML = enPreparacion.length === 0
+      ? '<p style="text-align:center;color:var(--text-muted);padding:12px 0;">No hay unidades en preparación.</p>'
+      : enPreparacion.map(item => {
+          const internoPT = String(item.interno || '');
+          const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
+          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
+              ${getDiasParadoHtml(item, desde)}
+            </div>
+            <div style="margin-top:4px; font-size:12px; color:var(--text-muted);">Ingresó el: <strong>${desde}</strong></div>
+            <div style="margin:10px 0; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+              <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Detalles de Preparación:</div>
+              ${getChecklistHtmlWithProgress(item, internoPT)}
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
+              ${getOrdenBtnHtml(internoPT)}
+              ${getEditBtnHtml(internoPT, 'inversiones')}
+            </div>
+          </div>`;
+        }).join('');
+  }
+}
+
+// Builds a print-ready copy of the currently-rendered dashboard cards + Transito/Fuera de
+// Servicio/Reparacion/En Preparacion tables (Servicios Pendientes is deliberately left out -
+// it's an operative-unit annotator, not part of what goes out of service) and sends it to the
+// server to be rendered into a PDF via headless Chromium.
+async function generarPdfParteTaller() {
+  const btn = document.getElementById('pt-download-pdf-btn');
+  const restoreBtn = () => {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons" style="font-size: 16px;">picture_as_pdf</span><span>Descargar PDF</span>';
+    }
+  };
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons" style="font-size: 16px;">hourglass_top</span><span>Generando...</span>';
+  }
+
+  try {
+    const cssRes = await fetch('style.css');
+    const css = await cssRes.text();
+
+    const statCardsEl = document.querySelector('.pt-stat-grid');
+    const statCardsHtml = statCardsEl ? statCardsEl.outerHTML : '';
+
+    function sectionHtml(title, badgeColor, tbodyId) {
+      const tbody = document.getElementById(tbodyId);
+      const table = tbody ? tbody.closest('table') : null;
+      if (!table) return '';
+      const count = tbody.querySelectorAll('tr').length;
+      return `
+        <h3 style="font-size:14px; font-weight:700; margin:18px 0 8px; display:flex; align-items:center; gap:8px;">
+          ${title} <span style="background:${badgeColor}; color:white; font-size:11px; padding:2px 8px; border-radius:10px;">${count}</span>
+        </h3>
+        ${table.outerHTML}`;
+    }
+
+    const reportHtml = `
+      <h2 style="margin:0 0 4px;">Parte Diario de Taller</h2>
+      <div style="color:#64748b; font-size:12px; margin-bottom:16px;">Generado el ${new Date().toLocaleString('es-AR')}</div>
+      ${statCardsHtml}
+      ${sectionHtml('En Tránsito', '#2563eb', 'pt-transito-tbody')}
+      ${sectionHtml('Fuera de Servicio', '#ef4444', 'pt-fuera-tbody')}
+      ${sectionHtml('En Reparación', '#f97316', 'pt-reparacion-tbody')}
+      ${sectionHtml('Unidades en Preparación', '#f59e0b', 'pt-inversiones-tbody')}
+    `;
+
+    const fullHtml = `<!doctype html><html><head><meta charset="utf-8"><style>
+      ${css}
+      body { background: #fff; padding: 10px; }
+      table { width: 100%; }
+      .col-acciones, .action-cell, button { display: none !important; }
+    </style></head><body>${reportHtml}</body></html>`;
+
+    const res = await fetch('/api/parte-taller/generar-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html: fullHtml })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Error al generar el PDF.');
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Parte_Taller_${new Date().toISOString().split('T')[0]}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('PDF generado correctamente', 'success');
+  } catch (e) {
+    console.error('Error generando PDF de Parte Taller:', e);
+    showToast('Error al generar el PDF: ' + e.message, 'danger');
+  } finally {
+    restoreBtn();
+  }
 }
 
 // Toggle Parte Taller section expand/collapse on mobile
@@ -11537,7 +11723,7 @@ async function ptAsignarSeleccionados(interno) {
   // 1. Update the checklist in Google Sheets
   if (window._ptState) {
     const state = window._ptState;
-    const lists = ['fuera_de_servicio', 'reparacion', 'servicios_pendientes'];
+    const lists = ['fuera_de_servicio', 'reparacion', 'servicios_pendientes', 'inversiones'];
     let foundList = null;
     let foundUnit = null;
     let foundIdx = -1;
@@ -11801,7 +11987,7 @@ async function markPtUnitOperativo() {
     // Si la unidad ya estaba registrada en alguna lista de Parte Taller, sacarla (queda resuelta)
     if (window._ptState && currentEditingPtInterno) {
       const state = window._ptState;
-      const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
+      const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones'];
       let removed = false;
       lists.forEach(listName => {
         if (state[listName]) {
@@ -11989,7 +12175,7 @@ function ptCheckForDuplicateUnit() {
 
   if (!window._ptState) return;
   const state = window._ptState;
-  const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
+  const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones'];
   let foundUnit = null;
   let foundList = null;
 
@@ -12248,8 +12434,8 @@ async function savePtUnit() {
       if (!window._ptState) return;
       const state = window._ptState;
 
-      // 1. Remove from all four lists to start clean (using original internally stored interno)
-      const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
+      // 1. Remove from all lists to start clean (using original internally stored interno)
+      const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones'];
       let foundUnitObj = null;
 
       lists.forEach(listName => {
