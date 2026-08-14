@@ -11624,6 +11624,8 @@ async function generarPdfParteTaller() {
 
     const statCardsEl = document.querySelector('.pt-stat-grid');
     const statCardsHtml = statCardsEl ? statCardsEl.outerHTML : '';
+    const supervisorSelect = document.getElementById('pt-supervisor-select');
+    const supervisorName = supervisorSelect ? supervisorSelect.value : '';
 
     function sectionHtml(title, badgeColor, tbodyId) {
       const tbody = document.getElementById(tbodyId);
@@ -11637,9 +11639,29 @@ async function generarPdfParteTaller() {
         ${table.outerHTML}`;
     }
 
+    const now = new Date();
+    const weekday = now.toLocaleDateString('es-AR', { weekday: 'long', timeZone: 'America/Argentina/Buenos_Aires' });
+    const weekdayCap = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+    const dateStr = now.toLocaleDateString('es-AR', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' });
+    const timeStr = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' });
+
     const reportHtml = `
-      <h2 style="margin:0 0 4px;">Parte Diario de Taller</h2>
-      <div style="color:#64748b; font-size:12px; margin-bottom:16px;">Generado el ${new Date().toLocaleString('es-AR')}</div>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:14px;">
+        <tr><td style="background:#1e293b; color:#fff; text-align:center; font-weight:700; font-size:18px; padding:10px;">PARTE DIARIO DE TALLER</td></tr>
+        <tr><td style="background:#3b82f6; padding:2px;"></td></tr>
+      </table>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+        <tr>
+          <td style="background:#eff6ff; padding:10px 14px; width:50%;">
+            <div style="font-size:11px; font-weight:700; color:#2563eb; letter-spacing:0.05em;">RESPONSABLE DEL PARTE</div>
+            <div style="font-size:16px; font-weight:800; color:#0f172a; margin-top:2px;">${(supervisorName || '—').toUpperCase()}</div>
+          </td>
+          <td style="background:#ecfdf5; padding:10px 14px; width:50%;">
+            <div style="font-size:11px; font-weight:700; color:#059669; letter-spacing:0.05em;">FECHA Y HORA DE EMISIÓN</div>
+            <div style="font-size:16px; font-weight:800; color:#0f172a; margin-top:2px;">${weekdayCap}, ${dateStr} - ${timeStr}</div>
+          </td>
+        </tr>
+      </table>
       ${statCardsHtml}
       ${sectionHtml('En Tránsito', '#2563eb', 'pt-transito-tbody')}
       ${sectionHtml('Fuera de Servicio', '#ef4444', 'pt-fuera-tbody')}
