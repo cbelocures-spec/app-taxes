@@ -6950,6 +6950,32 @@ async function submitBulkOrders() {
 // order per interno with a task carrying that formatted description - same order/task pipeline
 // as everything else in the app (syncs to Taxes normally), no separate data store for now.
 
+// Gomería tasks always sit on Centro de Costo "Mecánica" (15) - same name-matching approach
+// updateEmployeeDropdownForCard already uses to filter Mecánica-only employees for a task,
+// simplified here since there's no Herrería/Edilicio branch to consider.
+function getGomeriaMecanicaEmployees() {
+  const cleanName = (str) => {
+    if (typeof str !== 'string') return '';
+    return str.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+  };
+  const mecanicaNames = getSectorEmployees('Taller');
+  const mecanicaNamesCleaned = new Set(mecanicaNames.map(cleanName));
+  const matched = (cachedCatalogs.empleados || []).filter(emp => {
+    if (!emp || !emp.label) return false;
+    const empCleaned = cleanName(emp.label);
+    if (mecanicaNamesCleaned.has(empCleaned)) return true;
+    for (const mName of mecanicaNamesCleaned) {
+      if (empCleaned.includes(mName) || mName.includes(empCleaned)) return true;
+    }
+    return false;
+  });
+  mecanicaNames.forEach(name => {
+    const exists = matched.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
+    if (!exists) matched.push({ value: name, label: name });
+  });
+  return matched;
+}
+
 function addGomeriaInternoBlock() {
   const container = document.getElementById('gomeria-internos-container');
   if (!container) return;
@@ -6989,7 +7015,7 @@ function addGomeriaInternoBlock() {
         <label>Empleado *</label>
         <select class="gomeria-empleado-select" style="width:100%;">
           <option value="">Seleccionar Empleado...</option>
-          ${(cachedCatalogs.empleados || []).map(e => `<option value="${e.value}">${e.label}</option>`).join('')}
+          ${getGomeriaMecanicaEmployees().map(e => `<option value="${e.value}">${e.label}</option>`).join('')}
         </select>
       </div>
       <div class="form-group">
@@ -7004,6 +7030,10 @@ function addGomeriaInternoBlock() {
   `;
   container.appendChild(block);
   addGomeriaTireRow(block.querySelector('.btn-secondary'));
+  const internoSelectEl = block.querySelector('.gomeria-interno-select');
+  if (internoSelectEl && typeof convertSelectToSearchable === 'function') {
+    convertSelectToSearchable(internoSelectEl);
+  }
 }
 
 function removeGomeriaInternoBlock(btn) {
@@ -7152,7 +7182,10 @@ async function submitGomeriaOrders() {
         empleado: empleado,
         horasEstimadas: horasEstimadas,
         descripcion: descripcion,
-        status: "Pendiente"
+        // Gomería logs a tire change that's already done by the time it's entered here -
+        // unlike other order-creation flows, there's no reason to leave it Pendiente first.
+        // Marking it Finalizada up front is what lets the order sync as complete in Taxes.
+        status: "Finalizada"
       }]
     });
   }
