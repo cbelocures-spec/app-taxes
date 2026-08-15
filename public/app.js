@@ -7034,6 +7034,10 @@ function addGomeriaInternoBlock() {
   if (internoSelectEl && typeof convertSelectToSearchable === 'function') {
     convertSelectToSearchable(internoSelectEl);
   }
+  const empleadoSelectEl = block.querySelector('.gomeria-empleado-select');
+  if (empleadoSelectEl && typeof convertSelectToSearchable === 'function') {
+    convertSelectToSearchable(empleadoSelectEl);
+  }
 }
 
 function removeGomeriaInternoBlock(btn) {
@@ -7055,17 +7059,28 @@ function addGomeriaTireRow(btn) {
     </button>
     <div class="form-group" style="margin-bottom:10px;">
       <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Eje / Posición</label>
-      <select class="gomeria-posicion-select" style="width:100%;" onchange="this.parentElement.querySelector('.gomeria-posicion-otro').style.display = (this.value === '__otro__') ? 'block' : 'none';">
-        <option value="">Seleccionar posición...</option>
-        <option value="Delantero izquierdo">Delantero izquierdo</option>
-        <option value="Delantero derecho">Delantero derecho</option>
-        <option value="Trasero izquierdo exterior">Trasero izquierdo exterior</option>
-        <option value="Trasero izquierdo interior">Trasero izquierdo interior</option>
-        <option value="Trasero derecho exterior">Trasero derecho exterior</option>
-        <option value="Trasero derecho interior">Trasero derecho interior</option>
-        <option value="Auxilio / Repuesto">Auxilio / Repuesto</option>
-        <option value="__otro__">Otro (escribir)</option>
+      <select class="gomeria-posicion-select" style="width:100%; margin-bottom:6px;" onchange="ptGomeriaUpdatePosicionBadge(this)">
+        <option value="" data-group="">Seleccionar posición...</option>
+        <optgroup label="Eje Delantero">
+          <option value="Delantero izquierdo" data-group="delantero" style="background-color:#dcfce7; color:#166534;">Delantero izquierdo</option>
+          <option value="Delantero derecho" data-group="delantero" style="background-color:#dcfce7; color:#166534;">Delantero derecho</option>
+        </optgroup>
+        <optgroup label="Eje Trasero">
+          <option value="Trasero izquierdo exterior" data-group="trasero" style="background-color:#dbeafe; color:#1e40af;">Trasero izquierdo exterior</option>
+          <option value="Trasero izquierdo interior" data-group="trasero" style="background-color:#dbeafe; color:#1e40af;">Trasero izquierdo interior</option>
+          <option value="Trasero derecho exterior" data-group="trasero" style="background-color:#dbeafe; color:#1e40af;">Trasero derecho exterior</option>
+          <option value="Trasero derecho interior" data-group="trasero" style="background-color:#dbeafe; color:#1e40af;">Trasero derecho interior</option>
+        </optgroup>
+        <optgroup label="Eje Fijo / Flotante">
+          <option value="Eje fijo izquierdo" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje fijo izquierdo</option>
+          <option value="Eje fijo derecho" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje fijo derecho</option>
+          <option value="Eje flotante izquierdo" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje flotante izquierdo</option>
+          <option value="Eje flotante derecho" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje flotante derecho</option>
+        </optgroup>
+        <option value="Auxilio / Repuesto" data-group="otro">Auxilio / Repuesto</option>
+        <option value="__otro__" data-group="otro">Otro (escribir)</option>
       </select>
+      <span class="gomeria-posicion-badge" style="display:none; font-size:12px; font-weight:700; padding:4px 12px; border-radius:999px;"></span>
       <input type="text" class="gomeria-posicion-otro" placeholder="Escribir posición" style="width:100%; margin-top:6px; display:none;">
     </div>
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
@@ -7099,6 +7114,41 @@ function removeGomeriaTireRow(btn) {
     return;
   }
   row.remove();
+}
+
+// Native <option> elements can't reliably be colored (especially on mobile, where the OS
+// renders its own picker UI and ignores most CSS) - a small colored dot next to the select,
+// driven by each option's own data-group, is what actually renders the axle color reliably.
+// Matches the same colors set inline on each <option> above - those only actually render on
+// desktop browsers (Chrome/Firefox partly honor styled options), never on mobile, where the OS
+// draws its own picker UI and ignores them entirely. This badge is the one indicator that's
+// guaranteed to show the axle color everywhere, including on a phone.
+const GOMERIA_POSICION_GROUP_COLORS = {
+  delantero: { bg: '#dcfce7', text: '#166534' },
+  trasero: { bg: '#dbeafe', text: '#1e40af' },
+  fijoflotante: { bg: '#ede9fe', text: '#5b21b6' },
+  otro: { bg: 'var(--secondary-light)', text: 'var(--text-muted)' },
+  '': { bg: 'var(--secondary-light)', text: 'var(--text-muted)' }
+};
+
+function ptGomeriaUpdatePosicionBadge(selectEl) {
+  const wrapper = selectEl.closest('.form-group');
+  const badge = wrapper ? wrapper.querySelector('.gomeria-posicion-badge') : null;
+  const otroInput = wrapper ? wrapper.querySelector('.gomeria-posicion-otro') : null;
+  const selectedOption = selectEl.selectedOptions && selectEl.selectedOptions[0];
+  const group = selectedOption ? (selectedOption.dataset.group || '') : '';
+  if (badge) {
+    if (selectEl.value) {
+      const colors = GOMERIA_POSICION_GROUP_COLORS[group] || GOMERIA_POSICION_GROUP_COLORS[''];
+      badge.style.background = colors.bg;
+      badge.style.color = colors.text;
+      badge.textContent = selectedOption ? selectedOption.textContent : '';
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  if (otroInput) otroInput.style.display = (selectEl.value === '__otro__') ? 'block' : 'none';
 }
 
 // Builds the task description text for one interno block, one line per tire changed, matching
