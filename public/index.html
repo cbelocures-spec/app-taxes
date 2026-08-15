@@ -1206,7 +1206,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.4.5</div>
+      <div class="sidebar-version">Versión 1.5.0</div>
     </div>
   </aside>
 
@@ -1982,6 +1982,38 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="pt-checklist-review-modal">
+    <div class="dialog-modal" style="max-width: 420px;">
+      <div class="dialog-body" style="padding: 20px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 4px;">
+          <p style="font-size: 16px; font-weight: 700; margin: 0;" id="pt-review-title">Confirmar interno</p>
+          <span id="pt-review-estado-badge" style="font-size:11px; font-weight:700; padding:3px 10px; border-radius:12px;"></span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 14px;">Marcá lo que ya se hizo</p>
+
+        <div id="pt-review-checklist" style="display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto;"></div>
+
+        <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
+          <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:6px;">Agregar ítem nuevo</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="pt-review-new-item-input" placeholder="Describir tarea pendiente" style="flex:1; padding:8px; border-radius:6px; border:1px solid var(--border);" onkeydown="if(event.key==='Enter'){event.preventDefault(); ptReviewAddNewItem();}">
+            <button type="button" class="btn btn-secondary btn-xs" onclick="ptReviewAddNewItem()">
+              <span class="material-icons" style="font-size:16px;">add</span>
+            </button>
+          </div>
+          <div id="pt-review-new-items-list" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;"></div>
+        </div>
+
+        <p style="font-size:11px; color:var(--text-muted); margin: 14px 0 0;">Lo que no marques (y lo nuevo que agregues) queda anotado en Servicio Pendiente.</p>
+
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeChecklistReviewModal()">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-sm" id="pt-review-confirm-btn" onclick="confirmChecklistReviewAndApply()">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="pt-unit-modal">
     <div class="dialog-modal" style="max-width: 450px;">
       <div class="dialog-header" id="pt-unit-modal-header" style="background-color: var(--primary); color: white;">
@@ -2121,6 +2153,6 @@
     }
   </style>
 
-  <script src="app.js?v=116"></script>
+  <script src="app.js?v=117"></script>
 </body>
 </html>

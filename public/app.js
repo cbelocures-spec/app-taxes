@@ -999,12 +999,20 @@ function closeUnitStatusModal() {
   _unitStatusModalCtx = null;
 }
 
+// Instead of silently auto-matching checklist text against finalized task descriptions (which
+// missed anything that wasn't converted into a task with the exact same wording, e.g. work done
+// off the books), this opens the interactive review modal so a human decides what's actually
+// resolved before the status change goes through.
 async function resolveUnitStatusModal(estado) {
   const ctx = _unitStatusModalCtx;
   closeUnitStatusModal();
   if (!ctx) return;
-  const { interno, orderId } = ctx;
+  await openChecklistReviewModal(ctx.interno, ctx.orderId, estado);
+}
 
+// Applies the order-side status change (estadoUnidad + Taxes sync on Operativo) - the Parte
+// Taller side is handled separately by applyParteTallerReconciliation, called just before this.
+async function applyUnitStatusChange(interno, orderId, estado) {
   const order = activeOrders.find(o => o.id === orderId);
   if (order) {
     order.estadoUnidad = estado;
@@ -1036,12 +1044,11 @@ async function resolveUnitStatusModal(estado) {
       });
       fetchOrders();
     } catch (e) {
-      console.error('[resolveUnitStatusModal] Error al actualizar estadoUnidad:', e);
+      console.error('[applyUnitStatusChange] Error al actualizar estadoUnidad:', e);
     }
   }
 
   if (estado === 'operativo') {
-    await reconcilePendingServicesAfterOperativo(interno, order);
     if (order && order.id) {
       showToast("Sincronizando tareas en Taxes al pasar a Operativo...", "info");
       try {
@@ -1057,111 +1064,206 @@ async function resolveUnitStatusModal(estado) {
           showToast(data.message || "Error al sincronizar tareas en Taxes", "warning");
         }
       } catch (err) {
-        console.error('[resolveUnitStatusModal] Error al sincronizar tareas al pasar a operativo:', err);
+        console.error('[applyUnitStatusChange] Error al sincronizar tareas al pasar a operativo:', err);
       }
     } else {
       showToast("Unidad marcada como Operativa", "success");
     }
   } else {
-    await markPendingServiceEnProceso(interno);
-    showToast("Unidad marcada como Fuera de servicio (En Proceso)", "warning");
+    showToast("Unidad marcada como Fuera de servicio", "warning");
   }
   fetchOrders();
 }
 
-// Marks only the checklist items whose text matches a Finalizada task of THIS order
-// as done (hecho:true). Anything not converted into a task stays untouched in
-// servicios_pendientes so it's never lost.
-async function reconcilePendingServicesAfterOperativo(interno, order) {
-  if (!window._ptState) return;
-  const cleanInterno = String(interno || '').trim().toLowerCase();
-  if (!cleanInterno) return;
+// --- CHECKLIST REVIEW MODAL: shown when confirming Operativo/Fuera de Servicio -----------
+// Shows every pending Parte Taller item for this interno (across all lists, deduplicated) so a
+// human can check off what's actually done and add anything new, instead of relying on a
+// silent text-match against finalized tasks. Unchecked items (plus anything newly added) end
+// up as the unit's fresh Parte Taller entry: Servicios Pendientes if the unit is Operativo
+// (still working, just minor pending items), or Fuera de Servicio if not (still down).
 
-  const finalizedDescriptions = ((order && order.tasks) || [])
-    .filter(t => t && t.status === 'Finalizada')
-    .map(t => (t.descripcion || '').trim().toLowerCase());
+let _checklistReviewCtx = null;
 
-  if (finalizedDescriptions.length === 0) return;
+function getUnitTipoForInterno(interno) {
+  const rodadoOpt = cachedCatalogs.rodados
+    ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno || '').trim())
+    : null;
+  const equipo = String(rodadoOpt ? rodadoOpt.equipo || '' : '').trim().toUpperCase();
+  if (equipo.startsWith('COMPACTADOR')) return 'COMPACTADOR';
+  if (equipo.startsWith('VOLQUETE')) return 'VOLQUETE';
+  if (equipo.startsWith('ROLL OFF')) return 'ROLL - OFF';
+  if (equipo.startsWith('PLANCHA')) return 'PLANCHA';
+  return 'Otro';
+}
 
-  let changed = false;
-
-  Object.keys(PT_LIST_LABELS).forEach(listName => {
-    (window._ptState[listName] || []).forEach(item => {
-      if (String(item.interno || '').trim().toLowerCase() !== cleanInterno) return;
-
-      let entries = (Array.isArray(item.novedad_items) && item.novedad_items.length > 0)
-        ? item.novedad_items.slice()
-        : (item.novedad || '').split('\n').map(line => {
-            const l = line.trim();
-            if (!l) return null;
-            const hecho = l.startsWith('[X]') || l.startsWith('[x]');
-            const texto = l.replace(/^\[\s*[xX]?\s*\]\s*/, '').trim();
-            return texto ? { texto, hecho } : null;
-          }).filter(Boolean);
-
-      let itemChanged = false;
-      entries = entries.map(entry => {
-        if (!entry.hecho && finalizedDescriptions.includes((entry.texto || '').trim().toLowerCase())) {
-          itemChanged = true;
-          return { texto: entry.texto, hecho: true };
-        }
-        return entry;
+async function openChecklistReviewModal(interno, orderId, estado) {
+  let items = [];
+  let tipo = '';
+  try {
+    const res = await fetch('/api/parte-taller/estado');
+    const data = await res.json();
+    const state = data.state || data;
+    const cleanInterno = String(interno || '').trim().toLowerCase();
+    ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio'].forEach(listName => {
+      (state[listName] || []).forEach(unit => {
+        if (String(unit.interno || '').trim().toLowerCase() !== cleanInterno) return;
+        if (unit.tipo && !tipo) tipo = unit.tipo;
+        const entries = (Array.isArray(unit.novedad_items) && unit.novedad_items.length > 0)
+          ? unit.novedad_items
+          : (unit.novedad || '').split('\n').map(line => {
+              const l = line.trim();
+              if (!l) return null;
+              const hecho = l.startsWith('[X]') || l.startsWith('[x]');
+              const texto = l.replace(/^\[\s*[xX]?\s*\]\s*/, '').trim();
+              return texto ? { texto, hecho } : null;
+            }).filter(Boolean);
+        entries.forEach(e => {
+          if (e.hecho) return;
+          const clean = String(e.texto || '').trim();
+          if (clean && !items.some(it => it.toUpperCase() === clean.toUpperCase())) items.push(clean);
+        });
       });
+    });
+  } catch (e) {
+    console.error('[openChecklistReviewModal] Error leyendo Parte Taller:', e);
+  }
 
-      if (itemChanged) {
-        item.novedad_items = entries;
-        item.novedad = entries.map(e => `[${e.hecho ? 'X' : ' '}] ${e.texto}`).join('\n');
-        changed = true;
+  if (!tipo) tipo = getUnitTipoForInterno(interno);
+  _checklistReviewCtx = { interno, orderId, estado, tipo, newItems: [] };
+
+  const titleEl = document.getElementById('pt-review-title');
+  if (titleEl) titleEl.textContent = `Confirmar interno ${interno}`;
+  const badge = document.getElementById('pt-review-estado-badge');
+  if (badge) {
+    if (estado === 'operativo') {
+      badge.textContent = 'Operativo';
+      badge.style.background = 'var(--success-light)';
+      badge.style.color = '#065f46';
+    } else {
+      badge.textContent = 'Fuera de servicio';
+      badge.style.background = 'var(--danger-light)';
+      badge.style.color = '#991b1b';
+    }
+  }
+
+  const container = document.getElementById('pt-review-checklist');
+  if (container) {
+    container.innerHTML = items.length === 0
+      ? '<p style="font-size:13px; color:var(--text-muted); margin:0;">No hay ítems pendientes registrados para esta unidad.</p>'
+      : items.map(texto => `
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:13px; cursor:pointer;">
+          <input type="checkbox" class="pt-review-item-chk" data-texto="${String(texto).replace(/"/g, '&quot;')}" style="margin-top:2px;">
+          <span>${texto}</span>
+        </label>
+      `).join('');
+  }
+  const newItemsList = document.getElementById('pt-review-new-items-list');
+  if (newItemsList) newItemsList.innerHTML = '';
+  const newItemInput = document.getElementById('pt-review-new-item-input');
+  if (newItemInput) newItemInput.value = '';
+
+  const modal = document.getElementById('pt-checklist-review-modal');
+  if (modal) modal.classList.add('open');
+}
+
+function closeChecklistReviewModal() {
+  const modal = document.getElementById('pt-checklist-review-modal');
+  if (modal) modal.classList.remove('open');
+  _checklistReviewCtx = null;
+}
+
+function ptReviewAddNewItem() {
+  const input = document.getElementById('pt-review-new-item-input');
+  if (!input || !_checklistReviewCtx) return;
+  const val = input.value.trim();
+  if (!val) return;
+  _checklistReviewCtx.newItems.push(val);
+  input.value = '';
+  renderChecklistReviewNewItems();
+}
+
+function ptReviewRemoveNewItem(idx) {
+  if (!_checklistReviewCtx) return;
+  _checklistReviewCtx.newItems.splice(idx, 1);
+  renderChecklistReviewNewItems();
+}
+
+function renderChecklistReviewNewItems() {
+  const container = document.getElementById('pt-review-new-items-list');
+  if (!container || !_checklistReviewCtx) return;
+  container.innerHTML = _checklistReviewCtx.newItems.map((texto, idx) => `
+    <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+      <span class="material-icons" style="font-size:15px; color: var(--primary);">fiber_new</span>
+      <span style="flex:1;">${String(texto).replace(/</g, '&lt;')}</span>
+      <button type="button" onclick="ptReviewRemoveNewItem(${idx})" style="border:none; background:none; cursor:pointer; color:var(--text-muted); padding:0;">
+        <span class="material-icons" style="font-size:15px;">close</span>
+      </button>
+    </div>
+  `).join('');
+}
+
+// Rebuilds this interno's Parte Taller entry from scratch: dropped entirely if every item is
+// resolved, otherwise a fresh entry in Servicios Pendientes (Operativo) or Fuera de Servicio
+// (not Operativo) holding exactly the still-open items.
+async function applyParteTallerReconciliation(interno, estado, remainingItems, tipo) {
+  try {
+    const res = await fetch('/api/parte-taller/estado');
+    const data = await res.json();
+    const state = data.state || data;
+    const cleanInterno = String(interno || '').trim().toLowerCase();
+
+    ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio'].forEach(listName => {
+      if (Array.isArray(state[listName])) {
+        state[listName] = state[listName].filter(u => String(u.interno || '').trim().toLowerCase() !== cleanInterno);
       }
     });
-  });
 
-  if (!changed) return;
+    if (remainingItems.length > 0) {
+      const targetList = estado === 'operativo' ? 'servicios_pendientes' : 'fuera_de_servicio';
+      if (!state[targetList]) state[targetList] = [];
+      const novedad_items = remainingItems.map(texto => ({ texto, hecho: false }));
+      const unit = {
+        interno: String(interno).trim(),
+        tipo: tipo || 'Otro',
+        novedad: novedad_items.map(x => `[ ] ${x.texto}`).join('\n'),
+        novedad_items
+      };
+      if (targetList === 'fuera_de_servicio') {
+        unit.dia_parado = new Date().toLocaleDateString('es-AR');
+        unit.dias_en_reparacion = 0;
+      } else {
+        unit.servicio = '';
+      }
+      state[targetList].push(unit);
+    }
 
-  try {
     await fetch('/api/parte-taller/novedad', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accion: 'save_state', state: window._ptState })
+      body: JSON.stringify({ accion: 'save_state', state })
     });
     fetchParteTallerEstado();
   } catch (e) {
-    console.error('[reconcilePendingServicesAfterOperativo] Error guardando Parte Taller:', e);
+    console.error('[applyParteTallerReconciliation] Error guardando Parte Taller:', e);
   }
 }
 
-// Flags the unit's Parte Taller entry as "En Proceso" (still being worked on),
-// since choosing Fuera de servicio leaves the order open for more tasks and the
-// job may take a while.
-async function markPendingServiceEnProceso(interno) {
-  if (!window._ptState) return;
-  const cleanInterno = String(interno || '').trim().toLowerCase();
-  if (!cleanInterno) return;
+async function confirmChecklistReviewAndApply() {
+  const ctx = _checklistReviewCtx;
+  if (!ctx) return;
+  const { interno, orderId, estado, tipo } = ctx;
 
-  const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio'];
-  let changed = false;
+  const uncheckedTexts = Array.from(document.querySelectorAll('.pt-review-item-chk:not(:checked)')).map(chk => chk.dataset.texto);
+  const remainingItems = [...uncheckedTexts, ...ctx.newItems];
 
-  lists.forEach(listName => {
-    (window._ptState[listName] || []).forEach(item => {
-      if (String(item.interno || '').trim().toLowerCase() === cleanInterno) {
-        item.estadoTrabajo = 'en_proceso';
-        changed = true;
-      }
-    });
-  });
+  const btn = document.getElementById('pt-review-confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
 
-  if (!changed) return;
+  await applyParteTallerReconciliation(interno, estado, remainingItems, tipo);
+  closeChecklistReviewModal();
+  await applyUnitStatusChange(interno, orderId, estado);
 
-  try {
-    await fetch('/api/parte-taller/novedad', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accion: 'save_state', state: window._ptState })
-    });
-    fetchParteTallerEstado();
-  } catch (e) {
-    console.error('[markPendingServiceEnProceso] Error guardando Parte Taller:', e);
-  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Confirmar'; }
 }
 
 function openPtUnitModalForInterno(interno, sourceOrderId) {
