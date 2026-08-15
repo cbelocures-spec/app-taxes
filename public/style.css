@@ -70,6 +70,7 @@ html.dark-cards-active .preventivos-tabs-wrapper,
 html.dark-cards-active .prev-metric-card,
 html.dark-cards-active .prev-table-container,
 html.dark-cards-active .prev-mobile-card,
+html.dark-cards-active .pt-mobile-card,
 html.dark-cards-active .partetaller-dashboard-card {
   --text-main: #f1f5f9;
   --text-muted: #b8c2cf;
@@ -81,6 +82,7 @@ html.dark-cards-active .partetaller-dashboard-card {
    font-weight (600/700 headers, badges) since those override this. */
 .prev-table-container,
 .prev-mobile-card,
+.pt-mobile-card,
 .partetaller-dashboard-card {
   font-weight: 500;
 }

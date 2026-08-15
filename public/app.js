@@ -11671,13 +11671,13 @@ function renderParteTallerDashboard(state) {
           } else if (item.destinoIngreso === 'servicios_pendientes') {
             targetBadge = '<span class="badge" style="background:#2196f3; color:white; font-size:10px;">Servicios Pendientes</span>';
           }
-          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:var(--card-bg); border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
               <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
               ${targetBadge}
             </div>
             <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>En ruta desde: <strong>${desde}</strong></span></div>
-            <div style="margin:10px 0; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+            <div style="margin:10px 0; padding:8px; background:var(--card-bg); border-radius:6px; border:1px solid #e2e8f0;">
               <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Novedad en Ruta:</div>
               ${getChecklistHtml(item, internoPT)}
             </div>
@@ -11725,13 +11725,13 @@ function renderParteTallerDashboard(state) {
       : fueraDeServicio.map(item => {
           const internoPT = String(item.interno || '');
           const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
-          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:var(--card-bg); border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
               <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}${getEstadoTrabajoBadgeHtml(item)}</div>
               ${getDiasParadoHtml(item, desde)}
             </div>
             <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>Ingreso: <strong>${desde}</strong></span></div>
-            <div style="margin:10px 0; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+            <div style="margin:10px 0; padding:8px; background:var(--card-bg); border-radius:6px; border:1px solid #e2e8f0;">
               <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Novedades / Tareas Pendientes:</div>
               ${getChecklistHtml(item, internoPT)}
             </div>
@@ -11777,13 +11777,13 @@ function renderParteTallerDashboard(state) {
       : reparacion.map(item => {
           const internoPT = String(item.interno || '');
           const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
-          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:var(--card-bg); border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
               <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}${getEstadoTrabajoBadgeHtml(item)}</div>
               ${getDiasParadoHtml(item, desde)}
             </div>
             <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>Ingreso: <strong>${desde}</strong></span></div>
-            <div style="margin:10px 0; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+            <div style="margin:10px 0; padding:8px; background:var(--card-bg); border-radius:6px; border:1px solid #e2e8f0;">
               <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Tareas / Novedades Pendientes:</div>
               ${getChecklistHtml(item, internoPT)}
             </div>
@@ -11827,12 +11827,12 @@ function renderParteTallerDashboard(state) {
       : pendientes.map(item => {
           const internoPT = String(item.interno || '');
           const servicio = item.servicio || item.tipo_servicio || '—';
-          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:var(--card-bg); border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
               <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
               <span class="badge" style="background:#2196f3;color:white;font-size:11px;">${servicio}</span>
             </div>
-            <div style="margin:10px 0; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+            <div style="margin:10px 0; padding:8px; background:var(--card-bg); border-radius:6px; border:1px solid #e2e8f0;">
               <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Tareas / Novedades Pendientes:</div>
               ${getChecklistHtml(item, internoPT)}
             </div>
@@ -11873,13 +11873,13 @@ function renderParteTallerDashboard(state) {
       : enPreparacion.map(item => {
           const internoPT = String(item.interno || '');
           const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
-          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:var(--card-bg); border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
               <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
               ${getDiasParadoHtml(item, desde)}
             </div>
             <div style="margin-top:4px; font-size:12px; color:var(--text-muted);">Ingresó el: <strong>${desde}</strong></div>
-            <div style="margin:10px 0; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+            <div style="margin:10px 0; padding:8px; background:var(--card-bg); border-radius:6px; border:1px solid #e2e8f0;">
               <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">Detalles de Preparación:</div>
               ${getChecklistHtmlWithProgress(item, internoPT)}
             </div>
