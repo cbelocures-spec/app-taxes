@@ -39,9 +39,14 @@
 /* When the user picks a dark card color (sidebar "Color de tarjetas"), applyCardBgColor()
    toggles this class based on the chosen color's own luminance. Shadowing --text-main/
    --text-muted ONLY on the elements that actually receive --card-bg (not globally on html/body)
-   flips every descendant that reads those variables - including inline styles, since CSS custom
-   properties cascade through those too - without touching page-level text that stays on the
-   unaffected light --bg-color. */
+   flips descendants that reference those variables directly - but plenty of card content
+   (table cells, checklist labels in Parte Taller) sets NO color at all and just inherits
+   whatever `color` was already resolved on `body` (dark, since body sits outside every one of
+   these selectors) - inheritance propagates the RESOLVED value down, not a live variable
+   reference, so those elements never saw this override. Setting `color` explicitly on the
+   container itself (not just redefining the variable) fixes that: the container's own color
+   re-evaluates --text-main in its own (overridden) scope, and everything below it that doesn't
+   set its own color now inherits THAT light value instead. */
 html.dark-cards-active .app-header,
 html.dark-cards-active .action-btn,
 html.dark-cards-active .form-section-card,
@@ -68,6 +73,16 @@ html.dark-cards-active .prev-mobile-card,
 html.dark-cards-active .partetaller-dashboard-card {
   --text-main: #f1f5f9;
   --text-muted: #b8c2cf;
+  color: var(--text-main);
+}
+
+/* Parte Taller's tables (interno, tipo, checklist de novedades) read a bit thin at a glance -
+   nudge their normal-weight text one step up. Doesn't touch labels that already set their own
+   font-weight (600/700 headers, badges) since those override this. */
+.prev-table-container,
+.prev-mobile-card,
+.partetaller-dashboard-card {
+  font-weight: 500;
 }
 
 * {
