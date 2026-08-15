@@ -375,6 +375,25 @@
       </form>
     </section>
 
+    <!-- VIEW: GOMERIA (CAMBIO DE CUBIERTAS) -->
+    <section id="view-gomeria" class="app-view">
+      <div class="view-header">
+        <h2>Gomería — Cambio de Cubiertas</h2>
+      </div>
+
+      <div id="gomeria-internos-container">
+        <!-- Dynamic interno blocks -->
+      </div>
+
+      <button type="button" class="btn btn-secondary btn-block" onclick="addGomeriaInternoBlock()" style="display:flex; align-items:center; justify-content:center; gap:6px; margin: 4px 0 20px;">
+        <span class="material-icons" style="font-size:18px;">add</span> Agregar Interno
+      </button>
+
+      <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitGomeriaOrders()" style="margin-bottom: 30px;">
+        <span class="material-icons">send</span> Generar Órdenes
+      </button>
+    </section>
+
     <!-- VIEW 4: SETTINGS (AJUSTES) -->
     <section id="view-settings" class="app-view">
       <div class="view-header">
@@ -1209,6 +1228,10 @@
         <span class="material-icons">build_circle</span>
         <span>Preventivos</span>
       </button>
+      <button class="nav-item" onclick="switchView('gomeria')" id="nav-gomeria">
+        <span class="material-icons">album</span>
+        <span>Gomería</span>
+      </button>
       <button class="nav-item" onclick="switchView('partetaller')" id="nav-partetaller">
         <span class="material-icons">engineering</span>
         <span>Parte Taller</span>
@@ -1253,7 +1276,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.6.4</div>
+      <div class="sidebar-version">Versión 1.7.0</div>
     </div>
   </aside>
 
@@ -2208,6 +2231,6 @@
     }
   </style>
 
-  <script src="app.js?v=124"></script>
+  <script src="app.js?v=125"></script>
 </body>
 </html>
