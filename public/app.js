@@ -11291,6 +11291,17 @@ function adjustPtStateLists(state) {
     state.reparacion.push(tempUnit);
   }
 
+  // 4.5. Re-resolve tipo for EVERY unit left in these lists, not only the ones that just got
+  // moved/merged above (step 3 only re-resolves a unit's tipo when it has a matching active
+  // order with a running/paused task - a unit added straight from Parte Taller's own "Agregar
+  // Unidad" whose auto-created task is still "Pendiente" with no timer activity never passes
+  // through that path, so it kept showing whatever wrong tipo it was created with forever).
+  ['fuera_de_servicio', 'reparacion', 'servicios_pendientes'].forEach(listName => {
+    (state[listName] || []).forEach(unit => {
+      unit.tipo = resolveFleetTypeFromInterno(unit.interno) || 'Otro';
+    });
+  });
+
   // 5. Recalculate totals - split "fuera" into reparacion/fuera_de_servicio separately, and
   // factor in inversiones (units in preparation): they reduce operativos but the base fleet
   // total stays fixed (it comes from Base_Datos, not from how many units happen to be down).
@@ -12512,7 +12523,12 @@ async function ingresarUnidadTransito(interno) {
           horario: "12:00",
           incidente: incidentDesc,
           tasks: [],
-          estadoUnidad: (targetEstado === 'fuera_de_servicio' ? 'fuera_de_servicio' : 'operativo')
+          // This block only runs for targetEstado 'reparacion' or 'fuera_de_servicio' (see the
+          // `if` above) - both mean the unit isn't operational, so the order always has to
+          // start Fuera de Servicio. The same COMPACTADOR/'operativo'-style literal-string bug
+          // as savePtUnit() had: checking only 'fuera_de_servicio' let 'reparacion' fall through
+          // to 'operativo' by mistake.
+          estadoUnidad: 'fuera_de_servicio'
         };
 
         await fetch('/api/orders', {
@@ -12622,14 +12638,16 @@ function ptOnInternoChange() {
   const rodadoOpt = cachedCatalogs.rodados
     ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
     : null;
+  // Ground truth is Base_Datos' own "equipo" column (via getUnitTipoForInterno, the same
+  // resolver used everywhere else in Parte Taller) - not a keyword guess off the rodado LABEL
+  // (brand/model, e.g. "MERCEDES BENZ ATEGO 1725"), which almost never contains "VOLQ"/"ROLL"/
+  // "PLANCHA" and so always fell through to the hardcoded COMPACTADOR default.
   if (rodadoOpt) {
-    const labelUpper = String(rodadoOpt.label || '').toUpperCase();
-    let guessedType = 'COMPACTADOR';
-    if (labelUpper.includes('VOLQ')) guessedType = 'VOLQUETE';
-    else if (labelUpper.includes('ROLL') || labelUpper.includes('OFF')) guessedType = 'ROLL - OFF';
-    else if (labelUpper.includes('PLANCHA')) guessedType = 'PLANCHA';
-    
-    document.getElementById('pt-unit-tipo').value = guessedType;
+    // The <select>'s own "Otro" option is spelled "OTRO" - getUnitTipoForInterno returns
+    // title-case 'Otro', and `select.value = X` silently selects nothing on a case mismatch
+    // (no matching <option>), leaving the dropdown showing whatever was there before.
+    const resolvedTipo = getUnitTipoForInterno(interno);
+    document.getElementById('pt-unit-tipo').value = (resolvedTipo === 'Otro') ? 'OTRO' : resolvedTipo;
   }
 }
 
