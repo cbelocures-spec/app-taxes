@@ -12782,7 +12782,12 @@ async function savePtUnit() {
           horario: "12:00",
           incidente: incidentDesc || "Revisión en taller",
           tasks: autoTasks.length > 0 ? autoTasks : [{ id: `pt-task-${Date.now()}-0`, centroCosto: defaultCc, empleado: defaultEmp, horasEstimadas: 1.0, status: 'Pendiente', descripcion: incidentDesc || 'Diagnóstico y reparación' }],
-          estadoUnidad: (estado === 'fuera_de_servicio' ? 'fuera_de_servicio' : 'operativo')
+          // This block only runs for estado 'reparacion' or 'fuera_de_servicio' (see the `if`
+          // above) - both mean the unit is NOT operational, so the auto-created order always
+          // has to start Fuera de Servicio. Checking only the literal string 'fuera_de_servicio'
+          // here left 'reparacion' falling through to 'operativo' by mistake - the order's own
+          // switch showed Operativo for a unit that was actually down for repair.
+          estadoUnidad: 'fuera_de_servicio'
         };
 
         const orderRes = await fetch('/api/orders', {
