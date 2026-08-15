@@ -702,9 +702,14 @@ class LocalDB {
 
   // --- Work Orders Methods ---
   // Returns ACTIVE (non-archived) orders only — strictly deduplicated by internal ID ('interno')
-  // plus sector, or 'id'. Two orders can share the same generic `interno` (e.g. "REPARACIONES
-  // INTERNAS") while genuinely belonging to different sectors (Taller vs Herrería/Edilicio) -
-  // those must stay separate order cards, each with its own OT number, not merged into one.
+  // plus sector plus clasificación, or 'id'. Two orders can share the same generic `interno`
+  // (e.g. "REPARACIONES INTERNAS") while genuinely belonging to different sectors (Taller vs
+  // Herrería/Edilicio) - those must stay separate order cards, each with its own OT number, not
+  // merged into one. Clasificación is part of the key for the same reason: a real vehicle can
+  // have an Auxilio job AND a separate Correctivo job open at once for the same interno - those
+  // are two distinct OTs in Taxes, not one, and merging them made editing/deleting a task from
+  // one silently no-op if that task actually lived in the other (it kept reappearing on every
+  // refresh, since the merge just re-combined it back in from the untouched sibling order).
   getWorkOrders() {
     const db = this.read();
     const active = (db.workOrders || []).filter(o => !o.archived && o.deleted !== true);
@@ -713,7 +718,7 @@ class LocalDB {
     const uniqueMap = new Map();
     active.forEach(order => {
       const key = order.interno
-        ? `${String(order.interno).trim().toLowerCase()}::${classifySectorFromClasificacion(order.clasificacion)}`
+        ? `${String(order.interno).trim().toLowerCase()}::${classifySectorFromClasificacion(order.clasificacion)}::${String(order.clasificacion || '').trim().toLowerCase()}`
         : String(order.id);
       if (!uniqueMap.has(key)) {
         uniqueMap.set(key, { ...order });
