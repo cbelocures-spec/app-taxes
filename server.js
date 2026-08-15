@@ -1369,6 +1369,7 @@ app.post('/api/orders/:id/reset-taxes-number', (req, res) => {
 
     const updated = db.updateWorkOrder(req.params.id, {
       taxesOrderNumber: null,
+      forceClearTaxesNumber: true,
       syncStatus: 'pending',
       syncError: null,
       autoSyncRetryCount: 0,

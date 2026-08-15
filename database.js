@@ -883,8 +883,14 @@ class LocalDB {
         if (cleanUpdates[key] === undefined) delete cleanUpdates[key];
       });
 
-      // PERMANENT OT GUARANTEE: Never erase an existing taxesOrderNumber! Once assigned, it stays.
-      if (db.workOrders[idx].taxesOrderNumber && (!cleanUpdates.taxesOrderNumber || String(cleanUpdates.taxesOrderNumber).trim() === '')) {
+      // PERMANENT OT GUARANTEE: Never erase an existing taxesOrderNumber from a routine/partial
+      // update! Once assigned, it stays - UNLESS the caller explicitly asks to clear it via
+      // forceClearTaxesNumber (used by POST /api/orders/:id/reset-taxes-number, whose entire
+      // purpose is to deliberately wipe a stale/deleted-in-Taxes OT so a fresh one gets created;
+      // without this escape hatch that endpoint silently did nothing).
+      const explicitTaxesNumberClear = cleanUpdates.forceClearTaxesNumber === true;
+      delete cleanUpdates.forceClearTaxesNumber;
+      if (!explicitTaxesNumberClear && db.workOrders[idx].taxesOrderNumber && (!cleanUpdates.taxesOrderNumber || String(cleanUpdates.taxesOrderNumber).trim() === '')) {
         delete cleanUpdates.taxesOrderNumber;
       }
 
