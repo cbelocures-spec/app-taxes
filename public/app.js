@@ -1164,6 +1164,20 @@ async function openChecklistReviewModal(interno, orderId, estado) {
     }
   }
 
+  // Only ask where the leftover items land when the unit ISN'T going back into service -
+  // Operativo always means Servicios Pendientes, no choice to make there.
+  const destinoContainer = document.getElementById('pt-review-destino-container');
+  const destinoSelect = document.getElementById('pt-review-destino');
+  const footerText = document.getElementById('pt-review-footer-text');
+  if (estado === 'operativo') {
+    if (destinoContainer) destinoContainer.style.display = 'none';
+    if (footerText) footerText.textContent = 'Lo que no marques (y lo nuevo que agregues) queda anotado en Servicio Pendiente.';
+  } else {
+    if (destinoContainer) destinoContainer.style.display = 'block';
+    if (destinoSelect) destinoSelect.value = 'fuera_de_servicio';
+    if (footerText) footerText.textContent = 'Lo que no marques (y lo nuevo que agregues) queda anotado en el destino elegido arriba.';
+  }
+
   const container = document.getElementById('pt-review-checklist');
   if (container) {
     container.innerHTML = items.length === 0
@@ -1223,21 +1237,24 @@ function renderChecklistReviewNewItems() {
 // Rebuilds this interno's Parte Taller entry from scratch: dropped entirely if every item is
 // resolved, otherwise a fresh entry in Servicios Pendientes (Operativo) or Fuera de Servicio
 // (not Operativo) holding exactly the still-open items.
-async function applyParteTallerReconciliation(interno, estado, remainingItems, tipo) {
+async function applyParteTallerReconciliation(interno, estado, remainingItems, tipo, destino) {
   try {
     const res = await fetch('/api/parte-taller/estado');
     const data = await res.json();
     const state = data.state || data;
     const cleanInterno = String(interno || '').trim().toLowerCase();
 
-    ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio'].forEach(listName => {
+    ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones'].forEach(listName => {
       if (Array.isArray(state[listName])) {
         state[listName] = state[listName].filter(u => String(u.interno || '').trim().toLowerCase() !== cleanInterno);
       }
     });
 
     if (remainingItems.length > 0) {
-      const targetList = estado === 'operativo' ? 'servicios_pendientes' : 'fuera_de_servicio';
+      // Operativo always goes to Servicios Pendientes (nothing to choose there). Otherwise use
+      // whatever destino the user picked in the modal (Fuera de Servicio or En Preparación),
+      // falling back to Fuera de Servicio if none was passed.
+      const targetList = estado === 'operativo' ? 'servicios_pendientes' : (destino || 'fuera_de_servicio');
       if (!state[targetList]) state[targetList] = [];
       const novedad_items = remainingItems.map(texto => ({ texto, hecho: false }));
       const unit = {
@@ -1246,7 +1263,7 @@ async function applyParteTallerReconciliation(interno, estado, remainingItems, t
         novedad: novedad_items.map(x => `[ ] ${x.texto}`).join('\n'),
         novedad_items
       };
-      if (targetList === 'fuera_de_servicio') {
+      if (targetList === 'fuera_de_servicio' || targetList === 'inversiones') {
         unit.dia_parado = new Date().toLocaleDateString('es-AR');
         unit.dias_en_reparacion = 0;
       } else {
@@ -1274,10 +1291,13 @@ async function confirmChecklistReviewAndApply() {
   const uncheckedTexts = Array.from(document.querySelectorAll('.pt-review-item-chk:not(:checked)')).map(chk => chk.dataset.texto);
   const remainingItems = [...uncheckedTexts, ...ctx.newItems];
 
+  const destinoSelect = document.getElementById('pt-review-destino');
+  const destino = (estado !== 'operativo' && destinoSelect) ? destinoSelect.value : null;
+
   const btn = document.getElementById('pt-review-confirm-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
 
-  await applyParteTallerReconciliation(interno, estado, remainingItems, tipo);
+  await applyParteTallerReconciliation(interno, estado, remainingItems, tipo, destino);
   closeChecklistReviewModal();
   await applyUnitStatusChange(interno, orderId, estado);
 
