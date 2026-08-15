@@ -421,6 +421,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
           }
 
+          // Finalizing directly from a PAUSED state (never clicked "Reanudar" first) left a gap
+          // in the history - [Inició, Pausó, Fin] with nothing between Pausó and Fin -
+          // calculateTotalElapsedSeconds only sums Inicio/Reanudo→Pausa/Fin pairs, so that gap
+          // silently counted as zero worked time even though work may well have continued right
+          // up to Fin. Insert a "Reanudó" stamped at the SAME instant as that Pausó (not "now" -
+          // a resume can't be timestamped after the fact) so the pause collapses to zero-length
+          // and the whole Inicio-to-Fin span counts, same as if it had never been paused.
+          if (!isRunning) {
+            const historyBeforeFin = JSON.parse(card.dataset.timerHistory || '[]');
+            const lastEvent = historyBeforeFin[historyBeforeFin.length - 1];
+            const wasPaused = lastEvent && String(lastEvent.type || '').trim().toLowerCase().startsWith('paus');
+            if (wasPaused) {
+              historyBeforeFin.push({ type: 'Reanudó', formatted: lastEvent.formatted, timestamp: lastEvent.timestamp });
+              card.dataset.timerHistory = JSON.stringify(historyBeforeFin);
+              renderTaskTimerHistory(card);
+            }
+          }
+
           addTaskTimerEvent(card, 'Fin');
 
           const history = JSON.parse(card.dataset.timerHistory || '[]');
@@ -2457,7 +2475,13 @@ function renderTimerHistoryHtml(history) {
       icon = 'stop';
       label = 'Fin';
     }
-    return `<span style="display: inline-flex; align-items: center; gap: 2px; background: #e2e8f0; padding: 2px 5px; border-radius: 4px; font-size: 10px; color: var(--text-color);"><span class="material-icons" style="font-size: 10px;">${icon}</span>${label}: <strong>${item.formatted}</strong></span>`;
+    // Older/legacy timerHistory entries only ever stored `timestamp`, never a pre-formatted
+    // string - showing item.formatted directly on those renders the literal text "undefined".
+    // Derive the display time from the timestamp itself when formatted is missing.
+    const displayTime = item.formatted || (item.timestamp
+      ? new Date(item.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' })
+      : '--:--');
+    return `<span style="display: inline-flex; align-items: center; gap: 2px; background: #e2e8f0; padding: 2px 5px; border-radius: 4px; font-size: 10px; color: var(--text-color);"><span class="material-icons" style="font-size: 10px;">${icon}</span>${label}: <strong>${displayTime}</strong></span>`;
   }).join(' ');
 }
 
