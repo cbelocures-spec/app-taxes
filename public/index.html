@@ -22,6 +22,16 @@
         }
       } catch(e) {}
     })();
+    (function() {
+      // Apply the saved card-background color before first paint - doing this after
+      // style.css already applied would flash white for a frame on every load.
+      try {
+        var c = localStorage.getItem('cardBgColor');
+        if (c && /^#[0-9a-fA-F]{6}$/.test(c)) {
+          document.write('<style>:root { --card-bg: ' + c + ' !important; }</style>');
+        }
+      } catch(e) {}
+    })();
   </script>
 </head>
 <body>
@@ -1206,11 +1216,32 @@
       </button>
     </nav>
     <div class="sidebar-menu-footer">
+      <div style="padding: 0 16px 12px;">
+        <label style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; display: block; margin-bottom: 6px;">Color de tarjetas</label>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="card-bg-swatch" style="width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border-color); flex-shrink: 0;"></span>
+          <select id="card-bg-picker" onchange="applyCardBgColor(this.value)" style="flex: 1; font-size: 13px; padding: 6px 8px;">
+            <optgroup label="Opacos">
+              <option value="#ffffff">Blanco (original)</option>
+              <option value="#eef1f0">Gris suave</option>
+              <option value="#f2ede3">Beige suave</option>
+              <option value="#e6f1ea">Verde suave</option>
+              <option value="#e3edf7">Celeste suave</option>
+            </optgroup>
+            <optgroup label="Brillantes">
+              <option value="#34d399">Verde fuerte</option>
+              <option value="#38bdf8">Celeste fuerte</option>
+              <option value="#fbbf24">Amarillo fuerte</option>
+              <option value="#fb7185">Coral fuerte</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
       <button class="sidebar-logout-btn" onclick="logoutUser()">
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.5.5</div>
+      <div class="sidebar-version">Versión 1.6.0</div>
     </div>
   </aside>
 
@@ -2165,6 +2196,6 @@
     }
   </style>
 
-  <script src="app.js?v=121"></script>
+  <script src="app.js?v=122"></script>
 </body>
 </html>

@@ -341,6 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Check user session first
   checkUserSession();
+  initCardBgPicker();
 
   // If logged in, fetch initial data
   if (localStorage.getItem('currentUserUsername')) {
@@ -8611,6 +8612,25 @@ async function submitLoginForm() {
       if (waitingMsg) waitingMsg.style.display = 'none';
     }
   }
+}
+
+// Card-background color picker (sidebar, above Cerrar sesión) - lets each user pick a
+// less glare-prone color than pure white for every card in the app, since --card-bg is the
+// single CSS variable every module's card background already reads from.
+function applyCardBgColor(hex) {
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+  document.documentElement.style.setProperty('--card-bg', hex);
+  localStorage.setItem('cardBgColor', hex);
+  const swatch = document.getElementById('card-bg-swatch');
+  if (swatch) swatch.style.background = hex;
+}
+
+function initCardBgPicker() {
+  const saved = localStorage.getItem('cardBgColor') || '#ffffff';
+  const picker = document.getElementById('card-bg-picker');
+  if (picker) picker.value = saved;
+  const swatch = document.getElementById('card-bg-swatch');
+  if (swatch) swatch.style.background = saved;
 }
 
 function logoutUser() {
