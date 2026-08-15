@@ -4440,32 +4440,54 @@ async function syncExpressOtHeader(orderId) {
     await page.waitForSelector('table', { timeout: 10000 }).catch(() => {});
     await delay(1000);
 
-    // PRE-CHECK: Check if Taxes table already has an OT for this Interno & Clasificación!
-    const existingTableOt = await safeEvaluate(page, (targetInterno, targetClasif) => {
+    // PRE-CHECK: Check if Taxes table already has an OT for this Interno & Clasificación
+    // created TODAY (Argentina timezone). Without the date scope, a generic bucket interno
+    // like "REPARACIONES INTERNAS" - whose Interno+Clasificación combo repeats constantly
+    // across months of history - always matched some old row and reused that OT forever,
+    // instead of ever creating a fresh one for a genuinely new job. Mirrors the same
+    // today-only safeguard syncWorkOrder already applies before its own OT creation.
+    const expressTargetDateObj = order.createdAt ? new Date(order.createdAt) : new Date();
+    const expressTodayDateStr = expressTargetDateObj.toLocaleDateString('es-AR', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+
+    const existingTableOt = await safeEvaluate(page, (targetInterno, targetClasif, targetDateStr) => {
       const clean = s => (s || '').toString().trim().toUpperCase();
+      const normalizeDateStr = (str) => {
+        const parts = (str || '').match(/\d+/g);
+        if (!parts || parts.length < 3) return '';
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const y = parts[2].length === 2 ? 2000 + parseInt(parts[2], 10) : parseInt(parts[2], 10);
+        return `${d}-${m}-${y}`;
+      };
+      const targetDateNorm = normalizeDateStr(targetDateStr);
       const tables = Array.from(document.querySelectorAll('table'));
       for (const table of tables) {
         const rows = Array.from(table.querySelectorAll('tbody tr'));
         for (const row of rows) {
           const cells = Array.from(row.querySelectorAll('td')).map(c => clean(c.textContent));
           if (cells.length >= 3) {
+            const rowDate = cells[0] || '';
             const rowInterno = cells[1] || cells[0] || '';
             const rowOt = cells[2] || cells[1] || '';
             const rowClasif = cells[4] || cells[3] || '';
             const intMatch = rowInterno.includes(clean(targetInterno));
             const clasifMatch = !targetClasif || rowClasif.includes(clean(targetClasif));
+            const dateMatch = normalizeDateStr(rowDate) === targetDateNorm;
             const otNum = rowOt.replace(/\D/g, '');
-            if (intMatch && clasifMatch && /^\d+$/.test(otNum)) {
+            if (intMatch && clasifMatch && dateMatch && /^\d+$/.test(otNum)) {
               return otNum;
             }
           }
         }
       }
       return null;
-    }, order.interno, order.clasificacion);
+    }, order.interno, order.clasificacion, expressTodayDateStr);
 
     if (existingTableOt) {
-      console.log(`[Express OT Pre-Check] Found pre-existing OT #${existingTableOt} in Taxes for Interno ${order.interno}! Linking immediately.`);
+      console.log(`[Express OT Pre-Check] Found pre-existing OT #${existingTableOt} in Taxes for Interno ${order.interno} on ${expressTodayDateStr}! Linking immediately.`);
       db.updateWorkOrder(orderId, { taxesOrderNumber: existingTableOt, syncStatus: 'success', syncError: null });
       return { success: true, taxesOrderNumber: existingTableOt, preExisting: true };
     }
