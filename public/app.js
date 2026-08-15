@@ -7072,10 +7072,10 @@ function addGomeriaTireRow(btn) {
           <option value="Trasero derecho interior" data-group="trasero" style="background-color:#dbeafe; color:#1e40af;">Trasero derecho interior</option>
         </optgroup>
         <optgroup label="Eje Fijo / Flotante">
-          <option value="Eje fijo izquierdo" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje fijo izquierdo</option>
-          <option value="Eje fijo derecho" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje fijo derecho</option>
-          <option value="Eje flotante izquierdo" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje flotante izquierdo</option>
-          <option value="Eje flotante derecho" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje flotante derecho</option>
+          <option value="Eje fijo/flotante izquierdo exterior" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje fijo/flotante izquierdo exterior</option>
+          <option value="Eje fijo/flotante izquierdo interior" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje fijo/flotante izquierdo interior</option>
+          <option value="Eje fijo/flotante derecho exterior" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje fijo/flotante derecho exterior</option>
+          <option value="Eje fijo/flotante derecho interior" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje fijo/flotante derecho interior</option>
         </optgroup>
         <option value="Auxilio / Repuesto" data-group="otro">Auxilio / Repuesto</option>
         <option value="__otro__" data-group="otro">Otro (escribir)</option>
