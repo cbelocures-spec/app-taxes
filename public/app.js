@@ -7065,7 +7065,7 @@ function addGomeriaTireRow(btn) {
           <option value="Delantero izquierdo" data-group="delantero" style="background-color:#dcfce7; color:#166534;">Delantero izquierdo</option>
           <option value="Delantero derecho" data-group="delantero" style="background-color:#dcfce7; color:#166534;">Delantero derecho</option>
         </optgroup>
-        <optgroup label="Eje Trasero">
+        <optgroup label="Eje Trasero (Tracción - Diferencial)">
           <option value="Trasero izquierdo exterior" data-group="trasero" style="background-color:#dbeafe; color:#1e40af;">Trasero izquierdo exterior</option>
           <option value="Trasero izquierdo interior" data-group="trasero" style="background-color:#dbeafe; color:#1e40af;">Trasero izquierdo interior</option>
           <option value="Trasero derecho exterior" data-group="trasero" style="background-color:#dbeafe; color:#1e40af;">Trasero derecho exterior</option>
