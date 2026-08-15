@@ -36,6 +36,40 @@
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
+/* When the user picks a dark card color (sidebar "Color de tarjetas"), applyCardBgColor()
+   toggles this class based on the chosen color's own luminance. Shadowing --text-main/
+   --text-muted ONLY on the elements that actually receive --card-bg (not globally on html/body)
+   flips every descendant that reads those variables - including inline styles, since CSS custom
+   properties cascade through those too - without touching page-level text that stays on the
+   unaffected light --bg-color. */
+html.dark-cards-active .app-header,
+html.dark-cards-active .action-btn,
+html.dark-cards-active .form-section-card,
+html.dark-cards-active .settings-card,
+html.dark-cards-active .catalog-sync-card,
+html.dark-cards-active .worker-card,
+html.dark-cards-active .search-bar input,
+html.dark-cards-active .order-card,
+html.dark-cards-active .empty-state,
+html.dark-cards-active .tasks-empty-state,
+html.dark-cards-active .sidebar-menu,
+html.dark-cards-active .modal-header,
+html.dark-cards-active .dialog-modal,
+html.dark-cards-active .searchable-select-dropdown,
+html.dark-cards-active .dashboard-section,
+html.dark-cards-active .bulk-vehicle-selector,
+html.dark-cards-active .summary-card,
+html.dark-cards-active .modal-novelties-side,
+html.dark-cards-active .sector-tabs-bar,
+html.dark-cards-active .preventivos-tabs-wrapper,
+html.dark-cards-active .prev-metric-card,
+html.dark-cards-active .prev-table-container,
+html.dark-cards-active .prev-mobile-card,
+html.dark-cards-active .partetaller-dashboard-card {
+  --text-main: #f1f5f9;
+  --text-muted: #b8c2cf;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

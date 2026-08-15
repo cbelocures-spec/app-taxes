@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=36">
+  <link rel="stylesheet" href="style.css?v=37">
   <script>
     (function() {
       try {
@@ -23,12 +23,20 @@
       } catch(e) {}
     })();
     (function() {
-      // Apply the saved card-background color before first paint - doing this after
-      // style.css already applied would flash white for a frame on every load.
+      // Apply the saved card-background color (and, if it's dark, the matching light-text
+      // class) before first paint - doing this after style.css already applied would flash
+      // white-bg-with-dark-text for a frame on every load.
       try {
         var c = localStorage.getItem('cardBgColor');
         if (c && /^#[0-9a-fA-F]{6}$/.test(c)) {
           document.write('<style>:root { --card-bg: ' + c + ' !important; }</style>');
+          var r = parseInt(c.slice(1, 3), 16);
+          var g = parseInt(c.slice(3, 5), 16);
+          var b = parseInt(c.slice(5, 7), 16);
+          var luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          if (luminance < 0.5) {
+            document.documentElement.classList.add('dark-cards-active');
+          }
         }
       } catch(e) {}
     })();
@@ -1245,7 +1253,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.6.1</div>
+      <div class="sidebar-version">Versión 1.6.2</div>
     </div>
   </aside>
 
@@ -2200,6 +2208,6 @@
     }
   </style>
 
-  <script src="app.js?v=122"></script>
+  <script src="app.js?v=123"></script>
 </body>
 </html>

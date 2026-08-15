@@ -8617,9 +8617,21 @@ async function submitLoginForm() {
 // Card-background color picker (sidebar, above Cerrar sesión) - lets each user pick a
 // less glare-prone color than pure white for every card in the app, since --card-bg is the
 // single CSS variable every module's card background already reads from.
+
+// Standard perceived-brightness formula (ITU-R BT.601) - decides whether card TEXT needs to
+// flip to light or stay dark for whatever color was just picked, not just the two dark presets.
+function isColorDark(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance < 0.5;
+}
+
 function applyCardBgColor(hex) {
   if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
   document.documentElement.style.setProperty('--card-bg', hex);
+  document.documentElement.classList.toggle('dark-cards-active', isColorDark(hex));
   localStorage.setItem('cardBgColor', hex);
   const swatch = document.getElementById('card-bg-swatch');
   if (swatch) swatch.style.background = hex;
@@ -8631,6 +8643,7 @@ function initCardBgPicker() {
   if (picker) picker.value = saved;
   const swatch = document.getElementById('card-bg-swatch');
   if (swatch) swatch.style.background = saved;
+  document.documentElement.classList.toggle('dark-cards-active', isColorDark(saved));
 }
 
 function logoutUser() {
