@@ -3670,16 +3670,37 @@ function resolveTipoFromInterno(interno) {
   return resolveTipoFlotaFromEquipo(found ? found.equipo : null) || 'COMPACTADOR';
 }
 
+// The Taxes catalog scrape that feeds db.getCatalogs().rodados fails/times out
+// periodically (unrelated to Parte Taller). When it comes back empty or
+// missing a whole vehicle type, a fresh count would show that type's fleet
+// total as 0 — plainly wrong (a real fleet doesn't go to zero units). Cache
+// the last count seen for each type and only overwrite it when the new
+// count is actually positive, so a bad scrape can't zero out a real total.
 function calcularTotalesFlota() {
   const rodados = (db.getCatalogs() || {}).rodados || [];
-  const totales = { COMPACTADOR: 0, VOLQUETE: 0, 'ROLL - OFF': 0, PLANCHA: 0 };
+  const totalesFrescos = { COMPACTADOR: 0, VOLQUETE: 0, 'ROLL - OFF': 0, PLANCHA: 0 };
   rodados.forEach(r => {
     const equipoUpper = String(r.equipo || '').trim().toUpperCase();
     if (equipoUpper === 'HERRERIA' || equipoUpper === 'EDILICIO') return;
     const tipo = resolveTipoFlotaFromEquipo(r.equipo);
-    if (tipo) totales[tipo] = (totales[tipo] || 0) + 1;
+    if (tipo) totalesFrescos[tipo] = (totalesFrescos[tipo] || 0) + 1;
   });
-  return totales;
+
+  const dbData = db.read();
+  const cache = { ...(dbData.fleetTotalsCache || {}) };
+  let cambio = false;
+  Object.keys(totalesFrescos).forEach(tipo => {
+    if (totalesFrescos[tipo] > 0) {
+      if (cache[tipo] !== totalesFrescos[tipo]) cambio = true;
+      cache[tipo] = totalesFrescos[tipo];
+    }
+  });
+  if (cambio) {
+    dbData.fleetTotalsCache = cache;
+    db.write(dbData);
+  }
+
+  return { COMPACTADOR: 0, VOLQUETE: 0, 'ROLL - OFF': 0, PLANCHA: 0, ...cache };
 }
 
 function marcarItemComoCompletado(novedad, motivoBuscado) {
