@@ -1744,6 +1744,29 @@ function resolveAndMapEmployee(task) {
   return { employeeLabel, finalDescription };
 }
 
+// Un O.T. sólo debe reutilizarse mientras la unidad sigue caída bajo ese mismo ticket.
+// Si la unidad ya volvió a estar Operativa en alguna orden local con ese N° de O.T., el
+// trabajo quedó cerrado: una orden nueva para el mismo interno es una avería distinta y
+// tiene que generar su propio O.T., no encimarse sobre el anterior.
+const esEstadoOperativo = (estado) => {
+  const clean = String(estado || '').trim().toLowerCase();
+  return clean === 'operativo' || clean === 'operativa';
+};
+
+function otBloqueadaPorUnidadOperativa(interno, clasificacion, otNumero, excludeOrderId) {
+  if (!otNumero) return false;
+  const otClean = String(otNumero).replace(/\D/g, '');
+  const dbData = db.read();
+  return (dbData.workOrders || []).some(o =>
+    String(o.id) !== String(excludeOrderId) &&
+    o.deleted !== true &&
+    String(o.interno || '').trim().toLowerCase() === String(interno || '').trim().toLowerCase() &&
+    String(o.clasificacion || '').trim().toLowerCase() === String(clasificacion || '').trim().toLowerCase() &&
+    o.taxesOrderNumber && String(o.taxesOrderNumber).replace(/\D/g, '') === otClean &&
+    esEstadoOperativo(o.estadoUnidad)
+  );
+}
+
 // 2. SYNCHRONIZE SINGLE WORK ORDER (REPARADO ANTI-DUPLICADOS VELOCES)
 async function syncWorkOrder(orderId) {
   let order = db.getWorkOrderById(orderId);
@@ -1793,14 +1816,18 @@ async function syncWorkOrder(orderId) {
     }
 
     // Pre-check DB safeguard: If this order has no taxesOrderNumber yet, check if another active order for the same interno AND same clasificacion already generated an OT today!
+    // IMPORTANT: never reuse an OT whose order already went back to Operativo — eso significa
+    // que esa avería quedó cerrada, y una orden nueva para el mismo interno es una avería
+    // distinta que necesita su propio O.T.
     if (!order.taxesOrderNumber && order.interno) {
       const dbData = db.read();
-      const existingWithOt = (dbData.workOrders || []).find(o => 
-        String(o.id) !== String(orderId) && 
+      const existingWithOt = (dbData.workOrders || []).find(o =>
+        String(o.id) !== String(orderId) &&
         o.deleted !== true &&
         String(o.interno).trim().toLowerCase() === String(order.interno).trim().toLowerCase() &&
         String(o.clasificacion || '').trim().toLowerCase() === String(order.clasificacion || '').trim().toLowerCase() &&
         o.taxesOrderNumber && String(o.taxesOrderNumber).trim() !== '' &&
+        !esEstadoOperativo(o.estadoUnidad) &&
         (Date.now() - new Date(o.createdAt || o.syncDate || Date.now()).getTime() < 24 * 60 * 60 * 1000)
       );
       if (existingWithOt && existingWithOt.taxesOrderNumber) {
@@ -1892,7 +1919,9 @@ async function syncWorkOrder(orderId) {
           return null;
         }, order.interno, order.clasificacion);
 
-        if (existingOpenTaxesOt) {
+        if (existingOpenTaxesOt && otBloqueadaPorUnidadOperativa(order.interno, order.clasificacion, existingOpenTaxesOt, orderId)) {
+          console.log(`[Alta O.T.] O.T. #${existingOpenTaxesOt} detectada para Interno ${order.interno}, pero esa unidad ya pasó a Operativo en BD local (avería cerrada). Se procederá a crear una NUEVA O.T.`);
+        } else if (existingOpenTaxesOt) {
           console.log(`[Alta O.T.] O.T. abierta en proceso #${existingOpenTaxesOt} detectada para Interno ${order.interno}. Vinculando sin crear nueva...`);
           numeroGenerado = existingOpenTaxesOt;
           db.updateWorkOrder(orderId, { taxesOrderNumber: existingOpenTaxesOt, syncStatus: 'success', syncError: null });
@@ -3290,7 +3319,9 @@ async function syncWorkOrder(orderId) {
         return null;
       }, order.interno, order.clasificacion || '', todayDateStr);
 
-      if (existingOtOnPage) {
+      if (existingOtOnPage && otBloqueadaPorUnidadOperativa(order.interno, order.clasificacion, existingOtOnPage, orderId)) {
+        console.log(`[Pre-Check Safeguard] OT #${existingOtOnPage} para Interno ${order.interno} corresponde a una avería ya Operativa en BD local. No se reutiliza; se continuará creando una O.T. nueva.`);
+      } else if (existingOtOnPage) {
         console.log(`[Pre-Check Safeguard] Found pre-existing OT #${existingOtOnPage} for Interno ${order.interno} on date ${todayDateStr} in Taxes! Linking and switching to reconciliation...`);
         db.updateWorkOrder(orderId, { taxesOrderNumber: existingOtOnPage });
         await browser.close(); releaseBrowserLock();
@@ -4486,7 +4517,9 @@ async function syncExpressOtHeader(orderId) {
       return null;
     }, order.interno, order.clasificacion, expressTodayDateStr);
 
-    if (existingTableOt) {
+    if (existingTableOt && otBloqueadaPorUnidadOperativa(order.interno, order.clasificacion, existingTableOt, orderId)) {
+      console.log(`[Express OT Pre-Check] OT #${existingTableOt} para Interno ${order.interno} corresponde a una avería ya Operativa en BD local. No se reutiliza; se creará una O.T. nueva.`);
+    } else if (existingTableOt) {
       console.log(`[Express OT Pre-Check] Found pre-existing OT #${existingTableOt} in Taxes for Interno ${order.interno} on ${expressTodayDateStr}! Linking immediately.`);
       db.updateWorkOrder(orderId, { taxesOrderNumber: existingTableOt, syncStatus: 'success', syncError: null });
       return { success: true, taxesOrderNumber: existingTableOt, preExisting: true };

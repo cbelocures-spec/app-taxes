@@ -12519,8 +12519,19 @@ async function ptAsignarSeleccionados(interno) {
   const combinedDesc  = selectedTexts.join('\n');
 
   // 1. Update the checklist in Google Sheets
-  if (window._ptState) {
-    const state = window._ptState;
+  // Re-fetch the current state right before saving instead of reusing the possibly-stale
+  // window._ptState snapshot: this save writes back the ENTIRE state, so if another user
+  // added/edited units in the sheet after this browser last loaded the dashboard, saving the
+  // old snapshot would silently erase their changes.
+  let state = null;
+  try {
+    const freshRes = await fetch('/api/parte-taller/estado');
+    const freshData = await freshRes.json();
+    state = (freshData && freshData.state) ? freshData.state : freshData;
+  } catch (err) {
+    console.error('Error fetching fresh Parte Taller state before saving checklist selection:', err);
+  }
+  if (state) {
     const lists = ['fuera_de_servicio', 'reparacion', 'servicios_pendientes', 'inversiones'];
     let foundList = null;
     let foundUnit = null;
@@ -12783,8 +12794,19 @@ async function markPtUnitOperativo() {
 
   try {
     // Si la unidad ya estaba registrada en alguna lista de Parte Taller, sacarla (queda resuelta)
-    if (window._ptState && currentEditingPtInterno) {
-      const state = window._ptState;
+    // Re-fetch fresh instead of reusing window._ptState: this write replaces the ENTIRE state,
+    // so a stale snapshot would silently erase units another user added/edited meanwhile.
+    let state = null;
+    if (currentEditingPtInterno) {
+      try {
+        const freshRes = await fetch('/api/parte-taller/estado');
+        const freshData = await freshRes.json();
+        state = (freshData && freshData.state) ? freshData.state : freshData;
+      } catch (err) {
+        console.error('Error fetching fresh Parte Taller state before marking operativo:', err);
+      }
+    }
+    if (state) {
       const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones'];
       let removed = false;
       lists.forEach(listName => {
@@ -13187,21 +13209,6 @@ async function savePtUnit() {
         const incidentDesc = novedadFormatted.split('\n').map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()).filter(Boolean).join(', ');
 
         const autoSectorHerreria = (getSectorByUsername(currentUser) === 'Herrería');
-        const defaultCc = autoSectorHerreria ? '11' : '15';
-        const defaultEmp = (cachedCatalogs.empleados && cachedCatalogs.empleados[0]) ? String(cachedCatalogs.empleados[0].value) : '426';
-
-        const autoTasks = novedadFormatted.split('\n').map((line, idx) => {
-          const cleanDesc = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
-          if (!cleanDesc) return null;
-          return {
-            id: `pt-task-${Date.now()}-${idx}`,
-            centroCosto: defaultCc,
-            empleado: defaultEmp,
-            horasEstimadas: 1.0,
-            status: 'Pendiente',
-            descripcion: cleanDesc
-          };
-        }).filter(Boolean);
 
         const orderPayload = {
           rodado: rodadoLabel,
@@ -13211,7 +13218,10 @@ async function savePtUnit() {
           fechaEntrega: today,
           horario: "12:00",
           incidente: incidentDesc || "Revisión en taller",
-          tasks: autoTasks.length > 0 ? autoTasks : [{ id: `pt-task-${Date.now()}-0`, centroCosto: defaultCc, empleado: defaultEmp, horasEstimadas: 1.0, status: 'Pendiente', descripcion: incidentDesc || 'Diagnóstico y reparación' }],
+          // No se auto-generan tareas: el empleado/horas quedaban con un valor de relleno
+          // (el primer empleado del catálogo, 1hs fija) que no era real. La orden se crea
+          // vacía de tareas, igual que en el modo edición, y el usuario las carga a mano.
+          tasks: [],
           // This block only runs for estado 'reparacion' or 'fuera_de_servicio' (see the `if`
           // above) - both mean the unit is NOT operational, so the auto-created order always
           // has to start Fuera de Servicio. Checking only the literal string 'fuera_de_servicio'
@@ -13241,8 +13251,22 @@ async function savePtUnit() {
     } 
     // If EDITING an existing unit
     else {
-      if (!window._ptState) return;
-      const state = window._ptState;
+      // Re-fetch the current state right before saving instead of reusing the possibly-stale
+      // window._ptState snapshot captured whenever this dashboard was last loaded: this save
+      // writes back the ENTIRE state, so an old snapshot would silently erase any units
+      // another user added/edited in the sheet since then.
+      let state = null;
+      try {
+        const freshRes = await fetch('/api/parte-taller/estado');
+        const freshData = await freshRes.json();
+        state = (freshData && freshData.state) ? freshData.state : freshData;
+      } catch (err) {
+        console.error('Error fetching fresh Parte Taller state before saving edit:', err);
+      }
+      if (!state) {
+        showToast('No se pudo leer el estado actual del Parte Taller. No se guardó nada.', 'danger');
+        return;
+      }
 
       // 1. Remove from all lists to start clean (using original internally stored interno)
       const lists = ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones'];
