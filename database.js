@@ -614,6 +614,33 @@ class LocalDB {
     return normalizeEmail(email);
   }
 
+  // --- Parte Taller Methods ---
+  // Lives in db.json now instead of a Google Apps Script's PropertiesService.
+  // That Sheets-backed store had no real transaction safety (chunked properties
+  // with no locking), which is what caused a cascade of data-loss incidents:
+  // races between concurrent saves silently produced an "empty" read, and
+  // callers that saw that then wrote a blank state right back on top of real
+  // data. write() here is atomic (tmp file + rename), so that whole class of
+  // bug isn't reachable this way.
+  getParteTallerState() {
+    const db = this.read();
+    return db.parteTallerState || {
+      servicios_pendientes: [],
+      reparacion: [],
+      fuera_de_servicio: [],
+      inversiones: [],
+      transito: [],
+      resumen: { totales: {} }
+    };
+  }
+
+  saveParteTallerState(state) {
+    const db = this.read();
+    db.parteTallerState = state;
+    this.write(db);
+    return state;
+  }
+
   // --- Catalogs Methods ---
   getCatalogs() {
     const db = this.read();

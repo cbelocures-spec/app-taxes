@@ -2700,32 +2700,16 @@ app.post('/api/assistant/chat', async (req, res) => {
         noveltyText = message.trim();
       }
 
-      const ptScriptUrl = settings.parteTallerScriptUrl;
-      if (ptScriptUrl) {
-        try {
-          const ptResp = await fetch(ptScriptUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              accion: 'actualizar_estado_flota',
-              interno: internoDetected,
-              estado: nuevoEstado,
-              motivo: noveltyText,
-              responsable: req.headers['x-user-username'] || 'Chatbot',
-              sector: 'taller'
-            })
-          });
-          if (ptResp.ok) {
-            const estadoLabel = nuevoEstado === 'fuera_de_servicio' ? '❌ Fuera de Servicio' : 
-                               (nuevoEstado === 'reparacion' ? '🔧 En Reparación' : 
-                               (nuevoEstado === 'servicios_pendientes' ? '📋 Servicios Pendientes' : '✅ Operativo'));
-            return res.json({
-              response: `✅ **Novedad registrada en Parte de Taller**:\n- **Unidad:** #${internoDetected}\n- **Estado:** ${estadoLabel}\n- **Novedad:** "${noveltyText}"\n\nEl Parte de Taller fue actualizado inmediatamente.`
-            });
-          }
-        } catch (actErr) {
-          console.error('[Chatbot Action] Error updating parte taller:', actErr);
-        }
+      try {
+        actualizarEstadoFlotaLocal(internoDetected, nuevoEstado, noveltyText, req.headers['x-user-username'] || 'Chatbot');
+        const estadoLabel = nuevoEstado === 'fuera_de_servicio' ? '❌ Fuera de Servicio' :
+                           (nuevoEstado === 'reparacion' ? '🔧 En Reparación' :
+                           (nuevoEstado === 'servicios_pendientes' ? '📋 Servicios Pendientes' : '✅ Operativo'));
+        return res.json({
+          response: `✅ **Novedad registrada en Parte de Taller**:\n- **Unidad:** #${internoDetected}\n- **Estado:** ${estadoLabel}\n- **Novedad:** "${noveltyText}"\n\nEl Parte de Taller fue actualizado inmediatamente.`
+        });
+      } catch (actErr) {
+        console.error('[Chatbot Action] Error updating parte taller:', actErr);
       }
     }
 
@@ -2775,24 +2759,18 @@ app.post('/api/assistant/chat', async (req, res) => {
     // ── 1b. Fetch Parte de Taller fleet status ──
     let parteTallerContext = "";
     try {
-      const ptScriptUrl = settings.parteTallerScriptUrl;
-      if (ptScriptUrl) {
-        const ptUrl = `${ptScriptUrl}${ptScriptUrl.includes('?') ? '&' : '?'}accion=getEstadoFlota`;
-        const ptResp = await fetch(ptUrl, { signal: AbortSignal.timeout(6000) });
-        if (ptResp.ok) {
-          const ptData = await ptResp.json();
-          if (Array.isArray(ptData) && ptData.length > 0) {
-            const fuera = ptData.filter(u => u.estado && u.estado !== 'operativo' && u.estado !== 'OPERATIVO');
-            if (fuera.length > 0) {
-              const ptText = fuera.map(u =>
-                `Interno ${u.interno}: ${u.estado}${u.motivo ? ' - ' + u.motivo : ''}${u.fecha ? ' (fecha: ' + u.fecha + ')' : ''}`
-              ).join('\n');
-              parteTallerContext = `\n==== PARTE MECÁNICO / PARTE DE TALLER (unidades fuera de servicio) ====\n${ptText}\n======================================================================`;
-            } else {
-              parteTallerContext = `\n==== PARTE MECÁNICO / PARTE DE TALLER ====\nTodas las unidades del parte están operativas.\n==========================================`;
-            }
-          }
-        }
+      const ptState = db.getParteTallerState();
+      const fueraLists = [
+        ...(ptState.reparacion || []).map(u => ({ ...u, estadoLabel: 'En Reparación' })),
+        ...(ptState.fuera_de_servicio || []).map(u => ({ ...u, estadoLabel: 'Fuera de Servicio' }))
+      ];
+      if (fueraLists.length > 0) {
+        const ptText = fueraLists.map(u =>
+          `Interno ${u.interno}: ${u.estadoLabel}${u.novedad ? ' - ' + u.novedad.replace(/\n/g, '; ') : ''}${u.dia_parado ? ' (parado desde: ' + u.dia_parado + ')' : ''}`
+        ).join('\n');
+        parteTallerContext = `\n==== PARTE MECÁNICO / PARTE DE TALLER (unidades fuera de servicio) ====\n${ptText}\n======================================================================`;
+      } else {
+        parteTallerContext = `\n==== PARTE MECÁNICO / PARTE DE TALLER ====\nTodas las unidades del parte están operativas.\n==========================================`;
       }
     } catch (ptErr) {
       console.warn('[AI Chat] Error fetching parte taller:', ptErr);
@@ -3673,82 +3651,199 @@ app.post('/api/insumos/:idEgreso/resolve', (req, res) => {
   }
 });
 
-app.get('/api/parte-taller/estado', async (req, res) => {
-  const settings = db.getSettings();
-  const scriptUrl = settings.parteTallerScriptUrl;
-  const localPt = db.db && db.db.parteTallerState ? db.db.parteTallerState : {
-    servicios_pendientes: [],
-    reparacion: [],
-    fuera_de_servicio: [],
-    transito: []
-  };
+// ── Parte Taller: business logic, ported from the old Google Apps Script ──
+// (kept local now — see database.js's getParteTallerState/saveParteTallerState
+// for why: the Sheets-backed PropertiesService store had no real transaction
+// safety and repeatedly lost data under concurrent writes).
+function resolveTipoFlotaFromEquipo(equipoRaw) {
+  const equipo = String(equipoRaw || '').trim().toUpperCase();
+  if (equipo.startsWith('COMPACTADOR')) return 'COMPACTADOR';
+  if (equipo.startsWith('VOLQUETE')) return 'VOLQUETE';
+  if (equipo.startsWith('ROLL OFF') || equipo.startsWith('ROLL - OFF') || equipo.includes('ROLL')) return 'ROLL - OFF';
+  if (equipo.startsWith('PLANCHA')) return 'PLANCHA';
+  return null;
+}
 
-  if (scriptUrl) {
-    try {
-      const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}accion=get_state`;
-      const response = await fetch(url);
-      const text = await response.text();
-      try {
-        const data = JSON.parse(text);
-        if (data && typeof data === 'object') {
-          return res.json(data);
-        }
-      } catch (jsonErr) {
-        console.warn("parteTallerScriptUrl returned non-JSON (HTML page), using local state fallback.");
+function resolveTipoFromInterno(interno) {
+  const rodados = (db.getCatalogs() || {}).rodados || [];
+  const found = rodados.find(r => String(r.interno || '').trim() === String(interno).trim());
+  return resolveTipoFlotaFromEquipo(found ? found.equipo : null) || 'COMPACTADOR';
+}
+
+function calcularTotalesFlota() {
+  const rodados = (db.getCatalogs() || {}).rodados || [];
+  const totales = { COMPACTADOR: 0, VOLQUETE: 0, 'ROLL - OFF': 0, PLANCHA: 0 };
+  rodados.forEach(r => {
+    const equipoUpper = String(r.equipo || '').trim().toUpperCase();
+    if (equipoUpper === 'HERRERIA' || equipoUpper === 'EDILICIO') return;
+    const tipo = resolveTipoFlotaFromEquipo(r.equipo);
+    if (tipo) totales[tipo] = (totales[tipo] || 0) + 1;
+  });
+  return totales;
+}
+
+function marcarItemComoCompletado(novedad, motivoBuscado) {
+  if (!novedad) return '';
+  let ticketId = null;
+  const matchTicket = motivoBuscado.match(/ticket\s*#?\s*(\d+)/i) || motivoBuscado.match(/#\s*(\d+)/i);
+  if (matchTicket) ticketId = matchTicket[1];
+
+  const lines = novedad.split('\n');
+  let matched = false;
+  const newLines = lines.map(line => {
+    const lineUpper = line.toUpperCase();
+    if (ticketId && (lineUpper.includes('TICKET') && lineUpper.includes('#' + ticketId) || lineUpper.includes('#' + ticketId))) {
+      if (line.startsWith('[ ]')) { matched = true; return '[X]' + line.substring(3); }
+      if (!line.startsWith('[X]') && !line.startsWith('[x]')) { matched = true; return '[X] ' + line; }
+    }
+    if (!ticketId) {
+      const cleanMotivo = motivoBuscado.replace(/\[.*?\]/g, '').replace(/(operativo|listo|ok|cerrado|reparado)/gi, '').trim().toUpperCase();
+      if (cleanMotivo && cleanMotivo.length > 3 && lineUpper.includes(cleanMotivo)) {
+        if (line.startsWith('[ ]')) { matched = true; return '[X]' + line.substring(3); }
+        if (!line.startsWith('[X]') && !line.startsWith('[x]')) { matched = true; return '[X] ' + line; }
       }
-    } catch (error) {
-      console.error("Error fetching parte taller state:", error);
+    }
+    return line;
+  });
+  if (!matched) {
+    for (let i = newLines.length - 1; i >= 0; i--) {
+      if (newLines[i].startsWith('[ ]')) { newLines[i] = '[X]' + newLines[i].substring(3); matched = true; break; }
     }
   }
-  
-  res.json(localPt);
+  return newLines.join('\n');
+}
+
+function recalcularTotalesResumenLocal(state) {
+  const totalesDB = calcularTotalesFlota();
+  const totales = {};
+  ['COMPACTADOR', 'VOLQUETE', 'ROLL - OFF', 'PLANCHA'].forEach(tipo => {
+    totales[tipo] = { operativos: totalesDB[tipo] || 0, fuera: 0, total: totalesDB[tipo] || 0 };
+  });
+  ['reparacion', 'fuera_de_servicio', 'inversiones'].forEach(listName => {
+    (state[listName] || []).forEach(u => {
+      const t = String(u.tipo || '').trim().toUpperCase();
+      let tipoNorm = null;
+      if (t.includes('COMPAC')) tipoNorm = 'COMPACTADOR';
+      else if (t.includes('VOLQ')) tipoNorm = 'VOLQUETE';
+      else if (t.includes('ROLL') || t.includes('OFF')) tipoNorm = 'ROLL - OFF';
+      else if (t.includes('PLANCHA')) tipoNorm = 'PLANCHA';
+      if (tipoNorm && totales[tipoNorm]) {
+        totales[tipoNorm].fuera++;
+        if (totales[tipoNorm].operativos > 0) totales[tipoNorm].operativos--;
+      }
+    });
+  });
+  state.resumen = state.resumen || {};
+  state.resumen.totales = totales;
+  const now = new Date();
+  state.resumen.fecha = now.toLocaleDateString('es-AR');
+  state.resumen.hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Adds/moves one unit's novedad across the Parte Taller lists. Mirrors the old
+// Apps Script actualizarEstadoFlotaParte() 1:1, just backed by db.json instead
+// of PropertiesService.
+function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsableRaw) {
+  const interno = String(internoRaw).trim();
+  const estado = String(estadoRaw).trim().toLowerCase();
+  const motivo = String(motivoRaw || '').trim();
+  const responsable = String(responsableRaw || '').trim();
+
+  const state = db.getParteTallerState();
+  state.resumen = state.resumen || {};
+  if (responsable) state.resumen.responsable = responsable;
+
+  const lists = ['servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones'];
+  let existingNovedad = '';
+  let currentList = '';
+  lists.forEach(listName => {
+    const found = (state[listName] || []).find(u => String(u.interno).trim() === interno);
+    if (found) { currentList = listName; if (found.novedad) existingNovedad = found.novedad; }
+  });
+  lists.forEach(listName => {
+    state[listName] = (state[listName] || []).filter(u => String(u.interno).trim() !== interno);
+  });
+
+  const tipo = resolveTipoFromInterno(interno);
+  const fechaStr = new Date().toLocaleDateString('es-AR');
+
+  function appendMotivo(existing, nuevoMotivo) {
+    let cleanMotivo = nuevoMotivo.trim();
+    if (!cleanMotivo.startsWith('[ ]') && !cleanMotivo.startsWith('[X]') && !cleanMotivo.startsWith('[x]')) {
+      cleanMotivo = '[ ] ' + cleanMotivo;
+    }
+    return existing ? (existing.trim() + '\n' + cleanMotivo) : cleanMotivo;
+  }
+
+  if (estado === 'reparacion' || estado === 'fuera_de_servicio' || estado === 'fuera de servicio') {
+    const targetList = estado === 'reparacion' ? 'reparacion' : 'fuera_de_servicio';
+    const newNovedad = appendMotivo(existingNovedad, motivo);
+    state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0 });
+  } else if (estado === 'operativo') {
+    let newNovedad;
+    if (existingNovedad) {
+      newNovedad = marcarItemComoCompletado(existingNovedad, motivo);
+    } else {
+      newNovedad = motivo;
+      if (!newNovedad.startsWith('[ ]') && !newNovedad.startsWith('[X]') && !newNovedad.startsWith('[x]')) newNovedad = '[X] ' + newNovedad;
+      else if (newNovedad.startsWith('[ ]')) newNovedad = '[X]' + newNovedad.substring(3);
+    }
+    state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '' });
+  } else if (estado === 'servicios_pendientes' || estado === 'servicios pendientes') {
+    const targetList = (currentList === 'reparacion' || currentList === 'fuera_de_servicio') ? currentList : 'servicios_pendientes';
+    const newNovedad = appendMotivo(existingNovedad, motivo);
+    if (targetList === 'reparacion' || targetList === 'fuera_de_servicio') {
+      state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0 });
+    } else {
+      state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '' });
+    }
+  } else if (estado === 'inversiones' || estado === 'en_preparacion') {
+    const newNovedad = appendMotivo(existingNovedad, motivo);
+    state.inversiones.push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0 });
+  }
+
+  recalcularTotalesResumenLocal(state);
+  db.saveParteTallerState(state);
+  return `Unidad #${interno} actualizada a ${estado.toUpperCase()} en Parte del Taller`;
+}
+
+app.get('/api/parte-taller/estado', (req, res) => {
+  res.json({ ok: true, state: db.getParteTallerState() });
 });
 
-app.post('/api/parte-taller/novedad', async (req, res) => {
-  const settings = db.getSettings();
-  const scriptUrl = settings.parteTallerScriptUrl;
-  if (!scriptUrl) {
-    return res.status(400).json({ error: "URL del script de parte taller no configurada." });
-  }
+app.post('/api/parte-taller/novedad', (req, res) => {
   try {
     const payload = { ...req.body };
-    if (!payload.accion) {
-      payload.accion = 'actualizar_estado_flota';
+    const accion = payload.accion || 'actualizar_estado_flota';
+
+    if (accion === 'save_state') {
+      const saved = db.saveParteTallerState(payload.state || {});
+      return res.json({ ok: true, state: saved });
     }
+
+    if (accion === 'actualizar_responsable') {
+      const state = db.getParteTallerState();
+      state.resumen = state.resumen || {};
+      state.resumen.responsable = payload.responsable || state.resumen.responsable;
+      state.resumen.fecha = new Date().toLocaleDateString('es-AR');
+      state.resumen.hora = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      db.saveParteTallerState(state);
+      return res.json({ ok: true, msg: `Responsable actualizado a ${payload.responsable}` });
+    }
+
+    // Default / accion === 'actualizar_estado_flota'
     if (!payload.motivo && (payload.novedad || payload.observacion || payload.text)) {
       payload.motivo = payload.novedad || payload.observacion || payload.text;
     }
     if (!payload.estado && (payload.status || payload.state)) {
       payload.estado = payload.status || payload.state;
     }
-    if (!payload.estado) {
-      payload.estado = 'fuera_de_servicio';
-    }
+    if (!payload.estado) payload.estado = 'fuera_de_servicio';
 
-    // Google Apps Script web apps are occasionally flaky (cold starts, transient 5xx,
-    // or a non-JSON response) even though the underlying spreadsheet write went through.
-    // Retry once before giving up, instead of surfacing a false "failed to save" error
-    // to the user for a save that actually succeeded on the sheet.
-    let lastError = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const response = await fetch(scriptUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const rawText = await response.text();
-        if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
-        const data = rawText ? JSON.parse(rawText) : {};
-        return res.json(data);
-      } catch (attemptError) {
-        lastError = attemptError;
-        console.error(`Error forwarding post to parte taller (attempt ${attempt}/2):`, attemptError.message);
-        if (attempt < 2) await new Promise(r => setTimeout(r, 1500));
-      }
-    }
-    throw lastError;
+    const msg = actualizarEstadoFlotaLocal(payload.interno, payload.estado, payload.motivo, payload.responsable);
+    res.json({ ok: true, msg });
   } catch (error) {
+    console.error('[Parte Taller] Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
