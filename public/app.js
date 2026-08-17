@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '131';
+const CURRENT_APP_VERSION = '132';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11740,6 +11740,12 @@ function adjustPtStateLists(state) {
   // 5. Recalculate totals - split "fuera" into reparacion/fuera_de_servicio separately, and
   // factor in inversiones (units in preparation): they reduce operativos but the base fleet
   // total stays fixed (it comes from Base_Datos, not from how many units happen to be down).
+  // Internal work buckets / external-company placeholders, not real fleet units - counting
+  // them here is what made Compactador's Fuera de Servicio show 9 (should be 7) and the
+  // total look like 64 instead of the real 62.
+  const NO_FLOTA_INTERNOS = new Set(['IRINEO GRAL.', 'VOLQUETE NICO', 'REPARACIONES INTERNAS']);
+  const esUnidadDeFlotaReal = u => !NO_FLOTA_INTERNOS.has(String(u.interno || '').trim().toUpperCase());
+
   const totales = (state.resumen || {}).totales || {};
   const types = ['COMPACTADOR', 'VOLQUETE', 'ROLL - OFF', 'PLANCHA'];
   types.forEach(t => {
@@ -11747,9 +11753,9 @@ function adjustPtStateLists(state) {
     const origFs = parseInt((totales[t] || {}).fuera || '0') || 0;
     const totalFleet = totales[t] && totales[t].total !== undefined ? parseInt(totales[t].total) || 0 : (origOp + origFs);
 
-    const fsCount = (state.fuera_de_servicio || []).filter(u => String(u.tipo).trim().toUpperCase() === t).length;
-    const repCount = (state.reparacion || []).filter(u => String(u.tipo).trim().toUpperCase() === t).length;
-    const invCount = (state.inversiones || []).filter(u => String(u.tipo).trim().toUpperCase() === t).length;
+    const fsCount = (state.fuera_de_servicio || []).filter(esUnidadDeFlotaReal).filter(u => String(u.tipo).trim().toUpperCase() === t).length;
+    const repCount = (state.reparacion || []).filter(esUnidadDeFlotaReal).filter(u => String(u.tipo).trim().toUpperCase() === t).length;
+    const invCount = (state.inversiones || []).filter(esUnidadDeFlotaReal).filter(u => String(u.tipo).trim().toUpperCase() === t).length;
 
     if (!totales[t]) totales[t] = {};
     totales[t].fuera = fsCount + repCount;

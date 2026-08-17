@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '131';
+const APP_VERSION = '132';
 
 // Middleware
 app.use(cors());
@@ -3664,18 +3664,33 @@ function resolveTipoFlotaFromEquipo(equipoRaw) {
   return null;
 }
 
+// These are internal work buckets / external-company placeholders, not real
+// units of this fleet — a "novedad" can legitimately be logged against them,
+// but they must never be counted as a COMPACTADOR/VOLQUETE/etc for fleet
+// totals (that inflated Compactador's Fuera de Servicio count by 2 and made
+// the total look like 64 instead of the real 62).
+const INTERNOS_NO_FLOTA = new Set(['IRINEO GRAL.', 'VOLQUETE NICO', 'REPARACIONES INTERNAS']);
+
+function esInternoDeFlotaReal(interno) {
+  return !INTERNOS_NO_FLOTA.has(String(interno || '').trim().toUpperCase());
+}
+
 function resolveTipoFromInterno(interno) {
+  if (!esInternoDeFlotaReal(interno)) return null;
   const rodados = (db.getCatalogs() || {}).rodados || [];
   const found = rodados.find(r => String(r.interno || '').trim() === String(interno).trim());
   return resolveTipoFlotaFromEquipo(found ? found.equipo : null) || 'COMPACTADOR';
 }
 
-// The Taxes catalog scrape that feeds db.getCatalogs().rodados fails/times out
-// periodically (unrelated to Parte Taller). When it comes back empty or
-// missing a whole vehicle type, a fresh count would show that type's fleet
-// total as 0 — plainly wrong (a real fleet doesn't go to zero units). Cache
-// the last count seen for each type and only overwrite it when the new
-// count is actually positive, so a bad scrape can't zero out a real total.
+// The Taxes catalog scrape that feeds db.getCatalogs().rodados is unreliable
+// as a source for fleet TOTALS (unrelated to Parte Taller): it fails/times
+// out periodically, and even when it succeeds it still lists trucks that
+// were sold and never removed. So a fresh count from it can be wrong in
+// either direction — never trust it over a value a human already confirmed.
+// Once a type has a cached total (from an earlier successful read, or from
+// a manual seed via /api/parte-taller/recalcular-totales), it's sticky:
+// only ever fills in types that have NEVER been set, never overwrites an
+// existing value automatically.
 function calcularTotalesFlota() {
   const rodados = (db.getCatalogs() || {}).rodados || [];
   const totalesFrescos = { COMPACTADOR: 0, VOLQUETE: 0, 'ROLL - OFF': 0, PLANCHA: 0 };
@@ -3690,9 +3705,9 @@ function calcularTotalesFlota() {
   const cache = { ...(dbData.fleetTotalsCache || {}) };
   let cambio = false;
   Object.keys(totalesFrescos).forEach(tipo => {
-    if (totalesFrescos[tipo] > 0) {
-      if (cache[tipo] !== totalesFrescos[tipo]) cambio = true;
+    if (cache[tipo] === undefined && totalesFrescos[tipo] > 0) {
       cache[tipo] = totalesFrescos[tipo];
+      cambio = true;
     }
   });
   if (cambio) {
@@ -3742,6 +3757,7 @@ function recalcularTotalesResumenLocal(state) {
   });
   ['reparacion', 'fuera_de_servicio', 'inversiones'].forEach(listName => {
     (state[listName] || []).forEach(u => {
+      if (!esInternoDeFlotaReal(u.interno)) return;
       const t = String(u.tipo || '').trim().toUpperCase();
       let tipoNorm = null;
       if (t.includes('COMPAC')) tipoNorm = 'COMPACTADOR';
