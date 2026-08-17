@@ -3828,6 +3828,26 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   return `Unidad #${interno} actualizada a ${estado.toUpperCase()} en Parte del Taller`;
 }
 
+// Maintenance: force-recompute resumen.totales using the cache-protected
+// calcularTotalesFlota() (never zeroes out a type on a bad catalog read), or
+// manually seed the cache when the Taxes catalog itself is known-bad for a
+// stretch (pass {seed: {COMPACTADOR: N, ...}} to set trusted starting values).
+app.post('/api/parte-taller/recalcular-totales', (req, res) => {
+  try {
+    if (req.body && req.body.seed) {
+      const dbData = db.read();
+      dbData.fleetTotalsCache = { ...(dbData.fleetTotalsCache || {}), ...req.body.seed };
+      db.write(dbData);
+    }
+    const state = db.getParteTallerState();
+    recalcularTotalesResumenLocal(state);
+    db.saveParteTallerState(state);
+    res.json({ ok: true, totales: state.resumen.totales });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/parte-taller/estado', (req, res) => {
   res.json({ ok: true, state: db.getParteTallerState() });
 });
