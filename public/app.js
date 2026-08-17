@@ -1,4 +1,26 @@
 
+// Must match APP_VERSION in server.js and the ?v= on index.html's <script src="app.js">.
+// A tab left open from before a deploy keeps running this old code in memory forever —
+// no request it makes on its own would ever notice the backend moved on. This is what
+// let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
+// after the fix had already shipped. Polling and reloading closes that gap.
+const CURRENT_APP_VERSION = '131';
+
+function startAppVersionWatch() {
+  setInterval(async () => {
+    try {
+      const res = await fetch('/api/app-version');
+      const data = await res.json();
+      if (data && data.version && data.version !== CURRENT_APP_VERSION) {
+        console.warn(`[AppVersion] Nueva versión detectada (${data.version} != ${CURRENT_APP_VERSION}). Recargando...`);
+        window.location.reload();
+      }
+    } catch (e) {
+      // Silencioso: fallas de red transitorias no deben interrumpir el trabajo.
+    }
+  }, 60000);
+}
+
 function getEstimatedTaskHoursMax(taskText, mechanicName) {
   const txt = (taskText || '').toLowerCase();
   
@@ -342,6 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check user session first
   checkUserSession();
   initCardBgPicker();
+  startAppVersionWatch();
 
   // If logged in, fetch initial data
   if (localStorage.getItem('currentUserUsername')) {

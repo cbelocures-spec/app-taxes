@@ -51,6 +51,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 
+// Bump together with the ?v=NN query param on public/index.html's <script src="app.js">.
+// Lets already-open tabs detect a new deploy and reload themselves (see app.js's
+// checkForAppUpdate) instead of silently continuing to run stale client-side logic
+// against a backend that has since moved on — this is what let an old tab's outdated
+// window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
+const APP_VERSION = '131';
+
 // Middleware
 app.use(cors());
 // Disable client/browser caching so deploys reflect immediately on mobile & PC
@@ -698,6 +705,12 @@ app.get('/api/db-debug', (req, res) => {
     archivedCount: archived.length,
     sampleOrder: (rawData.workOrders || [])[0] || null
   });
+});
+
+// Polled by app.js so a tab left open since before a deploy notices it's stale
+// and reloads, instead of continuing to run old client logic against the new backend.
+app.get('/api/app-version', (req, res) => {
+  res.json({ version: APP_VERSION });
 });
 
 // Get all work orders (filtered by user sector)
