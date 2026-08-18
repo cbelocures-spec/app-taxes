@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '132';
+const CURRENT_APP_VERSION = '133';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11609,7 +11609,10 @@ function adjustPtStateLists(state) {
     }
   });
 
-  if (repairInternos.size === 0) return;
+  // NOTE: no early-return here when repairInternos is empty - steps 2-4 below already
+  // no-op safely on an empty map, and step 5 (recalculating the fleet totals breakdown)
+  // must always run regardless, or every stat card's En Rep./Fuera Serv./En Preparación
+  // silently zeroes out the moment there's no live Taxes task with a running/paused timer.
 
   // Helper to map and check matching
   function findMatchingOrder(internoPT) {
