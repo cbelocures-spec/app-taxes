@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '133';
+const CURRENT_APP_VERSION = '134';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12900,8 +12900,23 @@ function ptToggleEditItem(checkbox) {
 
 // Moves a unit from En Tránsito to its target state (Fuera de Servicio / En Reparación / Servicios Pendientes) upon arrival
 async function ingresarUnidadTransito(interno) {
-  if (!window._ptState) return;
-  const state = window._ptState;
+  // Fetch the current state fresh instead of reusing window._ptState (which can be minutes
+  // stale) and save the full result back with save_state: actualizar_estado_flota only knows
+  // how to ADD a unit to its target list on the server, it has no idea "transito" exists, so
+  // it never removed the entry there - the unit reappeared in Tránsito on the next refresh
+  // because the server's own transito array was never told to drop it.
+  let state = null;
+  try {
+    const freshRes = await fetch('/api/parte-taller/estado');
+    const freshData = await freshRes.json();
+    state = (freshData && freshData.state) ? freshData.state : freshData;
+  } catch (err) {
+    console.error('Error fetching fresh Parte Taller state before ingreso:', err);
+  }
+  if (!state) {
+    showToast('No se pudo leer el estado actual del Parte Taller. No se realizó el ingreso.', 'danger');
+    return;
+  }
   const transList = state.transito || [];
   const unit = transList.find(u => String(u.interno).trim() === String(interno).trim());
   if (!unit) return;
@@ -12933,29 +12948,20 @@ async function ingresarUnidadTransito(interno) {
   state[targetEstado] = state[targetEstado].filter(u => String(u.interno).trim().toUpperCase() !== targetIntStr);
   state[targetEstado].push(unit);
 
+  window._ptState = state;
   // Re-render UI immediately
   renderParteTallerDashboard(state);
 
-  // 4. Send update to server / Google Sheets
+  // 4. Persist the full state (transito removal + target list addition together) - see the
+  // comment above on why this can't be a targeted actualizar_estado_flota call.
   try {
-    let novedadFormatted = unit.novedad || '';
-    if (Array.isArray(unit.novedad_items)) {
-      novedadFormatted = unit.novedad_items.map(x => `${x.hecho ? '[X]' : '[ ]'} ${x.texto}`).join('\n');
-    }
     await fetch('/api/parte-taller/novedad', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        accion: 'actualizar_estado_flota',
-        interno: unit.interno,
-        estado: targetEstado,
-        motivo: novedadFormatted,
-        responsable: currentUser,
-        sector: unit.sector || ((getSectorByUsername(currentUser) === 'Herrería') ? 'herreria' : 'taller')
-      })
+      body: JSON.stringify({ accion: 'save_state', state })
     });
   } catch (e) {
-    console.error('Error updating Google Sheets on unit arrival:', e);
+    console.error('Error updating Parte Taller state on unit arrival:', e);
   }
 
   // 5. If moving to fuera_de_servicio or reparacion, auto-create Correctivo work order in Taxes if none exists
