@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '134';
+const CURRENT_APP_VERSION = '135';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11977,9 +11977,19 @@ function renderParteTallerDashboard(state) {
   // Determine current sector for Pt filtering based on active tab/selected sector
   const currentPtSector = (currentSelectedSector === 'Herrería') ? 'herreria' : 'taller';
 
+  // A Herrería-only work item (e.g. "12 verde", not a real Taxes-tracked asset) should stay
+  // out of Taller's board, but a real truck Herrería logged a novedad against still belongs
+  // on Taller's board too - it's still Taller's truck.
+  function esUnidadRealDeFlota(interno) {
+    return !!(cachedCatalogs.rodados && cachedCatalogs.rodados.some(r => String(r.interno || '').trim() === String(interno || '').trim()));
+  }
+
   function matchesPtSector(item) {
     // If item has no sector tag, show to everyone (legacy data)
     if (!item.sector) return true;
+    if (item.sector === 'herreria' && currentPtSector === 'taller') {
+      return esUnidadRealDeFlota(item.interno);
+    }
     return item.sector === currentPtSector;
   }
 

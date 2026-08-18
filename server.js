@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '134';
+const APP_VERSION = '135';
 
 // Middleware
 app.use(cors());
@@ -3780,11 +3780,15 @@ function recalcularTotalesResumenLocal(state) {
 // Adds/moves one unit's novedad across the Parte Taller lists. Mirrors the old
 // Apps Script actualizarEstadoFlotaParte() 1:1, just backed by db.json instead
 // of PropertiesService.
-function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsableRaw) {
+function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsableRaw, sectorRaw) {
   const interno = String(internoRaw).trim();
   const estado = String(estadoRaw).trim().toLowerCase();
   const motivo = String(motivoRaw || '').trim();
   const responsable = String(responsableRaw || '').trim();
+  // Was never actually persisted on the unit before — every unit ended up with no sector
+  // tag at all, so matchesPtSector's "legacy data, show to everyone" fallback made every
+  // Herrería-only item leak into the Taller board (and vice versa).
+  const sector = String(sectorRaw || 'taller').trim().toLowerCase() === 'herreria' ? 'herreria' : 'taller';
 
   const state = db.getParteTallerState();
   state.resumen = state.resumen || {};
@@ -3792,10 +3796,11 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
 
   const lists = ['servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones'];
   let existingNovedad = '';
+  let existingSector = null;
   let currentList = '';
   lists.forEach(listName => {
     const found = (state[listName] || []).find(u => String(u.interno).trim() === interno);
-    if (found) { currentList = listName; if (found.novedad) existingNovedad = found.novedad; }
+    if (found) { currentList = listName; if (found.novedad) existingNovedad = found.novedad; if (found.sector) existingSector = found.sector; }
   });
   lists.forEach(listName => {
     state[listName] = (state[listName] || []).filter(u => String(u.interno).trim() !== interno);
@@ -3803,6 +3808,9 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
 
   const tipo = resolveTipoFromInterno(interno);
   const fechaStr = new Date().toLocaleDateString('es-AR');
+  // Sticks to whichever sector originally logged this unit, so a Taller user closing out a
+  // Herrería-created item doesn't accidentally re-tag it as Taller's own.
+  const finalSector = existingSector || sector;
 
   function appendMotivo(existing, nuevoMotivo) {
     let cleanMotivo = nuevoMotivo.trim();
@@ -3815,7 +3823,7 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   if (estado === 'reparacion' || estado === 'fuera_de_servicio' || estado === 'fuera de servicio') {
     const targetList = estado === 'reparacion' ? 'reparacion' : 'fuera_de_servicio';
     const newNovedad = appendMotivo(existingNovedad, motivo);
-    state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0 });
+    state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector });
   } else if (estado === 'operativo') {
     let newNovedad;
     if (existingNovedad) {
@@ -3825,18 +3833,18 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
       if (!newNovedad.startsWith('[ ]') && !newNovedad.startsWith('[X]') && !newNovedad.startsWith('[x]')) newNovedad = '[X] ' + newNovedad;
       else if (newNovedad.startsWith('[ ]')) newNovedad = '[X]' + newNovedad.substring(3);
     }
-    state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '' });
+    state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '', sector: finalSector });
   } else if (estado === 'servicios_pendientes' || estado === 'servicios pendientes') {
     const targetList = (currentList === 'reparacion' || currentList === 'fuera_de_servicio') ? currentList : 'servicios_pendientes';
     const newNovedad = appendMotivo(existingNovedad, motivo);
     if (targetList === 'reparacion' || targetList === 'fuera_de_servicio') {
-      state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0 });
+      state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector });
     } else {
-      state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '' });
+      state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '', sector: finalSector });
     }
   } else if (estado === 'inversiones' || estado === 'en_preparacion') {
     const newNovedad = appendMotivo(existingNovedad, motivo);
-    state.inversiones.push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0 });
+    state.inversiones.push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector });
   }
 
   recalcularTotalesResumenLocal(state);
@@ -3897,7 +3905,7 @@ app.post('/api/parte-taller/novedad', (req, res) => {
     }
     if (!payload.estado) payload.estado = 'fuera_de_servicio';
 
-    const msg = actualizarEstadoFlotaLocal(payload.interno, payload.estado, payload.motivo, payload.responsable);
+    const msg = actualizarEstadoFlotaLocal(payload.interno, payload.estado, payload.motivo, payload.responsable, payload.sector);
     res.json({ ok: true, msg });
   } catch (error) {
     console.error('[Parte Taller] Error:', error);
