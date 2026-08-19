@@ -338,6 +338,12 @@ function routeForeignTasksToSiblingOrder(sector, tasksForSector, ctx) {
   ) : null;
 
   if (sibling) {
+    // The sibling already exists with its own tasks, some possibly already running - passing
+    // null here (like a brand-new order has to) made every one of THOSE pre-existing tasks look
+    // like it just started on every single save that routed anything into this sibling, even
+    // ones unrelated to it, which could fire a conflict-pause against the wrong employee's
+    // genuinely-running timer somewhere else in the app.
+    const previousTasksById = new Map((sibling.tasks || []).map(t => [t.id, t]));
     const mergedTasksMap = new Map((sibling.tasks || []).map(t => [t.id, t]));
     tasksForSector.forEach(t => mergedTasksMap.set(t.id, t));
     const merged = db.updateWorkOrder(sibling.id, {
@@ -345,7 +351,7 @@ function routeForeignTasksToSiblingOrder(sector, tasksForSector, ctx) {
       syncStatus: sibling.taxesOrderNumber ? sibling.syncStatus : 'pending'
     });
     console.log(`[Auto-Split] Movida(s) ${tasksForSector.length} tarea(s) de sector ${sector} a orden hermana existente ${sibling.id} (Interno ${ctx.interno}).`);
-    autoPauseConflictingTimers(sibling.id, tasksForSector, null);
+    autoPauseConflictingTimers(sibling.id, Array.from(mergedTasksMap.values()), previousTasksById);
     return merged;
   }
 
