@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '135';
+const CURRENT_APP_VERSION = '136';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11693,9 +11693,14 @@ function adjustPtStateLists(state) {
   });
 
   // 4. For any remaining repairInternos (units not currently in taller), create a temporary unit
+  // - except a unit already sitting in "En Preparación" (inversiones): working on it doesn't
+  // mean it needs repairing, it just means prep work is happening on it right now. It should
+  // stay in Preparación, not get duplicated into Reparación on top of it.
+  const inversionesInternos = new Set((state.inversiones || []).map(u => String(u.interno).trim().toUpperCase()));
   for (const [taxInt, order] of repairInternos.entries()) {
+    if (inversionesInternos.has(taxInt)) continue;
     let internoLabel = order.interno;
-    
+
     // HERRERIA/EDILICIO internos were already filtered out of activeRepairOrders above, so this
     // never resolves to null here - "Otro" covers every real but non-fleet-tracked equipo
     // (CAMIONETA, AUTOELEVADOR, IRINEO, REP. INT., etc.).
