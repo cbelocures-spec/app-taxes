@@ -4276,6 +4276,11 @@ async function startWorker() {
         // or a later re-sync attempt itself failed (syncStatus: 'error') even
         // though they were already synced before (have a taxesOrderNumber).
         const brokenOrder = orders.find(o => {
+          // getSyncableOrders() only excludes deleted orders, not archived ones - without this
+          // check, an order that's already done and sitting in Historial (its verifiedStatus
+          // stuck on 'error' from some past server restart interrupting its check) gets Puppeteer
+          // opening it again and again forever, since nothing ever moves it out of "needs retry".
+          if (o.archived === true) return false;
           if (!o.taxesOrderNumber || o.syncStatus === 'local' || o.syncStatus === 'draft') return false;
 
           const needsVerifyRetry = o.syncStatus === 'success' && o.verifiedStatus === 'error' &&
