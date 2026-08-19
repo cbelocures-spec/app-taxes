@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '137';
+const CURRENT_APP_VERSION = '138';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1147,7 +1147,9 @@ function getUnitTipoForInterno(interno) {
   if (equipo.startsWith('COMPACTADOR')) return 'COMPACTADOR';
   if (equipo.startsWith('VOLQUETE')) return 'VOLQUETE';
   if (equipo.startsWith('ROLL OFF')) return 'ROLL - OFF';
-  if (equipo.startsWith('PLANCHA')) return 'PLANCHA';
+  // Real planchas are catalogued as "CHASIS CON PLANCHA", not "PLANCHA ..." - startsWith missed
+  // every single one of them (they all fell through to 'Otro' instead).
+  if (equipo.includes('PLANCHA')) return 'PLANCHA';
   return 'Otro';
 }
 
@@ -11531,7 +11533,9 @@ function adjustPtStateLists(state) {
     if (equipo.startsWith('COMPACTADOR')) return 'COMPACTADOR';
     if (equipo.startsWith('VOLQUETE')) return 'VOLQUETE';
     if (equipo.startsWith('ROLL OFF')) return 'ROLL - OFF';
-    if (equipo.startsWith('PLANCHA')) return 'PLANCHA';
+    // Real planchas are catalogued as "CHASIS CON PLANCHA", not "PLANCHA ..." - startsWith missed
+    // every single one of them (they all fell through to 'Otro' instead).
+    if (equipo.includes('PLANCHA')) return 'PLANCHA';
     return 'Otro';
   }
 
@@ -11739,7 +11743,7 @@ function adjustPtStateLists(state) {
   // order with a running/paused task - a unit added straight from Parte Taller's own "Agregar
   // Unidad" whose auto-created task is still "Pendiente" with no timer activity never passes
   // through that path, so it kept showing whatever wrong tipo it was created with forever).
-  ['fuera_de_servicio', 'reparacion', 'servicios_pendientes'].forEach(listName => {
+  ['fuera_de_servicio', 'reparacion', 'servicios_pendientes', 'inversiones'].forEach(listName => {
     (state[listName] || []).forEach(unit => {
       unit.tipo = resolveFleetTypeFromInterno(unit.interno) || 'Otro';
     });

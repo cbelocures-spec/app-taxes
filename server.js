@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '137';
+const APP_VERSION = '138';
 
 // Middleware
 app.use(cors());
@@ -3671,7 +3671,9 @@ function resolveTipoFlotaFromEquipo(equipoRaw) {
   if (equipo.startsWith('COMPACTADOR')) return 'COMPACTADOR';
   if (equipo.startsWith('VOLQUETE')) return 'VOLQUETE';
   if (equipo.startsWith('ROLL OFF') || equipo.startsWith('ROLL - OFF') || equipo.includes('ROLL')) return 'ROLL - OFF';
-  if (equipo.startsWith('PLANCHA')) return 'PLANCHA';
+  // Real planchas are catalogued as "CHASIS CON PLANCHA", not "PLANCHA ..." - startsWith missed
+  // every single one of them (they all fell through to the generic COMPACTADOR default instead).
+  if (equipo.includes('PLANCHA')) return 'PLANCHA';
   return null;
 }
 
