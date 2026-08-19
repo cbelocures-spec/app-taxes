@@ -3791,7 +3791,7 @@ function recalcularTotalesResumenLocal(state) {
 // Adds/moves one unit's novedad across the Parte Taller lists. Mirrors the old
 // Apps Script actualizarEstadoFlotaParte() 1:1, just backed by db.json instead
 // of PropertiesService.
-function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsableRaw, sectorRaw) {
+function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsableRaw, sectorRaw, destinoIngresoRaw) {
   const interno = String(internoRaw).trim();
   const estado = String(estadoRaw).trim().toLowerCase();
   const motivo = String(motivoRaw || '').trim();
@@ -3805,7 +3805,7 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   state.resumen = state.resumen || {};
   if (responsable) state.resumen.responsable = responsable;
 
-  const lists = ['servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones'];
+  const lists = ['servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones', 'transito'];
   let existingNovedad = '';
   let existingSector = null;
   let currentList = '';
@@ -3856,6 +3856,25 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   } else if (estado === 'inversiones' || estado === 'en_preparacion') {
     const newNovedad = appendMotivo(existingNovedad, motivo);
     state.inversiones.push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector });
+  } else if (estado === 'transito') {
+    // Was missing entirely: the unit got cleared from every list above (the same step every
+    // other estado goes through) but nothing ever put it back anywhere, since no branch here
+    // matched 'transito' - it just vanished on save instead of showing up in En Tránsito.
+    const newNovedad = appendMotivo(existingNovedad, motivo);
+    const destinoIngreso = String(destinoIngresoRaw || 'fuera_de_servicio').trim().toLowerCase();
+    if (!state.transito) state.transito = [];
+    state.transito.push({
+      interno, tipo, novedad: newNovedad,
+      novedad_items: newNovedad.split('\n').map(line => {
+        const hecho = line.startsWith('[X]') || line.startsWith('[x]');
+        const texto = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
+        return { texto, hecho };
+      }).filter(x => x.texto),
+      destinoIngreso,
+      fecha_en_ruta: fechaStr,
+      dia_parado: fechaStr,
+      sector: finalSector
+    });
   }
 
   recalcularTotalesResumenLocal(state);
@@ -3916,7 +3935,7 @@ app.post('/api/parte-taller/novedad', (req, res) => {
     }
     if (!payload.estado) payload.estado = 'fuera_de_servicio';
 
-    const msg = actualizarEstadoFlotaLocal(payload.interno, payload.estado, payload.motivo, payload.responsable, payload.sector);
+    const msg = actualizarEstadoFlotaLocal(payload.interno, payload.estado, payload.motivo, payload.responsable, payload.sector, payload.destinoIngreso);
     res.json({ ok: true, msg });
   } catch (error) {
     console.error('[Parte Taller] Error:', error);
