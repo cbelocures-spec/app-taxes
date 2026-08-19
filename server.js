@@ -2135,10 +2135,15 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
       updates.taxesOrderNumber = taxesOrderNumber;
     }
 
-    const isVerified = updates.verifiedStatus === 'success' || (updates.verifiedStatus === undefined && existing.verifiedStatus === 'success');
     const targetEstadoUnidad = req.body.estadoUnidad !== undefined ? req.body.estadoUnidad : existing.estadoUnidad;
     const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
 
+    // Both were referenced below but never defined - this made the endpoint throw a
+    // ReferenceError on every call, so the sync result never actually got saved and the
+    // order stayed stuck showing "sincronizando" forever no matter how many times the local
+    // agent reported a real result for it.
+    const currentTasks = updates.tasks || existing.tasks || [];
+    const allTasksFinished = currentTasks.length > 0 && currentTasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada'));
     const allTasksSynced = currentTasks.length > 0 && currentTasks.every(t => t && t.synced === true);
     
     // STRICT ARCHIVING RULE: Only archive if explicitly requested OR (OPERATIVO + 100% tasks finished + 100% tasks synced in Taxes)
