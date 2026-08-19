@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '138';
+const APP_VERSION = '139';
 
 // Middleware
 app.use(cors());
@@ -3666,6 +3666,15 @@ app.post('/api/insumos/:idEgreso/resolve', (req, res) => {
 // (kept local now — see database.js's getParteTallerState/saveParteTallerState
 // for why: the Sheets-backed PropertiesService store had no real transaction
 // safety and repeatedly lost data under concurrent writes).
+
+// Manual correction for internos whose "equipo" is just wrong in the Taxes catalog itself
+// (e.g. interno 153 is a real Compactador but Taxes has it catalogued as "CAMION"). The real
+// fix is correcting it in Taxes directly - add here only as a stopgap for a specific interno
+// someone's already flagged, not as a permanent home for every miscategorized unit.
+const INTERNO_TIPO_OVERRIDES = {
+  '153': 'COMPACTADOR'
+};
+
 function resolveTipoFlotaFromEquipo(equipoRaw) {
   const equipo = String(equipoRaw || '').trim().toUpperCase();
   if (equipo.startsWith('COMPACTADOR')) return 'COMPACTADOR';
@@ -3690,8 +3699,10 @@ function esInternoDeFlotaReal(interno) {
 
 function resolveTipoFromInterno(interno) {
   if (!esInternoDeFlotaReal(interno)) return null;
+  const cleanInterno = String(interno).trim();
+  if (INTERNO_TIPO_OVERRIDES[cleanInterno]) return INTERNO_TIPO_OVERRIDES[cleanInterno];
   const rodados = (db.getCatalogs() || {}).rodados || [];
-  const found = rodados.find(r => String(r.interno || '').trim() === String(interno).trim());
+  const found = rodados.find(r => String(r.interno || '').trim() === cleanInterno);
   return resolveTipoFlotaFromEquipo(found ? found.equipo : null) || 'COMPACTADOR';
 }
 
@@ -3710,7 +3721,8 @@ function calcularTotalesFlota() {
   rodados.forEach(r => {
     const equipoUpper = String(r.equipo || '').trim().toUpperCase();
     if (equipoUpper === 'HERRERIA' || equipoUpper === 'EDILICIO') return;
-    const tipo = resolveTipoFlotaFromEquipo(r.equipo);
+    const cleanInterno = String(r.interno || '').trim();
+    const tipo = INTERNO_TIPO_OVERRIDES[cleanInterno] || resolveTipoFlotaFromEquipo(r.equipo);
     if (tipo) totalesFrescos[tipo] = (totalesFrescos[tipo] || 0) + 1;
   });
 

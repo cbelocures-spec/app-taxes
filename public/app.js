@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '138';
+const CURRENT_APP_VERSION = '139';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1139,9 +1139,20 @@ async function applyUnitStatusChange(interno, orderId, estado) {
 
 let _checklistReviewCtx = null;
 
+// Manual correction for internos whose "equipo" is just wrong in the Taxes catalog itself
+// (e.g. interno 153 is a real Compactador but Taxes has it catalogued as "CAMION"). The real
+// fix is correcting it in Taxes directly - add here only as a stopgap for a specific interno
+// someone's already flagged, not as a permanent home for every miscategorized unit. Keep in
+// sync with INTERNO_TIPO_OVERRIDES in server.js.
+const INTERNO_TIPO_OVERRIDES = {
+  '153': 'COMPACTADOR'
+};
+
 function getUnitTipoForInterno(interno) {
+  const cleanInterno = String(interno || '').trim();
+  if (INTERNO_TIPO_OVERRIDES[cleanInterno]) return INTERNO_TIPO_OVERRIDES[cleanInterno];
   const rodadoOpt = cachedCatalogs.rodados
-    ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno || '').trim())
+    ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === cleanInterno)
     : null;
   const equipo = String(rodadoOpt ? rodadoOpt.equipo || '' : '').trim().toUpperCase();
   if (equipo.startsWith('COMPACTADOR')) return 'COMPACTADOR';
@@ -11522,8 +11533,10 @@ function adjustPtStateLists(state) {
   // everything else real (CAMIONETA, AUTOELEVADOR, IRINEO, REP. INT., etc.) still shows in the
   // tables but as "Otro", uncounted in the Compactador/Volquete/Roll-Off/Plancha totals.
   function resolveFleetTypeFromInterno(internoVal) {
+    const cleanInternoVal = String(internoVal || '').trim();
+    if (INTERNO_TIPO_OVERRIDES[cleanInternoVal]) return INTERNO_TIPO_OVERRIDES[cleanInternoVal];
     const rodadoOpt = cachedCatalogs.rodados
-      ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(internoVal || '').trim())
+      ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === cleanInternoVal)
       : null;
     const equipo = String(rodadoOpt ? rodadoOpt.equipo || '' : '').trim().toUpperCase();
     if (equipo === 'HERRERIA' || equipo === 'EDILICIO') return null;
