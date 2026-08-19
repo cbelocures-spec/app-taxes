@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '136';
+const CURRENT_APP_VERSION = '137';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12073,8 +12073,28 @@ function renderParteTallerDashboard(state) {
         }).join('');
   }
 
+  // The 4 stat cards up top (Compactador/Volquete/Roll-Off/Plancha) and their tables are meant
+  // to be truck-only - a Herrería/Edilicio work bucket ("12 verde", "Acoplado nuevo", etc.)
+  // mixed into "Fuera de Servicio" made it hard to tell fleet problems from shop-internal jobs
+  // at a glance. Anything whose tipo isn't one of the 4 tracked fleet types gets pulled out of
+  // every list below and shown together instead, in its own "Herrería / Edilicio" section.
+  function esUnidadDeFlotaTrackeada(item) {
+    const t = String((item && item.tipo) || '').trim().toUpperCase();
+    return t.includes('COMPAC') || t.includes('VOLQ') || t.includes('ROLL') || t.includes('PLANCHA');
+  }
+  const otrosItems = [];
+  function separarOtros(lista, origenLista) {
+    const deFlota = [];
+    (lista || []).forEach(item => {
+      if (esUnidadDeFlotaTrackeada(item)) deFlota.push(item);
+      else otrosItems.push({ item, origenLista });
+    });
+    return deFlota;
+  }
+
   // 1. Fuera de servicio
-  const fueraDeServicio = (displayState.fuera_de_servicio || []).filter(matchesPtSector).filter(unitMatchesSearch).sort((a, b) => getDaysValue(b) - getDaysValue(a));
+  const fueraDeServicio = separarOtros((displayState.fuera_de_servicio || []).filter(matchesPtSector).filter(unitMatchesSearch), 'fuera_de_servicio')
+    .sort((a, b) => getDaysValue(b) - getDaysValue(a));
   if (el('pt-out-count')) el('pt-out-count').textContent = fueraDeServicio.length;
   if (el('stat-total-taller')) el('stat-total-taller').textContent = fueraDeServicio.length;
   if (el('pt-fuera-tbody')) {
@@ -12126,7 +12146,8 @@ function renderParteTallerDashboard(state) {
   }
 
   // 2. En reparación
-  const reparacion = (displayState.reparacion || []).filter(matchesPtSector).filter(unitMatchesSearch).sort((a, b) => getDaysValue(b) - getDaysValue(a));
+  const reparacion = separarOtros((displayState.reparacion || []).filter(matchesPtSector).filter(unitMatchesSearch), 'reparacion')
+    .sort((a, b) => getDaysValue(b) - getDaysValue(a));
   if (el('pt-rep-count')) el('pt-rep-count').textContent = reparacion.length;
   if (el('stat-active-orders')) el('stat-active-orders').textContent = reparacion.length;
   if (el('pt-reparacion-tbody')) {
@@ -12178,7 +12199,7 @@ function renderParteTallerDashboard(state) {
   }
 
   // 3. Servicios pendientes
-  const pendientes = (displayState.servicios_pendientes || []).filter(matchesPtSector).filter(unitMatchesSearch);
+  const pendientes = separarOtros((displayState.servicios_pendientes || []).filter(matchesPtSector).filter(unitMatchesSearch), 'servicios_pendientes');
   if (el('pt-pend-count')) el('pt-pend-count').textContent = pendientes.length;
   if (el('pt-pendientes-tbody')) {
     if (pendientes.length === 0) {
@@ -12227,7 +12248,8 @@ function renderParteTallerDashboard(state) {
   }
 
   // 4. En Preparación (unidades recién compradas, todavía no tocaron la calle)
-  const enPreparacion = (displayState.inversiones || []).filter(matchesPtSector).filter(unitMatchesSearch).sort((a, b) => getDaysValue(b) - getDaysValue(a));
+  const enPreparacion = separarOtros((displayState.inversiones || []).filter(matchesPtSector).filter(unitMatchesSearch), 'inversiones')
+    .sort((a, b) => getDaysValue(b) - getDaysValue(a));
   if (el('pt-inversiones-count')) el('pt-inversiones-count').textContent = enPreparacion.length;
   if (el('pt-inversiones-tbody')) {
     if (enPreparacion.length === 0) {
@@ -12271,6 +12293,34 @@ function renderParteTallerDashboard(state) {
             </div>
           </div>`;
         }).join('');
+  }
+
+  // 5. Herrería / Edilicio - everything pulled out of the 4 lists above by separarOtros()
+  // because it isn't one of the 4 tracked fleet types. Shown all mixed together in one place
+  // instead of scattered across (and cluttering) the truck-focused tables.
+  const origenLabels = {
+    fuera_de_servicio: 'Fuera de Servicio',
+    reparacion: 'En Reparación',
+    servicios_pendientes: 'Servicios Pendientes',
+    inversiones: 'En Preparación'
+  };
+  if (el('pt-otros-count')) el('pt-otros-count').textContent = otrosItems.length;
+  if (el('pt-otros-tbody')) {
+    if (otrosItems.length === 0) {
+      el('pt-otros-tbody').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No hay items de Herrería/Edilicio.</td></tr>';
+    } else {
+      el('pt-otros-tbody').innerHTML = otrosItems.map(({ item, origenLista }) => {
+        const internoPT = String(item.interno || '');
+        const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
+        return `<tr>
+          <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${getEditBtnHtml(internoPT, origenLista)} <strong>${internoPT}</strong></div></td>
+          <td><span style="font-size:11px;">${item.tipo || 'Otro'}</span></td>
+          <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
+          <td><span class="badge" style="background:#e2e8f0; color:#334155; font-size:11px;">${origenLabels[origenLista] || origenLista}</span></td>
+          <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
+        </tr>`;
+      }).join('');
+    }
   }
 }
 
