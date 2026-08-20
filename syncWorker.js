@@ -3536,6 +3536,15 @@ async function syncWorkOrder(orderId) {
     }, orderTime);
 
     // Fill Titulo, Clasificación, and Incidente (Descripción)
+    // Edilicio orders carry an `area` (Baño, Oficina, etc.) that must show up in Taxes even
+    // though it's not a real Taxes field - the user wants it visible "por las dudas" in both
+    // the Título (Interno de la Unidad) and the Incidente, so it survives review there. Only
+    // these two texts get combined with the área; `order.rodado` (the Rodado searchable-select,
+    // handled separately above) must stay an exact, untouched catalog match for Puppeteer.
+    const areaPrefix = order.area ? String(order.area).trim() : '';
+    const internoForTaxes = areaPrefix ? `${areaPrefix} - ${order.interno}` : order.interno;
+    const incidenteForTaxes = areaPrefix ? `[${areaPrefix}] ${order.incidente || ''}`.trim() : (order.incidente || '');
+
     await safeEvaluate(page, (clasificacionVal, internoVal, incidenteVal) => {
       // Classification select (name: inv_ot_clasificacion_id)
       const classSelect = document.querySelector('select[name="inv_ot_clasificacion_id"]');
@@ -3574,7 +3583,7 @@ async function syncWorkOrder(orderId) {
         descTextarea.dispatchEvent(new Event('input', { bubbles: true }));
         descTextarea.dispatchEvent(new Event('change', { bubbles: true }));
       }
-    }, order.clasificacion, order.interno, order.incidente || '');
+    }, order.clasificacion, internoForTaxes, incidenteForTaxes);
 
     await delay(1000);
 

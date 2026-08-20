@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '140';
+const APP_VERSION = '141';
 
 // Middleware
 app.use(cors());
@@ -791,7 +791,7 @@ app.get('/api/orders', (req, res) => {
 
 app.post('/api/orders', (req, res) => {
   try {
-    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset, sector: sectorFromClient } = req.body;
+    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset, sector: sectorFromClient, area } = req.body;
 
     if (!rodado || !responsable || !clasificacion) {
       return res.status(400).json({ error: "Faltan campos obligatorios: rodado, responsable y clasificacion son requeridos." });
@@ -870,7 +870,8 @@ app.post('/api/orders', (req, res) => {
       createdBy,
       estadoUnidad: estadoUnidad || 'fuera_de_servicio',
       combustibleReset,
-      sector
+      sector,
+      area: area || null
     });
 
     // Guard: a new task can be created with its timer already running (started while
@@ -1044,7 +1045,7 @@ function deriveTaskDateFromHistory(timerHistory) {
 // Update a work order
 app.put('/api/orders/:id', (req, res) => {
   try {
-    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset } = req.body;
+    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset, area } = req.body;
     
     const existing = db.getWorkOrderById(req.params.id);
     if (!existing) {
@@ -1285,6 +1286,7 @@ app.put('/api/orders/:id', (req, res) => {
       // Backfill `sector` for orders created before this field existed, based on
       // whoever originally created it (not whoever is editing it now).
       sector: resolvedSectorField,
+      area: area !== undefined ? area : existing.area,
       tasks: finalTasksToSave,
       archived: isArchived,
       archivedAt: isArchived ? (existing.archivedAt || new Date().toISOString()) : null,
@@ -3090,6 +3092,26 @@ app.get('/api/catalogs', (req, res) => {
   try {
     const catalogs = db.getCatalogs();
     res.json(catalogs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Supervisor-maintained areas/sectors within a building (Baño, Oficina, Depósito...) for
+// Edilicio orders - lets one interno (building) split into a separate O.T. per area instead
+// of merging all its work into a single order.
+app.get('/api/areas-edilicio', (req, res) => {
+  try {
+    res.json({ areas: db.getAreasEdilicio() });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/areas-edilicio', (req, res) => {
+  try {
+    const areas = db.addAreaEdilicio(req.body && req.body.nombre);
+    res.json({ areas });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

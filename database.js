@@ -641,6 +641,27 @@ class LocalDB {
     return state;
   }
 
+  // --- Áreas Edilicio Methods ---
+  // Supervisor-maintained list of building areas/sectors (Baño, Oficina, Depósito, etc.) used
+  // to split Edilicio work into separate O.T.s per area instead of one big order per building.
+  getAreasEdilicio() {
+    const db = this.read();
+    return Array.isArray(db.areasEdilicio) ? db.areasEdilicio : [];
+  }
+
+  addAreaEdilicio(nombre) {
+    const clean = String(nombre || '').trim();
+    if (!clean) return this.getAreasEdilicio();
+    const db = this.read();
+    if (!Array.isArray(db.areasEdilicio)) db.areasEdilicio = [];
+    const exists = db.areasEdilicio.some(a => a.trim().toLowerCase() === clean.toLowerCase());
+    if (!exists) {
+      db.areasEdilicio.push(clean);
+      this.write(db);
+    }
+    return db.areasEdilicio;
+  }
+
   // --- Catalogs Methods ---
   getCatalogs() {
     const db = this.read();
@@ -882,6 +903,10 @@ class LocalDB {
       estadoUnidad: orderData.estadoUnidad || 'operativo',
       combustibleReset: orderData.combustibleReset || null,
       sector: orderData.sector || null,
+      // Which area/room of the building this Edilicio order is for (Baño, Oficina, etc.) - lets
+      // the same interno (building) hold several separate open O.T.s at once, one per area,
+      // instead of every Edilicio job for that building merging into a single order.
+      area: orderData.area || null,
       archived: !!orderData.archived,
       deleted: !!orderData.deleted,
       deletedAt: orderData.deletedAt || null

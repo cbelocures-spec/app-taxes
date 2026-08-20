@@ -1647,6 +1647,18 @@
               </div>
             </div>
 
+            <div class="form-group" id="form-area-edilicio-group" style="display: none;">
+              <label for="form-area-edilicio">Área / Sector *</label>
+              <select id="form-area-edilicio" onchange="onFormAreaEdilicioChange()">
+                <option value="">Seleccionar área...</option>
+                <option value="__new__">+ Agregar área nueva...</option>
+              </select>
+              <div id="form-area-edilicio-new-row" style="display: none; margin-top: 8px; gap: 8px; align-items: center;">
+                <input type="text" id="form-area-edilicio-new-input" placeholder="Nombre del área/sector (ej: Baño)" style="flex: 1; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; height: 38px;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveNewAreaEdilicio()">Guardar</button>
+              </div>
+            </div>
+
             <div class="form-group" style="display: none;">
               <label for="form-incidente">Incidente o Requisito</label>
               <textarea id="form-incidente" placeholder="Describa el incidente o requisito..." rows="3"></textarea>
@@ -2261,6 +2273,6 @@
     }
   </style>
 
-  <script src="app.js?v=140"></script>
+  <script src="app.js?v=141"></script>
 </body>
 </html>

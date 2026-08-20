@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '140';
+const CURRENT_APP_VERSION = '141';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -145,6 +145,7 @@ window.fetch = async function(url, options = {}) {
 // Global State
 let cachedCatalogs = { rodados: [], responsables: [], empleados: [], centrosCosto: [] };
 let cachedInternoOptions = [];
+let cachedAreasEdilicio = [];
 let cachedNovelties = [];
 let activeOrders = [];
 // Task ids with an optimistic dashboard change (pause/resume/finish) whose PUT save is still
@@ -370,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (localStorage.getItem('currentUserUsername')) {
     fetchSettings();
     fetchCatalogs();
+    fetchAreasEdilicio();
     fetchOrders();
     fetchActiveMechanics();
     fetchParteTallerEstado();
@@ -1801,6 +1803,8 @@ function editOrder(orderId) {
     }
   }
   setupAllFieldsForSector();
+  const areaSelectEdit = document.getElementById('form-area-edilicio');
+  if (areaSelectEdit) areaSelectEdit.value = order.area || '';
   document.getElementById('form-incidente').value = order.incidente;
   document.getElementById('form-fecha').value = order.fechaEntrega;
   document.getElementById('form-hora').value = order.horario;
@@ -1901,6 +1905,9 @@ function viewOrder(orderId) {
     }
   }
   document.getElementById('form-clasificacion').value = order.clasificacion;
+  setupAllFieldsForSector();
+  const areaSelectView = document.getElementById('form-area-edilicio');
+  if (areaSelectView) areaSelectView.value = order.area || '';
   document.getElementById('form-incidente').value = order.incidente || '';
   document.getElementById('form-fecha').value = order.fechaEntrega;
   document.getElementById('form-hora').value = order.horario;
@@ -2334,6 +2341,69 @@ async function fetchCatalogs() {
     }
   } catch (error) {
     console.error("Error loading catalogs:", error);
+  }
+}
+
+async function fetchAreasEdilicio() {
+  try {
+    const res = await fetch('/api/areas-edilicio');
+    if (!res.ok) throw new Error("Error fetching areas edilicio");
+    const data = await res.json();
+    cachedAreasEdilicio = Array.isArray(data.areas) ? data.areas : [];
+    populateAreaEdilicioSelect();
+  } catch (error) {
+    console.error("Error loading areas edilicio:", error);
+  }
+}
+
+function populateAreaEdilicioSelect(selectedValue) {
+  const select = document.getElementById('form-area-edilicio');
+  if (!select) return;
+  const preserve = selectedValue !== undefined ? selectedValue : select.value;
+  select.innerHTML = '<option value="">Seleccionar área...</option>' +
+    cachedAreasEdilicio.map(a => `<option value="${a.replace(/"/g, '&quot;')}">${a}</option>`).join('') +
+    '<option value="__new__">+ Agregar área nueva...</option>';
+  if (preserve && preserve !== '__new__') {
+    const exists = Array.from(select.options).some(opt => opt.value === preserve);
+    if (exists) select.value = preserve;
+  }
+}
+
+function onFormAreaEdilicioChange() {
+  const select = document.getElementById('form-area-edilicio');
+  const newRow = document.getElementById('form-area-edilicio-new-row');
+  if (!select || !newRow) return;
+  if (select.value === '__new__') {
+    newRow.style.display = 'flex';
+    const input = document.getElementById('form-area-edilicio-new-input');
+    if (input) input.focus();
+  } else {
+    newRow.style.display = 'none';
+  }
+}
+
+async function saveNewAreaEdilicio() {
+  const input = document.getElementById('form-area-edilicio-new-input');
+  const nombre = input ? input.value.trim() : '';
+  if (!nombre) {
+    return showToast("Escribí un nombre para la nueva área.", "danger");
+  }
+  try {
+    const res = await fetch('/api/areas-edilicio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre })
+    });
+    if (!res.ok) throw new Error("Error al guardar el área");
+    const data = await res.json();
+    cachedAreasEdilicio = Array.isArray(data.areas) ? data.areas : cachedAreasEdilicio;
+    populateAreaEdilicioSelect(nombre);
+    const newRow = document.getElementById('form-area-edilicio-new-row');
+    if (newRow) newRow.style.display = 'none';
+    if (input) input.value = '';
+    showToast("Área agregada.", "success");
+  } catch (error) {
+    showToast("No se pudo guardar el área.", "danger");
   }
 }
 
@@ -3648,7 +3718,7 @@ function createHistoryCardHtml(order) {
         <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; margin-right: 8px;">
           ${canManageHistory ? `<input type="checkbox" class="history-order-select-checkbox" data-id="${order.id}" onchange="onHistoryOrderSelectionChange(event)" ${isChecked} style="margin: 0; width: 18px; height: 18px; cursor: pointer;">` : ''}
           <div style="min-width: 0; flex: 1;">
-            <div class="order-card-title" style="font-size:16px; font-weight:700; color:var(--primary);">${order.rodado}</div>
+            <div class="order-card-title" style="font-size:16px; font-weight:700; color:var(--primary);">${order.rodado}${order.area ? ` <span style="color:#7c3aed;">- ${order.area}</span>` : ''}</div>
             <div class="order-card-subtitle" style="font-size:13px; color:var(--text-muted); margin-top:2px;">Interno: <strong style="color:var(--text-color);">${order.interno}</strong> | Clasificación: <strong>${order.clasificacion || 'Preventivo'}</strong></div>
           </div>
         </div>
@@ -3841,7 +3911,7 @@ function createOrderCardHtml(order) {
             `
           ) : ''}
           <div style="min-width: 0; flex: 1;">
-            <div class="order-card-title">${order.rodado}</div>
+            <div class="order-card-title">${order.rodado}${order.area ? ` <span style="color:#7c3aed;font-weight:600;">- ${order.area}</span>` : ''}</div>
             <div class="order-card-subtitle" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
               <span>Interno: <strong>${(order.interno && order.interno !== '--') ? order.interno : '0KM'}</strong> | Clasificación: <strong>${order.clasificacion || 'Sin Clasificar'}</strong></span>
               ${(() => {
@@ -4100,7 +4170,18 @@ async function submitWorkOrder() {
     const userSector = getSectorByUsername(localStorage.getItem('currentUserUsername'));
     const formClasif = clasificacionEl ? clasificacionEl.value : '';
     const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || formClasif === 'Herrería');
+    const isEdilicioForm = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio');
     const rodadoVal = rodadoEl ? rodadoEl.value : '';
+
+    let areaVal = "";
+    if (isEdilicioForm) {
+      const areaEl = document.getElementById('form-area-edilicio');
+      areaVal = areaEl ? areaEl.value.trim() : "";
+      if (!areaVal || areaVal === '__new__') {
+        showToast("Por favor, selecciona el Área/Sector.", "danger");
+        return;
+      }
+    }
 
     const internoTextEl = document.getElementById('form-interno-text');
     let internoVal = "";
@@ -4258,7 +4339,8 @@ async function submitWorkOrder() {
       // on behalf of Edilicio/Herrería must have it land under that sector, not under "Admin"
       // (which used to make it invisible to Edilicio/Herrería users, since the server otherwise
       // only had the creator's own login-derived sector to go on).
-      sector: currentSelectedSector
+      sector: currentSelectedSector,
+      area: isEdilicioForm ? areaVal : (editingOrder ? editingOrder.area : null)
     };
    
     const url = currentEditingOrderId ? `/api/orders/${currentEditingOrderId}` : '/api/orders';
@@ -10454,6 +10536,21 @@ function setupAllFieldsForSector() {
     if (internoTextGroup) internoTextGroup.style.display = 'none';
     if (internoSelect) internoSelect.setAttribute('required', 'true');
     if (internoText) internoText.removeAttribute('required');
+  }
+
+  // 4. Área/Sector (Edilicio only) - each área of the same building (baño, oficina, etc.)
+  // becomes its own O.T., so this dropdown is required whenever the order is Edilicio.
+  const areaGroup = document.getElementById('form-area-edilicio-group');
+  const areaSelect = document.getElementById('form-area-edilicio');
+  if (isEdilicio) {
+    if (areaGroup) areaGroup.style.display = 'block';
+    if (areaSelect) areaSelect.setAttribute('required', 'true');
+    populateAreaEdilicioSelect();
+  } else {
+    if (areaGroup) areaGroup.style.display = 'none';
+    if (areaSelect) areaSelect.removeAttribute('required');
+    const areaNewRow = document.getElementById('form-area-edilicio-new-row');
+    if (areaNewRow) areaNewRow.style.display = 'none';
   }
 }
 
