@@ -1634,6 +1634,13 @@
                 <label for="form-interno-text">Interno Unidad *</label>
                 <input type="text" id="form-interno-text" placeholder="Ej: 5655" list="internos-datalist" style="width: 100%; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; height: 38px;">
               </div>
+              <div class="form-group col-6" id="form-area-edilicio-group" style="display: none; flex: 0 0 calc(50% - 6px); min-width: 0; max-width: calc(50% - 6px); box-sizing: border-box;">
+                <label for="form-area-edilicio">Área / Sector *</label>
+                <select id="form-area-edilicio" onchange="onFormAreaEdilicioChange()">
+                  <option value="">Seleccionar área...</option>
+                  <option value="__new__">+ Agregar área nueva...</option>
+                </select>
+              </div>
               <div class="form-group col-6" style="flex: 0 0 calc(50% - 6px); min-width: 0; max-width: calc(50% - 6px); box-sizing: border-box;">
                 <label for="form-clasificacion">Clasificación *</label>
                 <select id="form-clasificacion" required>
@@ -1647,16 +1654,9 @@
               </div>
             </div>
 
-            <div class="form-group" id="form-area-edilicio-group" style="display: none;">
-              <label for="form-area-edilicio">Área / Sector *</label>
-              <select id="form-area-edilicio" onchange="onFormAreaEdilicioChange()">
-                <option value="">Seleccionar área...</option>
-                <option value="__new__">+ Agregar área nueva...</option>
-              </select>
-              <div id="form-area-edilicio-new-row" style="display: none; margin-top: 8px; gap: 8px; align-items: center;">
-                <input type="text" id="form-area-edilicio-new-input" placeholder="Nombre del área/sector (ej: Baño)" style="flex: 1; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; height: 38px;">
-                <button type="button" class="btn btn-primary btn-sm" onclick="saveNewAreaEdilicio()">Guardar</button>
-              </div>
+            <div id="form-area-edilicio-new-row" style="display: none; margin: -8px 0 12px; gap: 8px; align-items: center;">
+              <input type="text" id="form-area-edilicio-new-input" placeholder="Nombre del área/sector (ej: Baño)" style="flex: 1; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; height: 38px;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="saveNewAreaEdilicio()">Guardar</button>
             </div>
 
             <div class="form-group" style="display: none;">
@@ -2273,6 +2273,6 @@
     }
   </style>
 
-  <script src="app.js?v=141"></script>
+  <script src="app.js?v=142"></script>
 </body>
 </html>

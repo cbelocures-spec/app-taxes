@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '141';
+const CURRENT_APP_VERSION = '142';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -4172,6 +4172,7 @@ async function submitWorkOrder() {
     const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || formClasif === 'Herrería');
     const isEdilicioForm = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio');
     const rodadoVal = rodadoEl ? rodadoEl.value : '';
+    const rodadoLabel = (rodadoEl && rodadoEl.options && rodadoEl.selectedIndex >= 0) ? (rodadoEl.options[rodadoEl.selectedIndex].text || rodadoVal) : rodadoVal;
 
     let areaVal = "";
     if (isEdilicioForm) {
@@ -4185,7 +4186,12 @@ async function submitWorkOrder() {
 
     const internoTextEl = document.getElementById('form-interno-text');
     let internoVal = "";
-    if (isHerreria) {
+    if (isEdilicioForm) {
+      // Edilicio's Rodado catalog is the building/property list itself (label = its interno) -
+      // there's no separate real "unit interno" to type, so the Área/Sector dropdown now sits
+      // where that text box used to be and this is derived straight from the chosen Rodado.
+      internoVal = rodadoLabel;
+    } else if (isHerreria) {
       internoVal = internoTextEl ? internoTextEl.value.trim() : "";
     } else {
       internoVal = internoEl ? internoEl.value.trim() : "";
@@ -4202,8 +4208,6 @@ async function submitWorkOrder() {
     if (!rodadoVal) return showToast("Por favor, selecciona un Rodado.", "danger");
     if (!internoVal) return showToast("Por favor, selecciona el Interno de Unidad.", "danger");
     if (!clasificacionEl.value) return showToast("Por favor, selecciona una Clasificación.", "danger");
-
-    const rodadoLabel = (rodadoEl && rodadoEl.options && rodadoEl.selectedIndex >= 0) ? (rodadoEl.options[rodadoEl.selectedIndex].text || rodadoVal) : rodadoVal;
    
     // Collect tasks safely
     const tasks = [];
@@ -10520,36 +10524,43 @@ function setupAllFieldsForSector() {
     if (preInternoSelect.rebuildSearchable) preInternoSelect.rebuildSearchable();
   }
 
-  // 3. Main modal ("Datos Generales"): Interno uses free text input box for Herrería/Edilicio
+  // 3. Main modal ("Datos Generales"): this slot shows exactly one of three mutually
+  // exclusive controls - the plain Interno select (Taller), a free-text Interno box
+  // (Herrería, which has no building-catalog shortcut), or the Área/Sector dropdown
+  // (Edilicio). Edilicio's own Rodado already IS the building/interno, so there's nothing
+  // left to type here - the área fills this slot instead, and is what feeds Taxes'
+  // "Interno de la Unidad" at sync time (see syncWorker.js).
   const internoSelectGroup = document.getElementById('form-interno-group-select');
   const internoTextGroup = document.getElementById('form-interno-group-text');
   const internoSelect = document.getElementById('form-interno');
   const internoText = document.getElementById('form-interno-text');
+  const areaGroup = document.getElementById('form-area-edilicio-group');
+  const areaSelect = document.getElementById('form-area-edilicio');
+  const areaNewRow = document.getElementById('form-area-edilicio-new-row');
 
-  if (isHerreria || isEdilicio) {
+  if (isEdilicio) {
+    if (internoSelectGroup) internoSelectGroup.style.display = 'none';
+    if (internoTextGroup) internoTextGroup.style.display = 'none';
+    if (internoSelect) internoSelect.removeAttribute('required');
+    if (internoText) internoText.removeAttribute('required');
+    if (areaGroup) areaGroup.style.display = 'block';
+    if (areaSelect) areaSelect.setAttribute('required', 'true');
+    populateAreaEdilicioSelect();
+  } else if (isHerreria) {
     if (internoSelectGroup) internoSelectGroup.style.display = 'none';
     if (internoTextGroup) internoTextGroup.style.display = 'block';
     if (internoSelect) internoSelect.removeAttribute('required');
     if (internoText) internoText.setAttribute('required', 'true');
+    if (areaGroup) areaGroup.style.display = 'none';
+    if (areaSelect) areaSelect.removeAttribute('required');
+    if (areaNewRow) areaNewRow.style.display = 'none';
   } else {
     if (internoSelectGroup) internoSelectGroup.style.display = 'block';
     if (internoTextGroup) internoTextGroup.style.display = 'none';
     if (internoSelect) internoSelect.setAttribute('required', 'true');
     if (internoText) internoText.removeAttribute('required');
-  }
-
-  // 4. Área/Sector (Edilicio only) - each área of the same building (baño, oficina, etc.)
-  // becomes its own O.T., so this dropdown is required whenever the order is Edilicio.
-  const areaGroup = document.getElementById('form-area-edilicio-group');
-  const areaSelect = document.getElementById('form-area-edilicio');
-  if (isEdilicio) {
-    if (areaGroup) areaGroup.style.display = 'block';
-    if (areaSelect) areaSelect.setAttribute('required', 'true');
-    populateAreaEdilicioSelect();
-  } else {
     if (areaGroup) areaGroup.style.display = 'none';
     if (areaSelect) areaSelect.removeAttribute('required');
-    const areaNewRow = document.getElementById('form-area-edilicio-new-row');
     if (areaNewRow) areaNewRow.style.display = 'none';
   }
 }
