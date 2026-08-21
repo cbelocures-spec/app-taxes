@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '143';
+const CURRENT_APP_VERSION = '144';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1167,6 +1167,12 @@ function getUnitTipoForInterno(interno) {
 }
 
 async function openChecklistReviewModal(interno, orderId, estado) {
+  // Defensive reset: if a previous confirm on this same modal left the button stuck as
+  // disabled/"Guardando..." (e.g. an error skipped the reset at the end of
+  // confirmChecklistReviewAndApply), the modal must never reopen already showing that state.
+  const confirmBtn = document.getElementById('pt-review-confirm-btn');
+  if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Confirmar'; }
+
   let items = [];
   let tipo = '';
   try {
@@ -1349,11 +1355,13 @@ async function confirmChecklistReviewAndApply() {
   const btn = document.getElementById('pt-review-confirm-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
 
-  await applyParteTallerReconciliation(interno, estado, remainingItems, tipo, destino);
-  closeChecklistReviewModal();
-  await applyUnitStatusChange(interno, orderId, estado);
-
-  if (btn) { btn.disabled = false; btn.textContent = 'Confirmar'; }
+  try {
+    await applyParteTallerReconciliation(interno, estado, remainingItems, tipo, destino);
+    closeChecklistReviewModal();
+    await applyUnitStatusChange(interno, orderId, estado);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirmar'; }
+  }
 }
 
 function openPtUnitModalForInterno(interno, sourceOrderId) {
