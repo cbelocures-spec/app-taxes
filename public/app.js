@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '145';
+const CURRENT_APP_VERSION = '146';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -2707,7 +2707,14 @@ function addTaskField(taskData = null) {
     });
 
     const isNew = taskData === null;
-    const timerStarted = taskData && (taskData.timerStarted === true || taskData.timerStarted === 'true' || (Array.isArray(taskData.timerHistory) && taskData.timerHistory.length > 0)) ? 'true' : 'false';
+    // Whether the card renders as "currently running" must follow the task's own
+    // `timerStarted` flag - merely HAVING timer history (which every already-worked task
+    // does, running or not) used to be enough on its own to mark it running here. That
+    // meant reopening the edit modal for an order with an already-paused task (any history
+    // at all) silently re-flagged it as running on save, which then made the server's
+    // auto-pause-conflicting-timers logic think that employee "just started" here and pause
+    // their real, currently-running timer on a completely different order.
+    const timerStarted = taskData && (taskData.timerStarted === true || taskData.timerStarted === 'true') ? 'true' : 'false';
     const timerHistoryJson = taskData && taskData.timerHistory ? JSON.stringify(taskData.timerHistory) : '[]';
 
     let displayHours = taskData ? parseFloat(String(taskData.horasEstimadas).replace(',', '.')) || 0 : 0;
