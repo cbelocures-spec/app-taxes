@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '146';
+const CURRENT_APP_VERSION = '147';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11739,6 +11739,27 @@ function adjustPtStateLists(state) {
   ['fuera_de_servicio', 'reparacion'].forEach(listName => {
     if (Array.isArray(state[listName])) {
       state[listName] = state[listName].filter(unit => !matchesOperativoOrder(unit.interno) && !hasNoOutstandingItems(unit));
+    }
+  });
+
+  // A unit the supervisor has explicitly marked "En Preparación" (inversiones) takes
+  // precedence over any stale entry left behind elsewhere - otherwise, once a unit has BOTH
+  // an inversiones entry and a leftover fuera_de_servicio/reparacion/servicios_pendientes
+  // entry from before it was marked as preparación, step 2-3 below keeps reviving/refreshing
+  // that stale entry (pushing it back into "reparacion") every time its Taxes task is
+  // touched, duplicating it across both tables. Step 4's "skip creating a new temp entry"
+  // guard only ever protected against a *brand-new* duplicate, not this one.
+  const preparacionInternos = new Set((state.inversiones || []).map(u => String(u.interno).trim().toUpperCase()));
+  function matchesPreparacionUnit(internoPT) {
+    const ptIntUpper = String(internoPT || '').trim().toUpperCase();
+    if (preparacionInternos.has(ptIntUpper)) return true;
+    if (ptIntUpper.includes('IRINEO') && preparacionInternos.has('IRINEO GRAL.')) return true;
+    if ((ptIntUpper.includes('NICO') || ptIntUpper.startsWith('NICO')) && preparacionInternos.has('VOLQUETE NICO')) return true;
+    return false;
+  }
+  ['fuera_de_servicio', 'reparacion', 'servicios_pendientes'].forEach(listName => {
+    if (Array.isArray(state[listName])) {
+      state[listName] = state[listName].filter(unit => !matchesPreparacionUnit(unit.interno));
     }
   });
 
