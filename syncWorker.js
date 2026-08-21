@@ -4146,14 +4146,32 @@ async function verifyWorkOrderWithTimeout(orderId) {
   }
 }
 
-// Helper wrapper to execute syncWorkOrder with a 6-minute global safety timeout
+// Helper wrapper to execute syncWorkOrder with a global safety timeout. A fixed 6 minutes was
+// only ever enough for orders with a handful of tasks - each task takes ~15-20s of its own in
+// Puppeteer (click, wait for AJAX, searchable employee select, fill hours with retries, fill
+// descripción, toggle estado), so an order with many tasks could still be legitimately working
+// when the fixed timeout killed it. Scale the budget with the task count instead, with a floor
+// that keeps covering login+standard-fields+save+verify for small orders.
+const SYNC_TIMEOUT_BASE_MS = 360 * 1000; // login, standard fields, save, verify - orders with few tasks
+const SYNC_TIMEOUT_PER_TASK_MS = 20 * 1000; // ~20s budget per task, generous enough for retries
+const SYNC_TIMEOUT_MAX_MS = 25 * 60 * 1000; // hard ceiling so a genuinely stuck browser still gets killed
+
 async function syncWorkOrderWithTimeout(orderId) {
   let timeoutId;
+  let timeoutMinutes = 6;
   try {
+    const order = db.getWorkOrderById(orderId);
+    const taskCount = order && Array.isArray(order.tasks) ? order.tasks.length : 0;
+    const timeoutMs = Math.min(
+      SYNC_TIMEOUT_MAX_MS,
+      Math.max(SYNC_TIMEOUT_BASE_MS, taskCount * SYNC_TIMEOUT_PER_TASK_MS + 120 * 1000)
+    );
+    timeoutMinutes = Math.round(timeoutMs / 60000);
+
     await Promise.race([
       syncWorkOrder(orderId),
       new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Timeout: sincronización tardó más de 6 minutos')), 360 * 1000);
+        timeoutId = setTimeout(() => reject(new Error(`Timeout: sincronización tardó más de ${timeoutMinutes} minutos`)), timeoutMs);
       })
     ]);
   } catch (err) {
@@ -4162,7 +4180,7 @@ async function syncWorkOrderWithTimeout(orderId) {
     try {
       db.updateWorkOrder(orderId, {
         syncStatus: 'error',
-        syncError: err.message || 'Sincronización cancelada por timeout de 6 minutos'
+        syncError: err.message || `Sincronización cancelada por timeout de ${timeoutMinutes} minutos`
       });
     } catch (dbErr) {
       console.error(`[SyncWorker Timeout Safety] Error al actualizar BD para orden ID ${orderId}:`, dbErr.message);
