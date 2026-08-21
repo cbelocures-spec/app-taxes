@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '144';
+const CURRENT_APP_VERSION = '145';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13610,7 +13610,12 @@ async function savePtUnit() {
             horario: "12:00",
             incidente: incidentDesc,
             tasks: [],
-            estadoUnidad: (estado === 'fuera_de_servicio' ? 'fuera_de_servicio' : 'operativo')
+            // This only runs for estado 'reparacion' or 'fuera_de_servicio' (see the `else if`
+            // above) - both mean the unit is NOT operational, so the auto-created order always
+            // has to start Fuera de Servicio. Checking only the literal string
+            // 'fuera_de_servicio' left 'reparacion' falling through to 'operativo' by mistake -
+            // same bug already fixed for the "brand-new unit" path above.
+            estadoUnidad: 'fuera_de_servicio'
           };
 
           await fetch('/api/orders', {
@@ -13631,6 +13636,11 @@ async function savePtUnit() {
     }
 
     closePtUnitModal();
+    // Refresh activeOrders BEFORE re-rendering the Parte Taller dashboard - otherwise the
+    // "Abrir Orden / Crear Orden" button on this unit still doesn't see the OT that was just
+    // auto-created above, and a supervisor clicking "Crear Orden" right after ends up creating
+    // a duplicate instead of opening the one that already exists.
+    if (typeof fetchOrders === 'function') await fetchOrders();
     fetchParteTallerEstado();
 
     if (window._ptLinkedOrderId) {
