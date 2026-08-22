@@ -4013,13 +4013,17 @@ async function syncWorkOrder(orderId) {
         console.error("Failed to take error screenshot:", screenshotErr.message);
       }
     }
+    // A thrown value without a real .message (e.g. a bare string/object) left syncError blank
+    // here before, which then rendered as an unhelpful "Error desconocido" in the app with no
+    // way to diagnose what actually failed.
+    const errorMessage = (error && error.message) ? error.message : (String(error) || 'Error desconocido durante la sincronización.');
     db.updateWorkOrder(orderId, {
       syncStatus: "error",
-      syncError: error.message,
+      syncError: errorMessage,
       autoSyncRetryCount: (order.autoSyncRetryCount || 0) + 1,
       lastAutoSyncAttempt: new Date().toISOString()
     });
-    return { success: false, message: error.message };
+    return { success: false, message: errorMessage };
   } finally {
     // Liberar los candados pase lo que pase (éxito o falla)
     const claveCandado = `${order.interno}_${order.clasificacion}`;

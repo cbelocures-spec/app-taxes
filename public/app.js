@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '152';
+const CURRENT_APP_VERSION = '153';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -857,6 +857,20 @@ function openPreOrderModal() {
     }
   }
 
+  // Área/Sector (Edilicio only) - shown here too so the existing-order lookup below can
+  // require it to match, not just Rodado/Interno. Without this, picking the same building
+  // again for a DIFFERENT área reopened whatever order was already open for that building
+  // instead of starting a new one, merging every área's tasks into a single O.T.
+  const preAreaGroup = document.getElementById('pre-form-area-edilicio-group');
+  const preAreaSelect = document.getElementById('pre-form-area-edilicio');
+  const isEdilicioUserForPreOrder = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Edilicio' || currentSelectedSector === 'Edilicio');
+  if (preAreaGroup) preAreaGroup.style.display = isEdilicioUserForPreOrder ? 'block' : 'none';
+  if (preAreaSelect) {
+    preAreaSelect.innerHTML = '<option value="">Seleccionar área...</option>' +
+      cachedAreasEdilicio.map(a => `<option value="${a.replace(/"/g, '&quot;')}">${a}</option>`).join('');
+    preAreaSelect.value = '';
+  }
+
   // Set up input vs select based on user sector AND updated classification
   setupAllFieldsForSector();
 
@@ -1411,6 +1425,17 @@ async function submitPreOrderCheck() {
     return;
   }
 
+  const isEdilicioUserForPreOrder = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio');
+  let preAreaVal = "";
+  if (isEdilicioUserForPreOrder) {
+    const preAreaEl = document.getElementById('pre-form-area-edilicio');
+    preAreaVal = preAreaEl ? preAreaEl.value.trim() : "";
+    if (!preAreaVal) {
+      showToast("Por favor, selecciona el Área/Sector.", "danger");
+      return;
+    }
+  }
+
   const isCarmona = currentUser === 'jcarmona@contenedoreshugo.com.ar' || currentUser === 'j.carmona@contenedoreshugo.com.ar';
 
   let existingOrder = null;
@@ -1433,7 +1458,11 @@ async function submitPreOrderCheck() {
       if (userSector === 'Herrería') {
         return orderIsHerreria;
       } else if (userSector === 'Edilicio') {
-        return orderIsEdilicio;
+        // A building can hold several separate open O.T.s at once, one per área - matching
+        // only by interno/clasificacion here (like Taller does) would reopen whichever área's
+        // order was already open and merge a different área's tasks into it.
+        if (!orderIsEdilicio) return false;
+        return String(o.area || '').trim().toLowerCase() === preAreaVal.trim().toLowerCase();
       } else {
         // Taller user: only match existing Taller orders (NOT Herrería or Edilicio)
         return !orderIsHerreria && !orderIsEdilicio;
@@ -1471,6 +1500,10 @@ async function submitPreOrderCheck() {
 
     closePreOrderModal();
     openNewOrderModal(interno, clasificacion);
+    if (isEdilicioUserForPreOrder && preAreaVal) {
+      const areaSelectInNewOrder = document.getElementById('form-area-edilicio');
+      if (areaSelectInNewOrder) areaSelectInNewOrder.value = preAreaVal;
+    }
 
     if (taskGroups.length > 0) {
       taskGroups.forEach(group => {
