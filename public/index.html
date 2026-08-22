@@ -970,7 +970,7 @@
       <!-- En Tránsito (Trabajando en Ruta) -->
       <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('trans')">
         <div style="display:flex; align-items:center; gap:8px;">
-          <h3 style="font-size: 14px; font-weight: 700; margin: 0;">En Tránsito (Trabajando / Novedad en Ruta)</h3>
+          <h3 style="font-size: 14px; font-weight: 700; margin: 0; color: #9333ea;">En Tránsito (Trabajando / Novedad en Ruta)</h3>
           <span class="badge" style="background-color: #9333ea; color: white;" id="pt-trans-count">0</span>
         </div>
         <span class="material-icons" id="pt-trans-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
@@ -999,41 +999,9 @@
         </table>
       </div>
 
-      <!-- Fuera de Servicio and Under Repair -->
-      <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('fuera')">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <h3 style="font-size: 14px; font-weight: 700; margin: 0;">Fuera de Servicio / En Taller</h3>
-          <span class="badge" style="background-color: #ef4444; color: white;" id="pt-out-count">0</span>
-        </div>
-        <span class="material-icons" id="pt-fuera-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
-      </div>
-      <div id="pt-fuera-mobile-cards" class="pt-mobile-cards-list">
-        <!-- Mobile dynamic -->
-      </div>
-
-      <div class="prev-table-container">
-        <table class="prev-table">
-          <thead>
-            <tr>
-              <th>Interno</th>
-              <th>Tipo</th>
-              <th>Novedad / Falla (Seleccionar)</th>
-              <th>Orden de Trabajo</th>
-              <th>Días Parado</th>
-              <th>Desde</th>
-            </tr>
-          </thead>
-          <tbody id="pt-fuera-tbody">
-            <tr>
-              <td colspan="6" style="text-align: center; padding: 20px;">No hay unidades registradas fuera de servicio.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
       <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('rep')">
         <div style="display:flex; align-items:center; gap:8px;">
-          <h3 style="font-size: 14px; font-weight: 700; margin: 0;">En Reparación</h3>
+          <h3 style="font-size: 14px; font-weight: 700; margin: 0; color: #ff9800;">En Reparación</h3>
           <span class="badge" style="background-color: #ff9800; color: white;" id="pt-rep-count">0</span>
         </div>
         <span class="material-icons" id="pt-rep-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
@@ -1062,14 +1030,15 @@
         </table>
       </div>
 
-      <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('pend')">
+      <!-- Fuera de Servicio and Under Repair -->
+      <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('fuera')">
         <div style="display:flex; align-items:center; gap:8px;">
-          <h3 style="font-size: 14px; font-weight: 700; margin: 0;">Servicios Pendientes</h3>
-          <span class="badge" style="background-color: #2196f3; color: white;" id="pt-pend-count">0</span>
+          <h3 style="font-size: 14px; font-weight: 700; margin: 0; color: #ef4444;">Fuera de Servicio / En Taller</h3>
+          <span class="badge" style="background-color: #ef4444; color: white;" id="pt-out-count">0</span>
         </div>
-        <span class="material-icons" id="pt-pend-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
+        <span class="material-icons" id="pt-fuera-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
       </div>
-      <div id="pt-pend-mobile-cards" class="pt-mobile-cards-list">
+      <div id="pt-fuera-mobile-cards" class="pt-mobile-cards-list">
         <!-- Mobile dynamic -->
       </div>
 
@@ -1079,14 +1048,15 @@
             <tr>
               <th>Interno</th>
               <th>Tipo</th>
-              <th>Novedades (Seleccionar)</th>
+              <th>Novedad / Falla (Seleccionar)</th>
               <th>Orden de Trabajo</th>
-              <th>Servicio</th>
+              <th>Días Parado</th>
+              <th>Desde</th>
             </tr>
           </thead>
-          <tbody id="pt-pendientes-tbody">
+          <tbody id="pt-fuera-tbody">
             <tr>
-              <td colspan="5" style="text-align: center; padding: 20px;">No hay servicios pendientes.</td>
+              <td colspan="6" style="text-align: center; padding: 20px;">No hay unidades registradas fuera de servicio.</td>
             </tr>
           </tbody>
         </table>
@@ -1094,7 +1064,7 @@
 
       <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('inversiones')">
         <div style="display:flex; align-items:center; gap:8px;">
-          <h3 style="font-size: 14px; font-weight: 700; margin: 0;">🏗️ Unidades en Preparación</h3>
+          <h3 style="font-size: 14px; font-weight: 700; margin: 0; color: #f59e0b;">🏗️ Unidades en Preparación</h3>
           <span class="badge" style="background-color: #f59e0b; color: white;" id="pt-inversiones-count">0</span>
         </div>
         <span class="material-icons" id="pt-inversiones-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
@@ -1123,9 +1093,39 @@
         </table>
       </div>
 
+      <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('pend')">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3 style="font-size: 14px; font-weight: 700; margin: 0; color: #2196f3;">Servicios Pendientes</h3>
+          <span class="badge" style="background-color: #2196f3; color: white;" id="pt-pend-count">0</span>
+        </div>
+        <span class="material-icons" id="pt-pend-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
+      </div>
+      <div id="pt-pend-mobile-cards" class="pt-mobile-cards-list">
+        <!-- Mobile dynamic -->
+      </div>
+
+      <div class="prev-table-container">
+        <table class="prev-table">
+          <thead>
+            <tr>
+              <th>Interno</th>
+              <th>Tipo</th>
+              <th>Novedades (Seleccionar)</th>
+              <th>Orden de Trabajo</th>
+              <th>Servicio</th>
+            </tr>
+          </thead>
+          <tbody id="pt-pendientes-tbody">
+            <tr>
+              <td colspan="5" style="text-align: center; padding: 20px;">No hay servicios pendientes.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <div class="partetaller-section-header pt-section-toggle" onclick="togglePtSection('otros')">
         <div style="display:flex; align-items:center; gap:8px;">
-          <h3 style="font-size: 14px; font-weight: 700; margin: 0;">🔧 Herrería / Edilicio</h3>
+          <h3 style="font-size: 14px; font-weight: 700; margin: 0; color: #64748b;">🔧 Herrería / Edilicio</h3>
           <span class="badge" style="background-color: #64748b; color: white;" id="pt-otros-count">0</span>
         </div>
         <span class="material-icons" id="pt-otros-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
@@ -2273,6 +2273,6 @@
     }
   </style>
 
-  <script src="app.js?v=147"></script>
+  <script src="app.js?v=148"></script>
 </body>
 </html>
