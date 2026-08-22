@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '149';
+const CURRENT_APP_VERSION = '150';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11999,6 +11999,18 @@ function renderParteTallerDashboard(state) {
     if (el(`pt-inv-${t.suffix}`)) el(`pt-inv-${t.suffix}`).textContent = inv;
     if (el(`pt-tot-${t.suffix}`)) el(`pt-tot-${t.suffix}`).textContent = tot;
     if (el(`pt-pct-${t.suffix}`)) el(`pt-pct-${t.suffix}`).textContent = `${pct}%`;
+
+    // Home (Inicio) mirrors the same totals: full cards on desktop (home-op/rep/fs/inv/tot/pct),
+    // plus a compact quadrant box on mobile showing the combined "not operational" count
+    // (Fuera Serv. + Reparación + Preparación) - see #home-type-summary-mobile in index.html.
+    if (el(`home-op-${t.suffix}`)) el(`home-op-${t.suffix}`).textContent = op;
+    if (el(`home-rep-${t.suffix}`)) el(`home-rep-${t.suffix}`).textContent = rep;
+    if (el(`home-fs-${t.suffix}`)) el(`home-fs-${t.suffix}`).textContent = fs;
+    if (el(`home-inv-${t.suffix}`)) el(`home-inv-${t.suffix}`).textContent = inv;
+    if (el(`home-tot-${t.suffix}`)) el(`home-tot-${t.suffix}`).textContent = tot;
+    if (el(`home-pct-${t.suffix}`)) el(`home-pct-${t.suffix}`).textContent = `${pct}%`;
+    if (el(`home-quad-${t.suffix}`)) el(`home-quad-${t.suffix}`).textContent = fs + rep + inv;
+    if (el(`home-quad-${t.suffix}-detail`)) el(`home-quad-${t.suffix}-detail`).textContent = `${fs} F/S · ${rep} R · ${inv} P`;
   });
 
   // Checklist helper
@@ -12214,6 +12226,31 @@ function renderParteTallerDashboard(state) {
       }).join('');
     }
   }
+  // HOME (Inicio): compact En Tránsito - just Interno, Novedad, Acción, reusing the same
+  // `transito` list and the same ingresarUnidadTransito() action as the full Parte Taller table.
+  if (el('home-trans-count')) el('home-trans-count').textContent = transito.length;
+  if (el('home-transito-tbody')) {
+    if (transito.length === 0) {
+      el('home-transito-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades en tránsito.</td></tr>';
+    } else {
+      el('home-transito-tbody').innerHTML = transito.map(item => {
+        const internoPT = String(item.interno || '');
+        const items = Array.isArray(item.novedad_items) && item.novedad_items.length > 0
+          ? item.novedad_items
+          : (item.novedad || '').split('\n').map(l => l.replace(/^\[\s*[xX]?\s*\]\s*/, '').trim()).filter(Boolean).map(texto => ({ texto, hecho: false }));
+        const novedadText = items.filter(x => !x.hecho).map(x => x.texto).join(', ') || '—';
+        const ingresarBtn = `<button class="btn btn-success btn-xs" onclick="ingresarUnidadTransito('${internoPT}')" style="background:#16a34a; color:#fff; border:none; padding:4px 8px; font-weight:600; font-size:11px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;" title="Marcar que la unidad llegó al taller">
+          <span class="material-icons" style="font-size:14px;">login</span> Ingresó
+        </button>`;
+        return `<tr>
+          <td><strong>${internoPT}</strong></td>
+          <td style="font-size:12px; color:var(--text-muted);">${novedadText}</td>
+          <td>${ingresarBtn}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
   // Mobile cards for En Tránsito
   const transMobile = el('pt-trans-mobile-cards');
   if (transMobile) {

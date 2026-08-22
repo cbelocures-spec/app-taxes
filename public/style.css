@@ -2227,6 +2227,19 @@ body {
   }
 }
 
+/* HOME: type summary - full dark cards on desktop, compact quadrant box on mobile */
+#home-type-summary-mobile {
+  display: none;
+}
+@media (max-width: 768px) {
+  #home-type-summary-desktop {
+    display: none !important;
+  }
+  #home-type-summary-mobile {
+    display: grid;
+  }
+}
+
 /* =============================================
    VOICE MODULE
    ============================================= */
