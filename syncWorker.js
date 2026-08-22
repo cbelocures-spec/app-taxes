@@ -2415,40 +2415,6 @@ async function syncWorkOrder(orderId) {
         }
       }
 
-      // Last resort: the OT may have been closed directly in Taxes' own UI (moved out of "En
-      // Proceso" into "Cerradas") by someone working there - our record still thinks there's
-      // something to reconcile, but there's nothing left to do once Taxes itself considers the
-      // job finished, and it will never appear under "En Proceso" no matter how many times this
-      // retries. Check "Cerradas" before giving up so this stops retrying forever against a
-      // row that will never exist there.
-      if (!pencilClicked) {
-        console.log(`[Reconcile] Row not found in "En Proceso". Checking "Cerradas" in case the O.T. was already closed directly in Taxes...`);
-        const clickedCerradas = await safeEvaluate(page, () => {
-          const navLinks = Array.from(document.querySelectorAll('a.nav-link, [role="tab"], .nav-tabs li a, .nav li a'));
-          const tab = navLinks.find(t => t.textContent.trim().toLowerCase().includes('cerrada'));
-          if (tab) { tab.click(); return true; }
-          return false;
-        });
-        if (clickedCerradas) {
-          await delay(2500);
-          const foundInCerradas = await safeEvaluate(page, (otNum) => {
-            const rows = Array.from(document.querySelectorAll('table tbody tr'));
-            return rows.some(row => {
-              const cells = Array.from(row.querySelectorAll('td'));
-              return cells.some(c => {
-                const txt = c.textContent.replace(/#/g, '').replace(/\s+/g, ' ').trim();
-                return txt === otNum || txt.includes(otNum);
-              });
-            });
-          }, otNumClean);
-          if (foundInCerradas) {
-            console.log(`[Reconcile] O.T. #${otNumClean} está Cerrada en Taxes - no hay nada para reconciliar. Dando por sincronizada.`);
-            db.updateWorkOrder(orderId, { syncStatus: "success", syncError: null, verifiedStatus: null, verifiedError: null });
-            return { success: true, message: `O.T. #${otNumClean} ya está Cerrada en Taxes - nada para reconciliar.` };
-          }
-        }
-      }
-
       if (!pencilClicked) {
         // Save screenshot for debugging
         try {
