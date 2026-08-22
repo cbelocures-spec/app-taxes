@@ -4156,9 +4156,15 @@ async function verifyWorkOrderWithTimeout(orderId) {
 // descripción, toggle estado), so an order with many tasks could still be legitimately working
 // when the fixed timeout killed it. Scale the budget with the task count instead, with a floor
 // that keeps covering login+standard-fields+save+verify for small orders.
+// The RECONCILE path (reopening an already-existing O.T. via the Lápiz to add/confirm tasks -
+// see the "Editar O.T." flow above) is slower per task than creating a brand-new order: each
+// new task card waits up to 15s just to confirm it rendered in the DOM, on top of the usual
+// fill time - an order with many tasks going through that path could still legitimately be
+// working when 20s/task ran out, timing out mid-way and closing the browser before ever
+// clicking Guardar (so nothing gets saved even though it looked like it was making progress).
 const SYNC_TIMEOUT_BASE_MS = 360 * 1000; // login, standard fields, save, verify - orders with few tasks
-const SYNC_TIMEOUT_PER_TASK_MS = 20 * 1000; // ~20s budget per task, generous enough for retries
-const SYNC_TIMEOUT_MAX_MS = 25 * 60 * 1000; // hard ceiling so a genuinely stuck browser still gets killed
+const SYNC_TIMEOUT_PER_TASK_MS = 35 * 1000; // ~35s budget per task, covers the slower reconcile-via-Lápiz path
+const SYNC_TIMEOUT_MAX_MS = 40 * 60 * 1000; // hard ceiling so a genuinely stuck browser still gets killed
 
 async function syncWorkOrderWithTimeout(orderId) {
   let timeoutId;
