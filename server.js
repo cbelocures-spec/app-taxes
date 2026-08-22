@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '151';
+const APP_VERSION = '152';
 
 // Middleware
 app.use(cors());
@@ -235,6 +235,17 @@ function autoPauseConflictingTimers(currentOrderId, tasksToCheck, previousTasksB
 // cuando existe una unidad con ese interno, para que Rodado e Interno Unidad nunca queden
 // desincronizados en una orden guardada (el cliente puede enviarlos desincronizados por bug de UI).
 function resolveRodadoForInterno(interno, fallbackRodado) {
+  // Herrería/Edilicio "bucket" rodados (IRINEO GRAL., VOLQUETE NICO, REPARACIONES INTERNAS, or
+  // a REP./FABRICACION/FINALIZACION/PRENSAS generic-equipment bucket) aren't tied to any one
+  // real vehicle - the "Interno Unidad" typed alongside them is just a reference note (e.g.
+  // "this Herrería job is about unit 25"), not the actual unit the order is for. Self-healing
+  // Rodado from that interno used to silently swap a legitimate bucket like "IRINEO GRAL." for
+  // whatever real truck that interno number happened to belong to - skip the override entirely
+  // when the rodado already on file is one of these buckets.
+  const cleanFallback = String(fallbackRodado || '').trim().toUpperCase();
+  if (INTERNOS_NO_FLOTA.has(cleanFallback) || isHerreriaExclusiveEquipment(null, fallbackRodado)) {
+    return fallbackRodado;
+  }
   const cleanInterno = String(interno || '').trim();
   if (!cleanInterno) return fallbackRodado;
   const rodados = (db.read().catalogs || {}).rodados || [];
