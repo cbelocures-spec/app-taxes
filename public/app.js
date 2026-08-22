@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '148';
+const CURRENT_APP_VERSION = '149';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -3735,6 +3735,12 @@ function createHistoryCardHtml(order) {
           <div style="min-width: 0; flex: 1;">
             <div class="order-card-title" style="font-size:16px; font-weight:700; color:var(--primary);">${order.rodado}${order.area ? ` <span style="color:#7c3aed;">- ${order.area}</span>` : ''}</div>
             <div class="order-card-subtitle" style="font-size:13px; color:var(--text-muted); margin-top:2px;">Interno: <strong style="color:var(--text-color);">${order.interno}</strong> | Clasificación: <strong>${order.clasificacion || 'Preventivo'}</strong></div>
+            ${order.incidente ? `
+              <div style="font-size:12px; color:var(--text-muted); margin-top:4px; display:flex; align-items:flex-start; gap:4px;" title="Motivo con el que se creó esta orden">
+                <span class="material-icons" style="font-size:14px; flex-shrink:0; margin-top:1px;">info</span>
+                <span style="font-style:italic;">${escapeHtml(order.incidente)}</span>
+              </div>
+            ` : ''}
           </div>
         </div>
         ${(() => {
@@ -3947,6 +3953,12 @@ function createOrderCardHtml(order) {
                 `;
               })()}
             </div>
+            ${order.incidente ? `
+              <div style="font-size:12px; color:var(--text-muted); margin-top:4px; display:flex; align-items:flex-start; gap:4px;" title="Motivo con el que se creó esta orden">
+                <span class="material-icons" style="font-size:14px; flex-shrink:0; margin-top:1px;">info</span>
+                <span style="font-style:italic;">${escapeHtml(order.incidente)}</span>
+              </div>
+            ` : ''}
           </div>
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;">
