@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '154';
+const CURRENT_APP_VERSION = '155';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -8328,9 +8328,19 @@ window.switchSector = function(sector) {
   if (typeof updateStats === 'function') updateStats();
   if (typeof setupAllFieldsForSector === 'function') setupAllFieldsForSector();
   if (typeof renderHistoryOrders === 'function') renderHistoryOrders();
+  updateHomeFleetSectionVisibility();
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
+
+// Edilicio (mantenimiento de edificios) no tiene flota de camiones - En Tránsito, el resumen
+// por tipo (Compactador/Volquete/Roll-Off/Plancha) y Preventivos Vencidos en Inicio no aplican
+// a ese sector y solo confunden.
+function updateHomeFleetSectionVisibility() {
+  const section = document.getElementById('home-fleet-summary-section');
+  if (!section) return;
+  section.style.display = (currentSelectedSector === 'Edilicio') ? 'none' : 'block';
+}
 
 function getFilteredActiveOrders() {
   if (!activeOrders || !Array.isArray(activeOrders)) return [];
@@ -9039,6 +9049,7 @@ function checkUserSession() {
   if (loginSector === 'Herrería' || loginSector === 'Edilicio') {
     currentSelectedSector = loginSector;
   }
+  updateHomeFleetSectionVisibility();
 
   loadUserPermissionsUI();
   updateClassificationSelectOptions();

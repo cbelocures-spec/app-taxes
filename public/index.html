@@ -90,6 +90,10 @@
         </div>
       </div>
 
+      <!-- HOME: fleet-only sections (En Tránsito, resumen por tipo, Preventivos) - no aplican a
+           Edilicio (mantenimiento de edificios, no tiene flota de camiones). -->
+      <div id="home-fleet-summary-section">
+
       <!-- HOME: EN TRÁNSITO (resumido) -->
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
         <span class="badge" style="background:#9333ea; color:#fff;" id="home-trans-count">0</span>
@@ -223,6 +227,9 @@
           <div style="font-size: 10px; color: var(--text-muted);" id="stat-sub-prev">0 este mes</div>
         </div>
       </div>
+
+      </div>
+      <!-- /HOME: fleet-only sections -->
 
       <!-- OPERATOR DASHBOARD SECTION -->
       <div class="dashboard-section">
@@ -2390,6 +2397,6 @@
     }
   </style>
 
-  <script src="app.js?v=154"></script>
+  <script src="app.js?v=155"></script>
 </body>
 </html>
