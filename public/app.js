@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '153';
+const CURRENT_APP_VERSION = '154';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -866,10 +866,10 @@ function openPreOrderModal() {
   const isEdilicioUserForPreOrder = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Edilicio' || currentSelectedSector === 'Edilicio');
   if (preAreaGroup) preAreaGroup.style.display = isEdilicioUserForPreOrder ? 'block' : 'none';
   if (preAreaSelect) {
-    preAreaSelect.innerHTML = '<option value="">Seleccionar área...</option>' +
-      cachedAreasEdilicio.map(a => `<option value="${a.replace(/"/g, '&quot;')}">${a}</option>`).join('');
-    preAreaSelect.value = '';
+    populateAreaEdilicioSelect('', 'pre-form-area-edilicio');
   }
+  const preAreaNewRow = document.getElementById('pre-form-area-edilicio-new-row');
+  if (preAreaNewRow) preAreaNewRow.style.display = 'none';
 
   // Set up input vs select based on user sector AND updated classification
   setupAllFieldsForSector();
@@ -1430,7 +1430,7 @@ async function submitPreOrderCheck() {
   if (isEdilicioUserForPreOrder) {
     const preAreaEl = document.getElementById('pre-form-area-edilicio');
     preAreaVal = preAreaEl ? preAreaEl.value.trim() : "";
-    if (!preAreaVal) {
+    if (!preAreaVal || preAreaVal === '__new__') {
       showToast("Por favor, selecciona el Área/Sector.", "danger");
       return;
     }
@@ -2397,8 +2397,8 @@ async function fetchAreasEdilicio() {
   }
 }
 
-function populateAreaEdilicioSelect(selectedValue) {
-  const select = document.getElementById('form-area-edilicio');
+function populateAreaEdilicioSelect(selectedValue, selectId = 'form-area-edilicio') {
+  const select = document.getElementById(selectId);
   if (!select) return;
   const preserve = selectedValue !== undefined ? selectedValue : select.value;
   select.innerHTML = '<option value="">Seleccionar área...</option>' +
@@ -2440,6 +2440,44 @@ async function saveNewAreaEdilicio() {
     cachedAreasEdilicio = Array.isArray(data.areas) ? data.areas : cachedAreasEdilicio;
     populateAreaEdilicioSelect(nombre);
     const newRow = document.getElementById('form-area-edilicio-new-row');
+    if (newRow) newRow.style.display = 'none';
+    if (input) input.value = '';
+    showToast("Área agregada.", "success");
+  } catch (error) {
+    showToast("No se pudo guardar el área.", "danger");
+  }
+}
+
+function onPreFormAreaEdilicioChange() {
+  const select = document.getElementById('pre-form-area-edilicio');
+  const newRow = document.getElementById('pre-form-area-edilicio-new-row');
+  if (!select || !newRow) return;
+  if (select.value === '__new__') {
+    newRow.style.display = 'flex';
+    const input = document.getElementById('pre-form-area-edilicio-new-input');
+    if (input) input.focus();
+  } else {
+    newRow.style.display = 'none';
+  }
+}
+
+async function savePreNewAreaEdilicio() {
+  const input = document.getElementById('pre-form-area-edilicio-new-input');
+  const nombre = input ? input.value.trim() : '';
+  if (!nombre) {
+    return showToast("Escribí un nombre para la nueva área.", "danger");
+  }
+  try {
+    const res = await fetch('/api/areas-edilicio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre })
+    });
+    if (!res.ok) throw new Error("Error al guardar el área");
+    const data = await res.json();
+    cachedAreasEdilicio = Array.isArray(data.areas) ? data.areas : cachedAreasEdilicio;
+    populateAreaEdilicioSelect(nombre, 'pre-form-area-edilicio');
+    const newRow = document.getElementById('pre-form-area-edilicio-new-row');
     if (newRow) newRow.style.display = 'none';
     if (input) input.value = '';
     showToast("Área agregada.", "success");

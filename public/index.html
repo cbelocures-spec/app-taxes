@@ -1463,9 +1463,14 @@
         </div>
         <div class="form-group" id="pre-form-area-edilicio-group" style="margin-top: 15px; display: none;">
           <label for="pre-form-area-edilicio">Área / Sector *</label>
-          <select id="pre-form-area-edilicio" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
+          <select id="pre-form-area-edilicio" onchange="onPreFormAreaEdilicioChange()" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
             <option value="">Seleccionar área...</option>
+            <option value="__new__">+ Agregar área nueva...</option>
           </select>
+          <div id="pre-form-area-edilicio-new-row" style="display: none; margin-top: 8px; gap: 8px; align-items: center;">
+            <input type="text" id="pre-form-area-edilicio-new-input" placeholder="Nombre del área/sector (ej: Baño)" style="flex: 1; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; height: 38px;">
+            <button type="button" class="btn btn-primary btn-sm" onclick="savePreNewAreaEdilicio()">Guardar</button>
+          </div>
         </div>
         <div class="form-group" id="pre-order-pending-items-group" style="margin-top: 15px; display: none;">
           <label>Ítems pendientes de esta unidad</label>
@@ -2385,6 +2390,6 @@
     }
   </style>
 
-  <script src="app.js?v=153"></script>
+  <script src="app.js?v=154"></script>
 </body>
 </html>
