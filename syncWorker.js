@@ -2265,15 +2265,28 @@ async function syncWorkOrder(orderId) {
         await page.keyboard.press('Backspace');
         await page.keyboard.type(otNumClean, { delay: 80 });
         await delay(500);
-        console.log(`[Reconcile] Typed OT number "${otNumClean}". Navigating to BUSCAR via Tab...`);
-        await page.keyboard.press('Tab');
-        await delay(200);
-        await page.keyboard.press('Tab');
-        await delay(200);
-        await page.keyboard.press('Tab');
-        await delay(200);
-        await page.keyboard.press('Enter');
-        console.log(`[Reconcile] Pressed Enter on focused BUSCAR button`);
+        // Blindly tabbing a fixed number of times to reach BUSCAR was fragile - any extra
+        // field or a different tab order left focus somewhere else, so Enter never actually
+        // triggered the search and the OT row never appeared. Find and click BUSCAR directly
+        // by its text instead, same reliable approach used for the fleet-catalog scrape.
+        console.log(`[Reconcile] Typed OT number "${otNumClean}". Clicking BUSCAR button directly...`);
+        const buscarClicked = await safeEvaluate(page, () => {
+          const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
+          for (const btn of buttons) {
+            const text = (btn.textContent || '').trim().toUpperCase();
+            const val = (btn.value || '').toUpperCase();
+            if (text.includes('BUSCAR') || val.includes('BUSCAR')) {
+              btn.click();
+              return true;
+            }
+          }
+          return false;
+        });
+        if (!buscarClicked) {
+          console.warn(`[Reconcile] BUSCAR button not found by text - falling back to Enter on the Numero field.`);
+          await page.keyboard.press('Enter');
+        }
+        console.log(`[Reconcile] BUSCAR click result: ${buscarClicked}`);
         await delay(1000);
       } else {
         console.warn(`[Reconcile] Could not find Numero input field`);
