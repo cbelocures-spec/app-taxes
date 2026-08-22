@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '150';
+const CURRENT_APP_VERSION = '151';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12010,7 +12010,7 @@ function renderParteTallerDashboard(state) {
     if (el(`home-tot-${t.suffix}`)) el(`home-tot-${t.suffix}`).textContent = tot;
     if (el(`home-pct-${t.suffix}`)) el(`home-pct-${t.suffix}`).textContent = `${pct}%`;
     if (el(`home-quad-${t.suffix}`)) el(`home-quad-${t.suffix}`).textContent = fs + rep + inv;
-    if (el(`home-quad-${t.suffix}-detail`)) el(`home-quad-${t.suffix}-detail`).textContent = `${fs} F/S · ${rep} R · ${inv} P`;
+    if (el(`home-quad-${t.suffix}-detail`)) el(`home-quad-${t.suffix}-detail`).innerHTML = `<span style="color:#ef4444;">${fs} F/S</span> · <span style="color:#f97316;">${rep} R</span> · <span style="color:#d97706;">${inv} P</span>`;
   });
 
   // Checklist helper
@@ -12249,6 +12249,27 @@ function renderParteTallerDashboard(state) {
         </tr>`;
       }).join('');
     }
+  }
+  const homeTransMobile = el('home-transito-mobile-cards');
+  if (homeTransMobile) {
+    homeTransMobile.innerHTML = transito.length === 0
+      ? '<p style="text-align:center;color:var(--text-muted);padding:12px 0;">No hay unidades en tránsito.</p>'
+      : transito.map(item => {
+          const internoPT = String(item.interno || '');
+          const items = Array.isArray(item.novedad_items) && item.novedad_items.length > 0
+            ? item.novedad_items
+            : (item.novedad || '').split('\n').map(l => l.replace(/^\[\s*[xX]?\s*\]\s*/, '').trim()).filter(Boolean).map(texto => ({ texto, hecho: false }));
+          const novedadText = items.filter(x => !x.hecho).map(x => x.texto).join(', ') || '—';
+          return `<div class="pt-mobile-card">
+            <div class="pt-mobile-card-header">
+              <strong style="font-size:15px;">${internoPT}</strong>
+              <button class="btn btn-success btn-xs" onclick="ingresarUnidadTransito('${internoPT}')" style="background:#16a34a; color:#fff; border:none; padding:5px 10px; font-weight:600; font-size:11px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="Marcar que la unidad llegó al taller">
+                <span class="material-icons" style="font-size:14px;">login</span> Ingresó
+              </button>
+            </div>
+            <div class="pt-mobile-card-row"><span style="color:var(--text-muted); font-size:12px;">${novedadText}</span></div>
+          </div>`;
+        }).join('');
   }
 
   // Mobile cards for En Tránsito

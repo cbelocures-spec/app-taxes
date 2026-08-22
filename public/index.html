@@ -111,6 +111,7 @@
           </tbody>
         </table>
       </div>
+      <div id="home-transito-mobile-cards" class="pt-mobile-cards-list"></div>
 
       <!-- HOME: RESUMEN POR TIPO DE UNIDAD -->
       <!-- Desktop: las 4 tarjetas completas oscuras, igual que en Parte Taller -->
@@ -182,33 +183,33 @@
       </div>
 
       <!-- Mobile: un cuadro dividido en 4, con el número resumido (Fuera Serv. + Reparación + Preparación) -->
-      <div id="home-type-summary-mobile" style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; margin-bottom:18px;">
-        <div style="padding:14px; border-right:1px solid var(--border-color); border-bottom:1px solid var(--border-color);">
+      <div id="home-type-summary-mobile" style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; margin-bottom:18px; overflow:hidden;">
+        <div style="padding:14px; border-right:1px solid var(--border-color); border-bottom:1px solid var(--border-color); border-left:4px solid #3b82f6;">
           <div style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Compactadores</div>
           <div style="margin-top:4px;">
-            <span style="font-size:24px; font-weight:800; color:var(--text-color);" id="home-quad-comp">0</span>
-            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;" id="home-quad-comp-detail">0 F/S · 0 R · 0 P</div>
+            <span style="font-size:24px; font-weight:800; color:#3b82f6;" id="home-quad-comp">0</span>
+            <div style="font-size:10px; margin-top:2px;" id="home-quad-comp-detail">0 F/S · 0 R · 0 P</div>
           </div>
         </div>
-        <div style="padding:14px; border-bottom:1px solid var(--border-color);">
+        <div style="padding:14px; border-bottom:1px solid var(--border-color); border-left:4px solid #8b5cf6;">
           <div style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Volquete</div>
           <div style="margin-top:4px;">
-            <span style="font-size:24px; font-weight:800; color:var(--text-color);" id="home-quad-volq">0</span>
-            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;" id="home-quad-volq-detail">0 F/S · 0 R · 0 P</div>
+            <span style="font-size:24px; font-weight:800; color:#8b5cf6;" id="home-quad-volq">0</span>
+            <div style="font-size:10px; margin-top:2px;" id="home-quad-volq-detail">0 F/S · 0 R · 0 P</div>
           </div>
         </div>
-        <div style="padding:14px; border-right:1px solid var(--border-color);">
+        <div style="padding:14px; border-right:1px solid var(--border-color); border-left:4px solid #06b6d4;">
           <div style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Roll - Off</div>
           <div style="margin-top:4px;">
-            <span style="font-size:24px; font-weight:800; color:var(--text-color);" id="home-quad-roll">0</span>
-            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;" id="home-quad-roll-detail">0 F/S · 0 R · 0 P</div>
+            <span style="font-size:24px; font-weight:800; color:#06b6d4;" id="home-quad-roll">0</span>
+            <div style="font-size:10px; margin-top:2px;" id="home-quad-roll-detail">0 F/S · 0 R · 0 P</div>
           </div>
         </div>
-        <div style="padding:14px;">
+        <div style="padding:14px; border-left:4px solid #f97316;">
           <div style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Plancha</div>
           <div style="margin-top:4px;">
-            <span style="font-size:24px; font-weight:800; color:var(--text-color);" id="home-quad-plancha">0</span>
-            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;" id="home-quad-plancha-detail">0 F/S · 0 R · 0 P</div>
+            <span style="font-size:24px; font-weight:800; color:#f97316;" id="home-quad-plancha">0</span>
+            <div style="font-size:10px; margin-top:2px;" id="home-quad-plancha-detail">0 F/S · 0 R · 0 P</div>
           </div>
         </div>
       </div>
@@ -2378,6 +2379,6 @@
     }
   </style>
 
-  <script src="app.js?v=150"></script>
+  <script src="app.js?v=151"></script>
 </body>
 </html>
