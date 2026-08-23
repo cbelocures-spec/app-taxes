@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '159';
+const APP_VERSION = '160';
 
 // Middleware
 app.use(cors());
@@ -3705,7 +3705,8 @@ app.post('/api/insumos/:idEgreso/resolve', (req, res) => {
 // fix is correcting it in Taxes directly - add here only as a stopgap for a specific interno
 // someone's already flagged, not as a permanent home for every miscategorized unit.
 const INTERNO_TIPO_OVERRIDES = {
-  '153': 'COMPACTADOR'
+  '153': 'COMPACTADOR',
+  '50': 'ROLL - OFF'
 };
 
 function resolveTipoFlotaFromEquipo(equipoRaw) {

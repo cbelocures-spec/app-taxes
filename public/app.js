@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '159';
+const CURRENT_APP_VERSION = '160';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1161,7 +1161,8 @@ let _checklistReviewCtx = null;
 // someone's already flagged, not as a permanent home for every miscategorized unit. Keep in
 // sync with INTERNO_TIPO_OVERRIDES in server.js.
 const INTERNO_TIPO_OVERRIDES = {
-  '153': 'COMPACTADOR'
+  '153': 'COMPACTADOR',
+  '50': 'ROLL - OFF'
 };
 
 function getUnitTipoForInterno(interno) {
