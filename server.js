@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '165';
+const APP_VERSION = '167';
 
 // Middleware
 app.use(cors());
@@ -341,11 +341,17 @@ function routeForeignTasksToSiblingOrder(sector, tasksForSector, ctx) {
   const siblingClasificacion = sector === 'Herrería' ? 'Herrería' : 'Correctivo';
   const cleanInterno = String(ctx.interno || '').trim().toLowerCase();
 
+  const cleanArea = String(ctx.area || '').trim().toLowerCase();
   const sibling = cleanInterno ? (db.getSyncableOrders() || []).find(o =>
     o.id !== ctx.excludeOrderId &&
     o.archived !== true && o.deleted !== true &&
     String(o.interno || '').trim().toLowerCase() === cleanInterno &&
-    getOrderSector(o.clasificacion, o.sector) === sector
+    getOrderSector(o.clasificacion, o.sector) === sector &&
+    // Edilicio can have several sibling orders open for the same building at once, one per
+    // área - matching only by interno+sector here dumped a "foreign" Edilicio task into
+    // whichever área's order happened to exist first, regardless of which área it actually
+    // belonged to.
+    (sector !== 'Edilicio' || String(o.area || '').trim().toLowerCase() === cleanArea)
   ) : null;
 
   if (sibling) {
@@ -378,7 +384,8 @@ function routeForeignTasksToSiblingOrder(sector, tasksForSector, ctx) {
     createdBy: ctx.createdBy,
     estadoUnidad: ctx.estadoUnidad,
     combustibleReset: ctx.combustibleReset,
-    sector: sector
+    sector: sector,
+    area: sector === 'Edilicio' ? (ctx.area || null) : null
   });
   console.log(`[Auto-Split] Creada orden hermana nueva ${created.id} para sector ${sector} (Interno ${ctx.interno}), ${tasksForSector.length} tarea(s) movida(s).`);
   autoPauseConflictingTimers(created.id, created.tasks, null);
@@ -907,7 +914,8 @@ app.post('/api/orders', (req, res) => {
         incidente,
         createdBy,
         estadoUnidad: estadoUnidad || 'fuera_de_servicio',
-        combustibleReset
+        combustibleReset,
+        area: area || null
       });
     });
 
@@ -1252,7 +1260,8 @@ app.put('/api/orders/:id', (req, res) => {
         incidente,
         createdBy,
         estadoUnidad: targetEstadoUnidad,
-        combustibleReset: combustibleReset !== undefined ? combustibleReset : existing.combustibleReset
+        combustibleReset: combustibleReset !== undefined ? combustibleReset : existing.combustibleReset,
+        area: area !== undefined ? area : existing.area
       });
     });
 

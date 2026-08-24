@@ -1837,6 +1837,7 @@ async function syncWorkOrder(orderId) {
       const existingWithOt = (dbData.workOrders || []).find(o =>
         String(o.id) !== String(orderId) &&
         o.deleted !== true &&
+        o.archived !== true &&
         String(o.interno).trim().toLowerCase() === String(order.interno).trim().toLowerCase() &&
         String(o.clasificacion || '').trim().toLowerCase() === String(order.clasificacion || '').trim().toLowerCase() &&
         // Edilicio can have several open O.T.s for the same building (interno) at once, one per

@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '165';
+const CURRENT_APP_VERSION = '167';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -3723,6 +3723,23 @@ function renderOrders() {
         <p>No se encontraron órdenes.</p>
       </div>
     `;
+  } else if (currentSelectedSector === 'Edilicio') {
+    // Group Edilicio orders by área so it's clear at a glance which O.T. belongs to which
+    // sector of the building, instead of one flat list mixing every área together.
+    const groups = new Map();
+    filtered.forEach(order => {
+      const key = order.area ? String(order.area).trim() : 'Sin Área';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(order);
+    });
+    const sortedAreas = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b, 'es'));
+    container.innerHTML = sortedAreas.map(area => `
+      <div style="display:flex; align-items:center; gap:8px; margin:18px 0 8px;">
+        <span class="badge" style="background:#7c3aed; color:#fff;">${groups.get(area).length}</span>
+        <h3 style="margin:0; font-size:14px; font-weight:700; color:#7c3aed;">${escapeHtml(area)}</h3>
+      </div>
+      ${groups.get(area).map(order => createOrderCardHtml(order)).join('')}
+    `).join('');
   } else {
     container.innerHTML = filtered.map(order => createOrderCardHtml(order)).join('');
   }
