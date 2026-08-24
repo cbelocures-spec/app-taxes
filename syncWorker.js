@@ -982,8 +982,21 @@ async function autoLogin(browser, username, password, portalUrl) {
 
   // Capture the page's own console/JS errors — a click that silently does
   // nothing (no navigation, no visible error) is often caused by a client-side
-  // JS error we can't see in a screenshot or HTML snapshot.
-  page.on('console', msg => console.log(`[Taxes-Console-${msg.type()}] ${msg.text()}`));
+  // JS error we can't see in a screenshot or HTML snapshot. msg.text() alone prints
+  // "JSHandle@error" when the logged argument is an Error/object (Puppeteer doesn't
+  // serialize non-primitive console args by default) - resolve each argument's real
+  // value instead so these logs are actually diagnosable.
+  page.on('console', msg => {
+    Promise.all(msg.args().map(arg => arg.jsonValue().catch(() => null))).then(values => {
+      const resolved = values.map((v, i) => {
+        if (v && typeof v === 'object' && v.message) return v.message;
+        if (v !== null && v !== undefined) return typeof v === 'object' ? JSON.stringify(v) : String(v);
+        return null;
+      }).filter(v => v !== null);
+      const text = resolved.length > 0 ? resolved.join(' ') : msg.text();
+      console.log(`[Taxes-Console-${msg.type()}] ${text}`);
+    }).catch(() => console.log(`[Taxes-Console-${msg.type()}] ${msg.text()}`));
+  });
   page.on('pageerror', err => console.log(`[Taxes-PageError] ${err.message}`));
   page.on('response', res => {
     if (res.url().includes('/login') && res.request().method() === 'POST') {
@@ -2788,7 +2801,7 @@ async function syncWorkOrder(orderId) {
             if (card) card.scrollIntoView({ behavior: 'auto', block: 'center' });
           }
         }, ci);
-        await delay(300);
+        await delay(200);
 
         // 1. Fill/Fix Centro de Costo if empty
         const ccCatalog = db.getCatalogs().centrosCosto || [];
@@ -2827,7 +2840,7 @@ async function syncWorkOrder(orderId) {
             }
           }
         }, ci, ccLabel);
-        await delay(300);
+        await delay(200);
 
         // 2. Fill/Fix Employee if empty, placeholder, or mismatch
         const { employeeLabel } = resolveAndMapEmployee(appTask);
@@ -2847,7 +2860,7 @@ async function syncWorkOrder(orderId) {
           console.log(`[Reconcile] Card #${ci} employee update required. Current: "${formCards[ci].employee}". Target: "${employeeLabel}"...`);
           const empFilled = await fillTaskEmployeeSearchableSelect(page, ci, employeeLabel);
           console.log(`[Reconcile] Card #${ci} employee select result: ${empFilled}`);
-          await delay(500);
+          await delay(350);
         }
 
         // 3. Fill/Fix Description if empty or doesn't match finalDescription (including diagnostico and insumos)
@@ -2907,7 +2920,7 @@ async function syncWorkOrder(orderId) {
             await delay(200);
             await page.type(sel, finalDescription, { delay: 15 });
             await page.keyboard.press('Tab').catch(() => {});
-            await delay(500);
+            await delay(350);
 
             const verifyDesc = await safeEvaluate(page, (s) => {
               const el = document.querySelector(s);
@@ -2982,7 +2995,7 @@ async function syncWorkOrder(orderId) {
                 el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
               }
             }, sel);
-            await delay(1000);
+            await delay(600);
           }
           appTask.needsHoursUpdate = false;
         }
@@ -3003,7 +3016,7 @@ async function syncWorkOrder(orderId) {
               if (lbl) lbl.click(); else cb.click();
             }
           }, ci, shouldBeRealizada);
-          await delay(2500);
+          await delay(1500);
           appTask.taxesRealizadaSynced = shouldBeRealizada;
         }
 
