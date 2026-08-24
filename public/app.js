@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '167';
+const CURRENT_APP_VERSION = '168';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1445,6 +1445,7 @@ async function submitPreOrderCheck() {
     // AND has the SAME clasificacion - a Correctivo/Preventivo/Auxilio for the same vehicle
     // are separate jobs and must always get their own order, never get merged into whichever
     // other job happens to already be open for that interno.
+    console.log('[submitPreOrderCheck][DEBUG] userSector:', userSector, '| currentSelectedSector:', currentSelectedSector, '| isEdilicioUserForPreOrder:', isEdilicioUserForPreOrder, '| preAreaVal:', JSON.stringify(preAreaVal), '| interno:', interno, '| clasificacion:', clasificacion);
     existingOrder = activeOrders.find(o => {
       const isSameInterno = String(o.interno).trim() === String(interno);
       if (!isSameInterno) return false;
@@ -1456,8 +1457,11 @@ async function submitPreOrderCheck() {
       const orderIsHerreria = isHerreriaOrder(o);
       const orderIsEdilicio = isEdilicioOrder(o);
 
+      let matched;
+      let branch;
       if (userSector === 'Herrería') {
-        return orderIsHerreria;
+        branch = 'userSector===Herrería';
+        matched = orderIsHerreria;
       } else if (isEdilicioUserForPreOrder) {
         // A building can hold several separate open O.T.s at once, one per área - matching
         // only by interno/clasificacion here (like Taller does) would reopen whichever área's
@@ -1465,16 +1469,20 @@ async function submitPreOrderCheck() {
         // isEdilicioUserForPreOrder check that gates the Área field itself (userSector OR the
         // active tab) - a Pañol/Admin account has no fixed sector, so checking only userSector
         // here fell through to the Taller branch below while working from the Edilicio tab.
-        if (!orderIsEdilicio) return false;
-        return String(o.area || '').trim().toLowerCase() === preAreaVal.trim().toLowerCase();
+        branch = 'isEdilicioUserForPreOrder';
+        matched = orderIsEdilicio && String(o.area || '').trim().toLowerCase() === preAreaVal.trim().toLowerCase();
       } else {
         // Taller user: only match existing Taller orders (NOT Herrería or Edilicio). Also
         // exclude anything with an área set at all - a truthy area unambiguously means this is
         // an Edilicio order, regardless of what its own clasificacion/sector text says, so it
         // must never be reused as a fallback "Taller" match.
-        return !orderIsHerreria && !orderIsEdilicio && !o.area;
+        branch = 'Taller fallback';
+        matched = !orderIsHerreria && !orderIsEdilicio && !o.area;
       }
+      console.log(`[submitPreOrderCheck][DEBUG] candidate id=${o.id} area=${JSON.stringify(o.area)} orderIsEdilicio=${orderIsEdilicio} orderIsHerreria=${orderIsHerreria} branch=${branch} matched=${matched}`);
+      return matched;
     });
+    console.log('[submitPreOrderCheck][DEBUG] FINAL existingOrder:', existingOrder ? existingOrder.id : null);
   }
 
   if (existingOrder) {
