@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '160';
+const CURRENT_APP_VERSION = '161';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1458,15 +1458,21 @@ async function submitPreOrderCheck() {
 
       if (userSector === 'Herrería') {
         return orderIsHerreria;
-      } else if (userSector === 'Edilicio') {
+      } else if (isEdilicioUserForPreOrder) {
         // A building can hold several separate open O.T.s at once, one per área - matching
         // only by interno/clasificacion here (like Taller does) would reopen whichever área's
-        // order was already open and merge a different área's tasks into it.
+        // order was already open and merge a different área's tasks into it. Uses the same
+        // isEdilicioUserForPreOrder check that gates the Área field itself (userSector OR the
+        // active tab) - a Pañol/Admin account has no fixed sector, so checking only userSector
+        // here fell through to the Taller branch below while working from the Edilicio tab.
         if (!orderIsEdilicio) return false;
         return String(o.area || '').trim().toLowerCase() === preAreaVal.trim().toLowerCase();
       } else {
-        // Taller user: only match existing Taller orders (NOT Herrería or Edilicio)
-        return !orderIsHerreria && !orderIsEdilicio;
+        // Taller user: only match existing Taller orders (NOT Herrería or Edilicio). Also
+        // exclude anything with an área set at all - a truthy area unambiguously means this is
+        // an Edilicio order, regardless of what its own clasificacion/sector text says, so it
+        // must never be reused as a fallback "Taller" match.
+        return !orderIsHerreria && !orderIsEdilicio && !o.area;
       }
     });
   }
