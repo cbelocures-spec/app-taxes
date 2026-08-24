@@ -1839,6 +1839,12 @@ async function syncWorkOrder(orderId) {
         o.deleted !== true &&
         String(o.interno).trim().toLowerCase() === String(order.interno).trim().toLowerCase() &&
         String(o.clasificacion || '').trim().toLowerCase() === String(order.clasificacion || '').trim().toLowerCase() &&
+        // Edilicio can have several open O.T.s for the same building (interno) at once, one per
+        // área - matching only by interno+clasificacion here (as Taller does, where that pair
+        // alone is a real distinct job) silently linked EVERY new área's order to whichever
+        // área happened to sync first, since Edilicio orders all share the same interno and the
+        // same "Correctivo" clasificacion. Require the área to match too when either side has one.
+        String(o.area || '').trim().toLowerCase() === String(order.area || '').trim().toLowerCase() &&
         o.taxesOrderNumber && String(o.taxesOrderNumber).trim() !== '' &&
         !esEstadoOperativo(o.estadoUnidad) &&
         (Date.now() - new Date(o.createdAt || o.syncDate || Date.now()).getTime() < 24 * 60 * 60 * 1000)
