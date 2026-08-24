@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '162';
+const APP_VERSION = '163';
 
 // Middleware
 app.use(cors());
@@ -853,8 +853,13 @@ app.post('/api/orders', (req, res) => {
       const sameRodado = String(o.rodado || '').trim().toUpperCase() === String(resolvedRodado || '').trim().toUpperCase();
       const sameClasif = String(o.clasificacion || '').trim().toUpperCase() === String(finalClasificacion || '').trim().toUpperCase();
       const sameTasks = (o.tasks || []).map(t => String(t.descripcion || '').trim()).join('|') === taskDescs;
+      // Edilicio orders for the same building but different área must never collapse into one
+      // just because two quick test/real submissions happened to share the same task text
+      // within the 15s window - this guard exists to catch accidental double-clicks, not to
+      // merge genuinely separate área orders.
+      const sameArea = String(o.area || '').trim().toUpperCase() === String(area || '').trim().toUpperCase();
 
-      return sameUser && sameInterno && sameRodado && sameClasif && sameTasks;
+      return sameUser && sameInterno && sameRodado && sameClasif && sameTasks && sameArea;
     });
 
     if (duplicateOrder) {
