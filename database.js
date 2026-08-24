@@ -1,6 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
+function genUniqueId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function resolveUsableDbPath() {
   const bundledPath = path.join(__dirname, 'db.json');
   let targetPath = process.env.DB_PATH;
@@ -870,7 +874,7 @@ class LocalDB {
     const targetInterno = orderData.interno ? String(orderData.interno).trim() : null;
     
     const tasks = (orderData.tasks || []).map((t, idx) => ({
-      id: t.id || `${Date.now()}-${idx}`,
+      id: t.id || genUniqueId(),
       centroCosto: t.centroCosto || "",
       empleado: t.empleado || "",
       horasEstimadas: parseFloat(String(t.horasEstimadas).replace(',', '.')) || 0,
@@ -885,7 +889,7 @@ class LocalDB {
 
     // Create new Work Order object with defaults
     const newOrder = {
-      id: orderData.id ? String(orderData.id) : Date.now().toString(), // preserve Railway ID if provided
+      id: orderData.id ? String(orderData.id) : genUniqueId(), // preserve Railway ID if provided
       rodado: orderData.rodado || "",
       responsable: orderData.responsable || "",
       fechaEntrega: orderData.fechaEntrega || "",
@@ -1365,3 +1369,4 @@ class LocalDB {
 
 module.exports = new LocalDB();
 module.exports.getTurnoForDate = getTurnoForDate;
+module.exports.genUniqueId = genUniqueId;

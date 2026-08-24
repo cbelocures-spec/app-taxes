@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '170';
+const APP_VERSION = '171';
 
 // Middleware
 app.use(cors());
@@ -1167,7 +1167,7 @@ app.put('/api/orders/:id', (req, res) => {
     // 2. Overwrite or append incoming tasks
     incomingTasks.forEach((t, idx) => {
       if (!t) return;
-      const tId = t.id || `${Date.now()}-${idx}`;
+      const tId = t.id || db.genUniqueId();
       const existingTask = mergedTasksMap.get(tId) || (existing.tasks ? existing.tasks.find(et => et.id === tId) : null);
 
       // A verified/locked task is frozen: keep it exactly as stored, ignore whatever the
