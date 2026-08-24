@@ -1784,9 +1784,14 @@ function otBloqueadaPorUnidadOperativa(interno, clasificacion, otNumero, exclude
 async function syncWorkOrder(orderId) {
   let order = db.getWorkOrderById(orderId);
   if (!order) return { success: false, message: "Order not found" };
+  console.log(`[syncWorkOrder][DEBUG] START orderId=${orderId} interno=${order.interno} area=${JSON.stringify(order.area)} taxesOrderNumber=${order.taxesOrderNumber || 'NEW'} taskCount=${(order.tasks||[]).length} taskIds=${(order.tasks||[]).map(t=>t.id).join(',')}`);
 
   // CONTROL INTERNO EN MEMORIA (Rechazo instantáneo en menos de 1 milisegundo)
-  const claveCandado = `${order.interno}_${order.clasificacion}`;
+  // Edilicio can have several orders open at once sharing the same interno+clasificacion (one
+  // per área) - without área in this key, syncing one blocks/serializes with every other área's
+  // order sharing that same building, which is at best a needless bottleneck and worth fixing
+  // alongside the rest of this investigation even if it isn't the root cause of the duplication.
+  const claveCandado = `${order.interno}_${order.clasificacion}_${order.area || ''}`;
   if (candadoInternosActivos.has(claveCandado)) {
     console.warn(`[Anti-Duplicado] 🛑 Petición duplicada veloz bloqueada para el camión: ${order.interno}`);
     return { success: false, message: "Esta orden ya se está procesando o está en cola de espera." };
@@ -1827,6 +1832,7 @@ async function syncWorkOrder(orderId) {
     if (!order) {
       return { success: false, message: "Order not found after lock" };
     }
+    console.log(`[syncWorkOrder][DEBUG] AFTER LOCK orderId=${orderId} taxesOrderNumber=${order.taxesOrderNumber || 'NEW'} taskCount=${(order.tasks||[]).length} taskIds=${(order.tasks||[]).map(t=>t.id).join(',')}`);
 
     // Pre-check DB safeguard: If this order has no taxesOrderNumber yet, check if another active order for the same interno AND same clasificacion already generated an OT today!
     // IMPORTANT: never reuse an OT whose order already went back to Operativo — eso significa
@@ -3051,6 +3057,7 @@ async function syncWorkOrder(orderId) {
       // a blind overwrite here would silently erase that edit by reverting to the stale snapshot.
       {
         const freshOrder = db.getWorkOrderById(orderId);
+        console.log(`[syncWorkOrder][DEBUG] SYNC-BACK MERGE orderId=${orderId} order.tasks(pre-Puppeteer)=${order.tasks.length} freshOrder.tasks(DB now)=${freshOrder ? (freshOrder.tasks||[]).length : 'N/A'}`);
         if (freshOrder && Array.isArray(freshOrder.tasks)) {
           const syncedById = new Map(order.tasks.map(t => [t.id, t]));
           const mergedTasks = freshOrder.tasks.map(freshTask => {
