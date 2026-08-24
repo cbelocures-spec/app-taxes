@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '168';
+const APP_VERSION = '169';
 
 // Middleware
 app.use(cors());
@@ -334,6 +334,7 @@ function splitTasksBySector(tasks, homeSector, centrosCostoList) {
 // it saves there.
 function routeForeignTasksToSiblingOrder(sector, tasksForSector, ctx) {
   if (!tasksForSector || tasksForSector.length === 0) return null;
+  console.log(`[routeForeignTasksToSiblingOrder][DEBUG] CALLED for sector=${sector} interno=${ctx.interno} area=${JSON.stringify(ctx.area)} taskCount=${tasksForSector.length} excludeOrderId=${ctx.excludeOrderId}`);
 
   // Herrería genuinely exists as a Taxes clasificacion value, so a Herrería sibling carries it
   // directly. Edilicio does not (see getOrderSector) - an Edilicio sibling gets "Correctivo"
@@ -880,6 +881,7 @@ app.post('/api/orders', (req, res) => {
     const homeSector = getOrderSector(finalClasificacion, sector);
     const centrosCostoForSplit = (db.read().catalogs || {}).centrosCosto || [];
     const { own: ownTasksForNewOrder, foreign: foreignTasksForNewOrder } = splitTasksBySector(tasks, homeSector, centrosCostoForSplit);
+    console.log(`[POST /api/orders][DEBUG] interno=${interno} area=${JSON.stringify(area)} sectorFromClient=${sectorFromClient} resolvedSector=${sector} homeSector=${homeSector} incomingTasks=${(tasks||[]).map(t=>t.centroCosto).join(',')} ownCount=${ownTasksForNewOrder.length} foreignHerreria=${foreignTasksForNewOrder['Herrería'].length} foreignEdilicio=${foreignTasksForNewOrder['Edilicio'].length} foreignTaller=${foreignTasksForNewOrder['Taller'].length}`);
 
     const newOrder = db.createWorkOrder({
       rodado: resolvedRodado,
