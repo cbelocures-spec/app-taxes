@@ -2134,11 +2134,23 @@ async function syncWorkOrder(orderId) {
           // 5. ESPERAR CONFIRMACIÓN TOAST DE TAXES Y CAPTURAR NÚMERO GENERADO REAL (#28448)
           console.log(`[Puppeteer] Escaneando confirmación Toast y tabla de Taxes para Interno ${order.interno}...`);
           
+          // Edilicio can have several open O.T.s for the same building/interno at once (one
+          // per área), so multiple rows in Taxes' own table can now legitimately match the same
+          // interno text. Excluding OT numbers already claimed by this building's OTHER open
+          // orders keeps the table-search fallback (option B) from grabbing an area's existing
+          // OT for a brand-new one - the toast (option A) is the reliable path and doesn't need
+          // this, but the fallback previously had no way to tell two same-interno rows apart.
+          const otherOrdersSameInterno = (db.getWorkOrders() || []).filter(o =>
+            o.id !== orderId && String(o.interno || '').trim().toUpperCase() === String(order.interno || '').trim().toUpperCase()
+          );
+          const alreadyClaimedOtNumbers = otherOrdersSameInterno.map(o => String(o.taxesOrderNumber || '').trim()).filter(Boolean);
+
           for (let check = 1; check <= 12; check++) {
             await delay(600);
-            numeroGenerado = await safeEvaluate(page, (targetInterno) => {
+            numeroGenerado = await safeEvaluate(page, (targetInterno, claimedNumbers) => {
               const clean = s => (s || '').toString().trim().toUpperCase();
               const cleanTargetInt = clean(targetInterno);
+              const isAlreadyClaimed = (num) => claimedNumbers.includes(num);
 
               // A. Carteles Toast / Alertas verdes oficiales (ej: "Orden de Trabajo N 28448 Creada con Éxito")
               const toasts = Array.from(document.querySelectorAll('.toast, .b-toast, .b-toaster, .toast-body, .alert, [role="alert"]'));
@@ -2167,17 +2179,18 @@ async function syncWorkOrder(orderId) {
                   });
 
                   if (rowMatchesInterno) {
-                    // Extraer la celda que contiene la OT (ej: "#28448" o "28448")
+                    // Extraer la celda que contiene la OT (ej: "#28448" o "28448") - saltar
+                    // cualquier número que ya pertenezca a otra orden de esta misma interno.
                     for (const cellTxt of cells) {
                       const otMatch = cellTxt.match(/#?\b(2\d{4})\b/);
-                      if (otMatch) return otMatch[1];
+                      if (otMatch && !isAlreadyClaimed(otMatch[1])) return otMatch[1];
                     }
                   }
                 }
               }
 
               return null;
-            }, order.interno);
+            }, order.interno, alreadyClaimedOtNumbers);
 
             if (numeroGenerado) {
               console.log(`[Alta O.T.] ¡Número de O.T. #${numeroGenerado} capturado exitosamente para Interno ${order.interno} en intento ${check}!`);
