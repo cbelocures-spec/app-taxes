@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '187';
+const CURRENT_APP_VERSION = '189';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12355,8 +12355,10 @@ function adjustPtStateLists(state) {
 
     // This unit may have been sitting in the sheet with a stale/wrong tipo since before the
     // equipo-based resolver existed (e.g. hardcoded to "COMPACTADOR" at creation time) -
-    // re-resolve it every time instead of trusting whatever was already stored.
-    unit.tipo = resolveFleetTypeFromInterno(matchingOrder.interno) || 'Otro';
+    // re-resolve it every time instead of trusting whatever was already stored. A real truck's
+    // interno reused for Herrería/Edilicio work isn't really that catalog vehicle type anymore
+    // for this job - show "Otro" instead of the fleet type.
+    unit.tipo = (isHerreriaOrder(matchingOrder) || isEdilicioOrder(matchingOrder)) ? 'Otro' : (resolveFleetTypeFromInterno(matchingOrder.interno) || 'Otro');
 
     state.reparacion.push(unit);
     const taxInt = String(matchingOrder.interno || '').trim().toUpperCase();
@@ -12412,7 +12414,8 @@ function adjustPtStateLists(state) {
   // through that path, so it kept showing whatever wrong tipo it was created with forever).
   ['fuera_de_servicio', 'reparacion', 'servicios_pendientes', 'inversiones'].forEach(listName => {
     (state[listName] || []).forEach(unit => {
-      unit.tipo = resolveFleetTypeFromInterno(unit.interno) || 'Otro';
+      const unitOrder = activeOrders.find(o => String(o.interno || '').trim().toUpperCase() === String(unit.interno || '').trim().toUpperCase());
+      unit.tipo = (unitOrder && (isHerreriaOrder(unitOrder) || isEdilicioOrder(unitOrder))) ? 'Otro' : (resolveFleetTypeFromInterno(unit.interno) || 'Otro');
     });
   });
 
@@ -12462,12 +12465,13 @@ function resolvePtUnitDisplayLabel(item, internoPT) {
   if (!descripcion && item.rodado && String(item.rodado).trim().toUpperCase() !== cleanInternoPT) {
     descripcion = item.rodado;
   }
-  // Show the descriptive label on the Herrería tab always, and on the Taller tab too when this
-  // particular interno's current order is itself Herrería work (e.g. a real truck's interno
-  // reused for a Herrería job) - a genuine Taller truck order still just shows its bare interno
-  // here, since its own TIPO column already carries the equipment type.
-  const isHerreriaWork = currentSelectedSector === 'Herrería' || (matchingOrder && isHerreriaOrder(matchingOrder));
-  if (isHerreriaWork && descripcion) {
+  // Show the descriptive label on the Herrería/Edilicio tabs always, and on the Taller tab too
+  // when this particular interno's current order is itself Herrería/Edilicio work (e.g. a real
+  // truck's interno reused for that job) - a genuine Taller truck order still just shows its
+  // bare interno here, since its own TIPO column already carries the equipment type.
+  const isHerreriaOrEdilicioWork = currentSelectedSector === 'Herrería' || currentSelectedSector === 'Edilicio' ||
+    (matchingOrder && (isHerreriaOrder(matchingOrder) || isEdilicioOrder(matchingOrder)));
+  if (isHerreriaOrEdilicioWork && descripcion) {
     return `<strong>${descripcion}</strong> <span style="color:var(--text-muted); font-weight:normal;">(${internoPT})</span>`;
   }
   return `<strong>${internoPT}</strong>`;
@@ -12704,6 +12708,15 @@ function renderParteTallerDashboard(state) {
     if (!item.sector) return true;
     if (item.sector === 'herreria' && currentPtSector === 'taller') {
       return esUnidadRealDeFlota(item.interno);
+    }
+    // A real truck's Parte Taller entry is tagged sector "taller" from when it was first added,
+    // but its CURRENT order can later become Herrería work (e.g. this same interno reused for a
+    // container/soldadura job) - surface it on the Herrería tab too in that case, alongside its
+    // normal Taller listing, instead of only wherever it happened to be created.
+    if (item.sector === 'taller' && currentPtSector === 'herreria') {
+      const cleanInterno = String(item.interno || '').trim().toUpperCase();
+      const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInterno);
+      return !!(matchingOrder && isHerreriaOrder(matchingOrder));
     }
     return item.sector === currentPtSector;
   }
