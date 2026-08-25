@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '175';
+const CURRENT_APP_VERSION = '176';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1485,34 +1485,53 @@ async function submitPreOrderCheck() {
     console.log('[submitPreOrderCheck][DEBUG] FINAL existingOrder:', existingOrder ? existingOrder.id : null);
   }
 
+  // Read checked pending-items BEFORE closing the modal (closing just hides it, but
+  // let's not depend on that - grab the selection while it's still guaranteed live).
+  const items = window._preOrderPendingItems || [];
+  const checkedIndices = Array.from(document.querySelectorAll('#pre-order-pending-items-list input[type="checkbox"]:checked'))
+    .map(cb => parseInt(cb.dataset.idx, 10));
+  const selectedItems = checkedIndices.map(idx => items[idx]).filter(Boolean);
+
+  // Default: one task per selected item. If more than one is selected, ask how many
+  // tasks to group them into (e.g. 2 items -> 1 task means both go in the SAME task).
+  let taskGroups = selectedItems.map(item => [item]);
+  if (selectedItems.length > 1) {
+    const input = window.prompt(
+      `Seleccionaste ${selectedItems.length} ítems. ¿En cuántas tareas los agrupamos?`,
+      String(selectedItems.length)
+    );
+    if (input === null) return; // cancelled: stay on the pre-order modal, nothing created
+    const parsed = parseInt(input, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= selectedItems.length) {
+      taskGroups = splitItemsIntoGroups(selectedItems, parsed);
+    }
+  }
+
+  const addSelectedItemsAsTasks = () => {
+    taskGroups.forEach(group => {
+      addTaskField({
+        centroCosto: mapRubroToCentroCosto(group[0].tipo),
+        empleado: "",
+        horasEstimadas: 0,
+        status: "Pendiente",
+        descripcion: group.map(i => i.texto).join(' / ')
+      });
+    });
+  };
+
   if (existingOrder) {
     const orderCls = existingOrder.clasificacion || "Sin Clasificar";
     showToast(`Abriendo orden en curso de Taller del interno ${interno} (${orderCls})...`, "warning");
     closePreOrderModal();
     editOrder(existingOrder.id);
-  } else {
-    // Read checked pending-items BEFORE closing the modal (closing just hides it, but
-    // let's not depend on that - grab the selection while it's still guaranteed live).
-    const items = window._preOrderPendingItems || [];
-    const checkedIndices = Array.from(document.querySelectorAll('#pre-order-pending-items-list input[type="checkbox"]:checked'))
-      .map(cb => parseInt(cb.dataset.idx, 10));
-    const selectedItems = checkedIndices.map(idx => items[idx]).filter(Boolean);
-
-    // Default: one task per selected item. If more than one is selected, ask how many
-    // tasks to group them into (e.g. 2 items -> 1 task means both go in the SAME task).
-    let taskGroups = selectedItems.map(item => [item]);
-    if (selectedItems.length > 1) {
-      const input = window.prompt(
-        `Seleccionaste ${selectedItems.length} ítems. ¿En cuántas tareas los agrupamos?`,
-        String(selectedItems.length)
-      );
-      if (input === null) return; // cancelled: stay on the pre-order modal, nothing created
-      const parsed = parseInt(input, 10);
-      if (!isNaN(parsed) && parsed >= 1 && parsed <= selectedItems.length) {
-        taskGroups = splitItemsIntoGroups(selectedItems, parsed);
-      }
+    // A checked pending item must always become its own new task here too, even though the
+    // order already has tasks (possibly one with this exact same description already) - the
+    // user needs a fresh task card for this specific job, never silently dropped just because
+    // it looks like something already logged.
+    if (taskGroups.length > 0) {
+      setTimeout(addSelectedItemsAsTasks, 200);
     }
-
+  } else {
     closePreOrderModal();
     openNewOrderModal(interno, clasificacion);
     if (isEdilicioUserForPreOrder && preAreaVal) {
@@ -1521,15 +1540,7 @@ async function submitPreOrderCheck() {
     }
 
     if (taskGroups.length > 0) {
-      taskGroups.forEach(group => {
-        addTaskField({
-          centroCosto: mapRubroToCentroCosto(group[0].tipo),
-          empleado: "",
-          horasEstimadas: 0,
-          status: "Pendiente",
-          descripcion: group.map(i => i.texto).join(' / ')
-        });
-      });
+      addSelectedItemsAsTasks();
     } else {
       // No item selected: don't make the user click "Agregar Tarea" for nothing. Call with no
       // taskData (not an object with blank fields) so addTaskField's own per-sector default
