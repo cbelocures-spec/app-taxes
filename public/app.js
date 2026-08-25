@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '192';
+const CURRENT_APP_VERSION = '193';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12184,6 +12184,21 @@ function adjustPtStateLists(state) {
     return 'Otro';
   }
 
+  // A Herrería/Edilicio bucket Rodado (e.g. "3 16 Interno REP. CAJA ROLL-OFF") is often paired
+  // with a plain numeric Interno Unidad that's just a loose reference note the user typed (it
+  // can even coincide with a REAL truck's own catalog interno, e.g. reusing "145" for an
+  // unrelated container job) - resolveFleetTypeFromInterno looks up by THAT interno and would
+  // wrongly report the real truck's fleet type for what's actually shop-internal work. Look up
+  // the catalog by the order's own RODADO label instead, which is what was genuinely selected.
+  function isRodadoBucketNotFleet(rodadoText) {
+    if (!rodadoText) return false;
+    const cleanRodado = String(rodadoText).trim();
+    const rodadoOpt = (cachedCatalogs.rodados || []).find(r => String(r.label || '').trim() === cleanRodado);
+    if (!rodadoOpt) return false;
+    const equipo = String(rodadoOpt.equipo || '').trim().toUpperCase();
+    return equipo === 'HERRERIA' || equipo === 'EDILICIO';
+  }
+
   // 1. Find all open orders with active or paused sector-matching tasks. A unit already
   // marked "operativo" is excluded no matter what its task history looks like - that field is
   // the real-world signal that the unit is back in service, not leftover task state.
@@ -12359,8 +12374,10 @@ function adjustPtStateLists(state) {
     // stays its real fleet type (Compactador/Volquete/etc.) even while its current order is
     // Herrería/Edilicio work - it's still a real vehicle that belongs in Taller's normal fleet
     // tracking, not the separate Herrería/Edilicio "not real fleet" section (see
-    // esUnidadDeFlotaTrackeada below, which keys off this same tipo).
-    unit.tipo = resolveFleetTypeFromInterno(matchingOrder.interno) || 'Otro';
+    // esUnidadDeFlotaTrackeada below, which keys off this same tipo). But if the order's own
+    // RODADO is itself a Herrería/Edilicio bucket (its Interno Unidad can be an unrelated real
+    // truck number reused as a loose reference), it genuinely isn't fleet work - "Otro" then.
+    unit.tipo = isRodadoBucketNotFleet(matchingOrder.rodado) ? 'Otro' : (resolveFleetTypeFromInterno(matchingOrder.interno) || 'Otro');
 
     state.reparacion.push(unit);
     const taxInt = String(matchingOrder.interno || '').trim().toUpperCase();
@@ -12416,7 +12433,8 @@ function adjustPtStateLists(state) {
   // through that path, so it kept showing whatever wrong tipo it was created with forever).
   ['fuera_de_servicio', 'reparacion', 'servicios_pendientes', 'inversiones'].forEach(listName => {
     (state[listName] || []).forEach(unit => {
-      unit.tipo = resolveFleetTypeFromInterno(unit.interno) || 'Otro';
+      const unitOrder = activeOrders.find(o => String(o.interno || '').trim().toUpperCase() === String(unit.interno || '').trim().toUpperCase());
+      unit.tipo = isRodadoBucketNotFleet(unitOrder && unitOrder.rodado) ? 'Otro' : (resolveFleetTypeFromInterno(unit.interno) || 'Otro');
     });
   });
 
