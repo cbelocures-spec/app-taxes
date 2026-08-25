@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '191';
+const CURRENT_APP_VERSION = '192';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12355,10 +12355,12 @@ function adjustPtStateLists(state) {
 
     // This unit may have been sitting in the sheet with a stale/wrong tipo since before the
     // equipo-based resolver existed (e.g. hardcoded to "COMPACTADOR" at creation time) -
-    // re-resolve it every time instead of trusting whatever was already stored. A real truck's
-    // interno reused for Herrería/Edilicio work isn't really that catalog vehicle type anymore
-    // for this job - show "Otro" instead of the fleet type.
-    unit.tipo = (isHerreriaOrder(matchingOrder) || isEdilicioOrder(matchingOrder)) ? 'Otro' : (resolveFleetTypeFromInterno(matchingOrder.interno) || 'Otro');
+    // re-resolve it every time instead of trusting whatever was already stored. A real truck
+    // stays its real fleet type (Compactador/Volquete/etc.) even while its current order is
+    // Herrería/Edilicio work - it's still a real vehicle that belongs in Taller's normal fleet
+    // tracking, not the separate Herrería/Edilicio "not real fleet" section (see
+    // esUnidadDeFlotaTrackeada below, which keys off this same tipo).
+    unit.tipo = resolveFleetTypeFromInterno(matchingOrder.interno) || 'Otro';
 
     state.reparacion.push(unit);
     const taxInt = String(matchingOrder.interno || '').trim().toUpperCase();
@@ -12414,8 +12416,7 @@ function adjustPtStateLists(state) {
   // through that path, so it kept showing whatever wrong tipo it was created with forever).
   ['fuera_de_servicio', 'reparacion', 'servicios_pendientes', 'inversiones'].forEach(listName => {
     (state[listName] || []).forEach(unit => {
-      const unitOrder = activeOrders.find(o => String(o.interno || '').trim().toUpperCase() === String(unit.interno || '').trim().toUpperCase());
-      unit.tipo = (unitOrder && (isHerreriaOrder(unitOrder) || isEdilicioOrder(unitOrder))) ? 'Otro' : (resolveFleetTypeFromInterno(unit.interno) || 'Otro');
+      unit.tipo = resolveFleetTypeFromInterno(unit.interno) || 'Otro';
     });
   });
 
