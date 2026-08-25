@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '194';
+const CURRENT_APP_VERSION = '195';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -5943,13 +5943,19 @@ async function syncTaskStartToParteTaller(internoRaw, centroCosto, orderSector, 
 
     // Don't re-push the same task description every time it's paused/resumed - the sheet
     // side just appends new lines onto whatever's already there for this interno.
-    const alreadyThere = ['reparacion', 'fuera_de_servicio'].some(listName => {
+    const alreadyThere = ['reparacion', 'fuera_de_servicio', 'inversiones'].some(listName => {
       const unit = (state[listName] || []).find(u => String(u.interno).trim().toUpperCase() === internoVal.toUpperCase());
       if (!unit) return false;
       const items = Array.isArray(unit.novedad_items) ? unit.novedad_items.map(x => String(x.texto || '').trim().toUpperCase()) : [];
       return items.includes(cleanDesc) || String(unit.novedad || '').toUpperCase().includes(cleanDesc);
     });
     if (alreadyThere) return;
+
+    // A unit the supervisor already put "En Preparación" must stay there while someone works on
+    // it - it only leaves Preparación manually or by going Operativo, never by simply forcing
+    // "reparacion" here just because a task started. Keep its own current estado in that case.
+    const isEnPreparacion = (state.inversiones || []).some(u => String(u.interno).trim().toUpperCase() === internoVal.toUpperCase());
+    const targetEstado = isEnPreparacion ? 'inversiones' : 'reparacion';
 
     // Send the canonical display name (e.g. "Rodriguez Nicolas") the sheet's Responsable
     // dropdown actually accepts - not the raw login username, and not the order's raw
@@ -5962,7 +5968,7 @@ async function syncTaskStartToParteTaller(internoRaw, centroCosto, orderSector, 
       body: JSON.stringify({
         accion: 'actualizar_estado_flota',
         interno: internoVal,
-        estado: 'reparacion',
+        estado: targetEstado,
         motivo: descripcion || 'Tarea sin descripción',
         responsable: responsableName,
         sector: 'taller'
