@@ -769,11 +769,15 @@ class LocalDB {
     // Strict deduplication map
     const uniqueMap = new Map();
     active.forEach(order => {
+      // Área must be part of this key: Edilicio can have several genuinely separate open
+      // orders for the same building (one per área), and without área here they all share
+      // the same interno+sector+clasificacion and got wrongly folded into a single card,
+      // silently dumping every área's tasks into whichever order was created first.
       const key = order.interno
-        ? `${String(order.interno).trim().toLowerCase()}::${classifySectorFromClasificacion(order.clasificacion)}::${String(order.clasificacion || '').trim().toLowerCase()}`
+        ? `${String(order.interno).trim().toLowerCase()}::${classifySectorFromClasificacion(order.clasificacion)}::${String(order.clasificacion || '').trim().toLowerCase()}::${String(order.area || '').trim().toLowerCase()}`
         : String(order.id);
       if (!uniqueMap.has(key)) {
-        uniqueMap.set(key, { ...order });
+        uniqueMap.set(key, { ...order, tasks: [...(order.tasks || [])] });
       } else {
         // Merge tasks into existing order card to prevent duplicate UI cards
         const existing = uniqueMap.get(key);
