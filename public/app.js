@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '177';
+const CURRENT_APP_VERSION = '178';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -785,6 +785,16 @@ function switchView(viewId) {
         if (container) {
           container.innerHTML = '';
           addGomeriaInternoBlock();
+        }
+      } catch(e) {}
+    }
+
+    if (viewId === 'elastiquero') {
+      try {
+        const container = document.getElementById('elastiquero-internos-container');
+        if (container) {
+          container.innerHTML = '';
+          addElastiqueroInternoBlock();
         }
       } catch(e) {}
     }
@@ -7526,6 +7536,281 @@ async function submitGomeriaOrders() {
   } catch (err) {
     showToast(err.message, 'danger');
     console.error('Error creating gomeria orders', err);
+  }
+}
+
+// --- ELASTIQUERO (CAMBIO/REPARACIÓN DE ELÁSTICOS) ---
+// Same order/task pipeline as Gomería: no cronómetro, horas cargadas a mano, la orden se marca
+// Finalizada/Operativa al crearla porque el trabajo ya está hecho para cuando se carga acá.
+// A diferencia de Gomería, varios elastiqueros pueden trabajar el mismo camión con horarios
+// distintos - por eso Empleados/Horas está separado de los Ejes trabajados: todos los ejes de
+// un interno se combinan en UNA sola descripción, y esa misma descripción se usa en la tarea de
+// cada empleado (una tarea por empleado, cada una con sus propias horas).
+function addElastiqueroEjeRow(btn) {
+  const block = btn.closest('.elastiquero-interno-block');
+  const rowsContainer = block ? block.querySelector('.elastiquero-eje-rows-container') : null;
+  if (!rowsContainer) return;
+
+  const row = document.createElement('div');
+  row.className = 'elastiquero-eje-row';
+  row.style.cssText = 'border:1px solid var(--border-color); border-radius:8px; padding:10px; margin-top:10px; position:relative;';
+  row.innerHTML = `
+    <button type="button" onclick="removeElastiqueroEjeRow(this)" style="position:absolute; top:6px; right:6px; border:none; background:none; color:var(--danger); cursor:pointer; padding:2px;" title="Quitar este eje">
+      <span class="material-icons" style="font-size:16px;">close</span>
+    </button>
+    <div class="form-group" style="margin-bottom:8px;">
+      <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Eje / Posición</label>
+      <select class="elastiquero-posicion-select" style="width:100%; margin-bottom:6px;">
+        <option value="">Seleccionar posición...</option>
+        <optgroup label="Eje Delantero">
+          <option value="Delantero izquierdo">Delantero izquierdo</option>
+          <option value="Delantero derecho">Delantero derecho</option>
+        </optgroup>
+        <optgroup label="Eje Trasero (Tracción - Diferencial)">
+          <option value="Trasero izquierdo exterior">Trasero izquierdo exterior</option>
+          <option value="Trasero izquierdo interior">Trasero izquierdo interior</option>
+          <option value="Trasero derecho exterior">Trasero derecho exterior</option>
+          <option value="Trasero derecho interior">Trasero derecho interior</option>
+        </optgroup>
+        <optgroup label="Eje Fijo / Flotante">
+          <option value="Eje fijo/flotante izquierdo exterior">Eje fijo/flotante izquierdo exterior</option>
+          <option value="Eje fijo/flotante izquierdo interior">Eje fijo/flotante izquierdo interior</option>
+          <option value="Eje fijo/flotante derecho exterior">Eje fijo/flotante derecho exterior</option>
+          <option value="Eje fijo/flotante derecho interior">Eje fijo/flotante derecho interior</option>
+        </optgroup>
+        <option value="Auxilio / Repuesto">Auxilio / Repuesto</option>
+        <option value="__otro__">Otro (escribir)</option>
+      </select>
+      <input type="text" class="elastiquero-posicion-otro" placeholder="Escribir posición" style="width:100%; margin-top:6px; display:none;">
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Descripción del trabajo</label>
+      <textarea class="elastiquero-eje-descripcion" rows="2" placeholder="Ej: cambio de elástico completo, reparación de hoja N°3" style="width:100%;"></textarea>
+    </div>
+  `;
+  rowsContainer.appendChild(row);
+  const posSelect = row.querySelector('.elastiquero-posicion-select');
+  const posOtro = row.querySelector('.elastiquero-posicion-otro');
+  posSelect.addEventListener('change', () => {
+    posOtro.style.display = (posSelect.value === '__otro__') ? 'block' : 'none';
+  });
+}
+
+function removeElastiqueroEjeRow(btn) {
+  const row = btn.closest('.elastiquero-eje-row');
+  if (!row) return;
+  const rowsContainer = row.parentElement;
+  if (rowsContainer.querySelectorAll('.elastiquero-eje-row').length <= 1) {
+    showToast('Cada interno necesita al menos un eje cargado.', 'warning');
+    return;
+  }
+  row.remove();
+}
+
+function addElastiqueroEmpleadoRow(btn) {
+  const block = btn.closest('.elastiquero-interno-block');
+  const rowsContainer = block ? block.querySelector('.elastiquero-empleado-rows-container') : null;
+  if (!rowsContainer) return;
+
+  const row = document.createElement('div');
+  row.className = 'elastiquero-empleado-row';
+  row.style.cssText = 'display:grid; grid-template-columns: 2fr 1fr auto; gap:8px; align-items:end; margin-top:8px;';
+  row.innerHTML = `
+    <div class="form-group" style="margin-bottom:0;">
+      <select class="elastiquero-empleado-select" style="width:100%;">
+        <option value="">Seleccionar empleado...</option>
+        ${getGomeriaMecanicaEmployees().map(e => `<option value="${e.value}">${e.label}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <input type="number" step="0.1" min="0" class="elastiquero-horas-input" placeholder="Horas">
+    </div>
+    <button type="button" onclick="removeElastiqueroEmpleadoRow(this)" style="border:none; background:none; color:var(--danger); cursor:pointer; padding:6px;" title="Quitar este empleado">
+      <span class="material-icons" style="font-size:18px;">close</span>
+    </button>
+  `;
+  rowsContainer.appendChild(row);
+  const empleadoSelectEl = row.querySelector('.elastiquero-empleado-select');
+  if (empleadoSelectEl && typeof convertSelectToSearchable === 'function') {
+    convertSelectToSearchable(empleadoSelectEl);
+  }
+}
+
+function removeElastiqueroEmpleadoRow(btn) {
+  const row = btn.closest('.elastiquero-empleado-row');
+  if (!row) return;
+  const rowsContainer = row.parentElement;
+  if (rowsContainer.querySelectorAll('.elastiquero-empleado-row').length <= 1) {
+    showToast('Cada interno necesita al menos un empleado cargado.', 'warning');
+    return;
+  }
+  row.remove();
+}
+
+function addElastiqueroInternoBlock() {
+  const container = document.getElementById('elastiquero-internos-container');
+  if (!container) return;
+  const internoOptionsHtml = (cachedInternoOptions || [])
+    .map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+
+  const block = document.createElement('div');
+  block.className = 'form-section-card elastiquero-interno-block';
+  block.innerHTML = `
+    <div class="card-title-header split">
+      <div class="flex-align">
+        <span class="material-icons">local_shipping</span>
+        <h3>Interno</h3>
+      </div>
+      <button type="button" class="btn btn-link btn-xs" onclick="removeElastiqueroInternoBlock(this)" style="color:var(--danger);" title="Quitar este interno">
+        <span class="material-icons" style="font-size:18px;">delete</span>
+      </button>
+    </div>
+    <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px;">
+      <div class="form-group">
+        <label>Interno *</label>
+        <select class="elastiquero-interno-select" style="width:100%;">
+          <option value="">Seleccionar Interno...</option>
+          ${internoOptionsHtml}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Clasificación *</label>
+        <select class="elastiquero-clasificacion-select" style="width:100%;">
+          <option value="Correctivo">Correctivo</option>
+          <option value="Preventivo">Preventivo</option>
+          <option value="Auxilio">Auxilio</option>
+        </select>
+      </div>
+    </div>
+
+    <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:14px 0 0;">Ejes trabajados</label>
+    <div class="elastiquero-eje-rows-container"></div>
+    <button type="button" class="btn btn-secondary btn-xs" onclick="addElastiqueroEjeRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
+      <span class="material-icons" style="font-size:14px;">add</span> Agregar otro eje
+    </button>
+
+    <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:16px 0 0; border-top:1px solid var(--border-color); padding-top:12px;">Empleados y horas</label>
+    <div class="elastiquero-empleado-rows-container"></div>
+    <button type="button" class="btn btn-secondary btn-xs" onclick="addElastiqueroEmpleadoRow(this)" style="margin-top:6px; display:flex; align-items:center; gap:4px;">
+      <span class="material-icons" style="font-size:14px;">add</span> Agregar empleado
+    </button>
+  `;
+  container.appendChild(block);
+  addElastiqueroEjeRow(block.querySelector('.elastiquero-eje-rows-container + button'));
+  addElastiqueroEmpleadoRow(block.querySelector('.elastiquero-empleado-rows-container + button'));
+  const internoSelectEl = block.querySelector('.elastiquero-interno-select');
+  if (internoSelectEl && typeof convertSelectToSearchable === 'function') {
+    convertSelectToSearchable(internoSelectEl);
+  }
+}
+
+function removeElastiqueroInternoBlock(btn) {
+  const block = btn.closest('.elastiquero-interno-block');
+  if (block) block.remove();
+}
+
+// Combines every eje row of one interno block into a single description string, one line per
+// eje ("Posición: descripción") - this is the SAME description every employee's task below gets,
+// since they're all logging hours against the same job(s) done on this truck.
+function buildElastiqueroDescription(block) {
+  const rows = Array.from(block.querySelectorAll('.elastiquero-eje-row'));
+  const lines = rows.map(row => {
+    const posSelect = row.querySelector('.elastiquero-posicion-select');
+    const posOtro = row.querySelector('.elastiquero-posicion-otro');
+    const posicion = (posSelect && posSelect.value === '__otro__')
+      ? (posOtro ? posOtro.value.trim() : '')
+      : (posSelect ? posSelect.value : '');
+    const descEl = row.querySelector('.elastiquero-eje-descripcion');
+    const descripcion = descEl ? descEl.value.trim() : '';
+    if (!posicion || !descripcion) return null;
+    return `${posicion}: ${descripcion}`;
+  }).filter(Boolean);
+  return lines.join('\n');
+}
+
+async function submitElastiqueroOrders() {
+  const blocks = Array.from(document.querySelectorAll('.elastiquero-interno-block'));
+  if (blocks.length === 0) {
+    showToast('Agregá al menos un interno.', 'danger');
+    return;
+  }
+
+  const ordersPayload = [];
+  for (const block of blocks) {
+    const selectEl = block.querySelector('.elastiquero-interno-select');
+    const interno = selectEl ? selectEl.value.trim() : '';
+    if (!interno) {
+      showToast('Todos los internos agregados deben estar seleccionados.', 'danger');
+      return;
+    }
+    const descripcion = buildElastiqueroDescription(block);
+    if (!descripcion) {
+      showToast(`Cargá la posición y la descripción de al menos un eje para el interno ${interno}.`, 'danger');
+      return;
+    }
+    const rodadoOpt = cachedCatalogs.rodados
+      ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === interno)
+      : null;
+    const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+    const clasifSelect = block.querySelector('.elastiquero-clasificacion-select');
+    const clasificacion = clasifSelect ? clasifSelect.value : 'Correctivo';
+
+    const empleadoRows = Array.from(block.querySelectorAll('.elastiquero-empleado-row'));
+    const tasks = [];
+    for (const row of empleadoRows) {
+      const empSelect = row.querySelector('.elastiquero-empleado-select');
+      const empleado = empSelect ? empSelect.value : '';
+      const horasInput = row.querySelector('.elastiquero-horas-input');
+      const horas = (horasInput && horasInput.value.trim()) ? parseFloat(horasInput.value.replace(',', '.')) || 0 : 0;
+      if (!empleado || horas <= 0) {
+        showToast(`Completá empleado y horas para todos los empleados del interno ${interno}.`, 'danger');
+        return;
+      }
+      tasks.push({
+        centroCosto: "15",
+        empleado: empleado,
+        horasEstimadas: horas,
+        descripcion: descripcion,
+        status: "Finalizada"
+      });
+    }
+
+    ordersPayload.push({
+      rodado: rodadoLabel,
+      responsable: "AUTO",
+      interno: interno,
+      clasificacion: clasificacion,
+      fechaEntrega: new Date().toISOString().split('T')[0],
+      horario: new Date().toTimeString().slice(0, 5),
+      incidente: "Cambio/Reparación de elástico",
+      estadoUnidad: "operativo",
+      tasks: tasks
+    });
+  }
+
+  try {
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const res = await fetch('/api/orders/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-username': currentUsername },
+      body: JSON.stringify({ orders: ordersPayload })
+    });
+    if (!res.ok) {
+      let errMsg = 'Error al generar las órdenes.';
+      try { const errData = await res.json(); if (errData && errData.error) errMsg = errData.error; } catch (_) {}
+      throw new Error(errMsg);
+    }
+    showToast(`✅ ${ordersPayload.length} orden(es) de Elastiquero generada(s)`, 'success');
+    const container = document.getElementById('elastiquero-internos-container');
+    if (container) {
+      container.innerHTML = '';
+      addElastiqueroInternoBlock();
+    }
+    fetchOrders();
+    switchView('orders');
+  } catch (err) {
+    showToast(err.message, 'danger');
+    console.error('Error creating elastiquero orders', err);
   }
 }
 

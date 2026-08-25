@@ -507,6 +507,25 @@
       </button>
     </section>
 
+    <!-- VIEW: ELASTIQUERO (CAMBIO/REPARACIÓN DE ELÁSTICOS) -->
+    <section id="view-elastiquero" class="app-view">
+      <div class="view-header">
+        <h2>Elastiquero</h2>
+      </div>
+
+      <div id="elastiquero-internos-container">
+        <!-- Dynamic interno blocks -->
+      </div>
+
+      <button type="button" class="btn btn-secondary btn-block" onclick="addElastiqueroInternoBlock()" style="display:flex; align-items:center; justify-content:center; gap:6px; margin: 4px 0 20px;">
+        <span class="material-icons" style="font-size:18px;">add</span> Agregar Interno
+      </button>
+
+      <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitElastiqueroOrders()" style="margin-bottom: 30px;">
+        <span class="material-icons">send</span> Generar Órdenes
+      </button>
+    </section>
+
     <!-- VIEW 4: SETTINGS (AJUSTES) -->
     <section id="view-settings" class="app-view">
       <div class="view-header">
@@ -1374,6 +1393,10 @@
       <button class="nav-item" onclick="switchView('gomeria')" id="nav-gomeria">
         <span class="material-icons">album</span>
         <span>Gomería</span>
+      </button>
+      <button class="nav-item" onclick="switchView('elastiquero')" id="nav-elastiquero">
+        <span class="material-icons">linear_scale</span>
+        <span>Elastiquero</span>
       </button>
       <button class="nav-item" onclick="switchView('partetaller')" id="nav-partetaller">
         <span class="material-icons">engineering</span>
@@ -2397,6 +2420,6 @@
     }
   </style>
 
-  <script src="app.js?v=177"></script>
+  <script src="app.js?v=178"></script>
 </body>
 </html>
