@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '182';
+const CURRENT_APP_VERSION = '183';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12291,24 +12291,6 @@ function adjustPtStateLists(state) {
     return null;
   }
 
-  // Herrería's "interno" is often just a hand-typed container/tacho ID (e.g. "20599") with no
-  // entry in the Rodados catalog, so it carries no description of its own on the Parte Taller
-  // checklist item. Fall back to whatever `rodado` the actual order for that interno was saved
-  // with (typed once when the order was created) rather than showing a bare, meaningless number.
-  function resolvePtUnitDisplayLabel(item, internoPT) {
-    const cleanInternoPT = String(internoPT || '').trim().toUpperCase();
-    let descripcion = (item.rodado && String(item.rodado).trim().toUpperCase() !== cleanInternoPT) ? item.rodado : null;
-    if (!descripcion) {
-      const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInternoPT);
-      if (matchingOrder && matchingOrder.rodado && String(matchingOrder.rodado).trim().toUpperCase() !== cleanInternoPT) {
-        descripcion = matchingOrder.rodado;
-      }
-    }
-    if (currentSelectedSector === 'Herrería' && descripcion) {
-      return `<strong>${descripcion}</strong> <span style="color:var(--text-muted); font-weight:normal;">(${internoPT})</span>`;
-    }
-    return `<strong>${internoPT}</strong>`;
-  }
 
   // 2. Scan all lists in state, extract matching units, and filter them out
   const lists = ['fuera_de_servicio', 'reparacion', 'servicios_pendientes'];
@@ -12458,6 +12440,25 @@ function adjustPtStateLists(state) {
     totales[t].total = totalFleet;
     totales[t].operativos = Math.max(0, totalFleet - fsCount - repCount - invCount);
   });
+}
+
+// Herrería's "interno" is often just a hand-typed container/tacho ID (e.g. "20599") with no
+// entry in the Rodados catalog, so it carries no description of its own on the Parte Taller
+// checklist item. Fall back to whatever `rodado` the actual order for that interno was saved
+// with (typed once when the order was created) rather than showing a bare, meaningless number.
+function resolvePtUnitDisplayLabel(item, internoPT) {
+  const cleanInternoPT = String(internoPT || '').trim().toUpperCase();
+  let descripcion = (item.rodado && String(item.rodado).trim().toUpperCase() !== cleanInternoPT) ? item.rodado : null;
+  if (!descripcion) {
+    const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInternoPT);
+    if (matchingOrder && matchingOrder.rodado && String(matchingOrder.rodado).trim().toUpperCase() !== cleanInternoPT) {
+      descripcion = matchingOrder.rodado;
+    }
+  }
+  if (currentSelectedSector === 'Herrería' && descripcion) {
+    return `<strong>${descripcion}</strong> <span style="color:var(--text-muted); font-weight:normal;">(${internoPT})</span>`;
+  }
+  return `<strong>${internoPT}</strong>`;
 }
 
 function renderParteTallerDashboard(state) {
