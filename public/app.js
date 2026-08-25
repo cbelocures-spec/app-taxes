@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '179';
+const CURRENT_APP_VERSION = '180';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7738,7 +7738,13 @@ async function submitElastiqueroOrders() {
     return;
   }
 
-  const ordersPayload = [];
+  // Elastiquero doesn't own its own O.T.: the truck is already Fuera de Servicio under an
+  // order the supervisor opened in Parte Taller (which can also carry Taller/mecánica tasks),
+  // and Elastiquero's job is just to add its own tasks to THAT existing order - never spin up
+  // a separate one for the same truck. Only falls back to creating a new order when there's
+  // genuinely no open one yet for that interno (e.g. Elastiquero used on its own).
+  const newOrdersToCreate = [];
+  const additionsToExistingOrders = [];
   for (const block of blocks) {
     const selectEl = block.querySelector('.elastiquero-interno-select');
     const interno = selectEl ? selectEl.value.trim() : '';
@@ -7751,12 +7757,6 @@ async function submitElastiqueroOrders() {
       showToast(`Cargá la posición y la descripción de al menos un eje para el interno ${interno}.`, 'danger');
       return;
     }
-    const rodadoOpt = cachedCatalogs.rodados
-      ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === interno)
-      : null;
-    const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
-    const clasifSelect = block.querySelector('.elastiquero-clasificacion-select');
-    const clasificacion = clasifSelect ? clasifSelect.value : 'Correctivo';
 
     const empleadoRows = Array.from(block.querySelectorAll('.elastiquero-empleado-row'));
     const tasks = [];
@@ -7778,32 +7778,72 @@ async function submitElastiqueroOrders() {
       });
     }
 
-    ordersPayload.push({
-      rodado: rodadoLabel,
-      responsable: "AUTO",
-      interno: interno,
-      clasificacion: clasificacion,
-      fechaEntrega: new Date().toISOString().split('T')[0],
-      horario: new Date().toTimeString().slice(0, 5),
-      incidente: "Cambio/Reparación de elástico",
-      estadoUnidad: "operativo",
-      tasks: tasks
-    });
+    // Same interno, still Fuera de Servicio, and a real Taller job (not a Herrería/Edilicio
+    // bucket that happens to share this interno) - reuse it instead of creating a duplicate.
+    const existingOrder = (activeOrders || []).find(o =>
+      String(o.interno || '').trim() === interno &&
+      o.estadoUnidad === 'fuera_de_servicio' &&
+      (!o.estado || o.estado.toLowerCase() !== 'cerrada') &&
+      !isHerreriaOrder(o) && !isEdilicioOrder(o)
+    );
+
+    if (existingOrder) {
+      additionsToExistingOrders.push({ orderId: existingOrder.id, interno, tasks });
+    } else {
+      const rodadoOpt = cachedCatalogs.rodados
+        ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === interno)
+        : null;
+      const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+      const clasifSelect = block.querySelector('.elastiquero-clasificacion-select');
+      const clasificacion = clasifSelect ? clasifSelect.value : 'Correctivo';
+      newOrdersToCreate.push({
+        rodado: rodadoLabel,
+        responsable: "AUTO",
+        interno: interno,
+        clasificacion: clasificacion,
+        fechaEntrega: new Date().toISOString().split('T')[0],
+        horario: new Date().toTimeString().slice(0, 5),
+        incidente: "Cambio/Reparación de elástico",
+        estadoUnidad: "operativo",
+        tasks: tasks
+      });
+    }
   }
 
   try {
     const currentUsername = localStorage.getItem('currentUserUsername') || '';
-    const res = await fetch('/api/orders/bulk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-user-username': currentUsername },
-      body: JSON.stringify({ orders: ordersPayload })
-    });
-    if (!res.ok) {
-      let errMsg = 'Error al generar las órdenes.';
-      try { const errData = await res.json(); if (errData && errData.error) errMsg = errData.error; } catch (_) {}
-      throw new Error(errMsg);
+    const commonHeaders = { 'Content-Type': 'application/json', 'x-user-username': currentUsername };
+
+    for (const addition of additionsToExistingOrders) {
+      const res = await fetch(`/api/orders/${addition.orderId}`, {
+        method: 'PUT',
+        headers: commonHeaders,
+        body: JSON.stringify({ tasks: addition.tasks })
+      });
+      if (!res.ok) {
+        let errMsg = `Error al agregar las tareas del interno ${addition.interno} a su orden ya abierta.`;
+        try { const errData = await res.json(); if (errData && errData.error) errMsg = errData.error; } catch (_) {}
+        throw new Error(errMsg);
+      }
     }
-    showToast(`✅ ${ordersPayload.length} orden(es) de Elastiquero generada(s)`, 'success');
+
+    if (newOrdersToCreate.length > 0) {
+      const res = await fetch('/api/orders/bulk', {
+        method: 'POST',
+        headers: commonHeaders,
+        body: JSON.stringify({ orders: newOrdersToCreate })
+      });
+      if (!res.ok) {
+        let errMsg = 'Error al generar las órdenes nuevas.';
+        try { const errData = await res.json(); if (errData && errData.error) errMsg = errData.error; } catch (_) {}
+        throw new Error(errMsg);
+      }
+    }
+
+    const parts = [];
+    if (additionsToExistingOrders.length > 0) parts.push(`${additionsToExistingOrders.length} agregada(s) a una orden ya abierta`);
+    if (newOrdersToCreate.length > 0) parts.push(`${newOrdersToCreate.length} orden(es) nueva(s) creada(s)`);
+    showToast(`✅ ${parts.join(' y ')}`, 'success');
     const container = document.getElementById('elastiquero-internos-container');
     if (container) {
       container.innerHTML = '';
