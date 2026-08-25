@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '176';
+const CURRENT_APP_VERSION = '177';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1515,7 +1515,7 @@ async function submitPreOrderCheck() {
         horasEstimadas: 0,
         status: "Pendiente",
         descripcion: group.map(i => i.texto).join(' / ')
-      });
+      }, true);
     });
   };
 
@@ -2749,7 +2749,7 @@ function renderTaskTimerHistory(card) {
   }
 }
 
-function addTaskField(taskData = null) {
+function addTaskField(taskData = null, forceNew = false) {
   try {
     const container = document.getElementById('modal-tasks-list');
     const emptyState = document.getElementById('tasks-empty-state');
@@ -2803,7 +2803,7 @@ function addTaskField(taskData = null) {
       ccOptions += `<option value="${opt.value}" ${isSelected ? "selected" : ""}>${opt.label || opt.value}</option>`;
     });
 
-    const isNew = taskData === null;
+    const isNew = taskData === null || forceNew;
     // Whether the card renders as "currently running" must follow the task's own
     // `timerStarted` flag - merely HAVING timer history (which every already-worked task
     // does, running or not) used to be enough on its own to mark it running here. That
@@ -2971,7 +2971,7 @@ function addTaskField(taskData = null) {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = cardHtml;
     const cardElement = tempDiv.firstElementChild;
-    if (taskData) {
+    if (taskData && !forceNew) {
       container.appendChild(cardElement);
     } else {
       container.prepend(cardElement);
@@ -7727,7 +7727,7 @@ function handlePendingServiceClick(entry) {
     horasEstimadas: 0,
     status: "Pendiente",
     descripcion: entry.texto
-  });
+  }, true);
 
   showToast("Tarea creada a partir de servicio pendiente", "success");
 }
@@ -7762,8 +7762,8 @@ function handleNoveltyClick(n) {
     horasEstimadas: 0,
     status: "Pendiente",
     descripcion: desc
-  });
-  
+  }, true);
+
   showToast("Tarea creada a partir de novedad", "success");
 }
 
@@ -11571,7 +11571,7 @@ function openNewOrderModalWithFuelPreventivo(interno, tipo, rowIndex, litrosTota
     descripcion: combinedDescription,
     centroCosto: "15", // MECANICA default
     status: "Pendiente"
-  });
+  }, true);
 }
 
 async function procesarCombustiblePlanilla() {
@@ -13081,13 +13081,13 @@ async function ptAsignarSeleccionados(interno) {
   if (existingOrder) {
     editOrder(existingOrder.id);
     setTimeout(() => {
-      addTaskField({ descripcion: combinedDesc, centroCosto: '15', status: 'Pendiente' });
+      addTaskField({ descripcion: combinedDesc, centroCosto: '15', status: 'Pendiente' }, true);
       showToast(`Ítem(s) agregado(s) a la Orden de Trabajo del Interno ${interno} ✓`, 'success');
     }, 200);
   } else {
     ptCrearOrden(interno);
     setTimeout(() => {
-      addTaskField({ descripcion: combinedDesc, centroCosto: '15', status: 'Pendiente' });
+      addTaskField({ descripcion: combinedDesc, centroCosto: '15', status: 'Pendiente' }, true);
       showToast(`Orden creada con los ítems seleccionados para Interno ${interno} ✓`, 'success');
     }, 200);
   }
