@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '185';
+const CURRENT_APP_VERSION = '186';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12448,16 +12448,19 @@ function adjustPtStateLists(state) {
 
 // Herrería's "interno" is often just a hand-typed container/tacho ID (e.g. "20599") with no
 // entry in the Rodados catalog, so it carries no description of its own on the Parte Taller
-// checklist item. Fall back to whatever `rodado` the actual order for that interno was saved
-// with (typed once when the order was created) rather than showing a bare, meaningless number.
+// checklist item. Prefer whatever `rodado` the LIVE order for that interno currently has (the
+// order is the source of truth someone actually edits) and only fall back to the Parte Taller
+// item's own stored `rodado` when there's no matching order at all - otherwise editing an
+// order's Rodado and saving kept showing the old value here forever, since the checklist item's
+// own copy never gets updated by that save.
 function resolvePtUnitDisplayLabel(item, internoPT) {
   const cleanInternoPT = String(internoPT || '').trim().toUpperCase();
-  let descripcion = (item.rodado && String(item.rodado).trim().toUpperCase() !== cleanInternoPT) ? item.rodado : null;
-  if (!descripcion) {
-    const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInternoPT);
-    if (matchingOrder && matchingOrder.rodado && String(matchingOrder.rodado).trim().toUpperCase() !== cleanInternoPT) {
-      descripcion = matchingOrder.rodado;
-    }
+  const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInternoPT);
+  let descripcion = (matchingOrder && matchingOrder.rodado && String(matchingOrder.rodado).trim().toUpperCase() !== cleanInternoPT)
+    ? matchingOrder.rodado
+    : null;
+  if (!descripcion && item.rodado && String(item.rodado).trim().toUpperCase() !== cleanInternoPT) {
+    descripcion = item.rodado;
   }
   if (currentSelectedSector === 'Herrería' && descripcion) {
     return `<strong>${descripcion}</strong> <span style="color:var(--text-muted); font-weight:normal;">(${internoPT})</span>`;

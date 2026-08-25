@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '185';
+const APP_VERSION = '186';
 
 // Middleware
 app.use(cors());
@@ -1224,7 +1224,15 @@ app.put('/api/orders/:id', (req, res) => {
     const targetEstadoUnidad = estadoUnidad !== undefined ? estadoUnidad : existing.estadoUnidad;
     const isOutOfService = targetEstadoUnidad === 'fuera_de_servicio';
     const resolvedInterno = interno !== undefined ? interno : existing.interno;
-    const resolvedRodado = resolveRodadoForInterno(resolvedInterno, rodado !== undefined ? rodado : existing.rodado);
+    // If the user explicitly edited Rodado to something different from what was on file, trust
+    // that edit outright - resolveRodadoForInterno's self-heal exists to fix a stale/wrong value
+    // nobody touched, not to overrule someone who just typed a new one on purpose (it always
+    // "wins" for a real catalog interno like a real truck number, silently discarding any manual
+    // edit every single save).
+    const rodadoWasExplicitlyChanged = rodado !== undefined && String(rodado).trim() !== String(existing.rodado || '').trim();
+    const resolvedRodado = rodadoWasExplicitlyChanged
+      ? rodado
+      : resolveRodadoForInterno(resolvedInterno, rodado !== undefined ? rodado : existing.rodado);
 
     // Taller and Herrería/Edilicio must never share one order - split off anything whose own
     // centro de costo doesn't match this order's sector into a sibling order for the same
