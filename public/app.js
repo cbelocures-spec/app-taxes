@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '186';
+const CURRENT_APP_VERSION = '187';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12462,7 +12462,12 @@ function resolvePtUnitDisplayLabel(item, internoPT) {
   if (!descripcion && item.rodado && String(item.rodado).trim().toUpperCase() !== cleanInternoPT) {
     descripcion = item.rodado;
   }
-  if (currentSelectedSector === 'Herrería' && descripcion) {
+  // Show the descriptive label on the Herrería tab always, and on the Taller tab too when this
+  // particular interno's current order is itself Herrería work (e.g. a real truck's interno
+  // reused for a Herrería job) - a genuine Taller truck order still just shows its bare interno
+  // here, since its own TIPO column already carries the equipment type.
+  const isHerreriaWork = currentSelectedSector === 'Herrería' || (matchingOrder && isHerreriaOrder(matchingOrder));
+  if (isHerreriaWork && descripcion) {
     return `<strong>${descripcion}</strong> <span style="color:var(--text-muted); font-weight:normal;">(${internoPT})</span>`;
   }
   return `<strong>${internoPT}</strong>`;
