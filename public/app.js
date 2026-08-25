@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '174';
+const CURRENT_APP_VERSION = '175';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -5700,15 +5700,14 @@ function renderDashboard() {
 
           seenTaskKeys.add(taskUniqueKey);
 
-          const hasPauseHistory = Array.isArray(task.timerHistory) && task.timerHistory.some(h => {
-            const tStr = String(h.type || h.action || h.event || '').toLowerCase();
-            return tStr.includes('paus') || tStr.includes('pause');
-          });
-
           if (isTimerRunning) {
             workingTasks.push(taskInfo);
             workingEmployeeLabels.add(String(empLabel).toLowerCase().trim());
-          } else if (hasPauseHistory) {
+          } else {
+            // Not running, not finished - whether it was paused mid-way or the cronómetro was
+            // never started at all when the order got submitted, it still needs someone to
+            // press play. Without this, a forgotten-to-start task was invisible here (it only
+            // showed up inside the O.T. itself) and nobody noticed it needed starting.
             pausedTasks.push(taskInfo);
             pausedEmployeeLabels.add(String(empLabel).toLowerCase().trim());
           }
@@ -5794,6 +5793,7 @@ function renderDashboard() {
         }
         const startLabel = getTimelineFullHistoryLabel(t.timerHistory, t.timerStart);
         const isLast = idx === pausedTasks.length - 1;
+        const resumeLabel = (Array.isArray(t.timerHistory) && t.timerHistory.length > 0) ? 'Reanudar' : 'Iniciar';
         return `
           <div class="timeline-item paused">
             <div class="timeline-track">
@@ -5838,7 +5838,7 @@ function renderDashboard() {
               </div>
               <div class="dashboard-card-actions">
                 <button type="button" class="btn btn-primary btn-xs" onclick="toggleDashboardTaskTimer('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
-                  <span class="material-icons" style="font-size:14px;">play_arrow</span> Reanudar
+                  <span class="material-icons" style="font-size:14px;">play_arrow</span> ${resumeLabel}
                 </button>
                 <button type="button" class="btn btn-primary btn-xs" onclick="markDashboardTaskFinished('${t.orderId}', '${t.taskId}')" style="background-color: var(--success); color: white; border-color: var(--success);">
                   <span class="material-icons" style="font-size:14px;">check</span> Fin
