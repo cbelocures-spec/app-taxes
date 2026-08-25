@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '193';
+const CURRENT_APP_VERSION = '194';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12188,15 +12188,25 @@ function adjustPtStateLists(state) {
   // with a plain numeric Interno Unidad that's just a loose reference note the user typed (it
   // can even coincide with a REAL truck's own catalog interno, e.g. reusing "145" for an
   // unrelated container job) - resolveFleetTypeFromInterno looks up by THAT interno and would
-  // wrongly report the real truck's fleet type for what's actually shop-internal work. Look up
-  // the catalog by the order's own RODADO label instead, which is what was genuinely selected.
+  // wrongly report the real truck's fleet type for what's actually shop-internal work.
+  // An exact catalog-label lookup turned out too fragile (the saved Rodado text doesn't always
+  // match a catalog option's label verbatim), so fall back to the same REP./FABRICACION/
+  // FINALIZACION/PRENSAS keyword signal isHerreriaExclusiveEquipmentClient uses for an interno,
+  // but checked as a substring anywhere in the Rodado text (not just a prefix on the interno) -
+  // that's what actually shows up in a constructed label like this one.
   function isRodadoBucketNotFleet(rodadoText) {
     if (!rodadoText) return false;
-    const cleanRodado = String(rodadoText).trim();
-    const rodadoOpt = (cachedCatalogs.rodados || []).find(r => String(r.label || '').trim() === cleanRodado);
-    if (!rodadoOpt) return false;
-    const equipo = String(rodadoOpt.equipo || '').trim().toUpperCase();
-    return equipo === 'HERRERIA' || equipo === 'EDILICIO';
+    const clean = String(rodadoText).toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    if (clean.includes('REP.') || clean.includes('REP ')) return true;
+    if (clean.includes('FABRIC')) return true;
+    if (clean.includes('FINALIZ')) return true;
+    if (clean.includes('PRENSAS')) return true;
+    const rodadoOpt = (cachedCatalogs.rodados || []).find(r => String(r.label || '').trim().toUpperCase() === String(rodadoText).trim().toUpperCase());
+    if (rodadoOpt) {
+      const equipo = String(rodadoOpt.equipo || '').trim().toUpperCase();
+      if (equipo === 'HERRERIA' || equipo === 'EDILICIO') return true;
+    }
+    return false;
   }
 
   // 1. Find all open orders with active or paused sector-matching tasks. A unit already
