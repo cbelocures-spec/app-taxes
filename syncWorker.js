@@ -1780,6 +1780,24 @@ function otBloqueadaPorUnidadOperativa(interno, clasificacion, otNumero, exclude
   );
 }
 
+// Taxes itself has no concept of área - its OT table only knows interno+clasificación, so a
+// table scan for "an O.T. already open for this interno" can't tell two Edilicio áreas of the
+// same building apart. If that OT number is already claimed by ANOTHER local order whose área
+// doesn't match this order's, reusing it here would silently merge this order's tasks into that
+// other área's O.T. instead of getting its own - check the local DB before accepting the match.
+function otClaimedByDifferentArea(otNumero, area, excludeOrderId) {
+  if (!otNumero || !area) return false; // Taller/Herrería orders have no área to protect
+  const otClean = String(otNumero).replace(/\D/g, '');
+  const cleanArea = String(area).trim().toLowerCase();
+  const dbData = db.read();
+  return (dbData.workOrders || []).some(o =>
+    String(o.id) !== String(excludeOrderId) &&
+    o.deleted !== true &&
+    o.taxesOrderNumber && String(o.taxesOrderNumber).replace(/\D/g, '') === otClean &&
+    String(o.area || '').trim().toLowerCase() !== cleanArea
+  );
+}
+
 // 2. SYNCHRONIZE SINGLE WORK ORDER (REPARADO ANTI-DUPLICADOS VELOCES)
 async function syncWorkOrder(orderId) {
   let order = db.getWorkOrderById(orderId);
@@ -1947,6 +1965,8 @@ async function syncWorkOrder(orderId) {
 
         if (existingOpenTaxesOt && otBloqueadaPorUnidadOperativa(order.interno, order.clasificacion, existingOpenTaxesOt, orderId)) {
           console.log(`[Alta O.T.] O.T. #${existingOpenTaxesOt} detectada para Interno ${order.interno}, pero esa unidad ya pasó a Operativo en BD local (avería cerrada). Se procederá a crear una NUEVA O.T.`);
+        } else if (existingOpenTaxesOt && otClaimedByDifferentArea(existingOpenTaxesOt, order.area, orderId)) {
+          console.log(`[Alta O.T.] O.T. #${existingOpenTaxesOt} detectada para Interno ${order.interno}, pero ya pertenece a otra orden local de distinta área ("${order.area}"). Se procederá a crear una NUEVA O.T.`);
         } else if (existingOpenTaxesOt) {
           console.log(`[Alta O.T.] O.T. abierta en proceso #${existingOpenTaxesOt} detectada para Interno ${order.interno}. Vinculando sin crear nueva...`);
           numeroGenerado = existingOpenTaxesOt;
@@ -3361,6 +3381,8 @@ async function syncWorkOrder(orderId) {
 
       if (existingOtOnPage && otBloqueadaPorUnidadOperativa(order.interno, order.clasificacion, existingOtOnPage, orderId)) {
         console.log(`[Pre-Check Safeguard] OT #${existingOtOnPage} para Interno ${order.interno} corresponde a una avería ya Operativa en BD local. No se reutiliza; se continuará creando una O.T. nueva.`);
+      } else if (existingOtOnPage && otClaimedByDifferentArea(existingOtOnPage, order.area, orderId)) {
+        console.log(`[Pre-Check Safeguard] OT #${existingOtOnPage} para Interno ${order.interno} ya pertenece a otra orden local de distinta área ("${order.area}"). No se reutiliza; se continuará creando una O.T. nueva.`);
       } else if (existingOtOnPage) {
         console.log(`[Pre-Check Safeguard] Found pre-existing OT #${existingOtOnPage} for Interno ${order.interno} on date ${todayDateStr} in Taxes! Linking and switching to reconciliation...`);
         db.updateWorkOrder(orderId, { taxesOrderNumber: existingOtOnPage });
@@ -4601,6 +4623,8 @@ async function syncExpressOtHeader(orderId) {
 
     if (existingTableOt && otBloqueadaPorUnidadOperativa(order.interno, order.clasificacion, existingTableOt, orderId)) {
       console.log(`[Express OT Pre-Check] OT #${existingTableOt} para Interno ${order.interno} corresponde a una avería ya Operativa en BD local. No se reutiliza; se creará una O.T. nueva.`);
+    } else if (existingTableOt && otClaimedByDifferentArea(existingTableOt, order.area, orderId)) {
+      console.log(`[Express OT Pre-Check] OT #${existingTableOt} para Interno ${order.interno} ya pertenece a otra orden local de distinta área ("${order.area}"). No se reutiliza; se creará una O.T. nueva.`);
     } else if (existingTableOt) {
       console.log(`[Express OT Pre-Check] Found pre-existing OT #${existingTableOt} in Taxes for Interno ${order.interno} on ${expressTodayDateStr}! Linking immediately.`);
       db.updateWorkOrder(orderId, { taxesOrderNumber: existingTableOt, syncStatus: 'success', syncError: null });
