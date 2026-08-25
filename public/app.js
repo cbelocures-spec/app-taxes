@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '189';
+const CURRENT_APP_VERSION = '190';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13070,7 +13070,7 @@ function renderParteTallerDashboard(state) {
         const internoPT = String(item.interno || '');
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         return `<tr>
-          <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${getEditBtnHtml(internoPT, origenLista)} <strong>${internoPT}</strong></div></td>
+          <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${getEditBtnHtml(internoPT, origenLista)} ${resolvePtUnitDisplayLabel(item, internoPT)}</div></td>
           <td><span style="font-size:11px;">${item.tipo || 'Otro'}</span></td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td><span class="badge" style="background:#e2e8f0; color:#334155; font-size:11px;">${origenLabels[origenLista] || origenLista}</span></td>
