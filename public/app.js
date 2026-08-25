@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '184';
+const CURRENT_APP_VERSION = '185';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -8662,12 +8662,15 @@ function updateClassificationSelectOptions() {
       // Taller / Admin / Edilicio - Taxes has no real "Edilicio" clasificacion value (only
       // Correctivo/Preventivo/Auxilio, plus Herrería which genuinely exists there). Edilicio
       // work is identified by the task's Centro de Costo, not by this field, so the Edilicio
-      // tab offers the exact same real options as Taller.
+      // tab offers the exact same real options as Taller. "Herrería" itself is still offered
+      // here too (not just on the Herrería tab) - a Pañol/Admin/Taller account often needs to
+      // log a container/tacho job (free-text interno) without switching tabs first.
       html = `
         <option value="" selected disabled>${sel.defaultText}</option>
         <option value="Preventivo">Preventivo</option>
         <option value="Auxilio">Auxilio</option>
         <option value="Correctivo">Correctivo</option>
+        <option value="Herrería">Herrería</option>
       `;
       if (sel.id === 'pre-form-clasificacion') {
         html = `
@@ -8675,6 +8678,7 @@ function updateClassificationSelectOptions() {
           <option value="Correctivo">Correctivo</option>
           <option value="Preventivo">Preventivo</option>
           <option value="Auxilio">Auxilio</option>
+          <option value="Herrería">Herrería</option>
         `;
       }
     }
