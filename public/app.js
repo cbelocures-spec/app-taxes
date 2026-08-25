@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '178';
+const CURRENT_APP_VERSION = '179';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7565,18 +7565,21 @@ function addElastiqueroEjeRow(btn) {
         <optgroup label="Eje Delantero">
           <option value="Delantero izquierdo">Delantero izquierdo</option>
           <option value="Delantero derecho">Delantero derecho</option>
+          <option value="Delantero completo (cambio de eje)">Delantero completo (cambio de eje)</option>
         </optgroup>
         <optgroup label="Eje Trasero (Tracción - Diferencial)">
           <option value="Trasero izquierdo exterior">Trasero izquierdo exterior</option>
           <option value="Trasero izquierdo interior">Trasero izquierdo interior</option>
           <option value="Trasero derecho exterior">Trasero derecho exterior</option>
           <option value="Trasero derecho interior">Trasero derecho interior</option>
+          <option value="Trasero completo (cambio de eje)">Trasero completo (cambio de eje)</option>
         </optgroup>
         <optgroup label="Eje Fijo / Flotante">
           <option value="Eje fijo/flotante izquierdo exterior">Eje fijo/flotante izquierdo exterior</option>
           <option value="Eje fijo/flotante izquierdo interior">Eje fijo/flotante izquierdo interior</option>
           <option value="Eje fijo/flotante derecho exterior">Eje fijo/flotante derecho exterior</option>
           <option value="Eje fijo/flotante derecho interior">Eje fijo/flotante derecho interior</option>
+          <option value="Eje fijo/flotante completo (cambio de eje)">Eje fijo/flotante completo (cambio de eje)</option>
         </optgroup>
         <option value="Auxilio / Repuesto">Auxilio / Repuesto</option>
         <option value="__otro__">Otro (escribir)</option>
