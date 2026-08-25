@@ -1790,7 +1790,7 @@
               </div>
               <div class="form-group col-6" style="flex: 0 0 calc(50% - 6px); min-width: 0; max-width: calc(50% - 6px); box-sizing: border-box;">
                 <label for="form-clasificacion">Clasificación *</label>
-                <select id="form-clasificacion" required>
+                <select id="form-clasificacion" required onchange="setupAllFieldsForSector()">
                   <option value="" selected disabled>Seleccionar...</option>
                   <option value="Preventivo">Preventivo</option>
                   <option value="Auxilio">Auxilio</option>
@@ -2420,6 +2420,6 @@
     }
   </style>
 
-  <script src="app.js?v=183"></script>
+  <script src="app.js?v=184"></script>
 </body>
 </html>
