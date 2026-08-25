@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '190';
+const CURRENT_APP_VERSION = '191';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13539,40 +13539,14 @@ function ptOnEstadoChange() {
 }
 
 // Opens the modal for editing an existing unit
-function openPtEditUnitModal(interno, listName) {
-  if (!window._ptState) return;
-  const list = window._ptState[listName] || [];
-  const item = list.find(u => String(u.interno).trim() === String(interno).trim());
-  if (!item) return;
-
-  currentEditingPtInterno = String(interno).trim();
-  currentEditingPtOriginalList = listName;
-  window._ptDuplicateEditInterno = null;
-  window._ptDuplicateEditList = null;
-  
-  document.getElementById('pt-unit-modal-title').textContent = `Editar Unidad #${interno}`;
-  
-  // Detect company anywhere in the name (case-insensitive)
-  let inputInternoVal = String(interno).trim();
-  let empresaVal = 'hugo';
-  const upperVal = inputInternoVal.toUpperCase();
-  if (upperVal.includes('IRINEO')) {
-    empresaVal = 'irineo';
-    inputInternoVal = inputInternoVal.replace(/irineo/gi, '').replace(/[-_]/g, '').trim();
-  } else if (upperVal.includes('NICO')) {
-    empresaVal = 'nico';
-    inputInternoVal = inputInternoVal.replace(/volquete\s+nico/gi, '').replace(/nico/gi, '').replace(/[-_]/g, '').trim();
-  }
-
-  document.getElementById('pt-unit-empresa').value = empresaVal;
-  document.getElementById('pt-unit-interno').value = inputInternoVal;
-  document.getElementById('pt-unit-interno').disabled = false;
-  document.getElementById('pt-unit-tipo').value = item.tipo || 'COMPACTADOR';
-  document.getElementById('pt-unit-estado').value = listName;
-  document.getElementById('pt-unit-destino').value = item.destinoIngreso || 'fuera_de_servicio';
-  ptOnEstadoChange();
-
-  // --- Build interactive checklist editor with ALL items (pending + done) ---
+// Builds the interactive checkbox checklist (pending + done) from a Parte Taller unit's own
+// novedad_items/novedad, and clears the textarea for genuinely NEW items only. Used both when
+// opening a unit via the edit pencil AND when ptCheckForDuplicateUnit() finds that an interno
+// just typed into "Agregar Unidad" already exists - that second path used to dump the existing
+// items as raw text straight into the "new item" textarea instead of into this checklist, so
+// anyone who didn't notice the pre-fill (or whose save got retried) ended up re-submitting the
+// same items again as if they were new, duplicating them.
+function populatePtChecklistEditorFromItem(item) {
   let allItems = []; // { texto, hecho }
   if (Array.isArray(item.novedad_items) && item.novedad_items.length > 0) {
     allItems = item.novedad_items.map(x => ({
@@ -13615,7 +13589,42 @@ function openPtEditUnitModal(interno, listName) {
   document.getElementById('pt-unit-novedad').value = '';
   const novedadLabel = document.getElementById('pt-unit-novedad-label');
   if (novedadLabel) novedadLabel.textContent = 'Agregar nuevos ítems (opcional)';
+}
 
+function openPtEditUnitModal(interno, listName) {
+  if (!window._ptState) return;
+  const list = window._ptState[listName] || [];
+  const item = list.find(u => String(u.interno).trim() === String(interno).trim());
+  if (!item) return;
+
+  currentEditingPtInterno = String(interno).trim();
+  currentEditingPtOriginalList = listName;
+  window._ptDuplicateEditInterno = null;
+  window._ptDuplicateEditList = null;
+  
+  document.getElementById('pt-unit-modal-title').textContent = `Editar Unidad #${interno}`;
+  
+  // Detect company anywhere in the name (case-insensitive)
+  let inputInternoVal = String(interno).trim();
+  let empresaVal = 'hugo';
+  const upperVal = inputInternoVal.toUpperCase();
+  if (upperVal.includes('IRINEO')) {
+    empresaVal = 'irineo';
+    inputInternoVal = inputInternoVal.replace(/irineo/gi, '').replace(/[-_]/g, '').trim();
+  } else if (upperVal.includes('NICO')) {
+    empresaVal = 'nico';
+    inputInternoVal = inputInternoVal.replace(/volquete\s+nico/gi, '').replace(/nico/gi, '').replace(/[-_]/g, '').trim();
+  }
+
+  document.getElementById('pt-unit-empresa').value = empresaVal;
+  document.getElementById('pt-unit-interno').value = inputInternoVal;
+  document.getElementById('pt-unit-interno').disabled = false;
+  document.getElementById('pt-unit-tipo').value = item.tipo || 'COMPACTADOR';
+  document.getElementById('pt-unit-estado').value = listName;
+  document.getElementById('pt-unit-destino').value = item.destinoIngreso || 'fuera_de_servicio';
+  ptOnEstadoChange();
+
+  populatePtChecklistEditorFromItem(item);
   document.getElementById('pt-unit-modal').classList.add('open');
 }
 
@@ -13888,17 +13897,12 @@ function ptCheckForDuplicateUnit() {
     document.getElementById('pt-unit-estado').value = foundList;
     ptOnEstadoChange();
 
-    let rawNovedadText = '';
-    if (Array.isArray(foundUnit.novedad_items)) {
-      rawNovedadText = foundUnit.novedad_items.map(x => {
-        const prefix = x.hecho ? '[X]' : '[ ]';
-        return `${prefix} ${x.texto.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()}`;
-      }).join('\n');
-    } else {
-      rawNovedadText = foundUnit.novedad || '';
-    }
-    document.getElementById('pt-unit-novedad').value = rawNovedadText;
-    
+    // Load existing items into the same checkbox checklist "Editar Unidad" uses (not as raw
+    // text in the "new item" textarea) - dumping them into that textarea let a save re-submit
+    // them as if they were new, duplicating them every time someone didn't notice they'd already
+    // been pre-filled.
+    populatePtChecklistEditorFromItem(foundUnit);
+
     window._ptDuplicateEditInterno = searchInterno;
     window._ptDuplicateEditList = foundList;
     showToast(`La unidad #${searchInterno} ya está registrada. Cargando novedades existentes...`, 'info');
@@ -13907,6 +13911,10 @@ function ptCheckForDuplicateUnit() {
     if (window._ptDuplicateEditInterno) {
       document.getElementById('pt-unit-modal-title').textContent = 'Agregar Unidad a Taller';
       document.getElementById('pt-unit-novedad').value = '';
+      const novedadLabel = document.getElementById('pt-unit-novedad-label');
+      if (novedadLabel) novedadLabel.textContent = 'Novedad / Diagnóstico / Servicio';
+      const checkSection = document.getElementById('pt-unit-checklist-section');
+      if (checkSection) checkSection.style.display = 'none';
       window._ptDuplicateEditInterno = null;
       window._ptDuplicateEditList = null;
     }
