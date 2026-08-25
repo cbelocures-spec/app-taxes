@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '171';
+const CURRENT_APP_VERSION = '172';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13055,7 +13055,13 @@ async function ptAsignarSeleccionados(interno) {
 
   // 2. Open or create the work order in Taxes
   const taxesInterno = resolvePtTaxesInterno(interno);
-  const existingOrder = activeOrders && activeOrders.find(o =>
+  // Edilicio can hold several open orders for the same building at once, one per área, and
+  // this checklist flow has no área input of its own - matching by interno alone (like Taller/
+  // Herrería safely do, since they have no área dimension) would silently glue this task onto
+  // whichever área's order happened to be open first. So for Edilicio, never auto-reuse here:
+  // always open a blank new-order modal and let the user pick the área themselves.
+  const isEdilicioContext = (getSectorByUsername(localStorage.getItem('currentUserUsername')) === 'Edilicio' || currentSelectedSector === 'Edilicio');
+  const existingOrder = !isEdilicioContext && activeOrders && activeOrders.find(o =>
     String(o.interno || '').trim() === String(taxesInterno).trim() &&
     (!o.estado || o.estado.toLowerCase() !== 'cerrada')
   );
