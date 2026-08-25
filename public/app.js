@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '180';
+const CURRENT_APP_VERSION = '182';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7685,6 +7685,7 @@ function addElastiqueroInternoBlock() {
         </select>
       </div>
     </div>
+    <div class="elastiquero-ot-info" style="display:none; margin-top:8px; padding:8px 10px; border-radius:6px; font-size:12px; font-weight:600;"></div>
 
     <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:14px 0 0;">Ejes trabajados</label>
     <div class="elastiquero-eje-rows-container"></div>
@@ -7702,14 +7703,58 @@ function addElastiqueroInternoBlock() {
   addElastiqueroEjeRow(block.querySelector('.elastiquero-eje-rows-container + button'));
   addElastiqueroEmpleadoRow(block.querySelector('.elastiquero-empleado-rows-container + button'));
   const internoSelectEl = block.querySelector('.elastiquero-interno-select');
-  if (internoSelectEl && typeof convertSelectToSearchable === 'function') {
-    convertSelectToSearchable(internoSelectEl);
+  if (internoSelectEl) {
+    internoSelectEl.addEventListener('change', () => updateElastiqueroOtInfo(internoSelectEl));
+    if (typeof convertSelectToSearchable === 'function') {
+      convertSelectToSearchable(internoSelectEl);
+    }
   }
 }
 
 function removeElastiqueroInternoBlock(btn) {
   const block = btn.closest('.elastiquero-interno-block');
   if (block) block.remove();
+}
+
+// Same match used at submit time: a real Taller order (not Herrería/Edilicio), still Fuera de
+// Servicio, for this exact interno - kept as one function so the live preview and the actual
+// submit never disagree about which order (if any) is going to receive the new tasks.
+function findOpenTallerOrderForInterno(interno) {
+  const cleanInterno = String(interno || '').trim();
+  if (!cleanInterno) return null;
+  return (activeOrders || []).find(o =>
+    String(o.interno || '').trim() === cleanInterno &&
+    o.estadoUnidad === 'fuera_de_servicio' &&
+    (!o.estado || o.estado.toLowerCase() !== 'cerrada') &&
+    !isHerreriaOrder(o) && !isEdilicioOrder(o)
+  ) || null;
+}
+
+// Shows, as soon as an Interno is picked, whether it already has an open O.T. that Elastiquero's
+// tasks will land on - so whoever is loading this doesn't have to guess or submit blind.
+function updateElastiqueroOtInfo(selectEl) {
+  const block = selectEl.closest('.elastiquero-interno-block');
+  const infoEl = block ? block.querySelector('.elastiquero-ot-info') : null;
+  if (!infoEl) return;
+
+  const interno = selectEl.value.trim();
+  if (!interno) {
+    infoEl.style.display = 'none';
+    return;
+  }
+
+  const existingOrder = findOpenTallerOrderForInterno(interno);
+  infoEl.style.display = 'block';
+  if (existingOrder) {
+    const otLabel = existingOrder.taxesOrderNumber ? `OT #${existingOrder.taxesOrderNumber}` : 'sin número de OT todavía';
+    infoEl.style.background = 'var(--success-light)';
+    infoEl.style.color = 'var(--success)';
+    infoEl.innerHTML = `<span class="material-icons" style="font-size:14px; vertical-align:-2px;">check_circle</span> Ya tiene una orden abierta (${otLabel}) — las tareas se van a agregar ahí.`;
+  } else {
+    infoEl.style.background = 'var(--warning-light)';
+    infoEl.style.color = 'var(--warning)';
+    infoEl.innerHTML = `<span class="material-icons" style="font-size:14px; vertical-align:-2px;">info</span> No tiene ninguna orden abierta — se va a crear una nueva.`;
+  }
 }
 
 // Combines every eje row of one interno block into a single description string, one line per
@@ -7778,14 +7823,7 @@ async function submitElastiqueroOrders() {
       });
     }
 
-    // Same interno, still Fuera de Servicio, and a real Taller job (not a Herrería/Edilicio
-    // bucket that happens to share this interno) - reuse it instead of creating a duplicate.
-    const existingOrder = (activeOrders || []).find(o =>
-      String(o.interno || '').trim() === interno &&
-      o.estadoUnidad === 'fuera_de_servicio' &&
-      (!o.estado || o.estado.toLowerCase() !== 'cerrada') &&
-      !isHerreriaOrder(o) && !isEdilicioOrder(o)
-    );
+    const existingOrder = findOpenTallerOrderForInterno(interno);
 
     if (existingOrder) {
       additionsToExistingOrders.push({ orderId: existingOrder.id, interno, tasks });
@@ -12253,6 +12291,25 @@ function adjustPtStateLists(state) {
     return null;
   }
 
+  // Herrería's "interno" is often just a hand-typed container/tacho ID (e.g. "20599") with no
+  // entry in the Rodados catalog, so it carries no description of its own on the Parte Taller
+  // checklist item. Fall back to whatever `rodado` the actual order for that interno was saved
+  // with (typed once when the order was created) rather than showing a bare, meaningless number.
+  function resolvePtUnitDisplayLabel(item, internoPT) {
+    const cleanInternoPT = String(internoPT || '').trim().toUpperCase();
+    let descripcion = (item.rodado && String(item.rodado).trim().toUpperCase() !== cleanInternoPT) ? item.rodado : null;
+    if (!descripcion) {
+      const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInternoPT);
+      if (matchingOrder && matchingOrder.rodado && String(matchingOrder.rodado).trim().toUpperCase() !== cleanInternoPT) {
+        descripcion = matchingOrder.rodado;
+      }
+    }
+    if (currentSelectedSector === 'Herrería' && descripcion) {
+      return `<strong>${descripcion}</strong> <span style="color:var(--text-muted); font-weight:normal;">(${internoPT})</span>`;
+    }
+    return `<strong>${internoPT}</strong>`;
+  }
+
   // 2. Scan all lists in state, extract matching units, and filter them out
   const lists = ['fuera_de_servicio', 'reparacion', 'servicios_pendientes'];
   const unitsToMove = [];
@@ -12651,10 +12708,7 @@ function renderParteTallerDashboard(state) {
     } else {
       el('pt-transito-tbody').innerHTML = transito.map(item => {
         const internoPT = String(item.interno || '');
-        const hasRodadoDesc = item.rodado && String(item.rodado).trim().toUpperCase() !== internoPT.trim().toUpperCase();
-        const displayLabel = (currentSelectedSector === 'Herrería' && hasRodadoDesc)
-          ? `<strong>${internoPT}</strong><div style="font-size:11px; color:var(--text-muted); font-weight:normal; margin-top:2px;">${item.rodado}</div>`
-          : `<strong>${internoPT}</strong>`;
+        const displayLabel = resolvePtUnitDisplayLabel(item, internoPT);
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         
         let targetBadge = '<span class="badge" style="background:#ef4444; color:white; font-size:10px;">Fuera de Servicio</span>';
@@ -12789,10 +12843,7 @@ function renderParteTallerDashboard(state) {
     } else {
       el('pt-fuera-tbody').innerHTML = fueraDeServicio.map(item => {
         const internoPT = String(item.interno || '');
-        const hasRodadoDesc = item.rodado && String(item.rodado).trim().toUpperCase() !== internoPT.trim().toUpperCase();
-        const displayLabel = (currentSelectedSector === 'Herrería' && hasRodadoDesc)
-          ? `<strong>${internoPT}</strong><div style="font-size:11px; color:var(--text-muted); font-weight:normal; margin-top:2px;">${item.rodado}</div>`
-          : `<strong>${internoPT}</strong>`;
+        const displayLabel = resolvePtUnitDisplayLabel(item, internoPT);
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         return `<tr>
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEstadoTrabajoBadgeHtml(item)} ${getEditBtnHtml(internoPT, 'fuera_de_servicio')}</div></td>
@@ -12842,10 +12893,7 @@ function renderParteTallerDashboard(state) {
     } else {
       el('pt-reparacion-tbody').innerHTML = reparacion.map(item => {
         const internoPT = String(item.interno || '');
-        const hasRodadoDesc = item.rodado && String(item.rodado).trim().toUpperCase() !== internoPT.trim().toUpperCase();
-        const displayLabel = (currentSelectedSector === 'Herrería' && hasRodadoDesc)
-          ? `<strong>${internoPT}</strong><div style="font-size:11px; color:var(--text-muted); font-weight:normal; margin-top:2px;">${item.rodado}</div>`
-          : `<strong>${internoPT}</strong>`;
+        const displayLabel = resolvePtUnitDisplayLabel(item, internoPT);
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         return `<tr>
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEstadoTrabajoBadgeHtml(item)} ${getEditBtnHtml(internoPT, 'reparacion')}</div></td>
@@ -12893,10 +12941,7 @@ function renderParteTallerDashboard(state) {
     } else {
       el('pt-pendientes-tbody').innerHTML = pendientes.map(item => {
         const internoPT = String(item.interno || '');
-        const hasRodadoDesc = item.rodado && String(item.rodado).trim().toUpperCase() !== internoPT.trim().toUpperCase();
-        const displayLabel = (currentSelectedSector === 'Herrería' && hasRodadoDesc)
-          ? `<strong>${internoPT}</strong><div style="font-size:11px; color:var(--text-muted); font-weight:normal; margin-top:2px;">${item.rodado}</div>`
-          : `<strong>${internoPT}</strong>`;
+        const displayLabel = resolvePtUnitDisplayLabel(item, internoPT);
         const servicio = item.servicio || item.tipo_servicio || '—';
         return `<tr>
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEditBtnHtml(internoPT, 'servicios_pendientes')}</div></td>
