@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '203';
+const CURRENT_APP_VERSION = '204';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -801,6 +801,18 @@ function switchView(viewId) {
 
     if (viewId === 'partetaller') {
       try { autoSetPtSupervisorSelect(); } catch(e) {}
+      try { fetchParteTallerEstado(); } catch(e) {}
+      parteTallerAutoRefreshInterval = setInterval(() => {
+        try { fetchParteTallerEstado(); } catch(e) {}
+      }, 60000);
+    }
+
+    // Inicio's fleet-by-tipo cards (home-tot-comp, etc.) are filled by this same
+    // fetchParteTallerEstado()/renderParteTallerDashboard() call as Parte Taller's own cards -
+    // but until now only Parte Taller kept polling it, so Inicio only ever showed whatever was
+    // true at the moment the app first loaded (stale numbers that didn't match Parte Taller,
+    // and never picked up a unit added afterward without a full page reload).
+    if (viewId === 'home') {
       try { fetchParteTallerEstado(); } catch(e) {}
       parteTallerAutoRefreshInterval = setInterval(() => {
         try { fetchParteTallerEstado(); } catch(e) {}
