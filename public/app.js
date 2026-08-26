@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '195';
+const CURRENT_APP_VERSION = '197';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -4111,7 +4111,7 @@ function createOrderCardHtml(order) {
         </div>
         <div class="task-employees-detail" id="task-emp-${order.id}" style="display:none; width:100%; margin-top:6px; padding:6px 8px; background:var(--bg-secondary); border-radius:6px; font-size:12px;"></div>
         <div class="card-actions" style="margin-top:6px;">
-          ${!order.taxesOrderNumber ? `
+          ${(!order.taxesOrderNumber && order.estadoUnidad !== 'fuera_de_servicio') ? `
             <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); handleObtenerNumeroOT('${order.id}', this)" style="padding:3px 8px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:3px; background:linear-gradient(135deg,#059669,#047857); border:none; color:#fff; border-radius:6px; cursor:pointer;" title="Obtener N° de O.T. Express en Taxes">
               <span class="material-icons" style="font-size:14px;">bolt</span> Obtener N° O.T.
             </button>
@@ -4119,12 +4119,12 @@ function createOrderCardHtml(order) {
           <button class="icon-btn primary" onclick="viewOrder('${order.id}')" title="Ver Orden (Solo Lectura)">
             <span class="material-icons">visibility</span>
           </button>
-          ${(order.syncStatus !== 'pending' && order.syncStatus !== 'syncing') ? `
+          ${(order.syncStatus !== 'syncing') ? `
             <button class="icon-btn warning" onclick="editOrder('${order.id}')" title="Editar Orden">
               <span class="material-icons">edit</span>
             </button>
           ` : ''}
-          ${(order.syncStatus === 'local' || order.syncStatus === 'error') ? `
+          ${((order.syncStatus === 'local' || order.syncStatus === 'error') && order.estadoUnidad !== 'fuera_de_servicio') ? `
             <button class="icon-btn success" onclick="retrySync('${order.id}')" title="Subir a Taxes">
               <span class="material-icons">cloud_upload</span>
             </button>
@@ -4189,7 +4189,9 @@ function toggleTaskEmployees(event, orderId) {
           <span style="background:#d1fae5; color:#065f46; border:1px solid #a7f3d0; padding:1px 6px; border-radius:10px; font-size:10px; font-weight:700; display:inline-flex; align-items:center; gap:2px;">
             <span class="material-icons" style="font-size:11px;">check_circle</span> Sincronizada
           </span>
-        ` : (order.taxesOrderNumber ? `
+        ` : (order.estadoUnidad === 'fuera_de_servicio' ? `
+          <span style="color:var(--text-muted); font-size:10px; font-style:italic;">Fuera de Servicio</span>
+        ` : order.taxesOrderNumber ? `
           <button type="button" class="btn btn-sm btn-primary" onclick="event.stopPropagation(); triggerSingleTaskSync('${order.id}', ${idx})" style="padding:1px 6px; font-size:10px; font-weight:600; display:inline-flex; align-items:center; gap:2px; background:linear-gradient(135deg,#0284c7,#0369a1); border:none; color:#fff; border-radius:4px; cursor:pointer;" title="Sincronizar esta tarea a Taxes">
             <span class="material-icons" style="font-size:11px;">bolt</span> Sincronizar Tarea
           </button>
@@ -7736,6 +7738,24 @@ function findOpenTallerOrderForInterno(interno) {
   ) || null;
 }
 
+// Elastiquero sometimes loads its part AFTER the truck already went back to Operativo (and its
+// order archived to Historial) - rather than spin up a disconnected duplicate order for the same
+// job, or guess by how much time passed, trust the explicit "Va a trabajar el Elastiquero" switch
+// the supervisor set in Parte Taller: reopen that flagged order and add the task there.
+function findRecentClosedTallerOrderForInterno(interno) {
+  const cleanInterno = String(interno || '').trim();
+  if (!cleanInterno) return null;
+  const candidates = [...(activeOrders || []), ...(archivedOrders || [])].filter(o =>
+    String(o.interno || '').trim() === cleanInterno &&
+    (!o.estado || o.estado.toLowerCase() !== 'cerrada') &&
+    !isHerreriaOrder(o) && !isEdilicioOrder(o) &&
+    o.pendingElastiquero === true
+  );
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => (parseInt(b.id) || 0) - (parseInt(a.id) || 0));
+  return candidates[0];
+}
+
 // Shows, as soon as an Interno is picked, whether it already has an open O.T. that Elastiquero's
 // tasks will land on - so whoever is loading this doesn't have to guess or submit blind.
 function updateElastiqueroOtInfo(selectEl) {
@@ -7750,12 +7770,18 @@ function updateElastiqueroOtInfo(selectEl) {
   }
 
   const existingOrder = findOpenTallerOrderForInterno(interno);
+  const recentClosedOrder = existingOrder ? null : findRecentClosedTallerOrderForInterno(interno);
   infoEl.style.display = 'block';
   if (existingOrder) {
     const otLabel = existingOrder.taxesOrderNumber ? `OT #${existingOrder.taxesOrderNumber}` : 'sin número de OT todavía';
     infoEl.style.background = 'var(--success-light)';
     infoEl.style.color = 'var(--success)';
     infoEl.innerHTML = `<span class="material-icons" style="font-size:14px; vertical-align:-2px;">check_circle</span> Ya tiene una orden abierta (${otLabel}) — las tareas se van a agregar ahí.`;
+  } else if (recentClosedOrder) {
+    const otLabel = recentClosedOrder.taxesOrderNumber ? `OT #${recentClosedOrder.taxesOrderNumber}` : 'sin número de OT todavía';
+    infoEl.style.background = 'var(--success-light)';
+    infoEl.style.color = 'var(--success)';
+    infoEl.innerHTML = `<span class="material-icons" style="font-size:14px; vertical-align:-2px;">check_circle</span> Ya pasó a Operativa (${otLabel}) — se va a reabrir para agregar las tareas ahí.`;
   } else {
     infoEl.style.background = 'var(--warning-light)';
     infoEl.style.color = 'var(--warning)';
@@ -7788,6 +7814,11 @@ async function submitElastiqueroOrders() {
     showToast('Agregá al menos un interno.', 'danger');
     return;
   }
+
+  // Refresh Historial before searching it below - archivedOrders can be stale/empty if nobody
+  // opened that tab yet this session, and a truck that went Operativo since the last load
+  // wouldn't be found otherwise.
+  if (typeof fetchArchivedOrders === 'function') await fetchArchivedOrders();
 
   // Elastiquero doesn't own its own O.T.: the truck is already Fuera de Servicio under an
   // order the supervisor opened in Parte Taller (which can also carry Taller/mecánica tasks),
@@ -7830,9 +7861,14 @@ async function submitElastiqueroOrders() {
     }
 
     const existingOrder = findOpenTallerOrderForInterno(interno);
+    const recentClosedOrder = existingOrder ? null : findRecentClosedTallerOrderForInterno(interno);
 
     if (existingOrder) {
-      additionsToExistingOrders.push({ orderId: existingOrder.id, interno, tasks });
+      additionsToExistingOrders.push({ orderId: existingOrder.id, interno, tasks, needsUnarchive: false, clearElastiqueroFlag: false });
+    } else if (recentClosedOrder) {
+      // Clear the flag once its tasks land - otherwise this same order would keep matching for
+      // an unrelated future job on this interno.
+      additionsToExistingOrders.push({ orderId: recentClosedOrder.id, interno, tasks, needsUnarchive: recentClosedOrder.archived === true, clearElastiqueroFlag: true });
     } else {
       const rodadoOpt = cachedCatalogs.rodados
         ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === interno)
@@ -7859,10 +7895,23 @@ async function submitElastiqueroOrders() {
     const commonHeaders = { 'Content-Type': 'application/json', 'x-user-username': currentUsername };
 
     for (const addition of additionsToExistingOrders) {
+      if (addition.needsUnarchive) {
+        const unarchiveRes = await fetch(`/api/orders/${addition.orderId}/unarchive`, {
+          method: 'PATCH',
+          headers: commonHeaders
+        });
+        if (!unarchiveRes.ok) {
+          let errMsg = `Error al reabrir la orden ya cerrada del interno ${addition.interno}.`;
+          try { const errData = await unarchiveRes.json(); if (errData && errData.error) errMsg = errData.error; } catch (_) {}
+          throw new Error(errMsg);
+        }
+      }
+      const putBody = { tasks: addition.tasks };
+      if (addition.clearElastiqueroFlag) putBody.pendingElastiquero = false;
       const res = await fetch(`/api/orders/${addition.orderId}`, {
         method: 'PUT',
         headers: commonHeaders,
-        body: JSON.stringify({ tasks: addition.tasks })
+        body: JSON.stringify(putBody)
       });
       if (!res.ok) {
         let errMsg = `Error al agregar las tareas del interno ${addition.interno} a su orden ya abierta.`;
@@ -13547,7 +13596,9 @@ function openPtAddUnitModal() {
   document.getElementById('pt-unit-estado').value = 'transito';
   document.getElementById('pt-unit-destino').value = 'fuera_de_servicio';
   document.getElementById('pt-unit-novedad').value = '';
-  
+  const elastiqueroCheck = document.getElementById('pt-unit-elastiquero');
+  if (elastiqueroCheck) elastiqueroCheck.checked = false;
+
   // Hide checklist editor, show plain textarea label
   const checkSection = document.getElementById('pt-unit-checklist-section');
   if (checkSection) checkSection.style.display = 'none';
@@ -13656,6 +13707,14 @@ function openPtEditUnitModal(interno, listName) {
   document.getElementById('pt-unit-interno').disabled = false;
   document.getElementById('pt-unit-tipo').value = item.tipo || 'COMPACTADOR';
   document.getElementById('pt-unit-estado').value = listName;
+  const elastiqueroCheck = document.getElementById('pt-unit-elastiquero');
+  if (elastiqueroCheck) {
+    const matchingOrder = [...(activeOrders || []), ...(archivedOrders || [])].find(o =>
+      String(o.interno || '').trim().toUpperCase() === String(interno).trim().toUpperCase() &&
+      (!o.estado || o.estado.toLowerCase() !== 'cerrada')
+    );
+    elastiqueroCheck.checked = !!(matchingOrder && matchingOrder.pendingElastiquero);
+  }
   document.getElementById('pt-unit-destino').value = item.destinoIngreso || 'fuera_de_servicio';
   ptOnEstadoChange();
 
@@ -14004,6 +14063,8 @@ async function savePtUnit() {
   const destinoIngreso = document.getElementById('pt-unit-destino').value;
   const novedadText = document.getElementById('pt-unit-novedad').value.trim();
   const currentUser = localStorage.getItem('currentUserUsername') || 'Rodriguez Nicolas';
+  const elastiqueroCheckEl = document.getElementById('pt-unit-elastiquero');
+  const pendingElastiqueroFlag = elastiqueroCheckEl ? elastiqueroCheckEl.checked : false;
 
   if (!interno) {
     showToast('El número de interno es obligatorio.', 'warning');
@@ -14136,7 +14197,8 @@ async function savePtUnit() {
           // has to start Fuera de Servicio. Checking only the literal string 'fuera_de_servicio'
           // here left 'reparacion' falling through to 'operativo' by mistake - the order's own
           // switch showed Operativo for a unit that was actually down for repair.
-          estadoUnidad: 'fuera_de_servicio'
+          estadoUnidad: 'fuera_de_servicio',
+          pendingElastiquero: pendingElastiqueroFlag
         };
 
         const orderRes = await fetch('/api/orders', {
@@ -14286,12 +14348,13 @@ async function savePtUnit() {
             // has to start Fuera de Servicio. Checking only the literal string
             // 'fuera_de_servicio' left 'reparacion' falling through to 'operativo' by mistake -
             // same bug already fixed for the "brand-new unit" path above.
-            estadoUnidad: 'fuera_de_servicio'
+            estadoUnidad: 'fuera_de_servicio',
+            pendingElastiquero: pendingElastiqueroFlag
           };
 
           await fetch('/api/orders', {
             method: 'POST',
-            headers: { 
+            headers: {
               'Content-Type': 'application/json',
               'x-user-username': localStorage.getItem('currentUserUsername') || ''
             },
@@ -14299,6 +14362,23 @@ async function savePtUnit() {
           });
           showToast(`Unidad actualizada y Orden de Trabajo Correctiva creada ✓`, 'success');
         } else {
+          // An order already exists - the switch might just be toggling this flag on an order
+          // that's not otherwise changing right now, so update it directly instead of silently
+          // ignoring whatever the user just set.
+          const existingOrderForFlag = activeOrders && activeOrders.find(o =>
+            String(o.interno || '').trim() === internoVal &&
+            (!o.estado || o.estado.toLowerCase() !== 'cerrada')
+          );
+          if (existingOrderForFlag) {
+            await fetch(`/api/orders/${existingOrderForFlag.id}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-user-username': localStorage.getItem('currentUserUsername') || ''
+              },
+              body: JSON.stringify({ pendingElastiquero: pendingElastiqueroFlag })
+            });
+          }
           showToast('Unidad actualizada con éxito.', 'success');
         }
       } else {

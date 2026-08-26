@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '195';
+const APP_VERSION = '199';
 
 // Middleware
 app.use(cors());
@@ -810,7 +810,7 @@ app.get('/api/orders', (req, res) => {
 
 app.post('/api/orders', (req, res) => {
   try {
-    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset, sector: sectorFromClient, area } = req.body;
+    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset, sector: sectorFromClient, area, pendingElastiquero } = req.body;
 
     if (!rodado || !responsable || !clasificacion) {
       return res.status(400).json({ error: "Faltan campos obligatorios: rodado, responsable y clasificacion son requeridos." });
@@ -896,7 +896,8 @@ app.post('/api/orders', (req, res) => {
       estadoUnidad: estadoUnidad || 'fuera_de_servicio',
       combustibleReset,
       sector,
-      area: area || null
+      area: area || null,
+      pendingElastiquero: !!pendingElastiquero
     });
 
     // Guard: a new task can be created with its timer already running (started while
@@ -1071,7 +1072,7 @@ function deriveTaskDateFromHistory(timerHistory) {
 // Update a work order
 app.put('/api/orders/:id', (req, res) => {
   try {
-    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset, area } = req.body;
+    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset, area, pendingElastiquero } = req.body;
     
     const existing = db.getWorkOrderById(req.params.id);
     if (!existing) {
@@ -1322,6 +1323,7 @@ app.put('/api/orders/:id', (req, res) => {
       // whoever originally created it (not whoever is editing it now).
       sector: resolvedSectorField,
       area: area !== undefined ? area : existing.area,
+      pendingElastiquero: pendingElastiquero !== undefined ? !!pendingElastiquero : existing.pendingElastiquero,
       tasks: finalTasksToSave,
       archived: isArchived,
       archivedAt: isArchived ? (existing.archivedAt || new Date().toISOString()) : null,
@@ -1594,6 +1596,9 @@ app.post('/api/orders/:id/tasks/:taskId/sync', async (req, res) => {
   try {
     const order = db.getWorkOrderById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+    if (order.estadoUnidad === 'fuera_de_servicio') {
+      return res.status(400).json({ error: 'No se puede sincronizar: la unidad está Fuera de Servicio. Debe pasar a Operativo para subir tareas a Taxes.' });
+    }
 
     const taskIndex = parseInt(req.params.taskId, 10);
     db.updateWorkOrder(req.params.id, { syncStatus: 'pending', syncError: null });
@@ -1616,6 +1621,9 @@ app.post('/api/orders/:id/sync-tasks', async (req, res) => {
   try {
     const order = db.getWorkOrderById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+    if (order.estadoUnidad === 'fuera_de_servicio') {
+      return res.status(400).json({ error: 'No se puede sincronizar: la unidad está Fuera de Servicio. Debe pasar a Operativo para subir tareas a Taxes.' });
+    }
 
     db.updateWorkOrder(req.params.id, { syncStatus: 'pending', syncError: null });
 
@@ -2062,6 +2070,10 @@ app.post('/api/orders/retry/:id', async (req, res) => {
     const userPerms = db.getUserPermissions(requester);
     if (!userPerms.canSync) {
       return res.status(403).json({ error: "No tiene permiso configurado para sincronizar órdenes." });
+    }
+
+    if (order.estadoUnidad === 'fuera_de_servicio') {
+      return res.status(400).json({ error: "No se puede subir a Taxes: la unidad está Fuera de Servicio. Debe pasar a Operativo para sincronizar." });
     }
 
     // Solo bloquear reintento si la orden ya fue creada en Taxes (tiene taxesOrderNumber)

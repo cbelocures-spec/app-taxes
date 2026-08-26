@@ -1802,6 +1802,10 @@ function otClaimedByDifferentArea(otNumero, area, excludeOrderId) {
 async function syncWorkOrder(orderId) {
   let order = db.getWorkOrderById(orderId);
   if (!order) return { success: false, message: "Order not found" };
+  if (order.estadoUnidad === 'fuera_de_servicio') {
+    console.log(`[syncWorkOrder] Order ${orderId} is Fuera de Servicio - skipping sync until it goes back to Operativo.`);
+    return { success: false, message: "La unidad está Fuera de Servicio. Debe pasar a Operativo para subir tareas a Taxes." };
+  }
   console.log(`[syncWorkOrder][DEBUG] START orderId=${orderId} interno=${order.interno} area=${JSON.stringify(order.area)} taxesOrderNumber=${order.taxesOrderNumber || 'NEW'} taskCount=${(order.tasks||[]).length} taskIds=${(order.tasks||[]).map(t=>t.id).join(',')}`);
 
   // CONTROL INTERNO EN MEMORIA (Rechazo instantáneo en menos de 1 milisegundo)
@@ -4364,7 +4368,10 @@ async function startWorker() {
       }
 
       const orders = db.getSyncableOrders();
-      const pendingOrder = orders.find(o => o.syncStatus === 'pending');
+      // Fuera de Servicio units stay queued but untouched here - they don't get pushed to
+      // Taxes until they're back Operativo (see applyUnitStatusChange's comment: Operativo
+      // is the moment everything gets synced in one shot).
+      const pendingOrder = orders.find(o => o.syncStatus === 'pending' && o.estadoUnidad !== 'fuera_de_servicio');
 
       if (pendingOrder) {
         console.log(`Found pending Work Order ID: ${pendingOrder.id}. Launching sync...`);
@@ -4380,6 +4387,7 @@ async function startWorker() {
           // stuck on 'error' from some past server restart interrupting its check) gets Puppeteer
           // opening it again and again forever, since nothing ever moves it out of "needs retry".
           if (o.archived === true) return false;
+          if (o.estadoUnidad === 'fuera_de_servicio') return false;
           if (!o.taxesOrderNumber || o.syncStatus === 'local' || o.syncStatus === 'draft') return false;
 
           const needsVerifyRetry = o.syncStatus === 'success' && o.verifiedStatus === 'error' &&
