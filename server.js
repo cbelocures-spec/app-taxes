@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '199';
+const APP_VERSION = '201';
 
 // Middleware
 app.use(cors());
@@ -2072,8 +2072,8 @@ app.post('/api/orders/retry/:id', async (req, res) => {
       return res.status(403).json({ error: "No tiene permiso configurado para sincronizar órdenes." });
     }
 
-    if (order.estadoUnidad === 'fuera_de_servicio') {
-      return res.status(400).json({ error: "No se puede subir a Taxes: la unidad está Fuera de Servicio. Debe pasar a Operativo para sincronizar." });
+    if (order.estadoUnidad === 'fuera_de_servicio' && order.taxesOrderNumber) {
+      return res.status(400).json({ error: "No se puede volver a subir a Taxes: la unidad está Fuera de Servicio. El N° de O.T. ya está creado; el resto se sube cuando pase a Operativo." });
     }
 
     // Solo bloquear reintento si la orden ya fue creada en Taxes (tiene taxesOrderNumber)

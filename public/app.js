@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '197';
+const CURRENT_APP_VERSION = '201';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -4024,6 +4024,8 @@ function createOrderCardHtml(order) {
       statusBadge += ` <span class="badge-status error" onclick="event.stopPropagation(); openErrorModal(null, '${order.id}')" title="Falló el último reintento. Clic para ver detalle."><span class="material-icons">error</span> Error</span>`;
     } else if (order.syncStatus === 'syncing') {
       statusBadge += ` <span class="badge-status syncing"><span class="material-icons spinner">autorenew</span> Sincronizando</span>`;
+    } else if (order.syncStatus === 'pending' && order.estadoUnidad === 'fuera_de_servicio') {
+      statusBadge += ` <span class="badge-status pending" style="font-size:11px;" title="No se sube a Taxes hasta que la unidad vuelva a Operativo"><span class="material-icons">pause_circle</span> En espera de Operativo</span>`;
     } else if (order.syncStatus === 'pending') {
       statusBadge += ` <span class="badge-status pending" style="font-size:11px;"><span class="material-icons">hourglass_empty</span> Pendiente Tareas</span>`;
     }
@@ -4111,7 +4113,7 @@ function createOrderCardHtml(order) {
         </div>
         <div class="task-employees-detail" id="task-emp-${order.id}" style="display:none; width:100%; margin-top:6px; padding:6px 8px; background:var(--bg-secondary); border-radius:6px; font-size:12px;"></div>
         <div class="card-actions" style="margin-top:6px;">
-          ${(!order.taxesOrderNumber && order.estadoUnidad !== 'fuera_de_servicio') ? `
+          ${!order.taxesOrderNumber ? `
             <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); handleObtenerNumeroOT('${order.id}', this)" style="padding:3px 8px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:3px; background:linear-gradient(135deg,#059669,#047857); border:none; color:#fff; border-radius:6px; cursor:pointer;" title="Obtener N° de O.T. Express en Taxes">
               <span class="material-icons" style="font-size:14px;">bolt</span> Obtener N° O.T.
             </button>
@@ -4124,7 +4126,7 @@ function createOrderCardHtml(order) {
               <span class="material-icons">edit</span>
             </button>
           ` : ''}
-          ${((order.syncStatus === 'local' || order.syncStatus === 'error') && order.estadoUnidad !== 'fuera_de_servicio') ? `
+          ${((order.syncStatus === 'local' || order.syncStatus === 'error') && !(order.estadoUnidad === 'fuera_de_servicio' && order.taxesOrderNumber)) ? `
             <button class="icon-btn success" onclick="retrySync('${order.id}')" title="Subir a Taxes">
               <span class="material-icons">cloud_upload</span>
             </button>

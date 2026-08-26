@@ -1802,9 +1802,12 @@ function otClaimedByDifferentArea(otNumero, area, excludeOrderId) {
 async function syncWorkOrder(orderId) {
   let order = db.getWorkOrderById(orderId);
   if (!order) return { success: false, message: "Order not found" };
-  if (order.estadoUnidad === 'fuera_de_servicio') {
-    console.log(`[syncWorkOrder] Order ${orderId} is Fuera de Servicio - skipping sync until it goes back to Operativo.`);
-    return { success: false, message: "La unidad está Fuera de Servicio. Debe pasar a Operativo para subir tareas a Taxes." };
+  // A brand-new order (no O.T. yet) still needs its header created even while Fuera de
+  // Servicio - only once that header exists does everything else wait for Operativo (see
+  // applyUnitStatusChange's comment: Operativo is the moment tasks get pushed in one shot).
+  if (order.estadoUnidad === 'fuera_de_servicio' && order.taxesOrderNumber) {
+    console.log(`[syncWorkOrder] Order ${orderId} is Fuera de Servicio and already has O.T. ${order.taxesOrderNumber} - skipping further sync until it goes back to Operativo.`);
+    return { success: false, message: "La unidad está Fuera de Servicio. El N° de O.T. ya está creado; el resto se sube cuando pase a Operativo." };
   }
   console.log(`[syncWorkOrder][DEBUG] START orderId=${orderId} interno=${order.interno} area=${JSON.stringify(order.area)} taxesOrderNumber=${order.taxesOrderNumber || 'NEW'} taskCount=${(order.tasks||[]).length} taskIds=${(order.tasks||[]).map(t=>t.id).join(',')}`);
 
@@ -4368,10 +4371,10 @@ async function startWorker() {
       }
 
       const orders = db.getSyncableOrders();
-      // Fuera de Servicio units stay queued but untouched here - they don't get pushed to
-      // Taxes until they're back Operativo (see applyUnitStatusChange's comment: Operativo
-      // is the moment everything gets synced in one shot).
-      const pendingOrder = orders.find(o => o.syncStatus === 'pending' && o.estadoUnidad !== 'fuera_de_servicio');
+      // A Fuera de Servicio unit still gets its O.T. header created here - only once it HAS
+      // one does it stay queued untouched until back Operativo (see applyUnitStatusChange's
+      // comment: Operativo is the moment everything else gets synced in one shot).
+      const pendingOrder = orders.find(o => o.syncStatus === 'pending' && !(o.estadoUnidad === 'fuera_de_servicio' && o.taxesOrderNumber));
 
       if (pendingOrder) {
         console.log(`Found pending Work Order ID: ${pendingOrder.id}. Launching sync...`);
