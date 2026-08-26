@@ -4094,8 +4094,12 @@ async function syncWorkOrder(orderId) {
     });
     return { success: false, message: errorMessage };
   } finally {
-    // Liberar los candados pase lo que pase (éxito o falla)
-    const claveCandado = `${order.interno}_${order.clasificacion}`;
+    // Liberar los candados pase lo que pase (éxito o falla) - reusa la MISMA clave con la que
+    // se tomó el candado más arriba (incluye área). Antes recalculaba una clave sin área acá,
+    // que nunca coincidía con la guardada - el .delete() fallaba en silencio, el candado
+    // quedaba trabado para siempre, y cualquier reintento posterior para ese mismo
+    // interno+clasificación chocaba con "Esta orden ya se está procesando" sin que Puppeteer
+    // llegara a abrir el navegador.
     candadoInternosActivos.delete(claveCandado);
     releaseBrowserLock();
     if (browser) try { await browser.close(); } catch (_) {}
