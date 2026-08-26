@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '204';
+const CURRENT_APP_VERSION = '205';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12319,12 +12319,25 @@ function adjustPtStateLists(state) {
   // "operativo" - this covers units that were put back in service through the order's own
   // status toggle (not through a Parte Taller checklist action), which otherwise leaves a
   // stale entry behind forever since nothing else ever removes it.
-  const operativoInternos = new Set();
+  // Only the MOST RECENT order per interno decides this - an old order left stuck on
+  // "operativo" (e.g. it never got archived because one of its tasks was never finalized)
+  // used to nuke a BRAND NEW reparación/fuera_de_servicio entry for that same interno the
+  // instant it was added via "Agregar Unidad", since that old order still matched by interno
+  // alone. A truck can have several orders over time; only whichever is newest reflects its
+  // real current status.
+  const latestOrderByInterno = new Map();
   activeOrders.forEach(o => {
-    if (o.estadoUnidad === 'operativo') {
-      const taxInt = String(o.interno || '').trim().toUpperCase();
-      if (taxInt) operativoInternos.add(taxInt);
+    const taxInt = String(o.interno || '').trim().toUpperCase();
+    if (!taxInt) return;
+    const oTime = parseInt(o.id) || 0;
+    const existing = latestOrderByInterno.get(taxInt);
+    if (!existing || oTime > (parseInt(existing.id) || 0)) {
+      latestOrderByInterno.set(taxInt, o);
     }
+  });
+  const operativoInternos = new Set();
+  latestOrderByInterno.forEach((o, taxInt) => {
+    if (o.estadoUnidad === 'operativo') operativoInternos.add(taxInt);
   });
   function matchesOperativoOrder(internoPT) {
     const ptIntUpper = String(internoPT || '').trim().toUpperCase();
