@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '202';
+const APP_VERSION = '203';
 
 // Middleware
 app.use(cors());
@@ -3868,8 +3868,8 @@ function recalcularTotalesResumenLocal(state) {
   state.resumen = state.resumen || {};
   state.resumen.totales = totales;
   const now = new Date();
-  state.resumen.fecha = now.toLocaleDateString('es-AR');
-  state.resumen.hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  state.resumen.fecha = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+  state.resumen.hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
 }
 
 // Adds/moves one unit's novedad across the Parte Taller lists. Mirrors the old
@@ -3902,7 +3902,7 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   });
 
   const tipo = resolveTipoFromInterno(interno);
-  const fechaStr = new Date().toLocaleDateString('es-AR');
+  const fechaStr = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
   // Sticks to whichever sector originally logged this unit, so a Taller user closing out a
   // Herrería-created item doesn't accidentally re-tag it as Taller's own.
   const finalSector = existingSector || sector;
@@ -4004,8 +4004,8 @@ app.post('/api/parte-taller/novedad', (req, res) => {
       const state = db.getParteTallerState();
       state.resumen = state.resumen || {};
       state.resumen.responsable = payload.responsable || state.resumen.responsable;
-      state.resumen.fecha = new Date().toLocaleDateString('es-AR');
-      state.resumen.hora = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      state.resumen.fecha = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+      state.resumen.hora = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
       db.saveParteTallerState(state);
       return res.json({ ok: true, msg: `Responsable actualizado a ${payload.responsable}` });
     }
@@ -4291,7 +4291,7 @@ async function sendHistoricalOrderToGoogleSheet(order, step) {
     if (step === 'crear') {
       payload = {
         accion: 'crear',
-        fecha: order.fechaEntrega || new Date().toLocaleDateString("es-AR"),
+        fecha: order.fechaEntrega || new Date().toLocaleDateString("es-AR", { timeZone: 'America/Argentina/Buenos_Aires' }),
         interno: String(order.interno || "—"),
         ot: order.taxesOrderNumber || order.taxesOtId || "Procesando...",
         centro_costo: ccName,

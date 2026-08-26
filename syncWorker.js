@@ -1942,7 +1942,7 @@ async function syncWorkOrder(orderId) {
         
         const existingOpenTaxesOt = await safeEvaluate(page, (targetInterno, targetClasif) => {
           const clean = s => (s || '').toString().trim().toUpperCase();
-          const todayStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          const todayStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' });
           
           const tables = Array.from(document.querySelectorAll('table'));
           for (const table of tables) {

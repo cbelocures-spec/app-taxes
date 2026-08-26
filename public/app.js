@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '202';
+const CURRENT_APP_VERSION = '203';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1347,7 +1347,7 @@ async function applyParteTallerReconciliation(interno, estado, remainingItems, t
         novedad_items
       };
       if (targetList === 'fuera_de_servicio' || targetList === 'inversiones') {
-        unit.dia_parado = new Date().toLocaleDateString('es-AR');
+        unit.dia_parado = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
         unit.dias_en_reparacion = 0;
       } else {
         unit.servicio = '';
@@ -1920,7 +1920,7 @@ function viewOrder(orderId) {
   deletedTaskIdsInModal = new Set();
 
   // Set modal title with sync date
-  const syncDate = order.syncDate ? ` — Subida: ${new Date(order.syncDate).toLocaleDateString('es-AR')}` : '';
+  const syncDate = order.syncDate ? ` — Subida: ${new Date(order.syncDate).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}` : '';
   document.getElementById('modal-order-title').textContent = `Ver Orden${syncDate}`;
 
   // Mark modal as readonly
@@ -2696,17 +2696,24 @@ function getTimelineFullHistoryLabel(timerHistory, timerStart) {
   const lines = [];
   if (Array.isArray(timerHistory)) {
     timerHistory.forEach(h => {
-      if (!h || !h.formatted) return;
+      if (!h) return;
+      // Recompute from the raw timestamp (pinned to Argentina time) instead of trusting the
+      // stored `formatted` string - see renderTimerHistoryHtml for why that string can be off
+      // by whatever offset the device's local timezone happened to be at the moment.
+      const label = h.timestamp
+        ? new Date(h.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' })
+        : h.formatted;
+      if (!label) return;
       const type = String(h.type || '').toLowerCase();
       if (type.startsWith('paus')) {
-        lines.push(`<span style="color: var(--warning);">${h.formatted}</span>`);
+        lines.push(`<span style="color: var(--warning);">${label}</span>`);
       } else if (type.startsWith('inici') || type.startsWith('reanud')) {
-        lines.push(h.formatted);
+        lines.push(label);
       }
     });
   }
   if (lines.length === 0 && timerStart) {
-    lines.push(new Date(timerStart).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }));
+    lines.push(new Date(timerStart).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' }));
   }
   return lines.join('<br>');
 }
@@ -2730,12 +2737,16 @@ function renderTimerHistoryHtml(history) {
       icon = 'stop';
       label = 'Fin';
     }
-    // Older/legacy timerHistory entries only ever stored `timestamp`, never a pre-formatted
-    // string - showing item.formatted directly on those renders the literal text "undefined".
-    // Derive the display time from the timestamp itself when formatted is missing.
-    const displayTime = item.formatted || (item.timestamp
+    // Always recompute from the raw timestamp (a real UTC instant, reliable regardless of
+    // which device/timezone was active) pinned to Argentina time - never trust the stored
+    // `formatted` string, which was rendered client-side via toLocaleTimeString with no
+    // explicit timeZone at the moment the button was tapped, so it silently used whatever
+    // timezone that device's OS happened to be set to (seen showing hours 3h ahead of the
+    // real Argentina time on a device that was on UTC). Only fall back to `formatted` for
+    // legacy/edge entries that have neither a valid timestamp nor one at all.
+    const displayTime = item.timestamp
       ? new Date(item.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' })
-      : '--:--');
+      : (item.formatted || '--:--');
     return `<span style="display: inline-flex; align-items: center; gap: 2px; background: #e2e8f0; padding: 2px 5px; border-radius: 4px; font-size: 10px; color: var(--text-color);"><span class="material-icons" style="font-size: 10px;">${icon}</span>${label}: <strong>${displayTime}</strong></span>`;
   }).join(' ');
 }
@@ -2744,7 +2755,7 @@ function addTaskTimerEvent(card, type) {
   if (!card) return;
   const history = JSON.parse(card.dataset.timerHistory || '[]');
   const now = new Date();
-  const formatted = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const formatted = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' });
   history.push({ type, formatted, timestamp: Date.now() });
   card.dataset.timerHistory = JSON.stringify(history);
   renderTaskTimerHistory(card);
@@ -3778,8 +3789,8 @@ function renderOrders() {
 }
 
 function createHistoryCardHtml(order) {
-  const syncDate = order.syncDate ? new Date(order.syncDate).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Fecha desconocida';
-  const fechaOnly = order.syncDate ? new Date(order.syncDate).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : (order.createdAt ? new Date(order.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-');
+  const syncDate = order.syncDate ? new Date(order.syncDate).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }) : 'Fecha desconocida';
+  const fechaOnly = order.syncDate ? new Date(order.syncDate).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' }) : (order.createdAt ? new Date(order.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' }) : '-');
   const isChecked = selectedHistoryOrderIds.has(String(order.id)) ? 'checked' : '';
   const canManageHistory = true;
 
@@ -5923,7 +5934,7 @@ function addTimerEventToTask(task, type) {
     task.timerHistory = [];
   }
   const now = new Date();
-  const formatted = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const formatted = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' });
   task.timerHistory.push({ type, formatted, timestamp: Date.now() });
 }
 
@@ -12201,7 +12212,7 @@ function adjustPtStateLists(state) {
           const texto = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
           return { texto, hecho };
         }),
-        dia_parado: new Date().toLocaleDateString('es-AR'),
+        dia_parado: new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
         dias_en_reparacion: 0
       });
     });
@@ -12486,7 +12497,7 @@ function adjustPtStateLists(state) {
         const texto = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
         return { texto, hecho };
       }),
-      dia_parado: new Date().toLocaleDateString('es-AR'),
+      dia_parado: new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
       dias_en_reparacion: 0
     };
 
@@ -13871,9 +13882,9 @@ async function ingresarUnidadTransito(interno) {
 
   // 2. Set entry date & new state
   unit.estado = targetEstado;
-  unit.dia_parado = new Date().toLocaleDateString('es-AR');
+  unit.dia_parado = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
   unit.dias_en_reparacion = 0;
-  unit.fecha_ingreso = new Date().toLocaleDateString('es-AR');
+  unit.fecha_ingreso = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
   delete unit.destinoIngreso;
 
   // 3. Add to target state list (removing any existing duplicate in target list first)
@@ -14262,7 +14273,7 @@ async function savePtUnit() {
       if (!hasNoItems) {
         // Items remain — update and re-add to the target list
         if (!foundUnitObj) {
-          foundUnitObj = { interno: saveInterno, tipo, dia_parado: new Date().toLocaleDateString('es-AR') };
+          foundUnitObj = { interno: saveInterno, tipo, dia_parado: new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }) };
         }
 
         // 2. Update properties
@@ -14285,7 +14296,7 @@ async function savePtUnit() {
         const oldWasOperative = (currentEditingPtOriginalList === 'servicios_pendientes');
         const newIsOperative = (estado === 'servicios_pendientes');
         if (oldWasOperative && !newIsOperative) {
-          foundUnitObj.dia_parado = new Date().toLocaleDateString('es-AR');
+          foundUnitObj.dia_parado = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
           foundUnitObj.dias_en_reparacion = 0;
         }
 
