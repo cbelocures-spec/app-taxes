@@ -2076,7 +2076,13 @@ async function syncWorkOrder(orderId) {
           await page.screenshot({ path: 'public/paso2_responsable.png' }).catch(() => {});
 
           // 4. CARGAR TÍTULO (NÚMERO DE INTERNO)
-          console.log(`[Puppeteer] 3. Cargar Título (número de interno): ${order.interno}`);
+          // Edilicio orders carry an `area` (Baño, Oficina, etc.) that has to show up here too,
+          // not just later when tasks get injected into an already-existing O.T. (see the
+          // areaPrefix logic further below) - otherwise the O.T. gets created with just the
+          // building's address/interno and the área only appears once someone loads tasks onto it.
+          const altaAreaPrefix = order.area ? String(order.area).trim() : '';
+          const altaInternoForTaxes = altaAreaPrefix ? `${altaAreaPrefix} - ${order.interno}` : order.interno;
+          console.log(`[Puppeteer] 3. Cargar Título (número de interno): ${altaInternoForTaxes}`);
           await safeEvaluate(page, (interno) => {
             let input = document.querySelector('input[name="titulo"]');
             if (!input) {
@@ -2097,7 +2103,7 @@ async function syncWorkOrder(orderId) {
               input.dispatchEvent(new Event('input', { bubbles: true }));
               input.dispatchEvent(new Event('change', { bubbles: true }));
             }
-          }, order.interno);
+          }, altaInternoForTaxes);
           await delay(500);
 
           // 5. CARGAR CLASIFICACIÓN
