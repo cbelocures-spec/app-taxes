@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '207';
+const CURRENT_APP_VERSION = '208';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12570,9 +12570,10 @@ function adjustPtStateLists(state) {
   // depend entirely on whichever UI path changed the order remembering to also sync Parte Taller
   // (the order card's own F. de Servicio switch never did; "Agregar Unidad" does, but only for
   // units added that way) - a single missed spot left a real Fuera de Servicio order with no row
-  // here at all, looking like it had silently vanished. This doesn't touch the saved state on the
-  // server, only what gets displayed, so it can't lose data - worst case it shows one extra
-  // synthesized row until someone works it into a real Parte Taller entry.
+  // here at all, looking like it had silently vanished. Shows a synthesized row immediately so
+  // it's never invisible, and also persists that same row for real in the background (once per
+  // interno per session - see below) so it becomes a normal, editable entry on the next fetch
+  // instead of a display-only stand-in the pencil can't find.
   (function ensureFueraDeServicioOrdersAreRepresented() {
     const representedInternos = new Set();
     ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones'].forEach(listName => {
@@ -12586,6 +12587,7 @@ function adjustPtStateLists(state) {
       return false;
     }
     if (!state.fuera_de_servicio) state.fuera_de_servicio = [];
+    if (!window._ptAutoSyncedInternos) window._ptAutoSyncedInternos = new Set();
     activeOrders.forEach(o => {
       if (o.archived || o.deleted) return;
       if (o.estadoUnidad !== 'fuera_de_servicio') return;
@@ -12600,6 +12602,31 @@ function adjustPtStateLists(state) {
         dias_en_reparacion: 0
       });
       representedInternos.add(String(o.interno || '').trim().toUpperCase());
+
+      // A row that only exists in this display-only clone isn't editable - the pencil
+      // (openPtEditUnitModal) looks the unit up in window._ptState, the raw un-adjusted state,
+      // which never has this synthesized entry. Persist it for real (once per interno per
+      // session) via the same endpoint "Agregar Unidad" uses, so the next fetch brings back a
+      // genuine entry that every normal Parte Taller action (editar, mover a Preparación, etc.)
+      // can find and operate on like any other.
+      const internoKey = String(o.interno || '').trim().toUpperCase();
+      if (internoKey && !window._ptAutoSyncedInternos.has(internoKey)) {
+        window._ptAutoSyncedInternos.add(internoKey);
+        fetch('/api/parte-taller/novedad', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accion: 'actualizar_estado_flota',
+            interno: o.interno,
+            estado: 'fuera_de_servicio',
+            motivo: o.incidente || 'Fuera de servicio',
+            responsable: localStorage.getItem('currentUserUsername') || '',
+            sector: (typeof isHerreriaOrder === 'function' && isHerreriaOrder(o)) ? 'herreria' : 'taller'
+          })
+        }).then(res => {
+          if (res.ok && typeof fetchParteTallerEstado === 'function') fetchParteTallerEstado();
+        }).catch(() => {});
+      }
     });
   })();
 
