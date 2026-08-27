@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '205';
+const CURRENT_APP_VERSION = '206';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -4739,6 +4739,29 @@ async function toggleOrderEstadoUnidad(event, orderId) {
     });
     if (!res.ok) throw new Error("Failed to update status");
     showToast(`Unidad marcada como ${newStatus === 'operativo' ? 'Operativa' : 'Fuera de Servicio'}`, "success");
+
+    // This switch never touched Parte Taller - only the separate checklist-review flow
+    // (applyParteTallerReconciliation) did. A truck flipped to Fuera de Servicio straight from
+    // here (no tasks yet, so that other flow never triggers) ended up with a real F. de Servicio
+    // order that had no matching row in Parte Taller at all - reuse the same endpoint
+    // "Agregar Unidad" already uses so both paths stay consistent.
+    try {
+      await fetch('/api/parte-taller/novedad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accion: 'actualizar_estado_flota',
+          interno: order.interno,
+          estado: newStatus,
+          motivo: order.incidente || (newStatus === 'fuera_de_servicio' ? 'Fuera de servicio' : 'Operativo'),
+          responsable: localStorage.getItem('currentUserUsername') || '',
+          sector: (typeof isHerreriaOrder === 'function' && isHerreriaOrder(order)) ? 'herreria' : 'taller'
+        })
+      });
+      if (typeof fetchParteTallerEstado === 'function') fetchParteTallerEstado();
+    } catch (ptErr) {
+      console.error('[toggleOrderEstadoUnidad] Error sincronizando Parte Taller:', ptErr);
+    }
 
     if (newStatus === 'operativo') {
       showToast("Sincronizando tareas en Taxes al pasar a Operativo...", "info");
