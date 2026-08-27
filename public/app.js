@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '206';
+const CURRENT_APP_VERSION = '207';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12563,6 +12563,45 @@ function adjustPtStateLists(state) {
       unit.tipo = isRodadoBucketNotFleet(unitOrder && unitOrder.rodado) ? 'Otro' : (resolveFleetTypeFromInterno(unit.interno) || 'Otro');
     });
   });
+
+  // 4.6. Safety net: any active order that's Fuera de Servicio has to be represented SOMEWHERE
+  // in Parte Taller - by now every other reconciliation step above has already run, so if an
+  // interno still isn't in any list at this point, nothing is ever going to add it. This used to
+  // depend entirely on whichever UI path changed the order remembering to also sync Parte Taller
+  // (the order card's own F. de Servicio switch never did; "Agregar Unidad" does, but only for
+  // units added that way) - a single missed spot left a real Fuera de Servicio order with no row
+  // here at all, looking like it had silently vanished. This doesn't touch the saved state on the
+  // server, only what gets displayed, so it can't lose data - worst case it shows one extra
+  // synthesized row until someone works it into a real Parte Taller entry.
+  (function ensureFueraDeServicioOrdersAreRepresented() {
+    const representedInternos = new Set();
+    ['transito', 'servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones'].forEach(listName => {
+      (state[listName] || []).forEach(u => representedInternos.add(String(u.interno || '').trim().toUpperCase()));
+    });
+    function isRepresented(internoOrder) {
+      const upper = String(internoOrder || '').trim().toUpperCase();
+      if (representedInternos.has(upper)) return true;
+      if (upper.includes('IRINEO') && representedInternos.has('IRINEO GRAL.')) return true;
+      if ((upper.includes('NICO') || upper.startsWith('NICO')) && representedInternos.has('VOLQUETE NICO')) return true;
+      return false;
+    }
+    if (!state.fuera_de_servicio) state.fuera_de_servicio = [];
+    activeOrders.forEach(o => {
+      if (o.archived || o.deleted) return;
+      if (o.estadoUnidad !== 'fuera_de_servicio') return;
+      if (isRepresented(o.interno)) return;
+      const tipo = isRodadoBucketNotFleet(o.rodado) ? 'Otro' : (resolveFleetTypeFromInterno(o.interno) || 'Otro');
+      state.fuera_de_servicio.push({
+        interno: o.interno,
+        tipo,
+        novedad: `[ ] ${o.incidente || 'Fuera de servicio'}`,
+        novedad_items: [{ texto: o.incidente || 'Fuera de servicio', hecho: false }],
+        dia_parado: new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
+        dias_en_reparacion: 0
+      });
+      representedInternos.add(String(o.interno || '').trim().toUpperCase());
+    });
+  })();
 
   // 5. Recalculate totals - split "fuera" into reparacion/fuera_de_servicio separately, and
   // factor in inversiones (units in preparation): they reduce operativos but the base fleet
