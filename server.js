@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '212';
+const APP_VERSION = '213';
 
 // Middleware
 app.use(cors());
@@ -3914,6 +3914,19 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   // Herrería-created item doesn't accidentally re-tag it as Taller's own.
   const finalSector = existingSector || sector;
 
+  // A unit the supervisor put in "En Preparación" (inversiones) has to STAY there no matter
+  // what routine sync knocks on this endpoint next - a new task's timer starting, the order
+  // card's F. de Servicio switch, a checklist re-sync - all of those call this same function
+  // with estado reparacion/fuera_de_servicio/servicios_pendientes, and used to yank the unit
+  // straight out of Preparación into whichever list even though nothing about its prep status
+  // actually changed. Only an explicit request to go back to 'operativo' (finished prepping)
+  // or another 'inversiones'/'en_preparacion' call is allowed to touch it; anything else gets
+  // folded into its existing Preparación entry instead of relocating it.
+  const estadoEfectivo = (currentList === 'inversiones' &&
+    ['reparacion', 'fuera_de_servicio', 'fuera de servicio', 'servicios_pendientes', 'servicios pendientes'].includes(estado))
+    ? 'inversiones'
+    : estado;
+
   function appendMotivo(existing, nuevoMotivo) {
     let cleanMotivo = nuevoMotivo.trim();
     if (!cleanMotivo.startsWith('[ ]') && !cleanMotivo.startsWith('[X]') && !cleanMotivo.startsWith('[x]')) {
@@ -3932,11 +3945,11 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
     return existing.trim() + '\n' + cleanMotivo;
   }
 
-  if (estado === 'reparacion' || estado === 'fuera_de_servicio' || estado === 'fuera de servicio') {
-    const targetList = estado === 'reparacion' ? 'reparacion' : 'fuera_de_servicio';
+  if (estadoEfectivo === 'reparacion' || estadoEfectivo === 'fuera_de_servicio' || estadoEfectivo === 'fuera de servicio') {
+    const targetList = estadoEfectivo === 'reparacion' ? 'reparacion' : 'fuera_de_servicio';
     const newNovedad = appendMotivo(existingNovedad, motivo);
     state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector });
-  } else if (estado === 'operativo') {
+  } else if (estadoEfectivo === 'operativo') {
     let newNovedad;
     if (existingNovedad) {
       newNovedad = marcarItemComoCompletado(existingNovedad, motivo);
@@ -3946,7 +3959,7 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
       else if (newNovedad.startsWith('[ ]')) newNovedad = '[X]' + newNovedad.substring(3);
     }
     state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '', sector: finalSector });
-  } else if (estado === 'servicios_pendientes' || estado === 'servicios pendientes') {
+  } else if (estadoEfectivo === 'servicios_pendientes' || estadoEfectivo === 'servicios pendientes') {
     const targetList = (currentList === 'reparacion' || currentList === 'fuera_de_servicio') ? currentList : 'servicios_pendientes';
     const newNovedad = appendMotivo(existingNovedad, motivo);
     if (targetList === 'reparacion' || targetList === 'fuera_de_servicio') {
@@ -3954,10 +3967,10 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
     } else {
       state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '', sector: finalSector });
     }
-  } else if (estado === 'inversiones' || estado === 'en_preparacion') {
+  } else if (estadoEfectivo === 'inversiones' || estadoEfectivo === 'en_preparacion') {
     const newNovedad = appendMotivo(existingNovedad, motivo);
     state.inversiones.push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector });
-  } else if (estado === 'transito') {
+  } else if (estadoEfectivo === 'transito') {
     // Was missing entirely: the unit got cleared from every list above (the same step every
     // other estado goes through) but nothing ever put it back anywhere, since no branch here
     // matched 'transito' - it just vanished on save instead of showing up in En Tránsito.
@@ -3980,7 +3993,7 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
 
   recalcularTotalesResumenLocal(state);
   db.saveParteTallerState(state);
-  return `Unidad #${interno} actualizada a ${estado.toUpperCase()} en Parte del Taller`;
+  return `Unidad #${interno} actualizada a ${estadoEfectivo.toUpperCase()} en Parte del Taller`;
 }
 
 // Maintenance: force-recompute resumen.totales using the cache-protected
