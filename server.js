@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '210';
+const APP_VERSION = '211';
 
 // Middleware
 app.use(cors());
@@ -3744,7 +3744,9 @@ const INTERNO_TIPO_OVERRIDES = {
   '50': 'ROLL - OFF',
   // Volkswagen 13180 / AH963YV - real fleet unit, now Roll-Off, Taxes still has it catalogued
   // as Compactador (added 2026-08-28).
-  '145': 'ROLL - OFF'
+  '145': 'ROLL - OFF',
+  // Volkswagen 17.280/43 LR SC / AI000GR - same situation as 145 (added 2026-08-28).
+  '147': 'ROLL - OFF'
 };
 
 function resolveTipoFlotaFromEquipo(equipoRaw) {
