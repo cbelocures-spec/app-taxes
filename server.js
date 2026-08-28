@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '209';
+const APP_VERSION = '210';
 
 // Middleware
 app.use(cors());
@@ -3741,7 +3741,10 @@ app.post('/api/insumos/:idEgreso/resolve', (req, res) => {
 // interno someone's already flagged, not as a permanent home for every miscategorized unit.
 // (Interno 153 used to need this - removed 2026-08-28, that unit no longer exists in Taxes at all.)
 const INTERNO_TIPO_OVERRIDES = {
-  '50': 'ROLL - OFF'
+  '50': 'ROLL - OFF',
+  // Volkswagen 13180 / AH963YV - real fleet unit, now Roll-Off, Taxes still has it catalogued
+  // as Compactador (added 2026-08-28).
+  '145': 'ROLL - OFF'
 };
 
 function resolveTipoFlotaFromEquipo(equipoRaw) {

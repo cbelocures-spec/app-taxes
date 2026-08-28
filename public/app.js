@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '209';
+const CURRENT_APP_VERSION = '210';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1177,14 +1177,16 @@ async function applyUnitStatusChange(interno, orderId, estado) {
 
 let _checklistReviewCtx = null;
 
-// Manual correction for internos whose "equipo" is just wrong in the Taxes catalog itself
-// (e.g. interno 153 is a real Compactador but Taxes has it catalogued as "CAMION"). The real
-// fix is correcting it in Taxes directly - add here only as a stopgap for a specific interno
-// someone's already flagged, not as a permanent home for every miscategorized unit. Keep in
-// sync with INTERNO_TIPO_OVERRIDES in server.js.
+// Manual correction for internos whose "equipo" is just wrong in the Taxes catalog itself.
+// The real fix is correcting it in Taxes directly - add here only as a stopgap for a specific
+// interno someone's already flagged, not as a permanent home for every miscategorized unit.
+// Keep in sync with INTERNO_TIPO_OVERRIDES in server.js.
+// (Interno 153 used to need this - removed 2026-08-28, that unit no longer exists in Taxes at all.)
 const INTERNO_TIPO_OVERRIDES = {
-  '153': 'COMPACTADOR',
-  '50': 'ROLL - OFF'
+  '50': 'ROLL - OFF',
+  // Volkswagen 13180 / AH963YV - real fleet unit, now Roll-Off, Taxes still has it catalogued
+  // as Compactador (added 2026-08-28).
+  '145': 'ROLL - OFF'
 };
 
 function getUnitTipoForInterno(interno) {
