@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '208';
+const CURRENT_APP_VERSION = '209';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13649,7 +13649,13 @@ async function ptAsignarSeleccionados(interno) {
         pendingCount = lines.filter(l => l.trim().startsWith('[ ]') || (!l.trim().startsWith('[X]') && !l.trim().startsWith('[x]'))).length;
       }
 
-      if (pendingCount === 0) {
+      // A unit in "inversiones" (En Preparación) never gets auto-removed just because its
+      // checklist hit zero pending items - "Asignar Seleccionados" immediately creates a fresh
+      // Pendiente task in Taxes for those same items below, so it's still mid-prep, not
+      // suddenly operativa. Removing it here left it in neither list until that new task's
+      // timer started, at which point it got re-created as a brand new "reparación" entry
+      // instead of staying put in Preparación like it should.
+      if (pendingCount === 0 && foundList !== 'inversiones') {
         state[foundList].splice(foundIdx, 1);
         showToast(`Unidad ${interno} quedó operativa al resolverse todos sus ítems pendientes ✓`, 'success');
       } else {

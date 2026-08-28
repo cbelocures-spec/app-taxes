@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '208';
+const APP_VERSION = '209';
 
 // Middleware
 app.use(cors());
@@ -3736,12 +3736,11 @@ app.post('/api/insumos/:idEgreso/resolve', (req, res) => {
 // for why: the Sheets-backed PropertiesService store had no real transaction
 // safety and repeatedly lost data under concurrent writes).
 
-// Manual correction for internos whose "equipo" is just wrong in the Taxes catalog itself
-// (e.g. interno 153 is a real Compactador but Taxes has it catalogued as "CAMION"). The real
-// fix is correcting it in Taxes directly - add here only as a stopgap for a specific interno
-// someone's already flagged, not as a permanent home for every miscategorized unit.
+// Manual correction for internos whose "equipo" is just wrong in the Taxes catalog itself.
+// The real fix is correcting it in Taxes directly - add here only as a stopgap for a specific
+// interno someone's already flagged, not as a permanent home for every miscategorized unit.
+// (Interno 153 used to need this - removed 2026-08-28, that unit no longer exists in Taxes at all.)
 const INTERNO_TIPO_OVERRIDES = {
-  '153': 'COMPACTADOR',
   '50': 'ROLL - OFF'
 };
 
@@ -3912,7 +3911,17 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
     if (!cleanMotivo.startsWith('[ ]') && !cleanMotivo.startsWith('[X]') && !cleanMotivo.startsWith('[x]')) {
       cleanMotivo = '[ ] ' + cleanMotivo;
     }
-    return existing ? (existing.trim() + '\n' + cleanMotivo) : cleanMotivo;
+    if (!existing) return cleanMotivo;
+    // A retry of the same client-side sync (e.g. the Parte Taller safety net re-firing on
+    // every page reload before it sees its own earlier write reflected back) used to append
+    // the identical line again each time - "Fuera de servicio" showing up 4-5 times in a row
+    // on the same unit's checklist. Skip the append if this exact line (ignoring its [ ]/[X]
+    // checkbox state) is already there.
+    const normalize = s => s.replace(/^\[\s*[xX]?\s*\]\s*/, '').trim().toUpperCase();
+    const nuevoNorm = normalize(cleanMotivo);
+    const yaExiste = existing.split('\n').some(line => normalize(line) === nuevoNorm);
+    if (yaExiste) return existing.trim();
+    return existing.trim() + '\n' + cleanMotivo;
   }
 
   if (estado === 'reparacion' || estado === 'fuera_de_servicio' || estado === 'fuera de servicio') {

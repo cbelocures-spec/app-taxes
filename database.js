@@ -915,6 +915,11 @@ class LocalDB {
       // the same interno (building) hold several separate open O.T.s at once, one per area,
       // instead of every Edilicio job for that building merging into a single order.
       area: orderData.area || null,
+      // Flagged from Parte Taller's "Agregar/Editar Unidad" switch when the supervisor knows
+      // Elastiquero still has to log its own tasks on this same job, possibly after the unit
+      // already went back to Operativo - lets Elastiquero find and reopen THIS exact order later
+      // instead of guessing by a time window or creating a disconnected duplicate.
+      pendingElastiquero: !!orderData.pendingElastiquero,
       archived: !!orderData.archived,
       deleted: !!orderData.deleted,
       deletedAt: orderData.deletedAt || null
