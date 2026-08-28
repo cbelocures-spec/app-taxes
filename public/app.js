@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '211';
+const CURRENT_APP_VERSION = '212';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1188,7 +1188,10 @@ const INTERNO_TIPO_OVERRIDES = {
   // as Compactador (added 2026-08-28).
   '145': 'ROLL - OFF',
   // Volkswagen 17.280/43 LR SC / AI000GR - same situation as 145 (added 2026-08-28).
-  '147': 'ROLL - OFF'
+  '147': 'ROLL - OFF',
+  // Scania P270 / GTO176 - real fleet unit, now Plancha, Taxes still has it catalogued as
+  // Roll Off (added 2026-08-28).
+  '116': 'PLANCHA'
 };
 
 function getUnitTipoForInterno(interno) {
