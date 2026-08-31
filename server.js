@@ -56,7 +56,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '213';
+const APP_VERSION = '214';
 
 // Middleware
 app.use(cors());
@@ -3749,8 +3749,18 @@ const INTERNO_TIPO_OVERRIDES = {
   '147': 'ROLL - OFF',
   // Scania P270 / GTO176 - real fleet unit, now Plancha, Taxes still has it catalogued as
   // Roll Off (added 2026-08-28).
-  '116': 'PLANCHA'
+  '116': 'PLANCHA',
+  // Volkswagen 13180 / LLP358 - real fleet unit, now Volquete, Taxes still has it catalogued
+  // as Compactador (added 2026-08-28).
+  '132': 'VOLQUETE'
 };
+
+// Sold/retired units still catalogued as active in Taxes - excluded here so they never count
+// toward a fleet total, even though Taxes hasn't been updated to reflect the sale yet.
+const INTERNOS_VENDIDOS = new Set([
+  '47',  // Mercedes Benz 1720 / FUM746 - vendido (2026-08-28)
+  '93'   // Mercedes Benz 1720 / GGZ483 - vendido (2026-08-28)
+]);
 
 function resolveTipoFlotaFromEquipo(equipoRaw) {
   const equipo = String(equipoRaw || '').trim().toUpperCase();
@@ -3799,6 +3809,7 @@ function calcularTotalesFlota() {
     const equipoUpper = String(r.equipo || '').trim().toUpperCase();
     if (equipoUpper === 'HERRERIA' || equipoUpper === 'EDILICIO') return;
     const cleanInterno = String(r.interno || '').trim();
+    if (INTERNOS_VENDIDOS.has(cleanInterno)) return;
     const tipo = INTERNO_TIPO_OVERRIDES[cleanInterno] || resolveTipoFlotaFromEquipo(r.equipo);
     if (tipo) totalesFrescos[tipo] = (totalesFrescos[tipo] || 0) + 1;
   });
