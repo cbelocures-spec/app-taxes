@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '220';
+const CURRENT_APP_VERSION = '221';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -10826,6 +10826,7 @@ async function fetchCustomPreventivos() {
 // grilla + header. Se puede llamar de nuevo sin duplicar nada (los ifs de "ya existe" cortan).
 function applyCustomPreventivos() {
   customPreventivos.forEach(p => {
+    ensureBulkSectorKnown(p.sector);
     if (!PREVENTIVO_LINES[p.key]) PREVENTIVO_LINES[p.key] = [p.label];
     if (!PREVENTIVO_TYPE_ORDER.includes(p.key)) PREVENTIVO_TYPE_ORDER.push(p.key);
 
@@ -10862,6 +10863,34 @@ function renderCustomPreventivoButton(p) {
   applyBulkSectorFilterToButton(btn);
 }
 
+const BULK_SECTORS_BASE = ['Mecanica', 'Electricista', 'Chapista', 'Gomeria', 'Elastiquero'];
+
+// Sectores creados a mano desde el modal (con "+ Crear sector nuevo...") se agregan tanto
+// como chip de filtro como opcion reutilizable en el select, para el proximo preventivo.
+function ensureBulkSectorKnown(sector) {
+  if (!sector || BULK_SECTORS_BASE.includes(sector)) return;
+
+  const chipContainer = document.getElementById('bulk-sector-custom-container');
+  if (chipContainer && !chipContainer.querySelector(`[data-sector="${CSS.escape(sector)}"]`)) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'btn btn-xs bulk-sector-chip';
+    chip.dataset.sector = sector;
+    chip.style.borderRadius = '999px';
+    chip.textContent = sector;
+    chip.onclick = () => setBulkSectorFilter(sector);
+    chipContainer.appendChild(chip);
+  }
+
+  const select = document.getElementById('cp-sector');
+  if (select && !Array.from(select.options).some(o => o.value === sector)) {
+    const opt = document.createElement('option');
+    opt.value = sector;
+    opt.textContent = sector;
+    select.insertBefore(opt, select.querySelector('option[value="__nuevo__"]'));
+  }
+}
+
 function applyBulkSectorFilterToButton(btn) {
   const matches = bulkSectorFilter === 'Todos' || btn.dataset.sector === bulkSectorFilter;
   btn.style.display = matches ? '' : 'none';
@@ -10878,9 +10907,19 @@ function setBulkSectorFilter(sector) {
   document.querySelectorAll('.bulk-preventivo-btn').forEach(btn => applyBulkSectorFilterToButton(btn));
 }
 
+function toggleCpSectorNuevo() {
+  const select = document.getElementById('cp-sector');
+  const input = document.getElementById('cp-sector-nuevo');
+  const isNuevo = select.value === '__nuevo__';
+  input.style.display = isNuevo ? 'block' : 'none';
+  if (isNuevo) input.focus();
+}
+
 function openCrearPreventivoModal() {
   document.getElementById('cp-label').value = '';
   document.getElementById('cp-sector').value = 'Mecanica';
+  document.getElementById('cp-sector-nuevo').value = '';
+  document.getElementById('cp-sector-nuevo').style.display = 'none';
   document.getElementById('cp-necesita-hoja').checked = true;
   document.getElementById('crear-preventivo-modal').classList.add('open');
 }
@@ -10891,10 +10930,16 @@ function closeCrearPreventivoModal() {
 
 async function submitCrearPreventivo() {
   const label = document.getElementById('cp-label').value.trim();
-  const sector = document.getElementById('cp-sector').value;
+  const sectorSelect = document.getElementById('cp-sector').value;
+  const sector = sectorSelect === '__nuevo__'
+    ? document.getElementById('cp-sector-nuevo').value.trim()
+    : sectorSelect;
   const necesitaHoja = document.getElementById('cp-necesita-hoja').checked;
   if (!label) {
     return showToast('Ingresá un nombre para el preventivo.', 'danger');
+  }
+  if (!sector) {
+    return showToast('Ingresá un nombre para el sector nuevo.', 'danger');
   }
   try {
     const res = await fetch('/api/preventivos-masiva', {

@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '220';
+const APP_VERSION = '221';
 
 // Middleware
 app.use(cors());
@@ -962,12 +962,19 @@ app.get('/api/preventivos-masiva', (req, res) => {
 
 app.post('/api/preventivos-masiva', (req, res) => {
   try {
+    // Los 5 sectores base (Mecanica/Electricista/Chapista/Gomeria/Elastiquero) son solo la
+    // lista inicial - el modal de "Crear Preventivo" deja escribir uno nuevo, asi que
+    // cualquier nombre no vacio es valido. Queda persistido en cuanto el primer preventivo
+    // lo usa; no hace falta una lista de sectores aparte.
     const { label, sector, necesitaHoja } = req.body;
-    const SECTORES_VALIDOS = new Set(['Mecanica', 'Electricista', 'Chapista', 'Gomeria', 'Elastiquero']);
-    if (!SECTORES_VALIDOS.has(sector)) {
+    const cleanSector = String(sector || '').trim();
+    if (!cleanSector) {
       return res.status(400).json({ error: 'Sector inválido.' });
     }
-    const item = db.addPreventivoMasivaCustom({ label, sector, necesitaHoja });
+    if (cleanSector.length > 40) {
+      return res.status(400).json({ error: 'El nombre del sector es demasiado largo.' });
+    }
+    const item = db.addPreventivoMasivaCustom({ label, sector: cleanSector, necesitaHoja });
     res.status(201).json({ preventivo: item });
   } catch (error) {
     res.status(400).json({ error: error.message });
