@@ -92,7 +92,12 @@ function encontrarOInsertarFilaInterno(sheet, interno) {
   return row;
 }
 
-function estiloParaValor(valorCrudo) {
+// bateria/alternador miden voltaje, no litros; vigia/luces son un control de
+// funcionamiento (OK/Sucio/etc.), un numero ahi no tiene unidad propia.
+var TIPOS_VOLTAJE = { bateria: true, alternador: true };
+var TIPOS_SIN_UNIDAD = { vigia: true, luces: true };
+
+function estiloParaValor(valorCrudo, tipo) {
   var norm = String(valorCrudo || '').trim().toUpperCase();
   if (norm === 'OK') return { texto: 'OK', color: COLOR_OK, fontColor: '#ffffff' };
   if (norm === 'SUCIO') return { texto: 'Sucio', color: COLOR_SUCIO, fontColor: '#ffffff' };
@@ -100,7 +105,9 @@ function estiloParaValor(valorCrudo) {
   if (norm === 'PERDIDA' || norm === 'PÉRDIDA') return { texto: 'Perdida', color: COLOR_PERDIDA, fontColor: '#1f2933' };
   var numero = Number(String(valorCrudo).replace(',', '.'));
   if (!isNaN(numero) && String(valorCrudo).trim() !== '') {
-    return { texto: numero + ' Lts', color: COLOR_LITROS, fontColor: '#1f2933' };
+    if (TIPOS_SIN_UNIDAD[tipo]) return { texto: String(numero), color: COLOR_LITROS, fontColor: '#1f2933' };
+    var unidad = TIPOS_VOLTAJE[tipo] ? 'Volt' : 'Lts';
+    return { texto: numero + ' ' + unidad, color: COLOR_LITROS, fontColor: '#1f2933' };
   }
   return { texto: String(valorCrudo || ''), color: null, fontColor: null };
 }
@@ -138,7 +145,7 @@ function actualizarControlesInsumos(fecha, responsable, registros) {
       if (!controlEntry) continue;
 
       var targetRow = encontrarOInsertarFilaInterno(sheet, reg.interno);
-      var estilo = estiloParaValor(controlEntry.valor);
+      var estilo = estiloParaValor(controlEntry.valor, tipo);
       var cell = sheet.getRange(targetRow, col);
       cell.setValue(estilo.texto);
       cell.setHorizontalAlignment('center');

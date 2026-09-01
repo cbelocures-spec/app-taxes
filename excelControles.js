@@ -42,7 +42,12 @@ const FILL_LITROS = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D
 const FONT_WHITE = { color: { argb: 'FFFFFFFF' }, bold: true };
 const FONT_DARK = { color: { argb: 'FF1F2933' }, bold: true };
 
-function estiloParaValor(valorCrudo) {
+// bateria/alternador miden voltaje, no litros; vigia/luces son un control de
+// funcionamiento (OK/Sucio/etc.), un numero ahi no tiene unidad propia.
+const TIPOS_VOLTAJE = new Set(['bateria', 'alternador']);
+const TIPOS_SIN_UNIDAD = new Set(['vigia', 'luces']);
+
+function estiloParaValor(valorCrudo, tipo) {
   const norm = String(valorCrudo || '').trim().toUpperCase();
   if (norm === 'OK') return { texto: 'OK', fill: FILL_OK, font: FONT_WHITE };
   if (norm === 'SUCIO') return { texto: 'Sucio', fill: FILL_SUCIO, font: FONT_WHITE };
@@ -50,7 +55,9 @@ function estiloParaValor(valorCrudo) {
   if (norm === 'PERDIDA' || norm === 'PÉRDIDA') return { texto: 'Perdida', fill: FILL_PERDIDA, font: FONT_DARK };
   const numero = Number(String(valorCrudo).replace(',', '.'));
   if (!Number.isNaN(numero) && String(valorCrudo).trim() !== '') {
-    return { texto: `${numero} Lts`, fill: FILL_LITROS, font: FONT_DARK };
+    if (TIPOS_SIN_UNIDAD.has(tipo)) return { texto: `${numero}`, fill: FILL_LITROS, font: FONT_DARK };
+    const unidad = TIPOS_VOLTAJE.has(tipo) ? 'Volt' : 'Lts';
+    return { texto: `${numero} ${unidad}`, fill: FILL_LITROS, font: FONT_DARK };
   }
   return { texto: String(valorCrudo || ''), fill: null, font: null };
 }
@@ -139,7 +146,7 @@ async function actualizarExcelControles({ fecha, responsable, registros }) {
       const controlEntry = (reg.controles || []).find(c => c.tipo === tipo);
       if (!controlEntry) return;
       const targetRow = encontrarOInsertarFilaInterno(sheet, reg.interno);
-      const { texto, fill, font } = estiloParaValor(controlEntry.valor);
+      const { texto, fill, font } = estiloParaValor(controlEntry.valor, tipo);
       const cell = sheet.getCell(targetRow, col);
       cell.value = texto;
       cell.alignment = { horizontal: 'center' };
