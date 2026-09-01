@@ -36,6 +36,11 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({ ok: true, hojas: resultado }))
         .setMimeType(ContentService.MimeType.JSON);
     }
+    if (accion === 'precargarTodasLasHojas') {
+      var hojasPrecargadas = precargarTodasLasHojas(body.todosInternos);
+      return ContentService.createTextOutput(JSON.stringify({ ok: true, hojas: hojasPrecargadas }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Acción desconocida: ' + accion }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
@@ -123,6 +128,20 @@ function asegurarTodasLasFilas(sheet, todosInternos) {
   for (var i = 0; i < ordenados.length; i++) {
     encontrarOInsertarFilaInterno(sheet, ordenados[i]);
   }
+}
+
+// Setup manual: crea (si hace falta) las 10 hojas de control y les precarga todos los
+// internos de una, sin esperar a que una Carga Masiva las vaya tocando de a una.
+function precargarTodasLasHojas(todosInternos) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var hojas = [];
+  for (var tipo in HOJA_POR_TIPO) {
+    var nombreHoja = HOJA_POR_TIPO[tipo];
+    var sheet = obtenerOCrearHoja(ss, nombreHoja);
+    asegurarTodasLasFilas(sheet, todosInternos);
+    hojas.push(nombreHoja);
+  }
+  return hojas;
 }
 
 // registros: [{ interno, modelo, patente, controles: [{ tipo, valor }] }]
