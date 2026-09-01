@@ -118,8 +118,16 @@ function encontrarOInsertarFilaInterno(sheet, interno) {
   return targetRow;
 }
 
+// Precarga todos los internos reales de la flota como filas (ordenadas), aunque no tengan
+// dato en esta masiva puntual - misma logica que el Google Apps Script equivalente.
+function asegurarTodasLasFilas(sheet, todosInternos) {
+  if (!Array.isArray(todosInternos) || todosInternos.length === 0) return;
+  const ordenados = [...todosInternos].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
+  ordenados.forEach(interno => encontrarOInsertarFilaInterno(sheet, interno));
+}
+
 // registros: [{ interno, modelo, patente, controles: [{ tipo, valor }] }]
-async function actualizarExcelControles({ fecha, responsable, registros }) {
+async function actualizarExcelControles({ fecha, responsable, registros, todosInternos }) {
   if (!Array.isArray(registros) || registros.length === 0) {
     return { path: EXCEL_PATH, hojasActualizadas: [] };
   }
@@ -134,6 +142,7 @@ async function actualizarExcelControles({ fecha, responsable, registros }) {
     const nombreHoja = HOJA_POR_TIPO[tipo];
     if (!nombreHoja) continue;
     const sheet = obtenerOCrearHoja(workbook, nombreHoja);
+    asegurarTodasLasFilas(sheet, todosInternos);
     const col = proximaColumnaLibre(sheet);
 
     sheet.getCell(HEADER_ROW, col).value = responsable || '';

@@ -1047,12 +1047,31 @@ app.post('/api/orders/bulk', async (req, res) => {
     if (controlesInsumos && Array.isArray(controlesInsumos.registros) && controlesInsumos.registros.length > 0) {
       const settingsForControles = db.getSettings();
       const controlesScriptUrl = settingsForControles.controlesMasivaScriptUrl;
+      // Full fleet list (sorted) so every sheet the script touches gets every real interno
+      // pre-populated as a row up front, in order - not just whichever trucks happened to be
+      // in this particular masiva. Keeps row order stable and avoids relying on inserting
+      // rows mid-write for internos never seen before.
+      const rodadosParaControles = (db.getCatalogs() || {}).rodados || [];
+      const todosInternos = rodadosParaControles
+        .filter(r => {
+          const interno = String(r.interno || '').trim();
+          // Only real vehicle internos (plain numbers) - excludes Herrería/Pañol's own
+          // internal work-bucket "internos" like "PRENSAS", "A01", "REP. VOLQUETE", etc.,
+          // which use text codes and aren't actual fleet units to track fluids/checks for.
+          if (!/^\d+$/.test(interno)) return false;
+          const equipoUpper = String(r.equipo || '').trim().toUpperCase();
+          if (equipoUpper === 'HERRERIA' || equipoUpper === 'EDILICIO') return false;
+          return esInternoDeFlotaReal(r.interno);
+        })
+        .map(r => String(r.interno || '').trim())
+        .filter(Boolean)
+        .sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
       if (controlesScriptUrl) {
         try {
           const scriptRes = await fetch(controlesScriptUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ accion: 'actualizarControlesInsumos', ...controlesInsumos })
+            body: JSON.stringify({ accion: 'actualizarControlesInsumos', ...controlesInsumos, todosInternos })
           });
           if (!scriptRes.ok) {
             console.warn('[Bulk] Google Sheet de controles respondió', scriptRes.status);
@@ -1063,7 +1082,7 @@ app.post('/api/orders/bulk', async (req, res) => {
         controlesExcelUrl = settingsForControles.controlesMasivaSheetUrl || null;
       } else {
         try {
-          await excelControles.actualizarExcelControles(controlesInsumos);
+          await excelControles.actualizarExcelControles({ ...controlesInsumos, todosInternos });
           controlesExcelUrl = '/api/controles/excel';
         } catch (excelErr) {
           console.error('[Bulk] Error actualizando excel de controles:', excelErr.message);

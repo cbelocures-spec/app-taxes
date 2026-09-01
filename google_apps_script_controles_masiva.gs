@@ -32,7 +32,7 @@ function doPost(e) {
     var body = JSON.parse(e.postData.contents);
     var accion = body.accion;
     if (accion === 'actualizarControlesInsumos') {
-      var resultado = actualizarControlesInsumos(body.fecha, body.responsable, body.registros);
+      var resultado = actualizarControlesInsumos(body.fecha, body.responsable, body.registros, body.todosInternos);
       return ContentService.createTextOutput(JSON.stringify({ ok: true, hojas: resultado }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -112,8 +112,21 @@ function estiloParaValor(valorCrudo, tipo) {
   return { texto: String(valorCrudo || ''), color: null, fontColor: null };
 }
 
+// Precarga todos los internos reales de la flota como filas (ordenadas), aunque no tengan
+// dato en esta masiva puntual - asi la hoja siempre tiene el listado completo desde el
+// principio, igual que la planilla vieja, en vez de ir apareciendo de a uno.
+function asegurarTodasLasFilas(sheet, todosInternos) {
+  if (!todosInternos || todosInternos.length === 0) return;
+  var ordenados = todosInternos.slice().sort(function(a, b) {
+    return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0);
+  });
+  for (var i = 0; i < ordenados.length; i++) {
+    encontrarOInsertarFilaInterno(sheet, ordenados[i]);
+  }
+}
+
 // registros: [{ interno, modelo, patente, controles: [{ tipo, valor }] }]
-function actualizarControlesInsumos(fecha, responsable, registros) {
+function actualizarControlesInsumos(fecha, responsable, registros, todosInternos) {
   if (!registros || registros.length === 0) return [];
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -130,6 +143,7 @@ function actualizarControlesInsumos(fecha, responsable, registros) {
     var nombreHoja = HOJA_POR_TIPO[tipo];
     if (!nombreHoja) continue;
     var sheet = obtenerOCrearHoja(ss, nombreHoja);
+    asegurarTodasLasFilas(sheet, todosInternos);
     var col = proximaColumnaLibre(sheet);
 
     sheet.getRange(HEADER_ROW, col).setValue(responsable || '').setFontWeight('bold');
