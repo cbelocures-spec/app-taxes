@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '216';
+const CURRENT_APP_VERSION = '217';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7295,11 +7295,7 @@ async function submitBulkOrders() {
     });
 
     if (res.ok) {
-      const data = await res.json().catch(() => ({}));
       showToast(`Éxito: Se crearon ${ordersList.length} órdenes correctamente.`, "success");
-      if (data && data.controlesExcelUrl) {
-        window.open(data.controlesExcelUrl, '_blank');
-      }
       toggleAllBulkVehicles(false);
       document.getElementById('bulk-incidente').value = '';
 

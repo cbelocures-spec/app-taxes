@@ -325,8 +325,11 @@
 
     <!-- VIEW 3: CARGA MASIVA -->
     <section id="view-bulk" class="app-view">
-      <div class="view-header">
+      <div class="view-header" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
         <h2>Carga Masiva</h2>
+        <a href="/api/controles/excel" target="_blank" class="btn btn-secondary btn-xs" style="display: flex; align-items: center; gap: 4px; text-decoration: none;">
+          <span class="material-icons" style="font-size: 14px;">download</span> Descargar Hoja de Controles
+        </a>
       </div>
 
       <form id="bulk-order-form" onsubmit="event.preventDefault(); submitBulkOrders();">
@@ -1467,7 +1470,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.9.1</div>
+      <div class="sidebar-version">Versión 1.9.2</div>
     </div>
   </aside>
 
@@ -2452,6 +2455,6 @@
     }
   </style>
 
-  <script src="app.js?v=216"></script>
+  <script src="app.js?v=217"></script>
 </body>
 </html>
