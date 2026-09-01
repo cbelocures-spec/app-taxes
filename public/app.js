@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '215';
+const CURRENT_APP_VERSION = '216';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -10750,8 +10750,14 @@ const PREVENTIVO_LINES = {
   'A':  ['Ctrol Refrigerante', 'Ctrol Aceite Motor', 'Ctrol Grasa Caja', 'Ctrol Grasa Diferencial', 'Ctrol Hco Direccion'],
   'RM': ['Ctrol Refrigerante', 'Ctrol Aceite Motor'],
   'C':  ['Ctrol Grasa Caja'],
-  'D':  ['Ctrol Grasa Diferencial']
+  'D':  ['Ctrol Grasa Diferencial'],
+  'H':  ['Ctrol Hco Equipo'],
+  'V':  ['Ctrol Vigía'],
+  'L':  ['Ctrol Luces'],
+  'B':  ['Ctrol Batería'],
+  'AL': ['Ctrol Alternador']
 };
+const PREVENTIVO_TYPE_ORDER = ['A', 'RM', 'C', 'D', 'H', 'V', 'L', 'B', 'AL'];
 
 // Sync button visual state to activePreventivoTypes
 function syncPreventivoButtons() {
@@ -10797,6 +10803,11 @@ function updateBulkInsumosGrid() {
   const isRMActive = activePreventivoTypes.has('RM');
   const isCActive  = activePreventivoTypes.has('C');
   const isDActive  = activePreventivoTypes.has('D');
+  const isHActive  = activePreventivoTypes.has('H');
+  const isVActive  = activePreventivoTypes.has('V');
+  const isLActive  = activePreventivoTypes.has('L');
+  const isBActive  = activePreventivoTypes.has('B');
+  const isALActive = activePreventivoTypes.has('AL');
   const isAnyActive = activePreventivoTypes.size > 0;
 
   if (checkboxes.length === 0 || !isAnyActive) {
@@ -10847,15 +10858,23 @@ function updateBulkInsumosGrid() {
     }
   });
 
-  // Show/hide columns based on active preventivo types - the 5 new controls (Hco Equipo,
-  // Vigía, Luces, Batería, Alternador) have no preventivo-type toggle of their own yet, so
-  // they just follow whether the grid is showing at all.
-  const showRefrig   = isAActive || isRMActive;
-  const showAcMotor  = isAActive || isRMActive;
-  const showAcCaja   = isAActive || isCActive;
-  const showAcDif    = isAActive || isDActive;
-  const showHcoDir   = isAActive;
-  document.querySelectorAll('.col-hco-equipo, .col-vigia, .col-luces, .col-bateria, .col-alternador').forEach(el => el.style.display = '');
+  // Show/hide columns based on active preventivo types - one button per control, same as
+  // the original 4 (Fluidos/R-M/C/D).
+  const showRefrig     = isAActive || isRMActive;
+  const showAcMotor    = isAActive || isRMActive;
+  const showAcCaja     = isAActive || isCActive;
+  const showAcDif      = isAActive || isDActive;
+  const showHcoDir     = isAActive;
+  const showHcoEquipo  = isHActive;
+  const showVigia      = isVActive;
+  const showLuces      = isLActive;
+  const showBateria    = isBActive;
+  const showAlternador = isALActive;
+  document.querySelectorAll('.col-hco-equipo').forEach(el  => el.style.display = showHcoEquipo  ? '' : 'none');
+  document.querySelectorAll('.col-vigia').forEach(el       => el.style.display = showVigia      ? '' : 'none');
+  document.querySelectorAll('.col-luces').forEach(el       => el.style.display = showLuces      ? '' : 'none');
+  document.querySelectorAll('.col-bateria').forEach(el     => el.style.display = showBateria    ? '' : 'none');
+  document.querySelectorAll('.col-alternador').forEach(el  => el.style.display = showAlternador ? '' : 'none');
   document.querySelectorAll('.col-refrig').forEach(el   => el.style.display = showRefrig  ? '' : 'none');
   document.querySelectorAll('.col-ac-motor').forEach(el => el.style.display = showAcMotor ? '' : 'none');
   document.querySelectorAll('.col-ac-caja').forEach(el  => el.style.display = showAcCaja  ? '' : 'none');
@@ -10891,7 +10910,7 @@ function loadPreventivoIntoBulkTasks(type) {
       descInput.value = '';
     } else {
       const allLines = [];
-      ['A', 'RM', 'C', 'D'].forEach(t => {
+      PREVENTIVO_TYPE_ORDER.forEach(t => {
         if (activePreventivoTypes.has(t)) {
           (PREVENTIVO_LINES[t] || []).forEach(line => {
             if (!allLines.includes(line)) allLines.push(line);
@@ -11126,7 +11145,7 @@ function applyOcrResultsToForm(results) {
     const descInput = card.querySelector('.bulk-task-desc');
     if (descInput) {
       const allLines = [];
-      ['A', 'RM', 'C', 'D'].forEach(t => {
+      PREVENTIVO_TYPE_ORDER.forEach(t => {
         if (activePreventivoTypes.has(t)) {
           (PREVENTIVO_LINES[t] || []).forEach(line => {
             if (!allLines.includes(line)) allLines.push(line);
