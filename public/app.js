@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '225';
+const CURRENT_APP_VERSION = '226';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7730,13 +7730,128 @@ function addElastiqueroEjeRow(btn) {
 
 function removeElastiqueroEjeRow(btn) {
   const row = btn.closest('.elastiquero-eje-row');
-  if (!row) return;
-  const rowsContainer = row.parentElement;
-  if (rowsContainer.querySelectorAll('.elastiquero-eje-row').length <= 1) {
-    showToast('Cada interno necesita al menos un eje cargado.', 'warning');
-    return;
+  if (row) row.remove();
+}
+
+// Los elastiqueros a veces tambien cambian cubiertas en el mismo camion - esta seccion es la
+// version embebida del formulario de Gomeria (mismos campos: eje/posicion, se saco, se coloco),
+// pero con sus propias clases para no interferir con la pantalla de Gomeria por separado. Es
+// opcional igual que los ejes: un interno puede tener solo ejes, solo cubiertas, o ambos.
+function addElastiqueroCubiertaRow(btn) {
+  const block = btn.closest('.elastiquero-interno-block');
+  const rowsContainer = block ? block.querySelector('.elastiquero-cubierta-rows-container') : null;
+  if (!rowsContainer) return;
+
+  const row = document.createElement('div');
+  row.className = 'elastiquero-cubierta-row';
+  row.style.cssText = 'border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-top:10px; position:relative;';
+  row.innerHTML = `
+    <button type="button" onclick="removeElastiqueroCubiertaRow(this)" style="position:absolute; top:6px; right:6px; border:none; background:none; color:var(--danger); cursor:pointer; padding:2px;" title="Quitar esta cubierta">
+      <span class="material-icons" style="font-size:16px;">close</span>
+    </button>
+    <div class="form-group" style="margin-bottom:10px;">
+      <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Eje / Posición</label>
+      <select class="elastiquero-cubierta-posicion-select" style="width:100%; margin-bottom:6px;" onchange="updateElastiqueroCubiertaPosicionBadge(this)">
+        <option value="" data-group="">Seleccionar posición...</option>
+        <optgroup label="Eje Delantero">
+          <option value="Delantero izquierdo" data-group="delantero" style="background-color:#dcfce7; color:#166534;">Delantero izquierdo</option>
+          <option value="Delantero derecho" data-group="delantero" style="background-color:#dcfce7; color:#166534;">Delantero derecho</option>
+        </optgroup>
+        <optgroup label="Eje Trasero (Tracción - Diferencial)">
+          <option value="Trasero izquierdo exterior" data-group="trasero" style="background-color:#dbeafe; color:#1e40af;">Trasero izquierdo exterior</option>
+          <option value="Trasero izquierdo interior" data-group="trasero" style="background-color:#dbeafe; color:#1e40af;">Trasero izquierdo interior</option>
+          <option value="Trasero derecho exterior" data-group="trasero" style="background-color:#dbeafe; color:#1e40af;">Trasero derecho exterior</option>
+          <option value="Trasero derecho interior" data-group="trasero" style="background-color:#dbeafe; color:#1e40af;">Trasero derecho interior</option>
+        </optgroup>
+        <optgroup label="Eje Fijo / Flotante">
+          <option value="Eje fijo/flotante izquierdo exterior" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje fijo/flotante izquierdo exterior</option>
+          <option value="Eje fijo/flotante izquierdo interior" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje fijo/flotante izquierdo interior</option>
+          <option value="Eje fijo/flotante derecho exterior" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje fijo/flotante derecho exterior</option>
+          <option value="Eje fijo/flotante derecho interior" data-group="fijoflotante" style="background-color:#ede9fe; color:#5b21b6;">Eje fijo/flotante derecho interior</option>
+        </optgroup>
+        <option value="Auxilio / Repuesto" data-group="otro">Auxilio / Repuesto</option>
+        <option value="__otro__" data-group="otro">Otro (escribir)</option>
+      </select>
+      <span class="elastiquero-cubierta-posicion-badge" style="display:none; font-size:12px; font-weight:700; padding:4px 12px; border-radius:999px;"></span>
+      <input type="text" class="elastiquero-cubierta-posicion-otro" placeholder="Escribir posición" style="width:100%; margin-top:6px; display:none;">
+    </div>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+      <div>
+        <label style="font-size:11px; font-weight:700; color:var(--danger); text-transform:uppercase; display:block; margin-bottom:6px;">Se sacó</label>
+        <input type="text" class="elastiquero-cubierta-salida-fuego" placeholder="N° Fuego" style="width:100%; margin-bottom:6px;">
+        <input type="text" class="elastiquero-cubierta-salida-tipo" placeholder="Tipo (ej: Lineal)" style="width:100%; margin-bottom:6px;">
+        <input type="text" class="elastiquero-cubierta-salida-marca" placeholder="Marca" style="width:100%; margin-bottom:6px;">
+        <input type="text" class="elastiquero-cubierta-salida-medida" placeholder="Medida (ej: 275)" style="width:100%; margin-bottom:6px;">
+        <input type="text" class="elastiquero-cubierta-salida-estado" placeholder="Estado (pinchada, liza...)" style="width:100%;">
+      </div>
+      <div>
+        <label style="font-size:11px; font-weight:700; color:var(--success); text-transform:uppercase; display:block; margin-bottom:6px;">Se colocó</label>
+        <input type="text" class="elastiquero-cubierta-entrada-fuego" placeholder="N° Fuego" style="width:100%; margin-bottom:6px;">
+        <input type="text" class="elastiquero-cubierta-entrada-tipo" placeholder="Tipo (ej: Lineal)" style="width:100%; margin-bottom:6px;">
+        <input type="text" class="elastiquero-cubierta-entrada-marca" placeholder="Marca" style="width:100%; margin-bottom:6px;">
+        <input type="text" class="elastiquero-cubierta-entrada-medida" placeholder="Medida (ej: 275)" style="width:100%; margin-bottom:6px;">
+        <input type="text" class="elastiquero-cubierta-entrada-estado" placeholder="Estado (recapada nueva...)" style="width:100%;">
+      </div>
+    </div>
+  `;
+  rowsContainer.appendChild(row);
+}
+
+function removeElastiqueroCubiertaRow(btn) {
+  const row = btn.closest('.elastiquero-cubierta-row');
+  if (row) row.remove();
+}
+
+function updateElastiqueroCubiertaPosicionBadge(selectEl) {
+  const wrapper = selectEl.closest('.form-group');
+  const badge = wrapper ? wrapper.querySelector('.elastiquero-cubierta-posicion-badge') : null;
+  const otroInput = wrapper ? wrapper.querySelector('.elastiquero-cubierta-posicion-otro') : null;
+  const selectedOption = selectEl.selectedOptions && selectEl.selectedOptions[0];
+  const group = selectedOption ? (selectedOption.dataset.group || '') : '';
+  if (badge) {
+    if (selectEl.value) {
+      const colors = GOMERIA_POSICION_GROUP_COLORS[group] || GOMERIA_POSICION_GROUP_COLORS[''];
+      badge.style.background = colors.bg;
+      badge.style.color = colors.text;
+      badge.textContent = selectedOption ? selectedOption.textContent : '';
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
   }
-  row.remove();
+  if (otroInput) otroInput.style.display = (selectEl.value === '__otro__') ? 'block' : 'none';
+}
+
+// Igual formato que buildGomeriaDescription, para que las tareas se vean iguales sin importar
+// desde que pantalla se cargaron.
+function buildElastiqueroCubiertaDescription(block) {
+  const rows = Array.from(block.querySelectorAll('.elastiquero-cubierta-row'));
+  const field = (row, cls) => {
+    const el = row.querySelector(`.${cls}`);
+    return el ? el.value.trim() : '';
+  };
+  const lines = rows.map((row, idx) => {
+    const posSelect = row.querySelector('.elastiquero-cubierta-posicion-select');
+    const posOtro = row.querySelector('.elastiquero-cubierta-posicion-otro');
+    const posicion = (posSelect && posSelect.value === '__otro__')
+      ? (posOtro ? posOtro.value.trim() : '')
+      : (posSelect ? posSelect.value : '');
+    const sFuego = field(row, 'elastiquero-cubierta-salida-fuego');
+    const sTipo = field(row, 'elastiquero-cubierta-salida-tipo');
+    const sMarca = field(row, 'elastiquero-cubierta-salida-marca');
+    const sMedida = field(row, 'elastiquero-cubierta-salida-medida');
+    const sEstado = field(row, 'elastiquero-cubierta-salida-estado');
+    const eFuego = field(row, 'elastiquero-cubierta-entrada-fuego');
+    const eTipo = field(row, 'elastiquero-cubierta-entrada-tipo');
+    const eMarca = field(row, 'elastiquero-cubierta-entrada-marca');
+    const eMedida = field(row, 'elastiquero-cubierta-entrada-medida');
+    const eEstado = field(row, 'elastiquero-cubierta-entrada-estado');
+    if (!sFuego && !eFuego) return null;
+    const prefix = rows.length > 1 ? `Cambio cubierta ${idx + 1}` : 'Cambio cubierta';
+    const posSuffix = posicion ? ` (${posicion})` : '';
+    return `${prefix}${posSuffix}: se sacó N° Fuego ${sFuego || '-'} - Tipo ${sTipo || '-'} - Marca ${sMarca || '-'} - Medida ${sMedida || '-'} - Estado ${sEstado || '-'} = se colocó = N° Fuego ${eFuego || '-'} - Tipo ${eTipo || '-'} - Marca ${eMarca || '-'} - Medida ${eMedida || '-'} - Estado ${eEstado || '-'}`;
+  }).filter(Boolean);
+  return lines.join('\n');
 }
 
 function addElastiqueroEmpleadoRow(btn) {
@@ -7886,10 +8001,16 @@ function addElastiqueroInternoBlock() {
     </div>
     <div class="elastiquero-ot-info" style="display:none; margin-top:8px; padding:8px 10px; border-radius:6px; font-size:12px; font-weight:600;"></div>
 
-    <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:14px 0 0;">Ejes trabajados</label>
+    <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:14px 0 0;">Ejes trabajados (elástico)</label>
     <div class="elastiquero-eje-rows-container"></div>
     <button type="button" class="btn btn-secondary btn-xs" onclick="addElastiqueroEjeRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
-      <span class="material-icons" style="font-size:14px;">add</span> Agregar otro eje
+      <span class="material-icons" style="font-size:14px;">add</span> Agregar eje
+    </button>
+
+    <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:16px 0 0; border-top:1px solid var(--border-color); padding-top:12px;">Cubiertas cambiadas (gomería)</label>
+    <div class="elastiquero-cubierta-rows-container"></div>
+    <button type="button" class="btn btn-secondary btn-xs" onclick="addElastiqueroCubiertaRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
+      <span class="material-icons" style="font-size:14px;">add</span> Agregar cubierta cambiada
     </button>
 
     <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:16px 0 0; border-top:1px solid var(--border-color); padding-top:12px;">Empleados y horas</label>
@@ -7904,7 +8025,6 @@ function addElastiqueroInternoBlock() {
     </button>
   `;
   container.appendChild(block);
-  addElastiqueroEjeRow(block.querySelector('.elastiquero-eje-rows-container + button'));
   addElastiqueroEmpleadoRow(block.querySelector('.elastiquero-empleado-rows-container + button'));
   const internoSelectEl = block.querySelector('.elastiquero-interno-select');
   if (internoSelectEl) {
@@ -8031,9 +8151,11 @@ async function submitElastiqueroOrders() {
       showToast('Todos los internos agregados deben estar seleccionados.', 'danger');
       return;
     }
-    const descripcion = buildElastiqueroDescription(block);
+    const ejeDescripcion = buildElastiqueroDescription(block);
+    const cubiertaDescripcion = buildElastiqueroCubiertaDescription(block);
+    const descripcion = [ejeDescripcion, cubiertaDescripcion].filter(Boolean).join('\n');
     if (!descripcion) {
-      showToast(`Cargá la posición y la descripción de al menos un eje para el interno ${interno}.`, 'danger');
+      showToast(`Cargá al menos un eje trabajado o una cubierta cambiada para el interno ${interno}.`, 'danger');
       return;
     }
 
@@ -8073,6 +8195,9 @@ async function submitElastiqueroOrders() {
       const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
       const clasifSelect = block.querySelector('.elastiquero-clasificacion-select');
       const clasificacion = clasifSelect ? clasifSelect.value : 'Correctivo';
+      const incidenteParts = [];
+      if (ejeDescripcion) incidenteParts.push('Cambio/Reparación de elástico');
+      if (cubiertaDescripcion) incidenteParts.push('Cambio de cubiertas');
       newOrdersToCreate.push({
         rodado: rodadoLabel,
         responsable: "AUTO",
@@ -8080,7 +8205,7 @@ async function submitElastiqueroOrders() {
         clasificacion: clasificacion,
         fechaEntrega: new Date().toISOString().split('T')[0],
         horario: new Date().toTimeString().slice(0, 5),
-        incidente: "Cambio/Reparación de elástico",
+        incidente: incidenteParts.join(' + '),
         estadoUnidad: "operativo",
         tasks: tasks
       });
