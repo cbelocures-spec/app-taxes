@@ -949,6 +949,21 @@ app.post('/api/orders', (req, res) => {
   }
 });
 
+// Lista fija de internos que participan de los controles de Carga Masiva (Grasa Caja,
+// Refrigerante, Vigia, etc.) - confirmada a mano por el usuario el 28/08/2026. El catalogo
+// de rodados completo incluye camionetas/sedanes/autoelevadores/tanques que no aplican a
+// estos controles, asi que esta lista curada reemplaza cualquier derivacion automatica.
+const CONTROLES_MASIVA_INTERNOS_FIJOS = [
+  '12', '14', '28', '29', '50', '51', '52', '53', '54', '56', '57', '59', '60', '61', '63',
+  '64', '65', '66', '67', '68', '69', '71', '72', '73', '74', '75', '76', '77', '78', '79',
+  '87', '88', '89', '90', '91', '92', '94', '95', '96', '97', '98', '99', '100', '101',
+  '102', '103', '104', '105', '106', '109', '110', '111', '112', '114', '115', '116', '117',
+  '118', '119', '120', '121', '122', '123', '125', '126', '127', '128', '129', '131', '132',
+  '133', '134', '135', '136', '137', '138', '139', '140', '141', '142', '143', '144', '145',
+  '146', '147', '148', '149', '150', '151', '152', '153', '154', '155', '156', '157', '158',
+  '159', '9A', 'A01', 'AC01', 'AC02', 'TR01'
+];
+
 app.post('/api/orders/bulk', async (req, res) => {
   try {
     const { orders, controlesInsumos } = req.body;
@@ -1047,25 +1062,11 @@ app.post('/api/orders/bulk', async (req, res) => {
     if (controlesInsumos && Array.isArray(controlesInsumos.registros) && controlesInsumos.registros.length > 0) {
       const settingsForControles = db.getSettings();
       const controlesScriptUrl = settingsForControles.controlesMasivaScriptUrl;
-      // Full fleet list (sorted) so every sheet the script touches gets every real interno
-      // pre-populated as a row up front, in order - not just whichever trucks happened to be
-      // in this particular masiva. Keeps row order stable and avoids relying on inserting
-      // rows mid-write for internos never seen before.
-      const rodadosParaControles = (db.getCatalogs() || {}).rodados || [];
-      const todosInternos = rodadosParaControles
-        .filter(r => {
-          const interno = String(r.interno || '').trim();
-          // Only real vehicle internos (plain numbers) - excludes Herrería/Pañol's own
-          // internal work-bucket "internos" like "PRENSAS", "A01", "REP. VOLQUETE", etc.,
-          // which use text codes and aren't actual fleet units to track fluids/checks for.
-          if (!/^\d+$/.test(interno)) return false;
-          const equipoUpper = String(r.equipo || '').trim().toUpperCase();
-          if (equipoUpper === 'HERRERIA' || equipoUpper === 'EDILICIO') return false;
-          return esInternoDeFlotaReal(r.interno);
-        })
-        .map(r => String(r.interno || '').trim())
-        .filter(Boolean)
-        .sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
+      // Lista fija confirmada a mano por el usuario (28/08/2026) - reemplaza el catalogo
+      // dinamico, que traia camionetas/sedanes/autoelevadores/tanques de mas. Se pasa tal
+      // cual, sin reordenar: encontrarOInsertarFilaInterno ya inserta cada numero en su
+      // posicion correcta y deja los codigos alfa (9A, A01, etc.) al final.
+      const todosInternos = CONTROLES_MASIVA_INTERNOS_FIJOS;
       if (controlesScriptUrl) {
         try {
           const scriptRes = await fetch(controlesScriptUrl, {
