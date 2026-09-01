@@ -130,15 +130,44 @@ function asegurarTodasLasFilas(sheet, todosInternos) {
   }
 }
 
+// Version rapida de asegurarTodasLasFilas para la precarga inicial: en vez de una llamada a
+// Sheets por interno (~1000 llamadas totales, demasiado lento para el limite de ejecucion de
+// Apps Script), lee la columna A una sola vez y escribe todos los faltantes juntos con un
+// solo setValues(). Los que ya existen (de un intento anterior que no llego a terminar)
+// quedan como estaban - son un prefijo ya ordenado, asi que agregar el resto ordenado al
+// final mantiene todo bien ordenado igual.
+function precargarFilasRapido(sheet, ordenados) {
+  if (!ordenados || ordenados.length === 0) return;
+  var lastRow = sheet.getLastRow();
+  var existentes = {};
+  if (lastRow >= FIRST_DATA_ROW) {
+    var vals = sheet.getRange(FIRST_DATA_ROW, INTERNO_COL, lastRow - FIRST_DATA_ROW + 1, 1).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      var v = String(vals[i][0]).trim();
+      if (v) existentes[v] = true;
+    }
+  }
+  var faltantes = ordenados.filter(function(i) { return !existentes[String(i).trim()]; });
+  if (faltantes.length === 0) return;
+  var startRow = Math.max(lastRow + 1, FIRST_DATA_ROW);
+  var values = faltantes.map(function(i) { return [String(i).trim()]; });
+  var range = sheet.getRange(startRow, INTERNO_COL, values.length, 1);
+  range.setValues(values);
+  range.setFontWeight('bold');
+}
+
 // Setup manual: crea (si hace falta) las 10 hojas de control y les precarga todos los
 // internos de una, sin esperar a que una Carga Masiva las vaya tocando de a una.
 function precargarTodasLasHojas(todosInternos) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ordenados = (todosInternos || []).slice().sort(function(a, b) {
+    return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0);
+  });
   var hojas = [];
   for (var tipo in HOJA_POR_TIPO) {
     var nombreHoja = HOJA_POR_TIPO[tipo];
     var sheet = obtenerOCrearHoja(ss, nombreHoja);
-    asegurarTodasLasFilas(sheet, todosInternos);
+    precargarFilasRapido(sheet, ordenados);
     hojas.push(nombreHoja);
   }
   return hojas;
