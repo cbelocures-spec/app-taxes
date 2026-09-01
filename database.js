@@ -306,7 +306,8 @@ const DEFAULT_DB = {
   workOrders: [],
   activeMechanics: DEFAULT_MECHANICS,
   users: {},
-  insumosPendientes: []
+  insumosPendientes: [],
+  preventivosMasivaCustom: []
 };
 
 // Thread-safe read/write helper
@@ -1207,6 +1208,46 @@ class LocalDB {
     item.estado = estado;
     item.aprobadoPor = aprobadoPor;
     item.fechaResolucion = new Date().toISOString();
+    this.write(db);
+    return item;
+  }
+
+  // --- Preventivos custom de Carga Masiva ---
+  // Definidos a mano por el usuario (nombre + sector + si necesita su propia hoja de
+  // control en Google Sheets), se suman a los 10 tipos fijos como botones permanentes.
+  getPreventivosMasivaCustom() {
+    const db = this.read();
+    return db.preventivosMasivaCustom || [];
+  }
+
+  addPreventivoMasivaCustom({ label, sector, necesitaHoja }) {
+    const db = this.read();
+    if (!Array.isArray(db.preventivosMasivaCustom)) db.preventivosMasivaCustom = [];
+    const cleanLabel = String(label || '').trim();
+    if (!cleanLabel) throw new Error('El nombre del preventivo no puede estar vacío.');
+
+    const slugBase = cleanLabel
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'preventivo';
+    let key = slugBase;
+    let suffix = 1;
+    const existingKeys = new Set(db.preventivosMasivaCustom.map(p => p.key));
+    while (existingKeys.has(key)) {
+      suffix++;
+      key = `${slugBase}_${suffix}`;
+    }
+
+    const item = {
+      key,
+      label: cleanLabel,
+      sector: sector || 'Mecanica',
+      necesitaHoja: !!necesitaHoja,
+      hoja: necesitaHoja ? cleanLabel : null,
+      createdAt: new Date().toISOString()
+    };
+    db.preventivosMasivaCustom.push(item);
     this.write(db);
     return item;
   }

@@ -32,12 +32,12 @@ function doPost(e) {
     var body = JSON.parse(e.postData.contents);
     var accion = body.accion;
     if (accion === 'actualizarControlesInsumos') {
-      var resultado = actualizarControlesInsumos(body.fecha, body.responsable, body.registros, body.todosInternos);
+      var resultado = actualizarControlesInsumos(body.fecha, body.responsable, body.registros, body.todosInternos, body.tiposHojas);
       return ContentService.createTextOutput(JSON.stringify({ ok: true, hojas: resultado }))
         .setMimeType(ContentService.MimeType.JSON);
     }
     if (accion === 'precargarTodasLasHojas') {
-      var hojasPrecargadas = precargarTodasLasHojas(body.todosInternos);
+      var hojasPrecargadas = precargarTodasLasHojas(body.todosInternos, body.tiposHojas);
       return ContentService.createTextOutput(JSON.stringify({ ok: true, hojas: hojasPrecargadas }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -144,16 +144,20 @@ function precargarFilasRapido(sheet, ordenados) {
   range.setFontWeight('bold');
 }
 
-// Setup manual: crea (si hace falta) las 10 hojas de control y les precarga todos los
+// Setup manual: crea (si hace falta) las hojas de control y les precarga todos los
 // internos de una, sin esperar a que una Carga Masiva las vaya tocando de a una.
-function precargarTodasLasHojas(todosInternos) {
+// tiposHojas (opcional): tipo -> nombre de hoja; si no llega, usa el mapa fijo de los 10
+// originales - pero el server siempre manda el mapa completo (fijos + custom) para que un
+// preventivo nuevo no necesite tocar este script nunca mas.
+function precargarTodasLasHojas(todosInternos, tiposHojas) {
+  var mapa = tiposHojas || HOJA_POR_TIPO;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ordenados = (todosInternos || []).slice().sort(function(a, b) {
     return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0);
   });
   var hojas = [];
-  for (var tipo in HOJA_POR_TIPO) {
-    var nombreHoja = HOJA_POR_TIPO[tipo];
+  for (var tipo in mapa) {
+    var nombreHoja = mapa[tipo];
     var sheet = obtenerOCrearHoja(ss, nombreHoja);
     precargarFilasRapido(sheet, ordenados);
     hojas.push(nombreHoja);
@@ -162,8 +166,9 @@ function precargarTodasLasHojas(todosInternos) {
 }
 
 // registros: [{ interno, modelo, patente, controles: [{ tipo, valor }] }]
-function actualizarControlesInsumos(fecha, responsable, registros, todosInternos) {
+function actualizarControlesInsumos(fecha, responsable, registros, todosInternos, tiposHojas) {
   if (!registros || registros.length === 0) return [];
+  var mapa = tiposHojas || HOJA_POR_TIPO;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   var tiposPresentes = {};
@@ -180,7 +185,7 @@ function actualizarControlesInsumos(fecha, responsable, registros, todosInternos
 
   var hojasActualizadas = [];
   for (var tipo in tiposPresentes) {
-    var nombreHoja = HOJA_POR_TIPO[tipo];
+    var nombreHoja = mapa[tipo];
     if (!nombreHoja) continue;
     var sheet = obtenerOCrearHoja(ss, nombreHoja);
     precargarFilasRapido(sheet, ordenados);

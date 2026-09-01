@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '219';
+const APP_VERSION = '220';
 
 // Middleware
 app.use(cors());
@@ -949,6 +949,31 @@ app.post('/api/orders', (req, res) => {
   }
 });
 
+// Preventivos custom de Carga Masiva - botones definidos a mano por el usuario ademas de
+// los 10 fijos (Refrigerante, Vigia, etc.), cada uno con su sector (para el filtro) y si
+// necesita o no su propia hoja de seguimiento en Google Sheets.
+app.get('/api/preventivos-masiva', (req, res) => {
+  try {
+    res.json({ preventivos: db.getPreventivosMasivaCustom() });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/preventivos-masiva', (req, res) => {
+  try {
+    const { label, sector, necesitaHoja } = req.body;
+    const SECTORES_VALIDOS = new Set(['Mecanica', 'Electricista', 'Chapista', 'Gomeria', 'Elastiquero']);
+    if (!SECTORES_VALIDOS.has(sector)) {
+      return res.status(400).json({ error: 'Sector inválido.' });
+    }
+    const item = db.addPreventivoMasivaCustom({ label, sector, necesitaHoja });
+    res.status(201).json({ preventivo: item });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Lista fija de internos que participan de los controles de Carga Masiva (Grasa Caja,
 // Refrigerante, Vigia, etc.) - confirmada a mano por el usuario el 28/08/2026. El catalogo
 // de rodados completo incluye camionetas/sedanes/autoelevadores/tanques que no aplican a
@@ -963,6 +988,21 @@ const CONTROLES_MASIVA_INTERNOS_FIJOS = [
   '146', '147', '148', '149', '150', '151', '152', '153', '154', '155', '156', '157', '158',
   '159', '9A', 'A01', 'AC01', 'AC02', 'TR01'
 ];
+
+// Los 10 controles fijos de Carga Masiva - tipo (key) -> nombre de hoja en Google Sheets.
+// Debe coincidir con BULK_INSUMO_TYPES en public/app.js.
+const HOJA_POR_TIPO_FIJO = {
+  refrigerante: 'Ctrol Refrigerante',
+  aceite_motor: 'Ctrol Aceite Motor',
+  grasa_caja: 'Grasa Caja',
+  grasa_diferencial: 'Grasa Diferencial',
+  hco_direccion: 'Hco Direccion',
+  hco_equipo: 'Hco Equipo',
+  vigia: 'Vigia',
+  luces: 'Luces',
+  bateria: 'Bateria',
+  alternador: 'Alternador'
+};
 
 app.post('/api/orders/bulk', async (req, res) => {
   try {
@@ -1067,12 +1107,19 @@ app.post('/api/orders/bulk', async (req, res) => {
       // cual, sin reordenar: encontrarOInsertarFilaInterno ya inserta cada numero en su
       // posicion correcta y deja los codigos alfa (9A, A01, etc.) al final.
       const todosInternos = CONTROLES_MASIVA_INTERNOS_FIJOS;
+      // tipo -> nombre de hoja, para los 10 fijos + cualquier preventivo custom que el
+      // usuario haya creado con seguimiento en Sheets. Se manda siempre, asi el Apps Script
+      // nunca necesita un HOJA_POR_TIPO hardcodeado ni tocarse a mano para uno nuevo.
+      const tiposHojas = { ...HOJA_POR_TIPO_FIJO };
+      db.getPreventivosMasivaCustom().forEach(p => {
+        if (p.necesitaHoja && p.hoja) tiposHojas[p.key] = p.hoja;
+      });
       if (controlesScriptUrl) {
         try {
           const scriptRes = await fetch(controlesScriptUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ accion: 'actualizarControlesInsumos', ...controlesInsumos, todosInternos })
+            body: JSON.stringify({ accion: 'actualizarControlesInsumos', ...controlesInsumos, todosInternos, tiposHojas })
           });
           if (!scriptRes.ok) {
             console.warn('[Bulk] Google Sheet de controles respondió', scriptRes.status);
@@ -1083,7 +1130,7 @@ app.post('/api/orders/bulk', async (req, res) => {
         controlesExcelUrl = settingsForControles.controlesMasivaSheetUrl || null;
       } else {
         try {
-          await excelControles.actualizarExcelControles({ ...controlesInsumos, todosInternos });
+          await excelControles.actualizarExcelControles({ ...controlesInsumos, todosInternos, tiposHojas });
           controlesExcelUrl = '/api/controles/excel';
         } catch (excelErr) {
           console.error('[Bulk] Error actualizando excel de controles:', excelErr.message);

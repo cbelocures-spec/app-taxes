@@ -327,9 +327,14 @@
     <section id="view-bulk" class="app-view">
       <div class="view-header" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
         <h2>Carga Masiva</h2>
-        <button type="button" onclick="abrirHojaControles()" class="btn btn-secondary btn-xs" style="display: flex; align-items: center; gap: 4px;">
-          <span class="material-icons" style="font-size: 14px;">open_in_new</span> Ver Hoja de Controles
-        </button>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" onclick="openCrearPreventivoModal()" class="btn btn-secondary btn-xs" style="display: flex; align-items: center; gap: 4px;">
+            <span class="material-icons" style="font-size: 14px;">add_circle</span> Crear Preventivo
+          </button>
+          <button type="button" onclick="abrirHojaControles()" class="btn btn-secondary btn-xs" style="display: flex; align-items: center; gap: 4px;">
+            <span class="material-icons" style="font-size: 14px;">open_in_new</span> Ver Hoja de Controles
+          </button>
+        </div>
       </div>
 
       <form id="bulk-order-form" onsubmit="event.preventDefault(); submitBulkOrders();">
@@ -387,7 +392,7 @@
                   <th class="col-luces" style="padding: 8px; font-weight: 600; width: 75px;">Luces</th>
                   <th class="col-bateria" style="padding: 8px; font-weight: 600; width: 75px;">Batería</th>
                   <th class="col-alternador" style="padding: 8px; font-weight: 600; width: 75px;">Alternador</th>
-                  <th style="padding: 8px; font-weight: 600;">Otros Insumos / Notas</th>
+                  <th id="bulk-th-otros" style="padding: 8px; font-weight: 600;">Otros Insumos / Notas</th>
                 </tr>
               </thead>
               <tbody id="bulk-insumos-grid-body">
@@ -414,37 +419,47 @@
             </button>
           </div>
 
-          <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
-            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('A')" style="display: flex; align-items: center; gap: 4px; background: #e2e8f0; border-color: #cbd5e1; color: #334155;">
+          <div id="bulk-sector-filter" style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center;">
+            <span style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-right: 2px;">Sector:</span>
+            <button type="button" class="btn btn-xs bulk-sector-chip" data-sector="Todos" onclick="setBulkSectorFilter('Todos')" style="border-radius: 999px;">Todos</button>
+            <button type="button" class="btn btn-xs bulk-sector-chip" data-sector="Mecanica" onclick="setBulkSectorFilter('Mecanica')" style="border-radius: 999px;">Mecánica</button>
+            <button type="button" class="btn btn-xs bulk-sector-chip" data-sector="Electricista" onclick="setBulkSectorFilter('Electricista')" style="border-radius: 999px;">Electricista</button>
+            <button type="button" class="btn btn-xs bulk-sector-chip" data-sector="Chapista" onclick="setBulkSectorFilter('Chapista')" style="border-radius: 999px;">Chapista</button>
+            <button type="button" class="btn btn-xs bulk-sector-chip" data-sector="Gomeria" onclick="setBulkSectorFilter('Gomeria')" style="border-radius: 999px;">Gomería</button>
+            <button type="button" class="btn btn-xs bulk-sector-chip" data-sector="Elastiquero" onclick="setBulkSectorFilter('Elastiquero')" style="border-radius: 999px;">Elastiquero</button>
+          </div>
+          <div id="bulk-preventivo-buttons" style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary btn-xs bulk-preventivo-btn" data-sector="Mecanica" onclick="loadPreventivoIntoBulkTasks('A')" style="display: flex; align-items: center; gap: 4px; background: #e2e8f0; border-color: #cbd5e1; color: #334155;">
               <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo Fluidos
             </button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('RM')" style="display: flex; align-items: center; gap: 4px; background: #e0f2fe; border-color: #bae6fd; color: #0369a1;">
+            <button type="button" class="btn btn-secondary btn-xs bulk-preventivo-btn" data-sector="Mecanica" onclick="loadPreventivoIntoBulkTasks('RM')" style="display: flex; align-items: center; gap: 4px; background: #e0f2fe; border-color: #bae6fd; color: #0369a1;">
               <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo R/M
             </button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('C')" style="display: flex; align-items: center; gap: 4px; background: #fef3c7; border-color: #fde68a; color: #b45309;">
+            <button type="button" class="btn btn-secondary btn-xs bulk-preventivo-btn" data-sector="Mecanica" onclick="loadPreventivoIntoBulkTasks('C')" style="display: flex; align-items: center; gap: 4px; background: #fef3c7; border-color: #fde68a; color: #b45309;">
               <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo C
             </button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('D')" style="display: flex; align-items: center; gap: 4px; background: #f0fdf4; border-color: #bbf7d0; color: #15803d;">
+            <button type="button" class="btn btn-secondary btn-xs bulk-preventivo-btn" data-sector="Mecanica" onclick="loadPreventivoIntoBulkTasks('D')" style="display: flex; align-items: center; gap: 4px; background: #f0fdf4; border-color: #bbf7d0; color: #15803d;">
               <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo D
             </button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('HD')" title="Hco Dirección" style="display: flex; align-items: center; gap: 4px; background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8;">
+            <button type="button" class="btn btn-secondary btn-xs bulk-preventivo-btn" data-sector="Mecanica" onclick="loadPreventivoIntoBulkTasks('HD')" title="Hco Dirección" style="display: flex; align-items: center; gap: 4px; background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8;">
               <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo HD
             </button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('H')" title="Hco Equipo" style="display: flex; align-items: center; gap: 4px; background: #ecfeff; border-color: #a5f3fc; color: #0e7490;">
+            <button type="button" class="btn btn-secondary btn-xs bulk-preventivo-btn" data-sector="Mecanica" onclick="loadPreventivoIntoBulkTasks('H')" title="Hco Equipo" style="display: flex; align-items: center; gap: 4px; background: #ecfeff; border-color: #a5f3fc; color: #0e7490;">
               <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo H
             </button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('V')" title="Vigía" style="display: flex; align-items: center; gap: 4px; background: #fdf4ff; border-color: #f0abfc; color: #a21caf;">
+            <button type="button" class="btn btn-secondary btn-xs bulk-preventivo-btn" data-sector="Electricista" onclick="loadPreventivoIntoBulkTasks('V')" title="Vigía" style="display: flex; align-items: center; gap: 4px; background: #fdf4ff; border-color: #f0abfc; color: #a21caf;">
               <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo V
             </button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('L')" title="Luces" style="display: flex; align-items: center; gap: 4px; background: #fffbeb; border-color: #fde68a; color: #92400e;">
+            <button type="button" class="btn btn-secondary btn-xs bulk-preventivo-btn" data-sector="Mecanica" onclick="loadPreventivoIntoBulkTasks('L')" title="Luces" style="display: flex; align-items: center; gap: 4px; background: #fffbeb; border-color: #fde68a; color: #92400e;">
               <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo L
             </button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('B')" title="Batería" style="display: flex; align-items: center; gap: 4px; background: #fef2f2; border-color: #fecaca; color: #b91c1c;">
+            <button type="button" class="btn btn-secondary btn-xs bulk-preventivo-btn" data-sector="Electricista" onclick="loadPreventivoIntoBulkTasks('B')" title="Batería" style="display: flex; align-items: center; gap: 4px; background: #fef2f2; border-color: #fecaca; color: #b91c1c;">
               <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo B
             </button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="loadPreventivoIntoBulkTasks('AL')" title="Alternador" style="display: flex; align-items: center; gap: 4px; background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6;">
+            <button type="button" class="btn btn-secondary btn-xs bulk-preventivo-btn" data-sector="Electricista" onclick="loadPreventivoIntoBulkTasks('AL')" title="Alternador" style="display: flex; align-items: center; gap: 4px; background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6;">
               <span class="material-icons" style="font-size: 14px;">playlist_add_check</span> Preventivo AL
             </button>
+            <span id="bulk-preventivo-custom-container" style="display: contents;"></span>
             <button type="button" class="btn btn-primary btn-xs" onclick="document.getElementById('bulk-ocr-file').click()" style="display: flex; align-items: center; gap: 4px; background: #8b5cf6; border-color: #7c3aed; color: #fff; margin-left: auto;">
               <span class="material-icons" style="font-size: 14px;">photo_camera</span> Escanear Planilla (Foto)
             </button>
@@ -1481,7 +1496,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.9.4</div>
+      <div class="sidebar-version">Versión 1.10.0</div>
     </div>
   </aside>
 
@@ -1752,6 +1767,40 @@
           <button class="btn btn-secondary" id="btn-diagnosis-skip" style="padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer;">Omitir</button>
           <button class="btn btn-primary" id="btn-diagnosis-save" style="padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer;">Guardar</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREAR PREVENTIVO MODAL (Carga Masiva) -->
+  <div class="popup-modal-backdrop" id="crear-preventivo-modal">
+    <div class="modal-content" style="max-width: 420px; margin: auto; padding: 24px; border-radius: 16px; background: var(--card-bg); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: slideUp 0.3s ease-out;">
+      <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 4px;">Crear preventivo</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 18px;">Se agrega como botón permanente en Carga Masiva.</p>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label for="cp-label" style="font-weight: 600; font-size: 12px; color: var(--text-main); text-transform: uppercase;">Nombre / descripción de la tarea</label>
+        <input type="text" id="cp-label" placeholder="Ej: Control de correa de distribución" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 6px; box-sizing: border-box;">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label for="cp-sector" style="font-weight: 600; font-size: 12px; color: var(--text-main); text-transform: uppercase;">Sector</label>
+        <select id="cp-sector" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 6px; box-sizing: border-box;">
+          <option value="Mecanica">Mecánica</option>
+          <option value="Electricista">Electricista</option>
+          <option value="Chapista">Chapista</option>
+          <option value="Gomeria">Gomería</option>
+          <option value="Elastiquero">Elastiquero</option>
+        </select>
+      </div>
+
+      <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 20px; cursor: pointer;">
+        <input type="checkbox" id="cp-necesita-hoja" checked style="width: auto; margin: 0;">
+        Necesita seguimiento en la Hoja de Controles (litros / estado por camión)
+      </label>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary" onclick="closeCrearPreventivoModal()" style="padding: 10px 18px; border-radius: 8px;">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="submitCrearPreventivo()" style="padding: 10px 18px; border-radius: 8px;">Crear preventivo</button>
       </div>
     </div>
   </div>
@@ -2466,6 +2515,6 @@
     }
   </style>
 
-  <script src="app.js?v=219"></script>
+  <script src="app.js?v=220"></script>
 </body>
 </html>

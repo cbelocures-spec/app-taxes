@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '219';
+const CURRENT_APP_VERSION = '220';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -148,6 +148,8 @@ let cachedInternoOptions = [];
 let cachedAreasEdilicio = [];
 let cachedNovelties = [];
 let activeOrders = [];
+let customPreventivos = []; // [{key, label, sector, necesitaHoja}] - Crear Preventivo en Carga Masiva
+let bulkSectorFilter = 'Todos';
 // Task ids with an optimistic dashboard change (pause/resume/finish) whose PUT save is still
 // in flight. The background 2s poll (fetchOrders) can otherwise land between the optimistic
 // local update and the server actually persisting it, momentarily overwriting the just-paused
@@ -2437,6 +2439,7 @@ async function fetchCatalogs() {
     
     // Render the bulk vehicle selector list
     renderBulkVehicleSelector();
+    fetchCustomPreventivos();
 
     // Update catalog status UI now that cachedCatalogs is populated
     if (lastKnownSettings) {
@@ -10804,6 +10807,119 @@ const BULK_INSUMO_TYPES = [
 ];
 const BULK_INSUMO_LABELS = Object.fromEntries(BULK_INSUMO_TYPES.map(t => [t.key, t.label]));
 
+// --- Preventivos custom de Carga Masiva (boton "Crear Preventivo") ---
+
+async function fetchCustomPreventivos() {
+  try {
+    const res = await fetch('/api/preventivos-masiva');
+    if (!res.ok) return;
+    const data = await res.json();
+    customPreventivos = data.preventivos || [];
+    applyCustomPreventivos();
+  } catch (e) {
+    console.error('Error cargando preventivos custom:', e);
+  }
+}
+
+// Enchufa cada preventivo custom en los mismos lugares que ya usan los 10 fijos - linea de
+// tarea, orden de armado de la descripcion, boton, y (si necesita seguimiento) columna de
+// grilla + header. Se puede llamar de nuevo sin duplicar nada (los ifs de "ya existe" cortan).
+function applyCustomPreventivos() {
+  customPreventivos.forEach(p => {
+    if (!PREVENTIVO_LINES[p.key]) PREVENTIVO_LINES[p.key] = [p.label];
+    if (!PREVENTIVO_TYPE_ORDER.includes(p.key)) PREVENTIVO_TYPE_ORDER.push(p.key);
+
+    if (p.necesitaHoja && !BULK_INSUMO_TYPES.some(t => t.key === p.key)) {
+      const cls = `col-custom-${p.key}`;
+      BULK_INSUMO_TYPES.push({ key: p.key, cls, label: p.label, hoja: p.hoja });
+      BULK_INSUMO_LABELS[p.key] = p.label;
+      const otrosHeader = document.getElementById('bulk-th-otros');
+      if (otrosHeader && !document.querySelector(`.${cls}`)) {
+        otrosHeader.insertAdjacentHTML('beforebegin', `<th class="${cls}" style="padding: 8px; font-weight: 600; width: 75px;">${p.label}</th>`);
+      }
+    }
+
+    renderCustomPreventivoButton(p);
+  });
+}
+
+function renderCustomPreventivoButton(p) {
+  const container = document.getElementById('bulk-preventivo-custom-container');
+  if (!container || document.getElementById(`bulk-btn-${p.key}`)) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = `bulk-btn-${p.key}`;
+  btn.className = 'btn btn-secondary btn-xs bulk-preventivo-btn';
+  btn.dataset.sector = p.sector;
+  btn.title = p.label;
+  btn.style.cssText = 'display: flex; align-items: center; gap: 4px;';
+  // setAttribute (not the .onclick property) so syncPreventivoButtons' selector
+  // ([onclick^="loadPreventivoIntoBulkTasks"], which reads getAttribute) also picks these up
+  // to highlight when active - same as every hardcoded preventivo button.
+  btn.setAttribute('onclick', `loadPreventivoIntoBulkTasks('${p.key}')`);
+  btn.innerHTML = `<span class="material-icons" style="font-size: 14px;">playlist_add_check</span> ${p.label}`;
+  container.appendChild(btn);
+  applyBulkSectorFilterToButton(btn);
+}
+
+function applyBulkSectorFilterToButton(btn) {
+  const matches = bulkSectorFilter === 'Todos' || btn.dataset.sector === bulkSectorFilter;
+  btn.style.display = matches ? '' : 'none';
+}
+
+function setBulkSectorFilter(sector) {
+  bulkSectorFilter = sector;
+  document.querySelectorAll('.bulk-sector-chip').forEach(chip => {
+    const active = chip.dataset.sector === sector;
+    chip.style.background = active ? 'var(--primary)' : '';
+    chip.style.color = active ? '#fff' : '';
+    chip.style.borderColor = active ? 'var(--primary)' : '';
+  });
+  document.querySelectorAll('.bulk-preventivo-btn').forEach(btn => applyBulkSectorFilterToButton(btn));
+}
+
+function openCrearPreventivoModal() {
+  document.getElementById('cp-label').value = '';
+  document.getElementById('cp-sector').value = 'Mecanica';
+  document.getElementById('cp-necesita-hoja').checked = true;
+  document.getElementById('crear-preventivo-modal').classList.add('open');
+}
+
+function closeCrearPreventivoModal() {
+  document.getElementById('crear-preventivo-modal').classList.remove('open');
+}
+
+async function submitCrearPreventivo() {
+  const label = document.getElementById('cp-label').value.trim();
+  const sector = document.getElementById('cp-sector').value;
+  const necesitaHoja = document.getElementById('cp-necesita-hoja').checked;
+  if (!label) {
+    return showToast('Ingresá un nombre para el preventivo.', 'danger');
+  }
+  try {
+    const res = await fetch('/api/preventivos-masiva', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label, sector, necesitaHoja })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Error al crear el preventivo');
+    }
+    const data = await res.json();
+    customPreventivos.push(data.preventivo);
+    applyCustomPreventivos();
+    // Fuerza a reconstruir las filas ya armadas de la grilla para que sumen la columna nueva.
+    const tbody = document.getElementById('bulk-insumos-grid-body');
+    if (tbody) tbody.innerHTML = '';
+    updateBulkInsumosGrid();
+    closeCrearPreventivoModal();
+    showToast(`Preventivo "${data.preventivo.label}" creado.`, 'success');
+  } catch (e) {
+    showToast(e.message, 'danger');
+  }
+}
+
 function updateBulkInsumosGrid() {
   const container = document.getElementById('bulk-insumos-grid-container');
   const tbody = document.getElementById('bulk-insumos-grid-body');
@@ -10817,11 +10933,6 @@ function updateBulkInsumosGrid() {
   const isCActive  = activePreventivoTypes.has('C');
   const isDActive  = activePreventivoTypes.has('D');
   const isHDActive = activePreventivoTypes.has('HD');
-  const isHActive  = activePreventivoTypes.has('H');
-  const isVActive  = activePreventivoTypes.has('V');
-  const isLActive  = activePreventivoTypes.has('L');
-  const isBActive  = activePreventivoTypes.has('B');
-  const isALActive = activePreventivoTypes.has('AL');
   const isAnyActive = activePreventivoTypes.size > 0;
 
   if (checkboxes.length === 0 || !isAnyActive) {
@@ -10872,28 +10983,23 @@ function updateBulkInsumosGrid() {
     }
   });
 
-  // Show/hide columns based on active preventivo types - one button per control, same as
-  // the original 4 (Fluidos/R-M/C/D).
-  const showRefrig     = isAActive || isRMActive;
-  const showAcMotor    = isAActive || isRMActive;
-  const showAcCaja     = isAActive || isCActive;
-  const showAcDif      = isAActive || isDActive;
-  const showHcoDir     = isAActive || isHDActive;
-  const showHcoEquipo  = isHActive;
-  const showVigia      = isVActive;
-  const showLuces      = isLActive;
-  const showBateria    = isBActive;
-  const showAlternador = isALActive;
-  document.querySelectorAll('.col-hco-equipo').forEach(el  => el.style.display = showHcoEquipo  ? '' : 'none');
-  document.querySelectorAll('.col-vigia').forEach(el       => el.style.display = showVigia      ? '' : 'none');
-  document.querySelectorAll('.col-luces').forEach(el       => el.style.display = showLuces      ? '' : 'none');
-  document.querySelectorAll('.col-bateria').forEach(el     => el.style.display = showBateria    ? '' : 'none');
-  document.querySelectorAll('.col-alternador').forEach(el  => el.style.display = showAlternador ? '' : 'none');
-  document.querySelectorAll('.col-refrig').forEach(el   => el.style.display = showRefrig  ? '' : 'none');
-  document.querySelectorAll('.col-ac-motor').forEach(el => el.style.display = showAcMotor ? '' : 'none');
-  document.querySelectorAll('.col-ac-caja').forEach(el  => el.style.display = showAcCaja  ? '' : 'none');
-  document.querySelectorAll('.col-ac-dif').forEach(el   => el.style.display = showAcDif   ? '' : 'none');
-  document.querySelectorAll('.col-hco-dir').forEach(el  => el.style.display = showHcoDir  ? '' : 'none');
+  // Show/hide columns based on active preventivo types. The first 5 controls have a
+  // "master" button (Fluidos/A) that shows them alongside their own dedicated button; every
+  // other control - including every preventivo custom created via "Crear Preventivo" - has
+  // no grouping, its column just follows its own button directly.
+  const GROUPED_SHOW = {
+    refrigerante: isAActive || isRMActive,
+    aceite_motor: isAActive || isRMActive,
+    grasa_caja: isAActive || isCActive,
+    grasa_diferencial: isAActive || isDActive,
+    hco_direccion: isAActive || isHDActive
+  };
+  BULK_INSUMO_TYPES.forEach(t => {
+    const show = Object.prototype.hasOwnProperty.call(GROUPED_SHOW, t.key)
+      ? GROUPED_SHOW[t.key]
+      : activePreventivoTypes.has(t.key);
+    document.querySelectorAll(`.${t.cls}`).forEach(el => el.style.display = show ? '' : 'none');
+  });
 }
 
 function loadPreventivoIntoBulkTasks(type) {

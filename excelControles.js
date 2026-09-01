@@ -127,11 +127,14 @@ function asegurarTodasLasFilas(sheet, todosInternos) {
 }
 
 // registros: [{ interno, modelo, patente, controles: [{ tipo, valor }] }]
-async function actualizarExcelControles({ fecha, responsable, registros, todosInternos }) {
+// tiposHojas (opcional): tipo -> nombre de hoja, incluye los preventivos custom que el
+// usuario haya creado con seguimiento en Sheets, ademas de los 10 fijos.
+async function actualizarExcelControles({ fecha, responsable, registros, todosInternos, tiposHojas }) {
   if (!Array.isArray(registros) || registros.length === 0) {
     return { path: EXCEL_PATH, hojasActualizadas: [] };
   }
 
+  const mapaHojas = { ...HOJA_POR_TIPO, ...(tiposHojas || {}) };
   const workbook = await cargarOCrearWorkbook();
   const tiposPresentes = new Set();
   registros.forEach(r => (r.controles || []).forEach(c => tiposPresentes.add(c.tipo)));
@@ -139,7 +142,7 @@ async function actualizarExcelControles({ fecha, responsable, registros, todosIn
   const hojasActualizadas = [];
 
   for (const tipo of tiposPresentes) {
-    const nombreHoja = HOJA_POR_TIPO[tipo];
+    const nombreHoja = mapaHojas[tipo];
     if (!nombreHoja) continue;
     const sheet = obtenerOCrearHoja(workbook, nombreHoja);
     asegurarTodasLasFilas(sheet, todosInternos);
