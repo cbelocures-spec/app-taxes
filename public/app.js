@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '223';
+const CURRENT_APP_VERSION = '224';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -384,6 +384,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Setup Event Listeners
   document.getElementById('settings-form').addEventListener('submit', saveSettings);
+
+  // Elastiquero: recalcula el resumen de horas por empleado en vivo (delegado en el
+  // contenedor, asi cubre filas/internos agregados dinamicamente sin volver a enganchar nada).
+  const elastiqueroContainer = document.getElementById('elastiquero-internos-container');
+  if (elastiqueroContainer) {
+    elastiqueroContainer.addEventListener('input', updateElastiqueroHorasResumen);
+    elastiqueroContainer.addEventListener('change', updateElastiqueroHorasResumen);
+  }
 
   // Dynamic change listener for Centro de Costo (task-cc) and Empleado conflict checking
   const tasksContainer = document.getElementById('modal-tasks-list');
@@ -7803,6 +7811,42 @@ function removeElastiqueroEmpleadoRow(btn) {
     return;
   }
   row.remove();
+  updateElastiqueroHorasResumen();
+}
+
+// Suma en vivo, para toda la pantalla (todos los internos cargados, no solo uno), las horas
+// por empleado - asi cada uno se fija si le faltan horas de la jornada (minimo 7hs, 4hs los
+// sabados) antes de mandar. Es solo un aviso visual, no bloquea el envio.
+function updateElastiqueroHorasResumen() {
+  const resumenEl = document.getElementById('elastiquero-horas-resumen');
+  if (!resumenEl) return;
+
+  const totales = new Map(); // empleado (value del select) -> { label, horas }
+  document.querySelectorAll('#elastiquero-internos-container .elastiquero-empleado-row').forEach(row => {
+    const select = row.querySelector('.elastiquero-empleado-select');
+    const empleado = select ? select.value : '';
+    if (!empleado) return;
+    const horasInput = row.querySelector('.elastiquero-horas-input');
+    const horas = (horasInput && horasInput.value.trim()) ? parseFloat(horasInput.value.replace(',', '.')) || 0 : 0;
+    const label = (select.selectedOptions && select.selectedOptions[0]) ? select.selectedOptions[0].text : empleado;
+    const entry = totales.get(empleado) || { label, horas: 0 };
+    entry.horas += horas;
+    totales.set(empleado, entry);
+  });
+
+  if (totales.size === 0) {
+    resumenEl.innerHTML = '';
+    return;
+  }
+
+  const minimo = (new Date().getDay() === 6) ? 4 : 7; // sabado: 4hs, resto de la semana: 7hs
+  resumenEl.innerHTML = Array.from(totales.values()).map(({ label, horas }) => {
+    const completo = horas >= minimo;
+    const bg = completo ? '#dff5e6' : '#fde3e3';
+    const fg = completo ? '#1e7d43' : '#b3271e';
+    const horasTxt = Number.isInteger(horas) ? horas : horas.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+    return `<span style="display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; background:${bg}; color:${fg}; font-size:12px; font-weight:700; white-space:nowrap;" title="${label}: ${horasTxt}hs cargadas (minimo ${minimo}hs)">${label}: ${horasTxt}h</span>`;
+  }).join('');
 }
 
 function addElastiqueroInternoBlock() {
@@ -7874,6 +7918,7 @@ function addElastiqueroInternoBlock() {
 function removeElastiqueroInternoBlock(btn) {
   const block = btn.closest('.elastiquero-interno-block');
   if (block) block.remove();
+  updateElastiqueroHorasResumen();
 }
 
 // Same match used at submit time: a real Taller order (not Herrería/Edilicio), still Fuera de
@@ -8094,6 +8139,7 @@ async function submitElastiqueroOrders() {
       container.innerHTML = '';
       addElastiqueroInternoBlock();
     }
+    updateElastiqueroHorasResumen();
     fetchOrders();
     switchView('orders');
   } catch (err) {
