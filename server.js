@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const selfsigned = require('selfsigned');
 const db = require('./database');
 const syncWorker = require('./syncWorker');
+const excelControles = require('./excelControles');
 const worker = syncWorker;
 let localtunnel = null;
 try { localtunnel = require('localtunnel'); } catch(e) {}
@@ -56,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '214';
+const APP_VERSION = '215';
 
 // Middleware
 app.use(cors());
@@ -948,9 +949,9 @@ app.post('/api/orders', (req, res) => {
   }
 });
 
-app.post('/api/orders/bulk', (req, res) => {
+app.post('/api/orders/bulk', async (req, res) => {
   try {
-    const { orders } = req.body;
+    const { orders, controlesInsumos } = req.body;
     if (!Array.isArray(orders) || orders.length === 0) {
       return res.status(400).json({ error: "Se requiere un array 'orders' no vacío." });
     }
@@ -1036,8 +1037,22 @@ app.post('/api/orders/bulk', (req, res) => {
       existingOrdersForDedupe.push(newOrder);
     }
 
+    // Log this masiva's litros/estado readings into the accumulating controles workbook
+    // (one sheet per control type) before responding - keeps the response honest about
+    // whether the excel actually has this batch's column, instead of a background job that
+    // could still be mid-write if the user immediately re-downloads.
+    let controlesExcelUrl = null;
+    if (controlesInsumos && Array.isArray(controlesInsumos.registros) && controlesInsumos.registros.length > 0) {
+      try {
+        await excelControles.actualizarExcelControles(controlesInsumos);
+        controlesExcelUrl = '/api/controles/excel';
+      } catch (excelErr) {
+        console.error('[Bulk] Error actualizando excel de controles:', excelErr.message);
+      }
+    }
+
     // Respond INSTANTLY (sub-100ms) to the user UI
-    res.status(201).json({ success: true, count: createdOrders.length, orders: createdOrders });
+    res.status(201).json({ success: true, count: createdOrders.length, orders: createdOrders, controlesExcelUrl });
 
     // Run Google Sheets webhooks asynchronously in background
     setImmediate(() => {
@@ -1057,6 +1072,16 @@ app.post('/api/orders/bulk', (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// Downloads the accumulating Carga Masiva controles workbook (Grasa Caja, Grasa Diferencial,
+// Ctrol Refrigerante, Ctrol Aceite Motor, Hco Direccion/Equipo, Vigia, Luces, Bateria,
+// Alternador) - the same file every masiva appends a column to, not a per-masiva snapshot.
+app.get('/api/controles/excel', (req, res) => {
+  if (!excelControles.existeExcelControles()) {
+    return res.status(404).json({ error: 'Todavía no se generó ningún control. Hacé una Carga Masiva primero.' });
+  }
+  res.download(excelControles.EXCEL_PATH, 'Hoja_de_Controles.xlsx');
 });
 
 // Legacy tasks created before the "Fecha Tarea" field existed have no stored date. If one gets

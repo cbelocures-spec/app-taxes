@@ -374,11 +374,16 @@
               <thead>
                 <tr style="background: #f1f5f9; border-bottom: 2px solid var(--border-color);">
                   <th style="padding: 8px; font-weight: 600;">Interno</th>
-                  <th class="col-refrig" style="padding: 8px; font-weight: 600; width: 75px;">Refrig. (L)</th>
-                  <th class="col-ac-motor" style="padding: 8px; font-weight: 600; width: 75px;">Ac. Motor (L)</th>
-                  <th class="col-ac-caja" style="padding: 8px; font-weight: 600; width: 75px;">Ac. Caja (L)</th>
-                  <th class="col-ac-dif" style="padding: 8px; font-weight: 600; width: 75px;">Ac. Dif. (L)</th>
-                  <th class="col-hco-dir" style="padding: 8px; font-weight: 600; width: 75px;">Hco. Dir. (L)</th>
+                  <th class="col-refrig" style="padding: 8px; font-weight: 600; width: 75px;">Refrig.</th>
+                  <th class="col-ac-motor" style="padding: 8px; font-weight: 600; width: 75px;">Ac. Motor</th>
+                  <th class="col-ac-caja" style="padding: 8px; font-weight: 600; width: 75px;">Ac. Caja</th>
+                  <th class="col-ac-dif" style="padding: 8px; font-weight: 600; width: 75px;">Ac. Dif.</th>
+                  <th class="col-hco-dir" style="padding: 8px; font-weight: 600; width: 75px;">Hco. Dir.</th>
+                  <th class="col-hco-equipo" style="padding: 8px; font-weight: 600; width: 75px;">Hco. Equipo</th>
+                  <th class="col-vigia" style="padding: 8px; font-weight: 600; width: 75px;">Vigía</th>
+                  <th class="col-luces" style="padding: 8px; font-weight: 600; width: 75px;">Luces</th>
+                  <th class="col-bateria" style="padding: 8px; font-weight: 600; width: 75px;">Batería</th>
+                  <th class="col-alternador" style="padding: 8px; font-weight: 600; width: 75px;">Alternador</th>
                   <th style="padding: 8px; font-weight: 600;">Otros Insumos / Notas</th>
                 </tr>
               </thead>
@@ -386,6 +391,11 @@
                 <!-- Dynamic rows populated when checking vehicles -->
               </tbody>
             </table>
+            <datalist id="bulk-insumo-status-opts">
+              <option value="Sucio"></option>
+              <option value="Perdida"></option>
+              <option value="Hco"></option>
+            </datalist>
           </div>
         </div>
 
@@ -1442,7 +1452,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.8.8</div>
+      <div class="sidebar-version">Versión 1.9.0</div>
     </div>
   </aside>
 
@@ -2427,6 +2437,6 @@
     }
   </style>
 
-  <script src="app.js?v=214"></script>
+  <script src="app.js?v=215"></script>
 </body>
 </html>

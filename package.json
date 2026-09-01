@@ -1,6 +1,6 @@
 {
   "name": "app-taxes-taller",
-  "version": "1.8.8",
+  "version": "1.9.0",
   "description": "Aplicación móvil de Taller con sincronización automática en segundo plano hacia taxes.com.ar",
   "main": "server.js",
   "scripts": {
@@ -11,6 +11,7 @@
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
     "express": "^4.19.2",
     "localtunnel": "^2.0.2",
     "puppeteer": "^22.10.0",

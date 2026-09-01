@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '214';
+const CURRENT_APP_VERSION = '215';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7182,6 +7182,18 @@ async function submitBulkOrders() {
 
   const ordersList = [];
 
+  // Which control columns are actually showing right now (tied to the active preventivo
+  // type buttons) - only those get logged for the excel/planilla, and only those default a
+  // blank cell to "OK" for a selected vehicle. A control that wasn't part of this masiva at
+  // all shouldn't get an "OK" it was never actually checked for.
+  const activeInsumoKeys = BULK_INSUMO_TYPES
+    .filter(t => {
+      const el = document.querySelector(`.${t.cls}`);
+      return el && el.style.display !== 'none';
+    })
+    .map(t => t.key);
+  const controlesInsumosPayload = [];
+
   for (let i = 0; i < selectedChks.length; i++) {
     const chk = selectedChks[i];
     const rodadoId = String(chk.value);
@@ -7193,23 +7205,41 @@ async function submitBulkOrders() {
     }
 
     const interno = String(rodadoOpt.interno || '').trim();
-    
-    // Read insumos for this specific vehicle
+
+    // Read insumos for this specific vehicle - each control's value is either a number
+    // (litros), free text (e.g. "Sucio", "Perdida", "Hco", or a longer note), or blank
+    // (controlado, sin novedad - OK). Blanks aren't sent; the server fills them in as "OK"
+    // for every control this vehicle was checked against.
     const row = document.getElementById(`bulk-row-${interno}`);
     const insumosParts = [];
+    const controlesVehiculo = [];
     if (row) {
       const inputs = row.querySelectorAll('.bulk-insumo-val');
       inputs.forEach(input => {
         const insumoType = input.dataset.insumo;
         const val = input.value.trim();
-        if (val) {
-          if (insumoType === 'refrigerante') insumosParts.push(`Refrigerante: ${val}L`);
-          else if (insumoType === 'aceite_motor') insumosParts.push(`Aceite Motor: ${val}L`);
-          else if (insumoType === 'grasa_caja') insumosParts.push(`Grasa Caja: ${val}L`);
-          else if (insumoType === 'grasa_diferencial') insumosParts.push(`Grasa Diferencial: ${val}L`);
-          else if (insumoType === 'hco_direccion') insumosParts.push(`Hco Dirección: ${val}L`);
-          else if (insumoType === 'otros') insumosParts.push(`Otros: ${val}`);
+        if (!val) return;
+        if (insumoType === 'otros') {
+          insumosParts.push(`Otros: ${val}`);
+          return;
         }
+        const label = BULK_INSUMO_LABELS[insumoType];
+        if (label) {
+          insumosParts.push(`${label}: ${val}`);
+          controlesVehiculo.push({ tipo: insumoType, valor: val });
+        }
+      });
+    }
+    if (activeInsumoKeys.length > 0) {
+      const covered = new Set(controlesVehiculo.map(c => c.tipo));
+      activeInsumoKeys.forEach(key => {
+        if (!covered.has(key)) controlesVehiculo.push({ tipo: key, valor: 'OK' });
+      });
+      controlesInsumosPayload.push({
+        interno,
+        modelo: rodadoOpt.modelo || '',
+        patente: rodadoOpt.patente || '',
+        controles: controlesVehiculo
       });
     }
 
@@ -7245,20 +7275,34 @@ async function submitBulkOrders() {
 
   try {
     const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const firstEmpOpt = cachedCatalogs.empleados.find(e => e.value === tasksPayload[0].empleado);
+    const responsableExcel = firstEmpOpt ? firstEmpOpt.label : (tasksPayload[0].empleado || '');
+    const body = { orders: ordersList };
+    if (controlesInsumosPayload.length > 0) {
+      body.controlesInsumos = {
+        fecha: fechaEntrega,
+        responsable: responsableExcel,
+        registros: controlesInsumosPayload
+      };
+    }
     const res = await fetch('/api/orders/bulk', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-user-username': currentUsername
       },
-      body: JSON.stringify({ orders: ordersList })
+      body: JSON.stringify(body)
     });
 
     if (res.ok) {
+      const data = await res.json().catch(() => ({}));
       showToast(`Éxito: Se crearon ${ordersList.length} órdenes correctamente.`, "success");
+      if (data && data.controlesExcelUrl) {
+        window.open(data.controlesExcelUrl, '_blank');
+      }
       toggleAllBulkVehicles(false);
       document.getElementById('bulk-incidente').value = '';
-      
+
       // Clear tasks and add one default
       const container = document.getElementById('bulk-tasks-container');
       if (container) {
@@ -10722,6 +10766,25 @@ function syncPreventivoButtons() {
   });
 }
 
+// Every control tracked by Carga Masiva - key matches data-insumo, cls matches the <th>/<td>
+// class used for show/hide, label is only used to build the datalist-less placeholder. One
+// shared field per control: type a number (litros) or pick Sucio/Perdida/Hco from the list,
+// free text also allowed (e.g. "Sucio - pierde por el sensor"); left blank means "controlado,
+// sin novedad" (OK) - nothing needs to be typed for the common case.
+const BULK_INSUMO_TYPES = [
+  { key: 'refrigerante', cls: 'col-refrig', label: 'Refrigerante', hoja: 'Ctrol Refrigerante' },
+  { key: 'aceite_motor', cls: 'col-ac-motor', label: 'Aceite Motor', hoja: 'Ctrol Aceite Motor' },
+  { key: 'grasa_caja', cls: 'col-ac-caja', label: 'Grasa Caja', hoja: 'Grasa Caja' },
+  { key: 'grasa_diferencial', cls: 'col-ac-dif', label: 'Grasa Diferencial', hoja: 'Grasa Diferencial' },
+  { key: 'hco_direccion', cls: 'col-hco-dir', label: 'Hco Dirección', hoja: 'Hco Direccion' },
+  { key: 'hco_equipo', cls: 'col-hco-equipo', label: 'Hco Equipo', hoja: 'Hco Equipo' },
+  { key: 'vigia', cls: 'col-vigia', label: 'Vigía', hoja: 'Vigia' },
+  { key: 'luces', cls: 'col-luces', label: 'Luces', hoja: 'Luces' },
+  { key: 'bateria', cls: 'col-bateria', label: 'Batería', hoja: 'Bateria' },
+  { key: 'alternador', cls: 'col-alternador', label: 'Alternador', hoja: 'Alternador' }
+];
+const BULK_INSUMO_LABELS = Object.fromEntries(BULK_INSUMO_TYPES.map(t => [t.key, t.label]));
+
 function updateBulkInsumosGrid() {
   const container = document.getElementById('bulk-insumos-grid-container');
   const tbody = document.getElementById('bulk-insumos-grid-body');
@@ -10772,25 +10835,27 @@ function updateBulkInsumosGrid() {
       row = document.createElement('tr');
       row.id = `bulk-row-${interno}`;
       row.style.borderBottom = '1px solid var(--border-color)';
+      const insumoCells = BULK_INSUMO_TYPES.map(t => `
+        <td class="${t.cls}" style="padding: 4px;"><input type="text" list="bulk-insumo-status-opts" class="bulk-insumo-val" data-interno="${interno}" data-insumo="${t.key}" placeholder="Litros o estado" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;"></td>
+      `).join('');
       row.innerHTML = `
         <td style="padding: 8px; font-weight: 600; color: var(--text-main); font-size: 13px;">${rodado.label}</td>
-        <td class="col-refrig" style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="refrigerante" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
-        <td class="col-ac-motor" style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="aceite_motor" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
-        <td class="col-ac-caja" style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="grasa_caja" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
-        <td class="col-ac-dif" style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="grasa_diferencial" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
-        <td class="col-hco-dir" style="padding: 4px;"><input type="number" step="0.1" class="bulk-insumo-val" data-interno="${interno}" data-insumo="hco_direccion" style="width: 100%; padding: 4px; box-sizing: border-box; text-align: right; border: 1px solid var(--border-color); border-radius: 6px;" min="0"></td>
+        ${insumoCells}
         <td style="padding: 4px;"><input type="text" class="bulk-insumo-val" data-interno="${interno}" data-insumo="otros" placeholder="Filtros, repuestos..." style="width: 100%; padding: 4px; box-sizing: border-box; border: 1px solid var(--border-color); border-radius: 6px;"></td>
       `;
       tbody.appendChild(row);
     }
   });
 
-  // Show/hide columns based on active preventivo types
+  // Show/hide columns based on active preventivo types - the 5 new controls (Hco Equipo,
+  // Vigía, Luces, Batería, Alternador) have no preventivo-type toggle of their own yet, so
+  // they just follow whether the grid is showing at all.
   const showRefrig   = isAActive || isRMActive;
   const showAcMotor  = isAActive || isRMActive;
   const showAcCaja   = isAActive || isCActive;
   const showAcDif    = isAActive || isDActive;
   const showHcoDir   = isAActive;
+  document.querySelectorAll('.col-hco-equipo, .col-vigia, .col-luces, .col-bateria, .col-alternador').forEach(el => el.style.display = '');
   document.querySelectorAll('.col-refrig').forEach(el   => el.style.display = showRefrig  ? '' : 'none');
   document.querySelectorAll('.col-ac-motor').forEach(el => el.style.display = showAcMotor ? '' : 'none');
   document.querySelectorAll('.col-ac-caja').forEach(el  => el.style.display = showAcCaja  ? '' : 'none');

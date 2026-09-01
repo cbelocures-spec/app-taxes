@@ -1379,3 +1379,7 @@ class LocalDB {
 module.exports = new LocalDB();
 module.exports.getTurnoForDate = getTurnoForDate;
 module.exports.genUniqueId = genUniqueId;
+// Exposed so other modules that need to persist alongside db.json (e.g. the Carga Masiva
+// controles excel) write to the same durable volume instead of the bundled code directory,
+// which gets replaced wholesale on every deploy.
+module.exports.DB_PATH = DB_PATH;

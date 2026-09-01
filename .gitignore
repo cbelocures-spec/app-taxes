@@ -14,3 +14,4 @@ db_backup*.json
 db_live*.json
 db_recovered.json
 db.json.tmp_*
+Hoja_de_Controles.xlsx
