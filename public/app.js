@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '222';
+const CURRENT_APP_VERSION = '223';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7760,6 +7760,40 @@ function addElastiqueroEmpleadoRow(btn) {
   }
 }
 
+// Sets a <select> that convertSelectToSearchable already wrapped to a given value, keeping
+// the custom trigger label and the underlying native select (and its 'change' listeners) in
+// sync - same steps the widget's own option-click handler does internally.
+function setSearchableSelectValue(selectEl, value) {
+  if (!selectEl) return;
+  selectEl.value = value;
+  selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+  const wrapper = selectEl.closest('.searchable-select-container');
+  const labelSpan = wrapper ? wrapper.querySelector('.trigger-label') : null;
+  const matchedOpt = Array.from(selectEl.options).find(o => o.value === value);
+  if (labelSpan && matchedOpt) labelSpan.textContent = matchedOpt.text;
+}
+
+// Accesos rapidos para los empleados de Elastiquero que mas se repiten - llena la primera
+// fila vacia si hay una, o agrega una fila nueva ya con el empleado puesto.
+function quickAddElastiqueroEmpleado(btn, empleadoValue) {
+  const block = btn.closest('.elastiquero-interno-block');
+  if (!block) return;
+  const rows = Array.from(block.querySelectorAll('.elastiquero-empleado-row'));
+  let targetRow = rows.find(r => {
+    const sel = r.querySelector('.elastiquero-empleado-select');
+    return sel && !sel.value;
+  });
+  if (!targetRow) {
+    const addBtn = block.querySelector('.elastiquero-empleado-rows-container').nextElementSibling;
+    addElastiqueroEmpleadoRow(addBtn);
+    rows.length = 0;
+    rows.push(...block.querySelectorAll('.elastiquero-empleado-row'));
+    targetRow = rows[rows.length - 1];
+  }
+  const select = targetRow.querySelector('.elastiquero-empleado-select');
+  setSearchableSelectValue(select, empleadoValue);
+}
+
 function removeElastiqueroEmpleadoRow(btn) {
   const row = btn.closest('.elastiquero-empleado-row');
   if (!row) return;
@@ -7815,6 +7849,11 @@ function addElastiqueroInternoBlock() {
     </button>
 
     <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:16px 0 0; border-top:1px solid var(--border-color); padding-top:12px;">Empleados y horas</label>
+    <div style="display:flex; gap:6px; margin:6px 0 0; flex-wrap:wrap;">
+      <button type="button" class="btn btn-secondary btn-xs" onclick="quickAddElastiqueroEmpleado(this, '528')" style="border-radius:999px;">+ Javier</button>
+      <button type="button" class="btn btn-secondary btn-xs" onclick="quickAddElastiqueroEmpleado(this, '598')" style="border-radius:999px;">+ Cristian</button>
+      <button type="button" class="btn btn-secondary btn-xs" onclick="quickAddElastiqueroEmpleado(this, 'CALOMINO DARIO')" style="border-radius:999px;">+ Darío</button>
+    </div>
     <div class="elastiquero-empleado-rows-container"></div>
     <button type="button" class="btn btn-secondary btn-xs" onclick="addElastiqueroEmpleadoRow(this)" style="margin-top:6px; display:flex; align-items:center; gap:4px;">
       <span class="material-icons" style="font-size:14px;">add</span> Agregar empleado
