@@ -119,23 +119,11 @@ function estiloParaValor(valorCrudo, tipo) {
 
 // Precarga todos los internos reales de la flota como filas (ordenadas), aunque no tengan
 // dato en esta masiva puntual - asi la hoja siempre tiene el listado completo desde el
-// principio, igual que la planilla vieja, en vez de ir apareciendo de a uno.
-function asegurarTodasLasFilas(sheet, todosInternos) {
-  if (!todosInternos || todosInternos.length === 0) return;
-  var ordenados = todosInternos.slice().sort(function(a, b) {
-    return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0);
-  });
-  for (var i = 0; i < ordenados.length; i++) {
-    encontrarOInsertarFilaInterno(sheet, ordenados[i]);
-  }
-}
-
-// Version rapida de asegurarTodasLasFilas para la precarga inicial: en vez de una llamada a
-// Sheets por interno (~1000 llamadas totales, demasiado lento para el limite de ejecucion de
-// Apps Script), lee la columna A una sola vez y escribe todos los faltantes juntos con un
-// solo setValues(). Los que ya existen (de un intento anterior que no llego a terminar)
-// quedan como estaban - son un prefijo ya ordenado, asi que agregar el resto ordenado al
-// final mantiene todo bien ordenado igual.
+// principio, igual que la planilla vieja, en vez de ir apareciendo de a uno. Lee la columna A
+// una sola vez y escribe todos los faltantes juntos con un solo setValues() (en vez de una
+// llamada a Sheets por interno, demasiado lento para el limite de ejecucion de Apps Script).
+// Los que ya existen quedan como estaban - son un prefijo ya ordenado, asi que agregar el
+// resto ordenado al final mantiene todo bien ordenado igual.
 function precargarFilasRapido(sheet, ordenados) {
   if (!ordenados || ordenados.length === 0) return;
   var lastRow = sheet.getLastRow();
@@ -186,12 +174,16 @@ function actualizarControlesInsumos(fecha, responsable, registros, todosInternos
     }
   }
 
+  var ordenados = (todosInternos || []).slice().sort(function(a, b) {
+    return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0);
+  });
+
   var hojasActualizadas = [];
   for (var tipo in tiposPresentes) {
     var nombreHoja = HOJA_POR_TIPO[tipo];
     if (!nombreHoja) continue;
     var sheet = obtenerOCrearHoja(ss, nombreHoja);
-    asegurarTodasLasFilas(sheet, todosInternos);
+    precargarFilasRapido(sheet, ordenados);
     var col = proximaColumnaLibre(sheet);
 
     sheet.getRange(HEADER_ROW, col).setValue(responsable || '').setFontWeight('bold');
