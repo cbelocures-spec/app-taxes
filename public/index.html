@@ -558,7 +558,6 @@
     <section id="view-elastiquero" class="app-view">
       <div class="view-header">
         <h2>Elastiquero</h2>
-        <div id="elastiquero-horas-resumen" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;"></div>
       </div>
 
       <div id="elastiquero-internos-container">
@@ -568,6 +567,8 @@
       <button type="button" class="btn btn-secondary btn-block" onclick="addElastiqueroInternoBlock()" style="display:flex; align-items:center; justify-content:center; gap:6px; margin: 4px 0 20px;">
         <span class="material-icons" style="font-size:18px;">add</span> Agregar Interno
       </button>
+
+      <div id="elastiquero-horas-resumen" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:14px;"></div>
 
       <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitElastiqueroOrders()" style="margin-bottom: 30px;">
         <span class="material-icons">send</span> Generar Órdenes
@@ -1498,7 +1499,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.10.4</div>
+      <div class="sidebar-version">Versión 1.10.5</div>
     </div>
   </aside>
 
@@ -2519,6 +2520,6 @@
     }
   </style>
 
-  <script src="app.js?v=224"></script>
+  <script src="app.js?v=225"></script>
 </body>
 </html>
