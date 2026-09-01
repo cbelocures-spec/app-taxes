@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '218';
+const CURRENT_APP_VERSION = '219';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -10763,13 +10763,14 @@ const PREVENTIVO_LINES = {
   'RM': ['Ctrol Refrigerante', 'Ctrol Aceite Motor'],
   'C':  ['Ctrol Grasa Caja'],
   'D':  ['Ctrol Grasa Diferencial'],
+  'HD': ['Ctrol Hco Direccion'],
   'H':  ['Ctrol Hco Equipo'],
   'V':  ['Ctrol Vigía'],
   'L':  ['Ctrol Luces'],
   'B':  ['Ctrol Batería'],
   'AL': ['Ctrol Alternador']
 };
-const PREVENTIVO_TYPE_ORDER = ['A', 'RM', 'C', 'D', 'H', 'V', 'L', 'B', 'AL'];
+const PREVENTIVO_TYPE_ORDER = ['A', 'RM', 'C', 'D', 'HD', 'H', 'V', 'L', 'B', 'AL'];
 
 // Sync button visual state to activePreventivoTypes
 function syncPreventivoButtons() {
@@ -10815,6 +10816,7 @@ function updateBulkInsumosGrid() {
   const isRMActive = activePreventivoTypes.has('RM');
   const isCActive  = activePreventivoTypes.has('C');
   const isDActive  = activePreventivoTypes.has('D');
+  const isHDActive = activePreventivoTypes.has('HD');
   const isHActive  = activePreventivoTypes.has('H');
   const isVActive  = activePreventivoTypes.has('V');
   const isLActive  = activePreventivoTypes.has('L');
@@ -10876,7 +10878,7 @@ function updateBulkInsumosGrid() {
   const showAcMotor    = isAActive || isRMActive;
   const showAcCaja     = isAActive || isCActive;
   const showAcDif      = isAActive || isDActive;
-  const showHcoDir     = isAActive;
+  const showHcoDir     = isAActive || isHDActive;
   const showHcoEquipo  = isHActive;
   const showVigia      = isVActive;
   const showLuces      = isLActive;
