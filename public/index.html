@@ -327,9 +327,9 @@
     <section id="view-bulk" class="app-view">
       <div class="view-header" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
         <h2>Carga Masiva</h2>
-        <a href="/api/controles/excel" target="_blank" class="btn btn-secondary btn-xs" style="display: flex; align-items: center; gap: 4px; text-decoration: none;">
-          <span class="material-icons" style="font-size: 14px;">download</span> Descargar Hoja de Controles
-        </a>
+        <button type="button" onclick="abrirHojaControles()" class="btn btn-secondary btn-xs" style="display: flex; align-items: center; gap: 4px;">
+          <span class="material-icons" style="font-size: 14px;">open_in_new</span> Ver Hoja de Controles
+        </button>
       </div>
 
       <form id="bulk-order-form" onsubmit="event.preventDefault(); submitBulkOrders();">
@@ -609,6 +609,14 @@
         <div class="form-group">
           <label for="set-partetaller-script-url">URL de Script de Parte Taller (Google Sheet)</label>
           <input type="url" id="set-partetaller-script-url" placeholder="https://script.google.com/macros/s/.../exec" style="width: 100%;">
+        </div>
+        <div class="form-group">
+          <label for="set-controles-masiva-script-url">URL de Script de Controles de Carga Masiva (Google Sheet)</label>
+          <input type="url" id="set-controles-masiva-script-url" placeholder="https://script.google.com/macros/s/.../exec" style="width: 100%;">
+        </div>
+        <div class="form-group">
+          <label for="set-controles-masiva-sheet-url">Link de la Hoja de Controles de Carga Masiva (para abrirla desde la app)</label>
+          <input type="url" id="set-controles-masiva-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/.../edit" style="width: 100%;">
         </div>
         <div class="form-group">
           <label for="set-gemini-api-key">Clave de API de Google Gemini</label>
@@ -1470,7 +1478,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.9.2</div>
+      <div class="sidebar-version">Versión 1.9.3</div>
     </div>
   </aside>
 
@@ -2455,6 +2463,6 @@
     }
   </style>
 
-  <script src="app.js?v=217"></script>
+  <script src="app.js?v=218"></script>
 </body>
 </html>

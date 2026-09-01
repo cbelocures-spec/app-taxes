@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '217';
+const CURRENT_APP_VERSION = '218';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -2076,6 +2076,11 @@ async function fetchSettings() {
     if (prevScriptInput) prevScriptInput.value = data.preventivoScriptUrl || "";
     const ptScriptInput = document.getElementById('set-partetaller-script-url');
     if (ptScriptInput) ptScriptInput.value = data.parteTallerScriptUrl || "";
+    const controlesScriptInput = document.getElementById('set-controles-masiva-script-url');
+    if (controlesScriptInput) controlesScriptInput.value = data.controlesMasivaScriptUrl || "";
+    const controlesSheetInput = document.getElementById('set-controles-masiva-sheet-url');
+    if (controlesSheetInput) controlesSheetInput.value = data.controlesMasivaSheetUrl || "";
+    window._controlesMasivaSheetUrl = data.controlesMasivaSheetUrl || "";
     const geminiApiKeyInput = document.getElementById('set-gemini-api-key');
     if (geminiApiKeyInput) geminiApiKeyInput.value = data.geminiApiKey || "";
     const claudeApiKeyInput = document.getElementById('set-claude-api-key');
@@ -2100,6 +2105,14 @@ async function fetchSettings() {
   }
 }
 
+// "Ver Hoja de Controles" in Carga Masiva - opens the actual Google Sheet once configured
+// (Ajustes > URL de Script/Link de Controles de Carga Masiva), falling back to the local
+// accumulating excel endpoint while that's not set up yet.
+function abrirHojaControles() {
+  const url = window._controlesMasivaSheetUrl || '';
+  window.open(url || '/api/controles/excel', '_blank');
+}
+
 async function saveSettings(e) {
   e.preventDefault();
   
@@ -2110,6 +2123,8 @@ async function saveSettings(e) {
   const googleActiveTasksUrl = document.getElementById('set-google-active-tasks-url')?.value || '';
   const preventivoScriptUrl = document.getElementById('set-preventivo-script-url')?.value || '';
   const parteTallerScriptUrl = document.getElementById('set-partetaller-script-url')?.value || '';
+  const controlesMasivaScriptUrl = document.getElementById('set-controles-masiva-script-url')?.value || '';
+  const controlesMasivaSheetUrl = document.getElementById('set-controles-masiva-sheet-url')?.value || '';
   const geminiApiKey = document.getElementById('set-gemini-api-key')?.value || '';
   const claudeApiKey = document.getElementById('set-claude-api-key')?.value || '';
   const currentUsername = localStorage.getItem('currentUserUsername') || '';
@@ -2121,7 +2136,7 @@ async function saveSettings(e) {
         'Content-Type': 'application/json',
         'x-user-username': currentUsername  // Tell server which user is saving
       },
-      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, geminiApiKey, claudeApiKey })
+      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, controlesMasivaScriptUrl, controlesMasivaSheetUrl, geminiApiKey, claudeApiKey })
     });
 
     if (!res.ok) {
@@ -2133,6 +2148,7 @@ async function saveSettings(e) {
     if (password && password !== "••••••••••••") {
       localStorage.setItem('currentUserPassword', password);
     }
+    window._controlesMasivaSheetUrl = controlesMasivaSheetUrl;
     showToast("Ajustes guardados correctamente", "success");
     // NOTE: DO NOT overwrite current-user here — header always shows localStorage user
     

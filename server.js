@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '217';
+const APP_VERSION = '218';
 
 // Middleware
 app.use(cors());
@@ -1037,17 +1037,37 @@ app.post('/api/orders/bulk', async (req, res) => {
       existingOrdersForDedupe.push(newOrder);
     }
 
-    // Log this masiva's litros/estado readings into the accumulating controles workbook
-    // (one sheet per control type) before responding - keeps the response honest about
-    // whether the excel actually has this batch's column, instead of a background job that
-    // could still be mid-write if the user immediately re-downloads.
+    // Log this masiva's litros/estado readings before responding - keeps the response honest
+    // about whether the log actually has this batch's column, instead of a background job
+    // that could still be mid-write if the user immediately re-checks it.
+    // Preferred destination is the Google Sheet (controlesMasivaScriptUrl) once configured -
+    // nothing gets written to Railway's own disk in that case. The local accumulating excel
+    // (excelControles.js) is only a fallback for while that's not set up yet.
     let controlesExcelUrl = null;
     if (controlesInsumos && Array.isArray(controlesInsumos.registros) && controlesInsumos.registros.length > 0) {
-      try {
-        await excelControles.actualizarExcelControles(controlesInsumos);
-        controlesExcelUrl = '/api/controles/excel';
-      } catch (excelErr) {
-        console.error('[Bulk] Error actualizando excel de controles:', excelErr.message);
+      const settingsForControles = db.getSettings();
+      const controlesScriptUrl = settingsForControles.controlesMasivaScriptUrl;
+      if (controlesScriptUrl) {
+        try {
+          const scriptRes = await fetch(controlesScriptUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accion: 'actualizarControlesInsumos', ...controlesInsumos })
+          });
+          if (!scriptRes.ok) {
+            console.warn('[Bulk] Google Sheet de controles respondió', scriptRes.status);
+          }
+        } catch (sheetErr) {
+          console.error('[Bulk] Error enviando controles al Google Sheet:', sheetErr.message);
+        }
+        controlesExcelUrl = settingsForControles.controlesMasivaSheetUrl || null;
+      } else {
+        try {
+          await excelControles.actualizarExcelControles(controlesInsumos);
+          controlesExcelUrl = '/api/controles/excel';
+        } catch (excelErr) {
+          console.error('[Bulk] Error actualizando excel de controles:', excelErr.message);
+        }
       }
     }
 
@@ -2467,6 +2487,8 @@ app.get('/api/settings', (req, res) => {
       googleActiveTasksUrl: settings.googleActiveTasksUrl || "",
       preventivoScriptUrl: settings.preventivoScriptUrl || "",
       parteTallerScriptUrl: settings.parteTallerScriptUrl || "",
+      controlesMasivaScriptUrl: settings.controlesMasivaScriptUrl || "",
+      controlesMasivaSheetUrl: settings.controlesMasivaSheetUrl || "",
       geminiApiKey: settings.geminiApiKey || "",
       claudeApiKey: settings.claudeApiKey || "",
       catalogSyncStatus: catalogStatus,
@@ -2484,7 +2506,7 @@ app.get('/api/settings', (req, res) => {
 // Save connection settings
 app.post('/api/settings', (req, res) => {
   try {
-    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, geminiApiKey, claudeApiKey, employeeMappings } = req.body;
+    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, controlesMasivaScriptUrl, controlesMasivaSheetUrl, geminiApiKey, claudeApiKey, employeeMappings } = req.body;
     const requestingUser = req.headers['x-user-username'] || null;
     const current = db.getSettings();
     
@@ -2499,7 +2521,9 @@ app.post('/api/settings', (req, res) => {
       googleScriptUrl: googleScriptUrl !== undefined ? googleScriptUrl : current.googleScriptUrl,
       googleActiveTasksUrl: googleActiveTasksUrl !== undefined ? googleActiveTasksUrl : current.googleActiveTasksUrl,
       preventivoScriptUrl: preventivoScriptUrl !== undefined ? preventivoScriptUrl : current.preventivoScriptUrl,
-      parteTallerScriptUrl: parteTallerScriptUrl !== undefined ? parteTallerScriptUrl : current.parteTallerScriptUrl
+      parteTallerScriptUrl: parteTallerScriptUrl !== undefined ? parteTallerScriptUrl : current.parteTallerScriptUrl,
+      controlesMasivaScriptUrl: controlesMasivaScriptUrl !== undefined ? controlesMasivaScriptUrl : current.controlesMasivaScriptUrl,
+      controlesMasivaSheetUrl: controlesMasivaSheetUrl !== undefined ? controlesMasivaSheetUrl : current.controlesMasivaSheetUrl
     };
 
     if (geminiApiKey !== undefined) {
@@ -2532,7 +2556,7 @@ app.post('/api/settings', (req, res) => {
     }
 
     const saved = db.saveSettings(updates);
-    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl, googleActiveTasksUrl: saved.googleActiveTasksUrl, preventivoScriptUrl: saved.preventivoScriptUrl, parteTallerScriptUrl: saved.parteTallerScriptUrl, employeeMappings: saved.employeeMappings || null } });
+    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl, googleActiveTasksUrl: saved.googleActiveTasksUrl, preventivoScriptUrl: saved.preventivoScriptUrl, parteTallerScriptUrl: saved.parteTallerScriptUrl, controlesMasivaScriptUrl: saved.controlesMasivaScriptUrl, controlesMasivaSheetUrl: saved.controlesMasivaSheetUrl, employeeMappings: saved.employeeMappings || null } });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
