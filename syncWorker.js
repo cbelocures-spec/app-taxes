@@ -2203,7 +2203,7 @@ async function syncWorkOrder(orderId) {
               for (const el of toasts) {
                 const txt = el.textContent || '';
                 if (txt.includes('Creada') || txt.includes('Exito') || txt.includes('Éxito')) {
-                  const match = txt.match(/\b(2\d{4})\b/); // Busca números de OT reales de 5 dígitos comenzando con 2
+                  const match = txt.match(/\b([1-9]\d{4})\b/); // Números de OT reales de 5 dígitos (no fijo a "2..." - Taxes ya pasó de 29999 a 30000+)
                   if (match) return match[1];
                 }
               }
@@ -2228,7 +2228,7 @@ async function syncWorkOrder(orderId) {
                     // Extraer la celda que contiene la OT (ej: "#28448" o "28448") - saltar
                     // cualquier número que ya pertenezca a otra orden de esta misma interno.
                     for (const cellTxt of cells) {
-                      const otMatch = cellTxt.match(/#?\b(2\d{4})\b/);
+                      const otMatch = cellTxt.match(/#?\b([1-9]\d{4})\b/);
                       if (otMatch && !isAlreadyClaimed(otMatch[1])) return otMatch[1];
                     }
                   }
