@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '252';
+const CURRENT_APP_VERSION = '253';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13059,21 +13059,54 @@ function adjustPtStateLists(state) {
     return ccLabel.includes('MECAN') || t.centroCosto === '15' || (!ccLabel.includes('HERRER') && !ccLabel.includes('EDILI'));
   }
 
+  // Turns a list of tasks into the "[ ] texto" / "[ ] ⚡ [En Proceso] texto" novedad lines +
+  // their checklist-item form, shared by both sector modes below.
+  function buildNovedadFromTasks(tasks) {
+    const lines = tasks.map(t => {
+      let prefix = '[ ]';
+      if (t.timerStart > 0) prefix = '[ ] ⚡ [En Proceso]';
+      else if (t.timerStarted || (t.timerHistory && t.timerHistory.length > 0)) prefix = '[ ] ⏸ [Pausado]';
+      return `${prefix} ${t.descripcion || 'Tarea sin descripción'}`;
+    });
+    return {
+      novedad: lines.join('\n'),
+      novedad_items: lines.map(line => {
+        const hecho = line.startsWith('[X]') || line.startsWith('[x]');
+        const texto = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
+        return { texto, hecho };
+      })
+    };
+  }
+
+  function guessUnitTypeFromCatalog(interno) {
+    const rodadoOpt = cachedCatalogs.rodados
+      ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
+      : null;
+    if (!rodadoOpt) return 'UNIDAD';
+    // "equipo" (e.g. "COMPACTADOR 3 EJES") is the real vehicle type - "label" is brand/model
+    // ("MERCEDES BENZ ATEGO 1725 Interno 101") and rarely contains any of these keywords.
+    const labelUpper = String(rodadoOpt.equipo || rodadoOpt.label || '').toUpperCase();
+    if (labelUpper.includes('VOLQ')) return 'VOLQUETE';
+    if (labelUpper.includes('ROLL') || labelUpper.includes('OFF')) return 'ROLL - OFF';
+    if (labelUpper.includes('PLANCHA')) return 'PLANCHA';
+    if (labelUpper.includes('COMPAC')) return 'COMPACTADOR';
+    if (labelUpper.includes('CONTENEDOR') || labelUpper.includes('CAJITA') || labelUpper.includes('CAJA')) return 'CONTENEDOR';
+    return 'UNIDAD';
+  }
+
   // ============================================================
-  // HERRERÍA / EDILICIO MODE: Only show live orders from Taxes as Fuera de Servicio - same
-  // logic for both, just matched against each sector's own tasks/centro de costo, so Edilicio
-  // gets its propio tablero de novedades igual que Herrería en vez de compartir el de Taller.
+  // HERRERÍA MODE: Only show live orders from Taxes as Fuera de Servicio
   // ============================================================
-  if (isHerreriaAdj || isEdilicioAdj) {
-    // Clear all Google Sheet-based lists (not applicable for Herrería/Edilicio)
+  if (isHerreriaAdj) {
+    // Clear all Google Sheet-based lists (not applicable for Herrería)
     state.fuera_de_servicio = [];
     state.reparacion = [];
     state.servicios_pendientes = [];
 
-    // Find all open sector orders with active/paused tasks. A unit already marked
+    // Find all open Herrería orders with active/paused tasks. A unit already marked
     // "operativo" is out of here no matter what its task history looks like - that field is
     // the real-world signal that the unit is back in service, not leftover task state.
-    const sectorOrders = activeOrders.filter(o => {
+    const herreriaOrders = activeOrders.filter(o => {
       const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
       if (isClosed) return false;
       if (o.estadoUnidad === 'operativo') return false;
@@ -13083,54 +13116,69 @@ function adjustPtStateLists(state) {
       );
     });
 
-    // Create fuera_de_servicio entries from live sector orders
-    sectorOrders.forEach(order => {
+    // Create fuera_de_servicio entries from live Herrería orders
+    herreriaOrders.forEach(order => {
       const activeTasks = (order.tasks || [])
         .filter(taskMatchesSector)
         .filter(t => t.status !== 'Finalizada')
-        .map(t => {
-          let prefix = '[ ]';
-          if (t.timerStart > 0) {
-            prefix = '[ ] ⚡ [En Proceso]';
-          } else if (t.timerStarted || (t.timerHistory && t.timerHistory.length > 0)) {
-            prefix = '[ ] ⏸ [Pausado]';
-          }
-          return `${prefix} ${t.descripcion || 'Tarea sin descripción'}`;
-        });
-
-      // Guess type from catalog
-      let unitType = 'UNIDAD';
-      const rodadoOpt = cachedCatalogs.rodados
-        ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(order.interno).trim())
-        : null;
-      if (rodadoOpt) {
-        // "equipo" (e.g. "COMPACTADOR 3 EJES") is the real vehicle type - "label" is brand/model
-        // ("MERCEDES BENZ ATEGO 1725 Interno 101") and rarely contains any of these keywords.
-        const labelUpper = String(rodadoOpt.equipo || rodadoOpt.label || '').toUpperCase();
-        if (labelUpper.includes('VOLQ')) unitType = 'VOLQUETE';
-        else if (labelUpper.includes('ROLL') || labelUpper.includes('OFF')) unitType = 'ROLL - OFF';
-        else if (labelUpper.includes('PLANCHA')) unitType = 'PLANCHA';
-        else if (labelUpper.includes('COMPAC')) unitType = 'COMPACTADOR';
-        else if (labelUpper.includes('CONTENEDOR') || labelUpper.includes('CAJITA') || labelUpper.includes('CAJA')) unitType = 'CONTENEDOR';
-        else unitType = 'UNIDAD';
-      }
+        .filter(t => t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0));
 
       state.fuera_de_servicio.push({
         interno: order.interno || 'Sin numero',
         rodado: order.rodado || '',
-        tipo: unitType,
-        novedad: activeTasks.join('\n'),
-        novedad_items: activeTasks.map(line => {
-          const hecho = line.startsWith('[X]') || line.startsWith('[x]');
-          const texto = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
-          return { texto, hecho };
-        }),
+        tipo: guessUnitTypeFromCatalog(order.interno),
+        ...buildNovedadFromTasks(activeTasks),
         dia_parado: new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
         dias_en_reparacion: 0
       });
     });
 
-    // Clear totals (not applicable for Herrería/Edilicio view)
+    // Clear totals (not applicable for Herrería view)
+    state.resumen = { totales: {} };
+    return;
+  }
+
+  // ============================================================
+  // EDILICIO MODE: separa las tareas en Reparación (arrancadas o pausadas) y Servicios
+  // Pendientes (asignadas pero todavía sin arrancar) - a diferencia de Herrería, un
+  // mantenimiento edilicio no es un vehículo que "sale de servicio", así que usa las mismas
+  // dos categorías que ya tiene el tablero de Taller en vez de un único bucket "Fuera de
+  // Servicio" que no describe bien el trabajo.
+  // ============================================================
+  if (isEdilicioAdj) {
+    state.fuera_de_servicio = [];
+    state.reparacion = [];
+    state.servicios_pendientes = [];
+
+    const edilicioOrders = activeOrders.filter(o => {
+      const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
+      if (isClosed) return false;
+      if (o.estadoUnidad === 'operativo') return false;
+      const tasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
+      return tasks.filter(taskMatchesSector).some(t => t.status !== 'Finalizada');
+    });
+
+    edilicioOrders.forEach(order => {
+      const tasks = (order.tasks || []).filter(taskMatchesSector).filter(t => t.status !== 'Finalizada');
+      const enCurso = tasks.filter(t => t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0));
+      const sinIniciar = tasks.filter(t => !(t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0)));
+
+      const entryBase = {
+        interno: order.interno || 'Sin numero',
+        rodado: order.rodado || '',
+        tipo: guessUnitTypeFromCatalog(order.interno),
+        dia_parado: new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
+        dias_en_reparacion: 0
+      };
+
+      if (enCurso.length > 0) {
+        state.reparacion.push({ ...entryBase, ...buildNovedadFromTasks(enCurso) });
+      }
+      if (sinIniciar.length > 0) {
+        state.servicios_pendientes.push({ ...entryBase, servicio: '', ...buildNovedadFromTasks(sinIniciar) });
+      }
+    });
+
     state.resumen = { totales: {} };
     return;
   }
