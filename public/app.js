@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '263';
+const CURRENT_APP_VERSION = '264';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13139,30 +13139,36 @@ function adjustPtStateLists(state) {
   }
 
   // ============================================================
-  // EDILICIO MODE: 3 categorías, según cómo lo definió el usuario -
-  //   Reparación        = tarea con el cronómetro ANDANDO ahora mismo.
-  //   Fuera de Servicio = tarea que se empezó y se pausó, pero sigue sin terminar (quedó a
-  //                       mitad de camino, no es trabajo activo ni algo todavía sin tocar).
-  //   Servicios Pendientes = tarea asignada que nunca se arrancó (novedad a futuro).
+  // EDILICIO MODE:
+  //   Reparación        = tarea con el cronómetro ANDANDO ahora mismo (orden real).
+  //   Fuera de Servicio = tarea arrancada y pausada, O la unidad/lugar está marcado Fuera de
+  //                       Servicio a nivel de la orden aunque todavía no tenga ninguna tarea
+  //                       cargada (el interruptor de la orden es señal suficiente por sí solo).
+  //   Servicios Pendientes = NO se reconstruye acá. Es solo una lista de anotaciones a futuro
+  //                       que "Agregar Unidad" guarda directo en el estado del Parte Taller sin
+  //                       crear ninguna orden - queda tal cual hasta que alguien decida
+  //                       trabajarla de verdad (ver ptAsignarSeleccionados, que ahí sí crea la
+  //                       orden real). Reconstruirla desde tareas en vivo como Reparación/Fuera
+  //                       de Servicio forzaría a crear una orden solo para poder anotar algo.
   // ============================================================
   if (isEdilicioAdj) {
     state.fuera_de_servicio = [];
     state.reparacion = [];
-    state.servicios_pendientes = [];
+    // state.servicios_pendientes queda intacto (lo que ya trae del server).
 
     const edilicioOrders = activeOrders.filter(o => {
       const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
       if (isClosed) return false;
       if (o.estadoUnidad === 'operativo') return false;
       const tasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
-      return tasks.filter(taskMatchesSector).some(t => t.status !== 'Finalizada');
+      const hasMatchingTask = tasks.filter(taskMatchesSector).some(t => t.status !== 'Finalizada');
+      return hasMatchingTask || o.estadoUnidad === 'fuera_de_servicio';
     });
 
     edilicioOrders.forEach(order => {
       const tasks = (order.tasks || []).filter(taskMatchesSector).filter(t => t.status !== 'Finalizada');
       const enCurso = tasks.filter(t => t.timerStart > 0);
       const pausadas = tasks.filter(t => !(t.timerStart > 0) && (t.timerStarted || (t.timerHistory && t.timerHistory.length > 0)));
-      const sinIniciar = tasks.filter(t => !(t.timerStart > 0) && !t.timerStarted && !(t.timerHistory && t.timerHistory.length > 0));
 
       const entryBase = {
         interno: order.interno || 'Sin numero',
@@ -13178,9 +13184,9 @@ function adjustPtStateLists(state) {
       }
       if (pausadas.length > 0) {
         state.fuera_de_servicio.push({ ...entryBase, ...buildNovedadFromTasks(pausadas) });
-      }
-      if (sinIniciar.length > 0) {
-        state.servicios_pendientes.push({ ...entryBase, servicio: '', ...buildNovedadFromTasks(sinIniciar) });
+      } else if (order.estadoUnidad === 'fuera_de_servicio' && enCurso.length === 0) {
+        const texto = order.incidente || 'Fuera de servicio';
+        state.fuera_de_servicio.push({ ...entryBase, novedad: `[ ] ${texto}`, novedad_items: [{ texto, hecho: false }] });
       }
     });
 
@@ -15487,12 +15493,11 @@ async function savePtUnit() {
       if (!res.ok) throw new Error('Error al registrar la novedad en el Parte Taller.');
 
       // 2. Automatically generate a Correctivo work order in Taxes if reparación o fuera_de_servicio.
-      // Edilicio también entra por Servicios Pendientes: a diferencia de Taller/Herrería (que
-      // muestran directo lo guardado arriba en el paso 1), el tablero de Edilicio se arma 100%
-      // a partir de tareas reales de órdenes activas (adjustPtStateLists) - sin una orden con
-      // una tarea de verdad acá, la novedad recién guardada nunca aparecería en ningún lado.
+      // Servicios Pendientes NUNCA crea orden/tarea todavía, ni siquiera para Edilicio - es solo
+      // una anotación a futuro hasta que alguien decida ponerse a trabajarla de verdad (ver
+      // ptAsignarSeleccionados, que sí crea la orden real en ese momento).
       const isEdilicioAdd = (sectorSel === 'edilicio');
-      if (estado === 'reparacion' || estado === 'fuera_de_servicio' || (isEdilicioAdd && estado === 'servicios_pendientes')) {
+      if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
         let rodadoLabel = '';
         let internoVal = '';
         if (empresa === 'irineo') {
