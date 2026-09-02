@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '245';
+const APP_VERSION = '246';
 
 // Middleware
 app.use(cors());
@@ -4146,6 +4146,58 @@ function recalcularTotalesResumenLocal(state) {
   state.resumen.hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
 }
 
+// One-way live mirror of Parte Taller into a "Parte Taller" tab of the same Google Sheet used
+// by el Medidor de Agua (settings.aguaScriptUrl). db.json stays the only source of truth - the
+// app never reads this tab back - precisely to avoid the old Sheets-backed data-loss races
+// described above saveParteTallerState. Fire-and-forget: never awaited by callers, errors just
+// get logged so a Sheets hiccup can't block a real Parte Taller update.
+function buildParteTallerFilas(state) {
+  const catLabels = {
+    fuera_de_servicio: 'Fuera de Servicio',
+    reparacion: 'Reparación',
+    servicios_pendientes: 'Servicios Pendientes',
+    inversiones: 'Preparación',
+    transito: 'Tránsito'
+  };
+  const filas = [];
+  Object.keys(catLabels).forEach(key => {
+    (state[key] || []).forEach(u => {
+      filas.push({
+        categoria: catLabels[key],
+        interno: u.interno || '',
+        tipo: u.tipo || '',
+        novedad: String(u.novedad || '').replace(/\n/g, ' | '),
+        sector: u.sector || '',
+        dia_parado: u.dia_parado || '',
+        dias_en_reparacion: u.dias_en_reparacion || '',
+        destino: u.destinoIngreso || ''
+      });
+    });
+  });
+  return filas;
+}
+
+async function syncParteTallerToSheet(state) {
+  try {
+    const settings = db.getSettings();
+    const scriptUrl = settings.aguaScriptUrl;
+    if (!scriptUrl) return;
+    const resumen = state.resumen || {};
+    const response = await fetch(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accion: 'actualizarParteTaller',
+        resumen: { responsable: resumen.responsable || '', fecha: resumen.fecha || '', hora: resumen.hora || '' },
+        filas: buildParteTallerFilas(state)
+      })
+    });
+    if (!response.ok) throw new Error(`Google Apps Script respondió con estado ${response.status}`);
+  } catch (error) {
+    console.error('[ParteTaller->Sheet] Error sincronizando:', error.message);
+  }
+}
+
 // Adds/moves one unit's novedad across the Parte Taller lists. Mirrors the old
 // Apps Script actualizarEstadoFlotaParte() 1:1, just backed by db.json instead
 // of PropertiesService.
@@ -4260,6 +4312,7 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
 
   recalcularTotalesResumenLocal(state);
   db.saveParteTallerState(state);
+  syncParteTallerToSheet(state);
   return `Unidad #${interno} actualizada a ${estadoEfectivo.toUpperCase()} en Parte del Taller`;
 }
 
@@ -4277,6 +4330,7 @@ app.post('/api/parte-taller/recalcular-totales', (req, res) => {
     const state = db.getParteTallerState();
     recalcularTotalesResumenLocal(state);
     db.saveParteTallerState(state);
+    syncParteTallerToSheet(state);
     res.json({ ok: true, totales: state.resumen.totales });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -4294,6 +4348,7 @@ app.post('/api/parte-taller/novedad', (req, res) => {
 
     if (accion === 'save_state') {
       const saved = db.saveParteTallerState(payload.state || {});
+      syncParteTallerToSheet(saved);
       return res.json({ ok: true, state: saved });
     }
 
@@ -4304,6 +4359,7 @@ app.post('/api/parte-taller/novedad', (req, res) => {
       state.resumen.fecha = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
       state.resumen.hora = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
       db.saveParteTallerState(state);
+      syncParteTallerToSheet(state);
       return res.json({ ok: true, msg: `Responsable actualizado a ${payload.responsable}` });
     }
 
