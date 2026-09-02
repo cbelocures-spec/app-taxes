@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '254';
+const CURRENT_APP_VERSION = '255';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -14058,11 +14058,19 @@ function renderParteTallerDashboard(state) {
   }
 
   // The 4 stat cards up top (Compactador/Volquete/Roll-Off/Plancha) and their tables are meant
-  // to be truck-only - a Herrería/Edilicio work bucket ("12 verde", "Acoplado nuevo", etc.)
-  // mixed into "Fuera de Servicio" made it hard to tell fleet problems from shop-internal jobs
-  // at a glance. Anything whose tipo isn't one of the 4 tracked fleet types gets pulled out of
-  // every list below and shown together instead, in its own "Herrería / Edilicio" section.
+  // to be truck-only, on the Taller tab - a Herrería work bucket ("12 verde", "Acoplado nuevo",
+  // etc.) mixed into "Fuera de Servicio" made it hard to tell fleet problems from shop-internal
+  // jobs at a glance. Anything whose tipo isn't one of the 4 tracked fleet types gets pulled out
+  // of every list below and shown together instead, in its own "Herrería / Edilicio" section.
+  //
+  // Edilicio's OWN board (viendo la pestaña Edilicio) es distinto: ahí NINGÚN item es nunca un
+  // camión de flota - si se aplicara este mismo filtro, mandaría el 100% del trabajo de Edilicio
+  // al cajón genérico de abajo en vez de a sus tablas En Reparación/Fuera de Servicio/Servicios
+  // Pendientes de arriba (que es justamente para lo que se armó ese tablero propio). En modo
+  // Edilicio esta separación queda desactivada.
+  const isEdilicioBoard = (currentSelectedSector === 'Edilicio');
   function esUnidadDeFlotaTrackeada(item) {
+    if (isEdilicioBoard) return true;
     const t = String((item && item.tipo) || '').trim().toUpperCase();
     return t.includes('COMPAC') || t.includes('VOLQ') || t.includes('ROLL') || t.includes('PLANCHA');
   }
