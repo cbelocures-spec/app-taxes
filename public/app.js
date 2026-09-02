@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '258';
+const CURRENT_APP_VERSION = '259';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13620,6 +13620,75 @@ function resolvePtUnitDisplayLabel(item, internoPT) {
   return `<strong>${internoPT}</strong>`;
 }
 
+// Resumen "Servicios pendientes por área" que se ve arriba de la tabla de Servicios Pendientes,
+// solo en el tablero de Edilicio (que sí tiene la dimensión área/sector, a diferencia de Taller/
+// Herrería). Un color distinto por área (ciclando esta paleta chica) y un clic desplegable con
+// el detalle de qué está pendiente en esa área en particular.
+const PT_AREA_COLOR_PALETTE = [
+  { base: '#D85A30', activo: '#993C1D' },
+  { base: '#1D9E75', activo: '#0F6E56' },
+  { base: '#D4537E', activo: '#993556' },
+  { base: '#7F77DD', activo: '#534AB7' },
+  { base: '#378ADD', activo: '#185FA5' },
+  { base: '#BA7517', activo: '#854F0B' }
+];
+let ptPendientesPorAreaState = { items: {}, openArea: null };
+
+function renderPtPendientesPorArea(pendientes) {
+  const container = document.getElementById('pt-pend-por-area');
+  const pillsEl = document.getElementById('pt-pend-por-area-pills');
+  const detailEl = document.getElementById('pt-pend-por-area-detail');
+  if (!container || !pillsEl || !detailEl) return;
+
+  if (!pendientes || pendientes.length === 0) {
+    container.style.display = 'none';
+    ptPendientesPorAreaState = { items: {}, openArea: null };
+    return;
+  }
+
+  const grouped = {};
+  pendientes.forEach(item => {
+    const area = item.area || 'Sin área';
+    if (!grouped[area]) grouped[area] = [];
+    grouped[area].push(item);
+  });
+  const areas = Object.keys(grouped);
+  const openArea = (ptPendientesPorAreaState.openArea && grouped[ptPendientesPorAreaState.openArea]) ? ptPendientesPorAreaState.openArea : null;
+  ptPendientesPorAreaState = { items: grouped, openArea };
+
+  container.style.display = 'block';
+  pillsEl.innerHTML = areas.map((area, idx) => {
+    const color = PT_AREA_COLOR_PALETTE[idx % PT_AREA_COLOR_PALETTE.length];
+    const isOpen = openArea === area;
+    const bg = isOpen ? color.activo : color.base;
+    const safeArea = area.replace(/'/g, "\\'");
+    return `<button type="button" onclick="togglePtPendientesArea('${safeArea}')" style="cursor:pointer; border:none; border-radius:999px; padding:7px 14px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:7px; background:${bg}; color:#ffffff;">${area} <span style="background:rgba(255,255,255,0.3); border-radius:999px; padding:1px 8px; font-size:12px;">${grouped[area].length}</span></button>`;
+  }).join('');
+
+  if (!openArea) {
+    detailEl.style.display = 'none';
+    detailEl.innerHTML = '';
+  } else {
+    const colorIdx = areas.indexOf(openArea) % PT_AREA_COLOR_PALETTE.length;
+    const color = PT_AREA_COLOR_PALETTE[colorIdx];
+    detailEl.style.display = 'block';
+    detailEl.innerHTML = `<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;">Pendientes en ${openArea}</div>` +
+      grouped[openArea].map(item => {
+        const internoPT = String(item.interno || '');
+        const rodadoLabel = resolvePtUnitDisplayLabel(item, internoPT);
+        const lines = String(item.novedad || '').split('\n')
+          .map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim())
+          .filter(Boolean);
+        return lines.map(l => `<div style="display:flex; align-items:flex-start; gap:8px; padding:4px 0; font-size:13px;"><span style="color:${color.base}; margin-top:2px;">&bull;</span><span>${l} <span style="color:var(--text-muted); font-size:11px;">(${rodadoLabel})</span></span></div>`).join('');
+      }).join('');
+  }
+}
+
+function togglePtPendientesArea(area) {
+  ptPendientesPorAreaState.openArea = (ptPendientesPorAreaState.openArea === area) ? null : area;
+  renderPtPendientesPorArea(Object.values(ptPendientesPorAreaState.items).flat());
+}
+
 // Arma las filas de detalle para la copia en vivo del Parte Taller en la Hoja del Medidor de
 // Agua, a partir del MISMO displayState ya reconciliado con Taxes que usa el tablero real (no
 // el estado crudo guardado en el server). Rodado e Interno van por separado: Rodado sale del
@@ -14188,6 +14257,7 @@ function renderParteTallerDashboard(state) {
   // 3. Servicios pendientes
   const pendientes = separarOtros((displayState.servicios_pendientes || []).filter(matchesPtSector).filter(unitMatchesSearch), 'servicios_pendientes');
   if (el('pt-pend-count')) el('pt-pend-count').textContent = pendientes.length;
+  renderPtPendientesPorArea(isEdilicioBoard ? pendientes : []);
   if (el('pt-pendientes-tbody')) {
     if (pendientes.length === 0) {
       el('pt-pendientes-tbody').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No hay servicios pendientes.</td></tr>';
