@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '234';
+const APP_VERSION = '235';
 
 // Middleware
 app.use(cors());
@@ -176,6 +176,19 @@ function isEdilicio(cls) {
   return norm.includes('edilici') || norm.includes('edilicio');
 }
 
+// "Horas Estimadas" se guarda como H,MM (no decimal) - ej. 1,30 son 1h30m, no 1.3h. Estos dos
+// conversores son compartidos por todo lo que suma minutos de cronometro a ese campo.
+function hmmToMinutesServer(hmmVal) {
+  const h = Math.floor(hmmVal);
+  const m = Math.round((hmmVal - h) * 100);
+  return h * 60 + m;
+}
+function minutesToHmmServer(totalMinutes) {
+  const h = Math.floor(totalMinutes / 60);
+  const m = Math.round(totalMinutes % 60);
+  return parseFloat((h + m / 100).toFixed(2));
+}
+
 // A person can't physically work on two tasks at once. If a task in `tasksToCheck` just
 // started its timer (timerStarted:true and it wasn't already running before this save,
 // per `previousTasksById`) and that same employee has a timer running on another active
@@ -183,17 +196,6 @@ function isEdilicio(cls) {
 // start a timer for the same employee within the same ~2s polling window and miss the
 // other's change, so this has to be enforced here, not just client-side.
 function autoPauseConflictingTimers(currentOrderId, tasksToCheck, previousTasksById) {
-  const hmmToMinutesServer = (hmmVal) => {
-    const h = Math.floor(hmmVal);
-    const m = Math.round((hmmVal - h) * 100);
-    return h * 60 + m;
-  };
-  const minutesToHmmServer = (totalMinutes) => {
-    const h = Math.floor(totalMinutes / 60);
-    const m = Math.round(totalMinutes % 60);
-    return parseFloat((h + m / 100).toFixed(2));
-  };
-
   for (const task of (tasksToCheck || [])) {
     if (!task || !task.empleado || task.timerStarted !== true) continue;
     const previousTask = previousTasksById ? previousTasksById.get(task.id) : null;
@@ -228,6 +230,53 @@ function autoPauseConflictingTimers(currentOrderId, tasksToCheck, previousTasksB
 
       db.updateWorkOrder(conflictOrder.id, { tasks: updatedConflictTasks });
       console.log(`[Auto-Pause] Empleado ${task.empleado} tenia un cronometro activo en orden ${conflictOrder.id} (Interno ${conflictOrder.interno}); se pauso automaticamente para iniciar en orden ${currentOrderId}.`);
+    }
+  }
+}
+
+// Un cronómetro olvidado corriendo toda la noche (nadie lo pausó al dejar de trabajar) termina
+// contando como horas trabajadas reales - pasó de verdad: alguien reanudó a las 14:14 y nadie
+// volvió a tocar el cronómetro hasta las 08:00 del día siguiente, sumando 17hs46m a una sola
+// tarea. Corre en un intervalo propio (no depende de que alguien tenga la app abierta - la falta
+// de esa dependencia es justamente lo que faltaba) y pausa cualquier tramo continuo (desde el
+// último Inició/Reanudó) que supere el límite, acreditando como mucho el límite mismo aunque el
+// chequeo llegue tarde por la frecuencia del intervalo.
+const TIMER_AUTO_PAUSE_LIMIT_HOURS = 7;
+function autoPauseTimersExceedingLimit() {
+  const limitMs = TIMER_AUTO_PAUSE_LIMIT_HOURS * 60 * 60 * 1000;
+  const orders = db.getSyncableOrders() || [];
+
+  for (const order of orders) {
+    if (order.archived === true || order.deleted === true) continue;
+    let touched = false;
+
+    const updatedTasks = (order.tasks || []).map(task => {
+      if (!task || task.timerStarted !== true) return task;
+      const startVal = (task.timerStart && parseInt(task.timerStart) > 0) ? parseInt(task.timerStart) : null;
+      if (!startVal) return task;
+      const elapsedMs = Date.now() - startVal;
+      if (elapsedMs < limitMs) return task;
+
+      const cappedMinutes = TIMER_AUTO_PAUSE_LIMIT_HOURS * 60;
+      const currentMinutes = hmmToMinutesServer(parseFloat(String(task.horasEstimadas || 0).replace(',', '.')) || 0);
+      const newHours = minutesToHmmServer(currentMinutes + cappedMinutes);
+
+      const history = Array.isArray(task.timerHistory) ? [...task.timerHistory] : [];
+      history.push({
+        type: 'Pausó',
+        formatted: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' }),
+        timestamp: Date.now(),
+        auto: true,
+        reason: `Límite de ${TIMER_AUTO_PAUSE_LIMIT_HOURS}hs continuas`
+      });
+
+      console.log(`[Auto-Pause Límite] Tarea ${task.id} de la orden ${order.id} (Interno ${order.interno}) llevaba corriendo mas de ${TIMER_AUTO_PAUSE_LIMIT_HOURS}hs seguidas; se pauso automaticamente.`);
+      touched = true;
+      return { ...task, timerStart: null, timerStarted: false, horasEstimadas: newHours, timerHistory: history };
+    });
+
+    if (touched) {
+      db.updateWorkOrder(order.id, { tasks: updatedTasks });
     }
   }
 }
@@ -4985,6 +5034,22 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   } catch (cleanErr) {
     console.warn('[Startup] Task auto-clean error:', cleanErr.message);
   }
+
+  // Corta cronómetros que quedaron corriendo por error humano (alguien se olvidó de pausar al
+  // dejar de trabajar) - corre apenas arranca el server (por si ya habia algo pasado de largo) y
+  // despues cada 5 minutos, sin depender de que alguien tenga la app abierta.
+  try {
+    autoPauseTimersExceedingLimit();
+  } catch (e) {
+    console.warn('[Startup] Auto-pause de cronometros error:', e.message);
+  }
+  setInterval(() => {
+    try {
+      autoPauseTimersExceedingLimit();
+    } catch (e) {
+      console.warn('[Auto-Pause Límite] Error:', e.message);
+    }
+  }, 5 * 60 * 1000);
 
   // Start localtunnel for HTTPS access from mobile (no cert issues)
   if (localtunnel) {
