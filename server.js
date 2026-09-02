@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '247';
+const APP_VERSION = '248';
 
 // Middleware
 app.use(cors());
@@ -4156,11 +4156,13 @@ function recalcularTotalesResumenLocal(state) {
 // les da tipo null/vacío, así que el filtro los excluye solo).
 const TIPOS_PARTE_TALLER_SHEET = new Set(['COMPACTADOR', 'VOLQUETE', 'ROLL - OFF', 'PLANCHA']);
 
+// Servicios Pendientes queda afuera de la Hoja a pedido: solo interesa ver ahí lo que
+// realmente tiene la unidad parada/en curso (Tránsito, Reparación, Fuera de Servicio,
+// Preparación), no la lista de items ya resueltos a la espera de agendarse.
 function buildParteTallerFilas(state) {
   const catLabels = {
     fuera_de_servicio: 'Fuera de Servicio',
     reparacion: 'Reparación',
-    servicios_pendientes: 'Servicios Pendientes',
     inversiones: 'Preparación',
     transito: 'Tránsito'
   };
