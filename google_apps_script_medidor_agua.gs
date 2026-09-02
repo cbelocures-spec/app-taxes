@@ -11,7 +11,7 @@ var NOMBRE_HOJA_AGUA = 'Medidor de Agua';
 var HEADERS_AGUA = ['Fecha', 'Hora', 'Turno', 'Lectura (L)', 'Consumo (L)', 'Registrado por'];
 
 var NOMBRE_HOJA_PARTE_TALLER = 'Parte Taller';
-var HEADERS_PARTE_TALLER = ['Categoría', 'Interno', 'Tipo', 'Novedad', 'Sector', 'Día Parado', 'Días en Reparación', 'Destino'];
+var HEADERS_PARTE_TALLER = ['Categoría', 'Rodado', 'Tipo', 'Novedad', 'Sector', 'Día Parado', 'Días en Reparación', 'Destino'];
 
 function doPost(e) {
   try {
@@ -136,7 +136,7 @@ function actualizarParteTaller(resumen, resumenTipos, filas) {
   if (filas && filas.length > 0) {
     var rows = filas.map(function (f) {
       return [
-        f.categoria || '', f.interno || '', f.tipo || '', f.novedad || '',
+        f.categoria || '', f.rodado || '', f.tipo || '', f.novedad || '',
         f.sector || '', f.dia_parado || '', f.dias_en_reparacion || '', f.destino || ''
       ];
     });

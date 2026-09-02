@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '249';
+const APP_VERSION = '250';
 
 // Middleware
 app.use(cors());
@@ -4159,7 +4159,14 @@ const TIPOS_PARTE_TALLER_SHEET = new Set(['COMPACTADOR', 'VOLQUETE', 'ROLL - OFF
 // Servicios Pendientes queda afuera de la Hoja a pedido: solo interesa ver ahí lo que
 // realmente tiene la unidad parada/en curso (Tránsito, Reparación, Fuera de Servicio,
 // Preparación), no la lista de items ya resueltos a la espera de agendarse.
+//
+// Muestra Rodado en vez de Interno, y de paso sirve como segundo filtro: solo entra una fila
+// si su interno matchea un camión real del catálogo (rodados). Eso deja afuera los "buckets"
+// de trabajo de Herrería que quedan cargados con un interno de texto en vez de un número
+// (REP. CONTENEDOR..., FABRICACION..., Caja verde N, Irineo 23, una dirección, etc.) - ninguno
+// de esos es un camión de la flota, así que nunca van a tener un rodado real que mostrar.
 function buildParteTallerFilas(state) {
+  const rodados = (db.getCatalogs() || {}).rodados || [];
   const catLabels = {
     fuera_de_servicio: 'Fuera de Servicio',
     reparacion: 'Reparación',
@@ -4170,9 +4177,12 @@ function buildParteTallerFilas(state) {
   Object.keys(catLabels).forEach(key => {
     (state[key] || []).forEach(u => {
       if (!TIPOS_PARTE_TALLER_SHEET.has(String(u.tipo || '').trim().toUpperCase())) return;
+      const cleanInterno = String(u.interno || '').trim();
+      const match = rodados.find(r => String(r.interno || '').trim() === cleanInterno);
+      if (!match) return;
       filas.push({
         categoria: catLabels[key],
-        interno: u.interno || '',
+        rodado: match.label || cleanInterno,
         tipo: u.tipo || '',
         novedad: String(u.novedad || '').replace(/\n/g, ' | '),
         sector: u.sector || '',
