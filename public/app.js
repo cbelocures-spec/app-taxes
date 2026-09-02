@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '242';
+const CURRENT_APP_VERSION = '243';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -911,10 +911,10 @@ function openPreOrderModal() {
   if (isLavaderoUserForPreOrder) {
     window._preSelectedTipoLavado = null;
     renderTipoLavadoChips();
-    const preLavadorSelect = document.getElementById('pre-form-lavador');
-    if (preLavadorSelect) {
-      populateSelect('pre-form-lavador', cachedCatalogs.empleados || [], 'Seleccionar empleado...');
-      preLavadorSelect.value = '';
+    const preLavadorRowsContainer = document.getElementById('pre-lavador-rows-container');
+    if (preLavadorRowsContainer) {
+      preLavadorRowsContainer.innerHTML = '';
+      addPreLavadorRow();
     }
   }
 
@@ -1509,14 +1509,16 @@ async function submitPreOrderCheck() {
   }
 
   const isLavaderoUserForPreOrder = (userSector === 'Lavadero' || currentSelectedSector === 'Lavadero');
-  let preLavadorVal = "";
+  let preLavadorVals = [];
   if (isLavaderoUserForPreOrder) {
-    preLavadorVal = document.getElementById('pre-form-lavador') ? document.getElementById('pre-form-lavador').value.trim() : "";
+    preLavadorVals = Array.from(document.querySelectorAll('#pre-lavador-rows-container .pre-lavador-select'))
+      .map(sel => sel.value.trim())
+      .filter(Boolean);
     if (!window._preSelectedTipoLavado) {
       showToast("Por favor, elegí el tipo de lavado.", "danger");
       return;
     }
-    if (!preLavadorVal) {
+    if (preLavadorVals.length === 0) {
       showToast("Por favor, elegí quién lava.", "danger");
       return;
     }
@@ -1639,16 +1641,29 @@ async function submitPreOrderCheck() {
       addTaskField();
     }
 
-    // Lavadero ya eligió Tipo de lavado y Lavador en "Filtro de Unidad y Tipo" - aplicarlos a
-    // la tarea recién creada y arrancar el cronómetro de una, en vez de hacer que se repita el
-    // trabajo (o encima aprete "Iniciar") en la pantalla completa. Esa pantalla queda disponible
-    // solo por si hace falta modificar algo antes de enviar.
+    // Lavadero ya eligió Tipo de lavado y Lavador(es) en "Filtro de Unidad y Tipo" - aplicarlos
+    // y arrancar el cronómetro de una, en vez de repetir el trabajo (o encima apretar
+    // "Iniciar") en la pantalla completa. Esa pantalla queda disponible solo por si hace falta
+    // modificar algo antes de enviar. A veces lavan entre varios: misma descripción para
+    // todos, pero una tarea (y un cronómetro) POR CADA lavador - la primera tarea es la que
+    // "addTaskField()" ya creó arriba, y se agrega una más por cada lavador extra.
     if (isLavaderoUserForPreOrder) {
-      const taskCard = document.querySelector('#modal-tasks-list .task-item-card');
-      if (taskCard) {
+      const tipo = tiposLavado.find(t => t.key === window._preSelectedTipoLavado);
+      const tipoDescText = tipo ? `Lavado ${tipo.label}${tipo.descripcion ? `: ${tipo.descripcion}` : ''}` : '';
+      highlightTipoLavadoChip('tipo-lavado-btn', window._preSelectedTipoLavado);
+      const taskListEl = document.getElementById('modal-tasks-list');
+
+      for (let i = 0; i < preLavadorVals.length; i++) {
+        if (i > 0) addTaskField();
+        // addTaskField() prepends brand-new cards (no taskData) to the TOP of the list, not the
+        // bottom - the just-created one is always cards[0], never the last element.
+        const cards = taskListEl ? taskListEl.querySelectorAll('.task-item-card') : [];
+        const taskCard = cards[0];
+        if (!taskCard) continue;
         const empSelect = taskCard.querySelector('.task-emp');
-        if (empSelect) setSearchableSelectValue(empSelect, preLavadorVal);
-        if (window._preSelectedTipoLavado) applyTipoLavado(window._preSelectedTipoLavado);
+        if (empSelect) setSearchableSelectValue(empSelect, preLavadorVals[i]);
+        const descField = taskCard.querySelector('.task-desc');
+        if (descField && tipoDescText) descField.value = tipoDescText;
         if (typeof toggleTaskTimer === 'function') await toggleTaskTimer(taskCard.id);
       }
     }
@@ -9261,7 +9276,7 @@ window.switchSector = function(sector) {
 function updateHomeFleetSectionVisibility() {
   const section = document.getElementById('home-fleet-summary-section');
   if (!section) return;
-  section.style.display = (currentSelectedSector === 'Edilicio') ? 'none' : 'block';
+  section.style.display = (currentSelectedSector === 'Edilicio' || currentSelectedSector === 'Lavadero') ? 'none' : 'block';
 }
 
 function getFilteredActiveOrders() {
@@ -11398,8 +11413,53 @@ function applyTipoLavadoPre(key) {
   highlightTipoLavadoChip('tipo-lavado-pre-btn', key);
 }
 
+// A veces lavan el camión entre varios - cada lavador tiene su propia fila (y va a terminar
+// con su propia tarea y cronómetro, uno por persona, igual que ya funciona en Elastiquero).
+function addPreLavadorRow() {
+  const rowsContainer = document.getElementById('pre-lavador-rows-container');
+  if (!rowsContainer) return;
+  const row = document.createElement('div');
+  row.className = 'pre-lavador-row';
+  row.style.cssText = 'display:flex; gap:8px; align-items:center; margin-top:8px;';
+  row.innerHTML = `
+    <select class="pre-lavador-select" style="flex:1; padding:10px; font-size:16px; border:1px solid var(--border-color); border-radius:8px;">
+      <option value="">Seleccionar empleado...</option>
+      ${(cachedCatalogs.empleados || []).map(e => `<option value="${e.value}">${e.label}</option>`).join('')}
+    </select>
+    <button type="button" onclick="removePreLavadorRow(this)" style="border:none; background:none; color:var(--danger); cursor:pointer; padding:6px;" title="Quitar este lavador">
+      <span class="material-icons" style="font-size:18px;">close</span>
+    </button>
+  `;
+  rowsContainer.appendChild(row);
+}
+
+function removePreLavadorRow(btn) {
+  const row = btn.closest('.pre-lavador-row');
+  if (!row) return;
+  const rowsContainer = row.parentElement;
+  if (rowsContainer.querySelectorAll('.pre-lavador-row').length <= 1) {
+    showToast('Necesitás al menos un lavador cargado.', 'warning');
+    return;
+  }
+  row.remove();
+}
+
+// Accesos rápidos: llenan la primera fila vacía si hay una, o agregan una fila nueva ya con
+// el empleado puesto - mismo patrón que quickAddElastiqueroEmpleado.
 function quickSetPreLavador(value) {
-  const select = document.getElementById('pre-form-lavador');
+  const rowsContainer = document.getElementById('pre-lavador-rows-container');
+  if (!rowsContainer) return;
+  const rows = Array.from(rowsContainer.querySelectorAll('.pre-lavador-row'));
+  let targetRow = rows.find(r => {
+    const sel = r.querySelector('.pre-lavador-select');
+    return sel && !sel.value;
+  });
+  if (!targetRow) {
+    addPreLavadorRow();
+    const allRows = rowsContainer.querySelectorAll('.pre-lavador-row');
+    targetRow = allRows[allRows.length - 1];
+  }
+  const select = targetRow ? targetRow.querySelector('.pre-lavador-select') : null;
   if (select) select.value = value;
 }
 

@@ -1505,7 +1505,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.11.4</div>
+      <div class="sidebar-version">Versión 1.11.5</div>
     </div>
   </aside>
 
@@ -1561,16 +1561,17 @@
           <div id="pre-tipo-lavado-chips" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
         </div>
         <div class="form-group" id="pre-lavador-group" style="margin-top: 15px; display: none;">
-          <label for="pre-form-lavador">Lavador *</label>
+          <label>Lavador (podés elegir más de uno) *</label>
           <div style="display: flex; gap: 6px; margin-bottom: 6px; flex-wrap: wrap;">
             <button type="button" class="btn btn-secondary btn-xs" onclick="quickSetPreLavador('531')" style="border-radius: 999px;">+ Santiago</button>
             <button type="button" class="btn btn-secondary btn-xs" onclick="quickSetPreLavador('262')" style="border-radius: 999px;">+ Martín</button>
             <button type="button" class="btn btn-secondary btn-xs" onclick="quickSetPreLavador('606')" style="border-radius: 999px;">+ Pablo</button>
             <button type="button" class="btn btn-secondary btn-xs" onclick="quickSetPreLavador('540')" style="border-radius: 999px;">+ Thiago</button>
           </div>
-          <select id="pre-form-lavador" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
-            <option value="">Seleccionar empleado...</option>
-          </select>
+          <div id="pre-lavador-rows-container"></div>
+          <button type="button" class="btn btn-secondary btn-xs" onclick="addPreLavadorRow()" style="margin-top: 6px; display: flex; align-items: center; gap: 4px;">
+            <span class="material-icons" style="font-size: 14px;">add</span> Agregar lavador
+          </button>
         </div>
         <div class="form-group" id="pre-form-area-edilicio-group" style="margin-top: 15px; display: none;">
           <label for="pre-form-area-edilicio">Área / Sector *</label>
@@ -2573,6 +2574,6 @@
     }
   </style>
 
-  <script src="app.js?v=242"></script>
+  <script src="app.js?v=243"></script>
 </body>
 </html>
