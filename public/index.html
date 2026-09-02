@@ -270,19 +270,22 @@
           <div class="empty-dashboard-state">No hay tareas en pausa.</div>
         </div>
 
-        <!-- Section: Insumos Retirados pendientes de aprobación (turno actual) -->
-        <div class="dashboard-sub-title" style="margin-top: 20px; justify-content: space-between;">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span class="indicator paused"></span>
-            <span>Insumos Retirados - Turno <span id="insumos-turno-label">-</span> (<span id="count-insumos-pendientes">0</span>)</span>
+        <!-- Section: Insumos Retirados pendientes de aprobación (turno actual) - oculta a
+        pedido, sin sacar el codigo, por si se retoma mas adelante en otra forma. -->
+        <div style="display: none;">
+          <div class="dashboard-sub-title" style="margin-top: 20px; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="indicator paused"></span>
+              <span>Insumos Retirados - Turno <span id="insumos-turno-label">-</span> (<span id="count-insumos-pendientes">0</span>)</span>
+            </div>
           </div>
+          <div class="insumos-pendientes-preview" id="insumos-pendientes-preview">
+            <div class="empty-dashboard-state">No hay insumos pendientes de aprobación en este turno.</div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-xs" style="margin-top: 8px;" onclick="openInsumosApprovalModal()">
+            <span class="material-icons" style="font-size: 14px;">list_alt</span> Ver todos / Aprobar-Rechazar
+          </button>
         </div>
-        <div class="insumos-pendientes-preview" id="insumos-pendientes-preview">
-          <div class="empty-dashboard-state">No hay insumos pendientes de aprobación en este turno.</div>
-        </div>
-        <button type="button" class="btn btn-secondary btn-xs" style="margin-top: 8px;" onclick="openInsumosApprovalModal()">
-          <span class="material-icons" style="font-size: 14px;">list_alt</span> Ver todos / Aprobar-Rechazar
-        </button>
       </div>
 
     </section>
@@ -1499,7 +1502,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.10.16</div>
+      <div class="sidebar-version">Versión 1.10.17</div>
     </div>
   </aside>
 
@@ -2520,6 +2523,6 @@
     }
   </style>
 
-  <script src="app.js?v=236"></script>
+  <script src="app.js?v=237"></script>
 </body>
 </html>
