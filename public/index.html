@@ -1526,7 +1526,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.14.0</div>
+      <div class="sidebar-version">Versión 1.14.1</div>
     </div>
   </aside>
 
@@ -2489,10 +2489,14 @@
             <option value="nico">Volquete Nico (Taxes: VOLQUETE NICO)</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="pt-unit-interno-group">
           <label id="pt-unit-interno-label">Número de Interno</label>
           <input type="text" id="pt-unit-interno" list="pt-interno-list" placeholder="Ej: 54 o REPARACIONES INTERNAS" style="width: 100%;" onchange="ptOnInternoChange()">
           <datalist id="pt-interno-list"></datalist>
+        </div>
+        <div class="form-group" id="pt-unit-interno-edilicio-group" style="display: none;">
+          <label>Rodado</label>
+          <select id="pt-unit-interno-edilicio" style="width: 100%;"></select>
         </div>
         <div class="form-group" id="pt-unit-area-container" style="display: none;">
           <label>Sector / Área</label>
@@ -2511,14 +2515,14 @@
         <div class="form-group">
           <label style="font-weight: 600; margin-bottom: 6px; display: block;">Estado en Taller</label>
           <select id="pt-unit-estado" style="width: 100%; font-size: 14px; padding: 8px;" onchange="ptOnEstadoChange()">
-            <option value="transito" selected>🚚 En Tránsito (trabajando / novedad en ruta)</option>
+            <option value="transito" id="pt-unit-estado-transito" selected>🚚 En Tránsito (trabajando / novedad en ruta)</option>
             <option value="servicios_pendientes">📋 Servicios Pendientes (unidad operativa)</option>
             <option value="reparacion">🔧 En Reparación (unidad inactiva)</option>
             <option value="fuera_de_servicio">❌ Fuera de Servicio (unidad inactiva)</option>
             <option value="inversiones">🏗️ En Preparación (unidad recién comprada)</option>
           </select>
         </div>
-        <div class="form-group" style="margin-top: 6px; background: rgba(250, 204, 21, 0.1); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(202, 138, 4, 0.4);">
+        <div class="form-group" id="pt-unit-elastiquero-group" style="margin-top: 6px; background: rgba(250, 204, 21, 0.1); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(202, 138, 4, 0.4);">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
             <input type="checkbox" id="pt-unit-elastiquero" style="width:16px; height:16px; accent-color:#ca8a04;">
             <span style="font-weight:600; font-size:13px;">Va a trabajar el Elastiquero</span>
@@ -2624,6 +2628,6 @@
     }
   </style>
 
-  <script src="app.js?v=257"></script>
+  <script src="app.js?v=258"></script>
 </body>
 </html>

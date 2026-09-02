@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '257';
+const CURRENT_APP_VERSION = '258';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -15181,12 +15181,44 @@ function ptOnSectorChange() {
   const areaContainer = document.getElementById('pt-unit-area-container');
   const empresaGroup = document.getElementById('pt-unit-empresa-group');
   const tipoGroup = document.getElementById('pt-unit-tipo-group');
-  const internoLabel = document.getElementById('pt-unit-interno-label');
+  const internoGroup = document.getElementById('pt-unit-interno-group');
+  const internoEdilicioGroup = document.getElementById('pt-unit-interno-edilicio-group');
+  const elastiqueroGroup = document.getElementById('pt-unit-elastiquero-group');
   if (areaContainer) areaContainer.style.display = isEdilicio ? 'block' : 'none';
   if (empresaGroup) empresaGroup.style.display = isEdilicio ? 'none' : 'block';
   if (tipoGroup) tipoGroup.style.display = isEdilicio ? 'none' : 'block';
-  if (internoLabel) internoLabel.textContent = isEdilicio ? 'Interno (lugar, ej: Av. Piedra 3550)' : 'Número de Interno';
-  if (isEdilicio) populateAreaEdilicioSelect(undefined, 'pt-unit-area');
+  if (internoGroup) internoGroup.style.display = isEdilicio ? 'none' : 'block';
+  if (internoEdilicioGroup) internoEdilicioGroup.style.display = isEdilicio ? 'block' : 'none';
+  // El Elastiquero solo existe en Taller, y "En Tránsito" es un concepto de camión (está
+  // trabajando afuera, todavía no volvió) que no aplica a un edificio.
+  if (elastiqueroGroup) elastiqueroGroup.style.display = isEdilicio ? 'none' : 'block';
+  const transitoOpt = document.getElementById('pt-unit-estado-transito');
+  if (transitoOpt) transitoOpt.hidden = isEdilicio;
+  const estadoSelect = document.getElementById('pt-unit-estado');
+  if (isEdilicio && estadoSelect && estadoSelect.value === 'transito') {
+    estadoSelect.value = 'servicios_pendientes';
+    ptOnEstadoChange();
+  }
+
+  if (isEdilicio) {
+    populateAreaEdilicioSelect(undefined, 'pt-unit-area');
+    // Edilicio's "Rodado" es el edificio/propiedad (catálogo modelo "Mantenimiento Edilicio"),
+    // nunca un camión - mismo filtro que usa el Rodado de Nueva Orden para Edilicio.
+    const internoEdilicioSelect = document.getElementById('pt-unit-interno-edilicio');
+    if (internoEdilicioSelect) {
+      const currentValue = internoEdilicioSelect.value;
+      const rodadosEdilicio = (cachedCatalogs.rodados || [])
+        .filter(r => String(r.modelo || '').trim() === 'Mantenimiento Edilicio')
+        .map(r => ({ value: r.interno, label: r.interno }));
+      populateSelect('pt-unit-interno-edilicio', rodadosEdilicio, "Seleccionar Rodado...");
+      if (currentValue) {
+        const stillExists = Array.from(internoEdilicioSelect.options).some(opt => opt.value === currentValue);
+        if (stillExists) internoEdilicioSelect.value = currentValue;
+      }
+      if (!internoEdilicioSelect.rebuildSearchable) convertSelectToSearchable(internoEdilicioSelect);
+      if (internoEdilicioSelect.rebuildSearchable) internoEdilicioSelect.rebuildSearchable();
+    }
+  }
   ptCheckForDuplicateUnit();
 }
 
@@ -15232,7 +15264,9 @@ async function savePtUnit() {
   const sectorSel = document.getElementById('pt-unit-sector').value; // 'taller' | 'herreria' | 'edilicio'
   const areaEdilicio = document.getElementById('pt-unit-area').value;
   const empresa = document.getElementById('pt-unit-empresa').value;
-  const interno = document.getElementById('pt-unit-interno').value.trim();
+  const interno = (sectorSel === 'edilicio')
+    ? document.getElementById('pt-unit-interno-edilicio').value.trim()
+    : document.getElementById('pt-unit-interno').value.trim();
   const tipo = document.getElementById('pt-unit-tipo').value;
   const estado = document.getElementById('pt-unit-estado').value;
   const destinoIngreso = document.getElementById('pt-unit-destino').value;
