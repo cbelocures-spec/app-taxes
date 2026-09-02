@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '266';
+const CURRENT_APP_VERSION = '267';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -14871,6 +14871,17 @@ function openPtAddUnitModal() {
   document.getElementById('pt-unit-empresa').value = 'hugo';
   document.getElementById('pt-unit-interno').value = '';
   document.getElementById('pt-unit-interno').disabled = false;
+  // ptOnSectorChange() de abajo PRESERVA el valor actual del Rodado/Área al repoblar sus
+  // opciones (a propósito, para no perderlo si solo se está tocando el selector de sector a
+  // mitad de una edición) - pero al abrir "Agregar Unidad" de nuevo hay que arrancar en blanco,
+  // si no quedaba pegado el Rodado/Área del intento anterior.
+  const internoEdilicioSelect = document.getElementById('pt-unit-interno-edilicio');
+  if (internoEdilicioSelect) {
+    internoEdilicioSelect.value = '';
+    if (internoEdilicioSelect.rebuildSearchable) internoEdilicioSelect.rebuildSearchable();
+  }
+  const areaSelectEl = document.getElementById('pt-unit-area');
+  if (areaSelectEl) areaSelectEl.value = '';
   document.getElementById('pt-unit-tipo').value = 'COMPACTADOR';
   document.getElementById('pt-unit-estado').value = 'transito';
   document.getElementById('pt-unit-destino').value = 'fuera_de_servicio';
