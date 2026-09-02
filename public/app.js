@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '229';
+const CURRENT_APP_VERSION = '230';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7988,14 +7988,26 @@ function addElastiqueroInternoBlock() {
         <span class="material-icons" style="font-size:18px;">delete</span>
       </button>
     </div>
-    <div class="form-group">
-      <label>Interno *</label>
-      <select class="elastiquero-interno-select" style="width:100%;">
-        <option value="">Seleccionar Interno...</option>
-        ${internoOptionsHtml}
-      </select>
+    <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px;">
+      <div class="form-group">
+        <label>Interno *</label>
+        <select class="elastiquero-interno-select" style="width:100%;">
+          <option value="">Seleccionar Interno...</option>
+          ${internoOptionsHtml}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Clasificación *</label>
+        <select class="elastiquero-clasificacion-select" style="width:100%;">
+          <option value="Elastiquero" selected>Elastiquero</option>
+          <option value="Correctivo">Correctivo</option>
+          <option value="Preventivo">Preventivo</option>
+          <option value="Auxilio">Auxilio</option>
+          <option value="Herrería">Herrería</option>
+          <option value="Lavadero">Lavadero</option>
+        </select>
+      </div>
     </div>
-    <div style="font-size:12px; color:var(--text-muted); margin-top:-4px;">Clasificación en Taxes: <strong>Elastiquero</strong></div>
     <div class="elastiquero-ot-info" style="display:none; margin-top:8px; padding:8px 10px; border-radius:6px; font-size:12px; font-weight:600;"></div>
 
     <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:14px 0 0;">Ejes trabajados (elástico)</label>
@@ -8190,6 +8202,8 @@ async function submitElastiqueroOrders() {
         ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === interno)
         : null;
       const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+      const clasifSelect = block.querySelector('.elastiquero-clasificacion-select');
+      const clasificacion = clasifSelect ? clasifSelect.value : 'Elastiquero';
       const incidenteParts = [];
       if (ejeDescripcion) incidenteParts.push('Cambio/Reparación de elástico');
       if (cubiertaDescripcion) incidenteParts.push('Cambio de cubiertas');
@@ -8197,7 +8211,7 @@ async function submitElastiqueroOrders() {
         rodado: rodadoLabel,
         responsable: "AUTO",
         interno: interno,
-        clasificacion: 'Elastiquero',
+        clasificacion: clasificacion,
         fechaEntrega: new Date().toISOString().split('T')[0],
         horario: new Date().toTimeString().slice(0, 5),
         incidente: incidenteParts.join(' + '),
