@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '265';
+const APP_VERSION = '266';
 
 // Middleware
 app.use(cors());
@@ -4186,7 +4186,7 @@ app.post('/api/parte-taller/sync-sheet', async (req, res) => {
 // Adds/moves one unit's novedad across the Parte Taller lists. Mirrors the old
 // Apps Script actualizarEstadoFlotaParte() 1:1, just backed by db.json instead
 // of PropertiesService.
-function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsableRaw, sectorRaw, destinoIngresoRaw) {
+function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsableRaw, sectorRaw, destinoIngresoRaw, areaRaw) {
   const interno = String(internoRaw).trim();
   const estado = String(estadoRaw).trim().toLowerCase();
   const motivo = String(motivoRaw || '').trim();
@@ -4204,10 +4204,11 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   const lists = ['servicios_pendientes', 'reparacion', 'fuera_de_servicio', 'inversiones', 'transito'];
   let existingNovedad = '';
   let existingSector = null;
+  let existingArea = null;
   let currentList = '';
   lists.forEach(listName => {
     const found = (state[listName] || []).find(u => String(u.interno).trim() === interno);
-    if (found) { currentList = listName; if (found.novedad) existingNovedad = found.novedad; if (found.sector) existingSector = found.sector; }
+    if (found) { currentList = listName; if (found.novedad) existingNovedad = found.novedad; if (found.sector) existingSector = found.sector; if (found.area) existingArea = found.area; }
   });
   lists.forEach(listName => {
     state[listName] = (state[listName] || []).filter(u => String(u.interno).trim() !== interno);
@@ -4218,6 +4219,10 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   // Sticks to whichever sector originally logged this unit, so a Taller user closing out a
   // Herrería-created item doesn't accidentally re-tag it as Taller's own.
   const finalSector = existingSector || sector;
+  // El área/sector de Edilicio (Comedor, Baño, etc.) se estaba perdiendo del todo: nunca se
+  // guardaba en ninguno de los pushes de abajo, así que toda novedad de Edilicio terminaba
+  // agrupada como "Sin área" en vez de bajo el área real que el usuario eligió.
+  const finalArea = existingArea || String(areaRaw || '').trim();
 
   // A unit the supervisor put in "En Preparación" (inversiones) has to STAY there no matter
   // what routine sync knocks on this endpoint next - a new task's timer starting, the order
@@ -4253,7 +4258,7 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   if (estadoEfectivo === 'reparacion' || estadoEfectivo === 'fuera_de_servicio' || estadoEfectivo === 'fuera de servicio') {
     const targetList = estadoEfectivo === 'reparacion' ? 'reparacion' : 'fuera_de_servicio';
     const newNovedad = appendMotivo(existingNovedad, motivo);
-    state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector });
+    state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector, area: finalArea });
   } else if (estadoEfectivo === 'operativo') {
     let newNovedad;
     if (existingNovedad) {
@@ -4263,18 +4268,18 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
       if (!newNovedad.startsWith('[ ]') && !newNovedad.startsWith('[X]') && !newNovedad.startsWith('[x]')) newNovedad = '[X] ' + newNovedad;
       else if (newNovedad.startsWith('[ ]')) newNovedad = '[X]' + newNovedad.substring(3);
     }
-    state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '', sector: finalSector });
+    state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '', sector: finalSector, area: finalArea });
   } else if (estadoEfectivo === 'servicios_pendientes' || estadoEfectivo === 'servicios pendientes') {
     const targetList = (currentList === 'reparacion' || currentList === 'fuera_de_servicio') ? currentList : 'servicios_pendientes';
     const newNovedad = appendMotivo(existingNovedad, motivo);
     if (targetList === 'reparacion' || targetList === 'fuera_de_servicio') {
-      state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector });
+      state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector, area: finalArea });
     } else {
-      state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '', sector: finalSector });
+      state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '', sector: finalSector, area: finalArea });
     }
   } else if (estadoEfectivo === 'inversiones' || estadoEfectivo === 'en_preparacion') {
     const newNovedad = appendMotivo(existingNovedad, motivo);
-    state.inversiones.push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector });
+    state.inversiones.push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector, area: finalArea });
   } else if (estadoEfectivo === 'transito') {
     // Was missing entirely: the unit got cleared from every list above (the same step every
     // other estado goes through) but nothing ever put it back anywhere, since no branch here
@@ -4354,7 +4359,7 @@ app.post('/api/parte-taller/novedad', (req, res) => {
     }
     if (!payload.estado) payload.estado = 'fuera_de_servicio';
 
-    const msg = actualizarEstadoFlotaLocal(payload.interno, payload.estado, payload.motivo, payload.responsable, payload.sector, payload.destinoIngreso);
+    const msg = actualizarEstadoFlotaLocal(payload.interno, payload.estado, payload.motivo, payload.responsable, payload.sector, payload.destinoIngreso, payload.area);
     res.json({ ok: true, msg });
   } catch (error) {
     console.error('[Parte Taller] Error:', error);

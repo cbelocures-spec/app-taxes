@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '265';
+const CURRENT_APP_VERSION = '266';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -15495,7 +15495,8 @@ async function savePtUnit() {
           destinoIngreso: (estado === 'transito' ? destinoIngreso : null),
           motivo: novedadFormatted,
           responsable: currentUser,
-          sector: sectorSel
+          sector: sectorSel,
+          area: sectorSel === 'edilicio' ? areaEdilicio : undefined
         })
       });
       if (!res.ok) throw new Error('Error al registrar la novedad en el Parte Taller.');
