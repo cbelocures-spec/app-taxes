@@ -1252,6 +1252,33 @@ class LocalDB {
     return item;
   }
 
+  // Permite corregir un preventivo custom ya creado - en particular necesitaHoja, por si al
+  // crearlo se olvidaron de tildar "Necesita seguimiento en la Hoja de Controles" y quedo sin
+  // columna ni hoja asignada.
+  updatePreventivoMasivaCustom(key, { label, sector, necesitaHoja } = {}) {
+    const db = this.read();
+    if (!Array.isArray(db.preventivosMasivaCustom)) db.preventivosMasivaCustom = [];
+    const item = db.preventivosMasivaCustom.find(p => p.key === key);
+    if (!item) throw new Error('Preventivo no encontrado.');
+
+    if (label !== undefined) {
+      const cleanLabel = String(label || '').trim();
+      if (!cleanLabel) throw new Error('El nombre del preventivo no puede estar vacío.');
+      item.label = cleanLabel;
+    }
+    if (sector !== undefined) {
+      const cleanSector = String(sector || '').trim();
+      if (!cleanSector) throw new Error('Sector inválido.');
+      item.sector = cleanSector;
+    }
+    if (necesitaHoja !== undefined) {
+      item.necesitaHoja = !!necesitaHoja;
+      item.hoja = item.necesitaHoja ? (item.hoja || item.label) : item.hoja;
+    }
+    this.write(db);
+    return item;
+  }
+
   // --- Audit Log for Auto-Deleted Verified Orders ---
   getDeletedOrdersLog() {
     const db = this.read();

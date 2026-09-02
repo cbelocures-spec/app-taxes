@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '232';
+const CURRENT_APP_VERSION = '233';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7209,16 +7209,11 @@ async function submitBulkOrders() {
 
   const ordersList = [];
 
-  // Which control columns are actually showing right now (tied to the active preventivo
-  // type buttons) - only those get logged for the excel/planilla, and only those default a
+  // Which controls are actually active right now (tied to the active preventivo type
+  // buttons) - only those get logged for la hoja de controles, and only those default a
   // blank cell to "OK" for a selected vehicle. A control that wasn't part of this masiva at
-  // all shouldn't get an "OK" it was never actually checked for.
-  const activeInsumoKeys = BULK_INSUMO_TYPES
-    .filter(t => {
-      const el = document.querySelector(`.${t.cls}`);
-      return el && el.style.display !== 'none';
-    })
-    .map(t => t.key);
+  // all (ningun preventivo apretado) shouldn't get an "OK" it was never actually checked for.
+  const activeInsumoKeys = getActiveInsumoKeys();
   const controlesInsumosPayload = [];
 
   for (let i = 0; i < selectedChks.length; i++) {
@@ -10980,11 +10975,11 @@ async function submitMassiveOrders() {
 // --- PREVENTIVO MULTI-SELECT STATE ---
 let activePreventivoTypes = new Set();
 const PREVENTIVO_LINES = {
-  'A':  ['Ctrol Refrigerante', 'Ctrol Aceite Motor', 'Ctrol Grasa Caja', 'Ctrol Grasa Diferencial', 'Ctrol Hco Direccion'],
+  'A':  ['Ctrol Refrigerante', 'Ctrol Aceite Motor', 'Ctrol Grasa Caja', 'Ctrol Grasa Diferencial', 'Ctrol ATF (Hco Dirección)'],
   'RM': ['Ctrol Refrigerante', 'Ctrol Aceite Motor'],
   'C':  ['Ctrol Grasa Caja'],
   'D':  ['Ctrol Grasa Diferencial'],
-  'HD': ['Ctrol Hco Direccion'],
+  'HD': ['Ctrol ATF (Hco Dirección)'],
   'H':  ['Ctrol Hco Equipo'],
   'V':  ['Ctrol Vigía'],
   'L':  ['Ctrol Luces'],
@@ -11183,19 +11178,38 @@ async function submitCrearPreventivo() {
   }
 }
 
+// Fuente de verdad unica de que controles (fijos o custom) estan activos ahora mismo, segun los
+// botones de preventivo apretados - la usan tanto updateBulkInsumosGrid (que columnas mostrar)
+// como submitBulkOrders (que controles marcar "OK" al enviar), para que nunca queden
+// desincronizados entre si. Antes submitBulkOrders miraba el display:none de cada <th> en vez de
+// esto, y como esas celdas nunca se tocaban cuando no habia ningun preventivo apretado (quedaban
+// visibles por default desde la carga de la pagina), una carga masiva sin apretar ningun
+// preventivo terminaba marcando "OK" en TODAS las hojas igual.
+function getActiveInsumoKeys() {
+  if (activePreventivoTypes.size === 0) return [];
+  const isAActive  = activePreventivoTypes.has('A');
+  const isRMActive = activePreventivoTypes.has('RM');
+  const isCActive  = activePreventivoTypes.has('C');
+  const isDActive  = activePreventivoTypes.has('D');
+  const isHDActive = activePreventivoTypes.has('HD');
+  const GROUPED_SHOW = {
+    refrigerante: isAActive || isRMActive,
+    aceite_motor: isAActive || isRMActive,
+    grasa_caja: isAActive || isCActive,
+    grasa_diferencial: isAActive || isDActive,
+    hco_direccion: isAActive || isHDActive
+  };
+  return BULK_INSUMO_TYPES
+    .filter(t => Object.prototype.hasOwnProperty.call(GROUPED_SHOW, t.key) ? GROUPED_SHOW[t.key] : activePreventivoTypes.has(t.key))
+    .map(t => t.key);
+}
+
 function updateBulkInsumosGrid() {
   const container = document.getElementById('bulk-insumos-grid-container');
   const tbody = document.getElementById('bulk-insumos-grid-body');
   if (!container || !tbody) return;
 
   const checkboxes = document.querySelectorAll('#bulk-vehicle-list input[type="checkbox"]:checked');
-  
-  // Use activePreventivoTypes Set (set by preventivo buttons)
-  const isAActive  = activePreventivoTypes.has('A');
-  const isRMActive = activePreventivoTypes.has('RM');
-  const isCActive  = activePreventivoTypes.has('C');
-  const isDActive  = activePreventivoTypes.has('D');
-  const isHDActive = activePreventivoTypes.has('HD');
   const isAnyActive = activePreventivoTypes.size > 0;
 
   if (checkboxes.length === 0 || !isAnyActive) {
@@ -11246,22 +11260,11 @@ function updateBulkInsumosGrid() {
     }
   });
 
-  // Show/hide columns based on active preventivo types. The first 5 controls have a
-  // "master" button (Fluidos/A) that shows them alongside their own dedicated button; every
-  // other control - including every preventivo custom created via "Crear Preventivo" - has
-  // no grouping, its column just follows its own button directly.
-  const GROUPED_SHOW = {
-    refrigerante: isAActive || isRMActive,
-    aceite_motor: isAActive || isRMActive,
-    grasa_caja: isAActive || isCActive,
-    grasa_diferencial: isAActive || isDActive,
-    hco_direccion: isAActive || isHDActive
-  };
+  // Show/hide columns based on active preventivo types (misma logica que submitBulkOrders usa
+  // para decidir que controles mandar - ver getActiveInsumoKeys).
+  const activeKeys = new Set(getActiveInsumoKeys());
   BULK_INSUMO_TYPES.forEach(t => {
-    const show = Object.prototype.hasOwnProperty.call(GROUPED_SHOW, t.key)
-      ? GROUPED_SHOW[t.key]
-      : activePreventivoTypes.has(t.key);
-    document.querySelectorAll(`.${t.cls}`).forEach(el => el.style.display = show ? '' : 'none');
+    document.querySelectorAll(`.${t.cls}`).forEach(el => el.style.display = activeKeys.has(t.key) ? '' : 'none');
   });
 }
 
