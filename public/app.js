@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '267';
+const CURRENT_APP_VERSION = '268';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -15401,19 +15401,25 @@ function ptOnInternoChange() {
 // Submits the unit add/edit data
 async function savePtUnit() {
   const saveBtn = document.getElementById('btn-save-pt-unit');
-  const sectorSel = document.getElementById('pt-unit-sector').value; // 'taller' | 'herreria' | 'edilicio'
-  const areaEdilicio = document.getElementById('pt-unit-area').value;
-  const empresa = document.getElementById('pt-unit-empresa').value;
+  // Lecturas defensivas (?.value en vez de .value a secas): si algún selector no existiera en
+  // el DOM en ese momento, esto devolvía "Cannot read properties of null" ANTES de llegar al
+  // try/catch de más abajo - la función se cortaba ahí mismo sin ningún toast de error, dando
+  // la sensación de que "Guardar Unidad" no hacía nada en absoluto.
+  const sectorSel = document.getElementById('pt-unit-sector')?.value || 'taller'; // 'taller' | 'herreria' | 'edilicio'
+  const areaEdilicio = document.getElementById('pt-unit-area')?.value || '';
+  const empresa = document.getElementById('pt-unit-empresa')?.value || 'hugo';
   const interno = (sectorSel === 'edilicio')
-    ? document.getElementById('pt-unit-interno-edilicio').value.trim()
-    : document.getElementById('pt-unit-interno').value.trim();
-  const tipo = document.getElementById('pt-unit-tipo').value;
-  const estado = document.getElementById('pt-unit-estado').value;
-  const destinoIngreso = document.getElementById('pt-unit-destino').value;
-  const novedadText = document.getElementById('pt-unit-novedad').value.trim();
+    ? (document.getElementById('pt-unit-interno-edilicio')?.value || '').trim()
+    : (document.getElementById('pt-unit-interno')?.value || '').trim();
+  const tipo = document.getElementById('pt-unit-tipo')?.value || '';
+  const estado = document.getElementById('pt-unit-estado')?.value || '';
+  const destinoIngreso = document.getElementById('pt-unit-destino')?.value || '';
+  const novedadText = (document.getElementById('pt-unit-novedad')?.value || '').trim();
   const currentUser = localStorage.getItem('currentUserUsername') || 'Rodriguez Nicolas';
   const elastiqueroCheckEl = document.getElementById('pt-unit-elastiquero');
   const pendingElastiqueroFlag = elastiqueroCheckEl ? elastiqueroCheckEl.checked : false;
+
+  console.log('[savePtUnit] sectorSel=', sectorSel, 'interno=', interno, 'areaEdilicio=', areaEdilicio, 'estado=', estado);
 
   if (sectorSel === 'edilicio' && !areaEdilicio) {
     showToast('Elegí el área de Edilicio.', 'warning');
@@ -15510,7 +15516,11 @@ async function savePtUnit() {
           area: sectorSel === 'edilicio' ? areaEdilicio : undefined
         })
       });
-      if (!res.ok) throw new Error('Error al registrar la novedad en el Parte Taller.');
+      if (!res.ok) {
+        let serverMsg = '';
+        try { serverMsg = (await res.json()).error || ''; } catch (e) {}
+        throw new Error(serverMsg || `Error al registrar la novedad en el Parte Taller (HTTP ${res.status}).`);
+      }
 
       // 2. Automatically generate a Correctivo work order in Taxes if reparación o fuera_de_servicio.
       // Servicios Pendientes NUNCA crea orden/tarea todavía, ni siquiera para Edilicio - es solo
