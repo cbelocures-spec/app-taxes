@@ -1526,7 +1526,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.13.4</div>
+      <div class="sidebar-version">Versión 1.14.0</div>
     </div>
   </aside>
 
@@ -2474,6 +2474,14 @@
       </div>
       <div class="dialog-body">
         <div class="form-group">
+          <label>Sector</label>
+          <select id="pt-unit-sector" style="width: 100%;" onchange="ptOnSectorChange()">
+            <option value="taller">Taller</option>
+            <option value="herreria">Herrería</option>
+            <option value="edilicio">Edilicio</option>
+          </select>
+        </div>
+        <div class="form-group" id="pt-unit-empresa-group">
           <label>Empresa</label>
           <select id="pt-unit-empresa" style="width: 100%;" onchange="ptOnEmpresaChange()">
             <option value="hugo">Contenedores Hugo</option>
@@ -2482,11 +2490,15 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Número de Interno</label>
+          <label id="pt-unit-interno-label">Número de Interno</label>
           <input type="text" id="pt-unit-interno" list="pt-interno-list" placeholder="Ej: 54 o REPARACIONES INTERNAS" style="width: 100%;" onchange="ptOnInternoChange()">
           <datalist id="pt-interno-list"></datalist>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="pt-unit-area-container" style="display: none;">
+          <label>Sector / Área</label>
+          <select id="pt-unit-area" style="width: 100%;"></select>
+        </div>
+        <div class="form-group" id="pt-unit-tipo-group">
           <label>Tipo de Unidad</label>
           <select id="pt-unit-tipo" style="width: 100%;">
             <option value="COMPACTADOR">COMPACTADOR</option>
@@ -2612,6 +2624,6 @@
     }
   </style>
 
-  <script src="app.js?v=256"></script>
+  <script src="app.js?v=257"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '256';
+const CURRENT_APP_VERSION = '257';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -14738,6 +14738,11 @@ function openPtAddUnitModal() {
   window._ptDuplicateEditList = null;
   
   document.getElementById('pt-unit-modal-title').textContent = 'Agregar Unidad a Taller';
+  // Arranca en el sector de la pestaña donde está parado el usuario, no siempre "taller" - si
+  // abre "Agregar Unidad" estando en Edilicio, tiene sentido que la novedad sea de Edilicio.
+  const defaultSector = currentSelectedSector === 'Herrería' ? 'herreria'
+    : currentSelectedSector === 'Edilicio' ? 'edilicio' : 'taller';
+  document.getElementById('pt-unit-sector').value = defaultSector;
   document.getElementById('pt-unit-empresa').value = 'hugo';
   document.getElementById('pt-unit-interno').value = '';
   document.getElementById('pt-unit-interno').disabled = false;
@@ -14747,6 +14752,7 @@ function openPtAddUnitModal() {
   document.getElementById('pt-unit-novedad').value = '';
   const elastiqueroCheck = document.getElementById('pt-unit-elastiquero');
   if (elastiqueroCheck) elastiqueroCheck.checked = false;
+  ptOnSectorChange();
 
   // Hide checklist editor, show plain textarea label
   const checkSection = document.getElementById('pt-unit-checklist-section');
@@ -15166,6 +15172,24 @@ function ptCheckForDuplicateUnit() {
 
 
 // Handles change of company in the modal
+// Toggles the "Agregar Unidad" modal between camion-flota fields (Empresa/Tipo de Unidad) and
+// Edilicio fields (Sector/Área) - Edilicio no tiene "empresa" ni tipo de camión, tiene un lugar
+// (el Interno, ej. "Av. Piedra 3550") y un área dentro de ese lugar (Comedor, Baño, etc.).
+function ptOnSectorChange() {
+  const sector = document.getElementById('pt-unit-sector').value;
+  const isEdilicio = (sector === 'edilicio');
+  const areaContainer = document.getElementById('pt-unit-area-container');
+  const empresaGroup = document.getElementById('pt-unit-empresa-group');
+  const tipoGroup = document.getElementById('pt-unit-tipo-group');
+  const internoLabel = document.getElementById('pt-unit-interno-label');
+  if (areaContainer) areaContainer.style.display = isEdilicio ? 'block' : 'none';
+  if (empresaGroup) empresaGroup.style.display = isEdilicio ? 'none' : 'block';
+  if (tipoGroup) tipoGroup.style.display = isEdilicio ? 'none' : 'block';
+  if (internoLabel) internoLabel.textContent = isEdilicio ? 'Interno (lugar, ej: Av. Piedra 3550)' : 'Número de Interno';
+  if (isEdilicio) populateAreaEdilicioSelect(undefined, 'pt-unit-area');
+  ptCheckForDuplicateUnit();
+}
+
 function ptOnEmpresaChange() {
   const empresa = document.getElementById('pt-unit-empresa').value;
   const tipoSelect = document.getElementById('pt-unit-tipo');
@@ -15205,6 +15229,8 @@ function ptOnInternoChange() {
 // Submits the unit add/edit data
 async function savePtUnit() {
   const saveBtn = document.getElementById('btn-save-pt-unit');
+  const sectorSel = document.getElementById('pt-unit-sector').value; // 'taller' | 'herreria' | 'edilicio'
+  const areaEdilicio = document.getElementById('pt-unit-area').value;
   const empresa = document.getElementById('pt-unit-empresa').value;
   const interno = document.getElementById('pt-unit-interno').value.trim();
   const tipo = document.getElementById('pt-unit-tipo').value;
@@ -15214,6 +15240,11 @@ async function savePtUnit() {
   const currentUser = localStorage.getItem('currentUserUsername') || 'Rodriguez Nicolas';
   const elastiqueroCheckEl = document.getElementById('pt-unit-elastiquero');
   const pendingElastiqueroFlag = elastiqueroCheckEl ? elastiqueroCheckEl.checked : false;
+
+  if (sectorSel === 'edilicio' && !areaEdilicio) {
+    showToast('Elegí el área de Edilicio.', 'warning');
+    return;
+  }
 
   if (!interno) {
     showToast('El número de interno es obligatorio.', 'warning');
@@ -15301,8 +15332,7 @@ async function savePtUnit() {
           destinoIngreso: (estado === 'transito' ? destinoIngreso : null),
           motivo: novedadFormatted,
           responsable: currentUser,
-          sector: (getSectorByUsername(currentUser) === 'Herrería') ? 'herreria'
-            : (getSectorByUsername(currentUser) === 'Edilicio') ? 'edilicio' : 'taller'
+          sector: sectorSel
         })
       });
       if (!res.ok) throw new Error('Error al registrar la novedad en el Parte Taller.');
@@ -15328,11 +15358,11 @@ async function savePtUnit() {
         const today = new Date().toISOString().split('T')[0];
         const incidentDesc = novedadFormatted.split('\n').map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()).filter(Boolean).join(', ');
 
-        const autoSectorHerreria = (getSectorByUsername(currentUser) === 'Herrería');
+        const autoSectorHerreria = (sectorSel === 'herreria');
         // Taxes has no real "Edilicio" clasificacion value - Edilicio work is identified by the
         // order's own `sector` field instead (see getOrderSector/isEdilicioOrder), never by
         // writing "Edilicio" into clasificacion.
-        const autoSectorEdilicio = (getSectorByUsername(currentUser) === 'Edilicio');
+        const autoSectorEdilicio = (sectorSel === 'edilicio');
 
         const orderPayload = {
           rodado: rodadoLabel,
@@ -15340,6 +15370,7 @@ async function savePtUnit() {
           interno: internoVal,
           clasificacion: autoSectorHerreria ? "Herrería" : "Correctivo",
           sector: autoSectorEdilicio ? "Edilicio" : undefined,
+          area: autoSectorEdilicio ? areaEdilicio : undefined,
           fechaEntrega: today,
           horario: "12:00",
           incidente: incidentDesc || "Revisión en taller",
