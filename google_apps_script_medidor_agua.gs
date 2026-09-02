@@ -11,7 +11,7 @@ var NOMBRE_HOJA_AGUA = 'Medidor de Agua';
 var HEADERS_AGUA = ['Fecha', 'Hora', 'Turno', 'Lectura (L)', 'Consumo (L)', 'Registrado por'];
 
 var NOMBRE_HOJA_PARTE_TALLER = 'Parte Taller';
-var HEADERS_PARTE_TALLER = ['Categoría', 'Rodado', 'Tipo', 'Novedad', 'Sector', 'Día Parado', 'Días en Reparación', 'Destino'];
+var HEADERS_PARTE_TALLER = ['Categoría', 'Rodado', 'Interno', 'Tipo', 'Novedad', 'Sector', 'Día Parado', 'Días en Reparación', 'Destino'];
 
 function doPost(e) {
   try {
@@ -75,7 +75,7 @@ function agregarLectura(fecha, hora, turno, lectura, registradoPor) {
   return consumo;
 }
 
-var NUM_COLS_PARTE_TALLER = HEADERS_PARTE_TALLER.length; // 8
+var NUM_COLS_PARTE_TALLER = HEADERS_PARTE_TALLER.length; // 9
 
 // Colores por tipo de camión, iguales a las tarjetas del "Parte Diario de Taller" adentro de
 // la app, para que la Hoja se lea igual de un vistazo.
@@ -143,7 +143,7 @@ function actualizarParteTaller(resumen, resumenTipos, filas) {
   if (filas && filas.length > 0) {
     var rows = filas.map(function (f) {
       return [
-        f.categoria || '', f.rodado || '', f.tipo || '', f.novedad || '',
+        f.categoria || '', f.rodado || '', f.interno || '', f.tipo || '', f.novedad || '',
         f.sector || '', f.dia_parado || '', f.dias_en_reparacion || '', f.destino || ''
       ];
     });

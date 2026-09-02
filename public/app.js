@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '250';
+const CURRENT_APP_VERSION = '251';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13561,6 +13561,65 @@ function resolvePtUnitDisplayLabel(item, internoPT) {
   return `<strong>${internoPT}</strong>`;
 }
 
+// Arma las filas de detalle para la copia en vivo del Parte Taller en la Hoja del Medidor de
+// Agua, a partir del MISMO displayState ya reconciliado con Taxes que usa el tablero real (no
+// el estado crudo guardado en el server). Rodado e Interno van por separado: Rodado sale del
+// campo que ya trae la unidad sintetizada por adjustPtStateLists, o si no de una búsqueda en el
+// catálogo; si ninguna de las dos resuelve un rodado real, la fila se descarta (es un "bucket"
+// de trabajo de Herrería, no un camión de la flota - REP. CONTENEDOR..., Caja verde N, etc.).
+function buildParteTallerFilasForSheet(state) {
+  const TIPOS = new Set(['COMPACTADOR', 'VOLQUETE', 'ROLL - OFF', 'PLANCHA']);
+  const catLabels = {
+    fuera_de_servicio: 'Fuera de Servicio',
+    reparacion: 'Reparación',
+    inversiones: 'Preparación',
+    transito: 'Tránsito'
+  };
+  const filas = [];
+  Object.keys(catLabels).forEach(key => {
+    (state[key] || []).forEach(u => {
+      const tipoNorm = String(u.tipo || '').trim().toUpperCase();
+      if (!TIPOS.has(tipoNorm)) return;
+      const cleanInterno = String(u.interno || '').trim();
+      let rodado = u.rodado || '';
+      if (!rodado && cachedCatalogs && cachedCatalogs.rodados) {
+        const match = cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === cleanInterno);
+        if (match) rodado = match.label || '';
+      }
+      if (!rodado) return;
+      filas.push({
+        categoria: catLabels[key],
+        rodado,
+        interno: cleanInterno,
+        tipo: u.tipo || '',
+        novedad: String(u.novedad || '').replace(/\n/g, ' | '),
+        sector: u.sector || '',
+        dia_parado: u.dia_parado || '',
+        dias_en_reparacion: u.dias_en_reparacion || '',
+        destino: u.destinoIngreso || ''
+      });
+    });
+  });
+  return filas;
+}
+
+async function syncParteTallerResumenSheetLive(displayState, resumenTipos) {
+  try {
+    const resumen = displayState.resumen || {};
+    await fetch('/api/parte-taller/sync-sheet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resumen: { responsable: resumen.responsable || '', fecha: resumen.fecha || '', hora: resumen.hora || '' },
+        resumenTipos: resumenTipos || [],
+        filas: buildParteTallerFilasForSheet(displayState)
+      })
+    });
+  } catch (e) {
+    console.error('[ParteTaller->Sheet] Error sincronizando:', e);
+  }
+}
+
 function renderParteTallerDashboard(state) {
   if (!state) {
     const noData = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos registrados aún.</td></tr>';
@@ -13597,6 +13656,7 @@ function renderParteTallerDashboard(state) {
     { key: 'ROLL - OFF',  suffix: 'roll' },
     { key: 'PLANCHA',     suffix: 'plancha' }
   ];
+  const resumenTiposParaSheet = [];
   types.forEach(t => {
     const op = parseCount(t.key, 'operativos');
     const rep = parseCount(t.key, 'reparacion');
@@ -13622,7 +13682,18 @@ function renderParteTallerDashboard(state) {
     if (el(`home-pct-${t.suffix}`)) el(`home-pct-${t.suffix}`).textContent = `${pct}%`;
     if (el(`home-quad-${t.suffix}`)) el(`home-quad-${t.suffix}`).textContent = fs + rep + inv;
     if (el(`home-quad-${t.suffix}-detail`)) el(`home-quad-${t.suffix}-detail`).innerHTML = `<span style="color:#ef4444;">${fs} F/S</span> · <span style="color:#f97316;">${rep} R</span> · <span style="color:#d97706;">${inv} P</span>`;
+
+    resumenTiposParaSheet.push({ tipo: t.key, operativos: op, reparacion: rep, fueraServicio: fs, preparacion: inv, total: tot, disponibilidad: pct });
   });
+
+  // Manda a la Hoja del Medidor de Agua los MISMOS números que se acaban de pintar arriba (ya
+  // reconciliados con las órdenes activas de Taxes vía adjustPtStateLists) en vez de recalcularlos
+  // de nuevo en el servidor con datos incompletos - así la Hoja siempre coincide con lo que se ve
+  // en la app. Fire-and-forget: si la URL del script no está configurada el server devuelve 400
+  // y acá simplemente se ignora.
+  if (typeof syncParteTallerResumenSheetLive === 'function') {
+    syncParteTallerResumenSheetLive(displayState, resumenTiposParaSheet);
+  }
 
   // Checklist helper
   function getChecklistHtml(item, internoPT) {

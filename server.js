@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '250';
+const APP_VERSION = '251';
 
 // Middleware
 app.use(cors());
@@ -4143,97 +4143,45 @@ function recalcularTotalesResumenLocal(state) {
   state.resumen.totales = totales;
   const now = new Date();
   state.resumen.fecha = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
-  state.resumen.hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
+  state.resumen.hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' });
 }
 
-// One-way live mirror of Parte Taller into a "Parte Taller" tab of the same Google Sheet used
-// by el Medidor de Agua (settings.aguaScriptUrl). db.json stays the only source of truth - the
-// app never reads this tab back - precisely to avoid the old Sheets-backed data-loss races
-// described above saveParteTallerState. Fire-and-forget: never awaited by callers, errors just
-// get logged so a Sheets hiccup can't block a real Parte Taller update.
-// Solo estos 4 tipos de camiones van a la Hoja - deja afuera los "buckets" internos que no son
-// unidades reales (IRINEO GRAL., VOLQUETE NICO, REPARACIONES INTERNAS: resolveTipoFromInterno
-// les da tipo null/vacío, así que el filtro los excluye solo).
-const TIPOS_PARTE_TALLER_SHEET = new Set(['COMPACTADOR', 'VOLQUETE', 'ROLL - OFF', 'PLANCHA']);
-
-// Servicios Pendientes queda afuera de la Hoja a pedido: solo interesa ver ahí lo que
-// realmente tiene la unidad parada/en curso (Tránsito, Reparación, Fuera de Servicio,
-// Preparación), no la lista de items ya resueltos a la espera de agendarse.
+// One-way live mirror del Parte Taller en una pestaña "Parte Taller" de la misma Hoja del
+// Medidor de Agua (settings.aguaScriptUrl). db.json sigue siendo la única fuente de verdad -
+// la app nunca lee esa pestaña de vuelta - precisamente para no repetir las corridas de pérdida
+// de datos del viejo esquema Sheets-backed via PropertiesService.
 //
-// Muestra Rodado en vez de Interno, y de paso sirve como segundo filtro: solo entra una fila
-// si su interno matchea un camión real del catálogo (rodados). Eso deja afuera los "buckets"
-// de trabajo de Herrería que quedan cargados con un interno de texto en vez de un número
-// (REP. CONTENEDOR..., FABRICACION..., Caja verde N, Irineo 23, una dirección, etc.) - ninguno
-// de esos es un camión de la flota, así que nunca van a tener un rodado real que mostrar.
-function buildParteTallerFilas(state) {
-  const rodados = (db.getCatalogs() || {}).rodados || [];
-  const catLabels = {
-    fuera_de_servicio: 'Fuera de Servicio',
-    reparacion: 'Reparación',
-    inversiones: 'Preparación',
-    transito: 'Tránsito'
-  };
-  const filas = [];
-  Object.keys(catLabels).forEach(key => {
-    (state[key] || []).forEach(u => {
-      if (!TIPOS_PARTE_TALLER_SHEET.has(String(u.tipo || '').trim().toUpperCase())) return;
-      const cleanInterno = String(u.interno || '').trim();
-      const match = rodados.find(r => String(r.interno || '').trim() === cleanInterno);
-      if (!match) return;
-      filas.push({
-        categoria: catLabels[key],
-        rodado: match.label || cleanInterno,
-        tipo: u.tipo || '',
-        novedad: String(u.novedad || '').replace(/\n/g, ' | '),
-        sector: u.sector || '',
-        dia_parado: u.dia_parado || '',
-        dias_en_reparacion: u.dias_en_reparacion || '',
-        destino: u.destinoIngreso || ''
-      });
-    });
-  });
-  return filas;
-}
-
-// Mismo cálculo que adjustPtStateLists() en app.js (las 4 tarjetas de arriba de Parte Taller /
-// Inicio): parte de los totales de flota ya calculados en state.resumen.totales[tipo].total y
-// separa Fuera de Servicio/Reparación/Preparación como conteos independientes en vez del
-// "fuera" combinado que guarda recalcularTotalesResumenLocal.
-function buildParteTallerResumenTipos(state) {
-  const esUnidadDeFlotaReal = u => !INTERNOS_NO_FLOTA.has(String(u.interno || '').trim().toUpperCase());
-  const totales = (state.resumen || {}).totales || {};
-  return ['COMPACTADOR', 'VOLQUETE', 'ROLL - OFF', 'PLANCHA'].map(tipo => {
-    const totalFlota = totales[tipo] && totales[tipo].total !== undefined ? parseInt(totales[tipo].total) || 0 : 0;
-    const fueraServicio = (state.fuera_de_servicio || []).filter(esUnidadDeFlotaReal).filter(u => String(u.tipo).trim().toUpperCase() === tipo).length;
-    const reparacion = (state.reparacion || []).filter(esUnidadDeFlotaReal).filter(u => String(u.tipo).trim().toUpperCase() === tipo).length;
-    const preparacion = (state.inversiones || []).filter(esUnidadDeFlotaReal).filter(u => String(u.tipo).trim().toUpperCase() === tipo).length;
-    const operativos = Math.max(0, totalFlota - fueraServicio - reparacion - preparacion);
-    const disponibilidad = totalFlota > 0 ? Math.round((operativos / totalFlota) * 100) : 0;
-    return { tipo, operativos, reparacion, fueraServicio, preparacion, total: totalFlota, disponibilidad };
-  });
-}
-
-async function syncParteTallerToSheet(state) {
+// Los conteos por tipo (Operativos/En Reparación/Fuera Servicio/En Preparación) NO se calculan
+// acá: dependen de la reconciliación con las órdenes activas de Taxes que hace
+// adjustPtStateLists() en app.js (una unidad con una tarea en curso pasa a "En Reparación" antes
+// de que alguien la cargue manualmente en el Parte Taller). Recalcularlo de cero server-side con
+// solo el estado guardado daba números que no coincidían con el tablero real de la app. En vez
+// de duplicar esa lógica acá (con el riesgo de que las dos versiones se desincronicen con el
+// tiempo), este endpoint es un simple proxy: el cliente ya calculó los números correctos para
+// pintar el tablero, así que se los reenvía tal cual a la Hoja.
+app.post('/api/parte-taller/sync-sheet', async (req, res) => {
   try {
     const settings = db.getSettings();
     const scriptUrl = settings.aguaScriptUrl;
-    if (!scriptUrl) return;
-    const resumen = state.resumen || {};
+    if (!scriptUrl) return res.status(400).json({ error: 'URL del script del Medidor de Agua no configurada en Ajustes.' });
+    const { resumen, resumenTipos, filas } = req.body || {};
     const response = await fetch(scriptUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         accion: 'actualizarParteTaller',
-        resumen: { responsable: resumen.responsable || '', fecha: resumen.fecha || '', hora: resumen.hora || '' },
-        resumenTipos: buildParteTallerResumenTipos(state),
-        filas: buildParteTallerFilas(state)
+        resumen: resumen || {},
+        resumenTipos: resumenTipos || [],
+        filas: filas || []
       })
     });
     if (!response.ok) throw new Error(`Google Apps Script respondió con estado ${response.status}`);
+    res.json({ success: true });
   } catch (error) {
     console.error('[ParteTaller->Sheet] Error sincronizando:', error.message);
+    res.status(500).json({ error: error.message });
   }
-}
+});
 
 // Adds/moves one unit's novedad across the Parte Taller lists. Mirrors the old
 // Apps Script actualizarEstadoFlotaParte() 1:1, just backed by db.json instead
@@ -4349,7 +4297,6 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
 
   recalcularTotalesResumenLocal(state);
   db.saveParteTallerState(state);
-  syncParteTallerToSheet(state);
   return `Unidad #${interno} actualizada a ${estadoEfectivo.toUpperCase()} en Parte del Taller`;
 }
 
@@ -4367,7 +4314,6 @@ app.post('/api/parte-taller/recalcular-totales', (req, res) => {
     const state = db.getParteTallerState();
     recalcularTotalesResumenLocal(state);
     db.saveParteTallerState(state);
-    syncParteTallerToSheet(state);
     res.json({ ok: true, totales: state.resumen.totales });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -4385,7 +4331,6 @@ app.post('/api/parte-taller/novedad', (req, res) => {
 
     if (accion === 'save_state') {
       const saved = db.saveParteTallerState(payload.state || {});
-      syncParteTallerToSheet(saved);
       return res.json({ ok: true, state: saved });
     }
 
@@ -4394,9 +4339,8 @@ app.post('/api/parte-taller/novedad', (req, res) => {
       state.resumen = state.resumen || {};
       state.resumen.responsable = payload.responsable || state.resumen.responsable;
       state.resumen.fecha = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
-      state.resumen.hora = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
+      state.resumen.hora = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' });
       db.saveParteTallerState(state);
-      syncParteTallerToSheet(state);
       return res.json({ ok: true, msg: `Responsable actualizado a ${payload.responsable}` });
     }
 
