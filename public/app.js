@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '230';
+const CURRENT_APP_VERSION = '231';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7698,16 +7698,19 @@ function addElastiqueroEjeRow(btn) {
         <optgroup label="Eje Delantero">
           <option value="Delantero izquierdo">Delantero izquierdo</option>
           <option value="Delantero derecho">Delantero derecho</option>
+          <option value="Delantero ambos lados">Delantero ambos lados</option>
           <option value="Delantero completo (cambio de eje)">Delantero completo (cambio de eje)</option>
         </optgroup>
         <optgroup label="Eje Trasero (Tracción - Diferencial)">
           <option value="Trasero izquierdo">Trasero izquierdo</option>
           <option value="Trasero derecho">Trasero derecho</option>
+          <option value="Trasero ambos lados">Trasero ambos lados</option>
           <option value="Trasero completo (cambio de eje)">Trasero completo (cambio de eje)</option>
         </optgroup>
         <optgroup label="Eje Fijo / Flotante">
           <option value="Eje fijo/flotante izquierdo">Eje fijo/flotante izquierdo</option>
           <option value="Eje fijo/flotante derecho">Eje fijo/flotante derecho</option>
+          <option value="Eje fijo/flotante ambos lados">Eje fijo/flotante ambos lados</option>
           <option value="Eje fijo/flotante completo (cambio de eje)">Eje fijo/flotante completo (cambio de eje)</option>
         </optgroup>
         <option value="Auxilio / Repuesto">Auxilio / Repuesto</option>
