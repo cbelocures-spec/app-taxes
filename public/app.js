@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '241';
+const CURRENT_APP_VERSION = '242';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -904,8 +904,10 @@ function openPreOrderModal() {
   // pantalla completa - por pedido explicito: "quiero que este todo aca al principio".
   const preTipoLavadoGroup = document.getElementById('pre-tipo-lavado-group');
   const preLavadorGroup = document.getElementById('pre-lavador-group');
+  const preLavaderoImage = document.getElementById('pre-lavadero-image');
   if (preTipoLavadoGroup) preTipoLavadoGroup.style.display = isLavaderoUserForPreOrder ? 'block' : 'none';
   if (preLavadorGroup) preLavadorGroup.style.display = isLavaderoUserForPreOrder ? 'block' : 'none';
+  if (preLavaderoImage) preLavaderoImage.style.display = isLavaderoUserForPreOrder ? 'block' : 'none';
   if (isLavaderoUserForPreOrder) {
     window._preSelectedTipoLavado = null;
     renderTipoLavadoChips();
