@@ -94,6 +94,13 @@ function actualizarParteTaller(resumen, resumenTipos, filas) {
   var sheet = obtenerHoja(NOMBRE_HOJA_PARTE_TALLER, HEADERS_PARTE_TALLER);
   sheet.clear();
 
+  // La columna F es "Flota Total" (número) arriba en las tarjetas y "Día Parado" (texto tipo
+  // fecha) más abajo en el detalle - al ser la MISMA columna, el autoformato de Sheets termina
+  // detectando "fecha" para toda la columna y convierte el número de flota (ej. 63) en una
+  // fecha rara (3/3/1900). Forzar texto plano en todo el bloque antes de escribir nada evita
+  // que Sheets reinterprete ningún valor, sin importar en qué fila/columna caiga.
+  sheet.getRange(1, 1, 500, NUM_COLS_PARTE_TALLER).setNumberFormat('@');
+
   // --- Encabezado tipo "Parte Diario de Taller" ---
   sheet.getRange(1, 1, 1, NUM_COLS_PARTE_TALLER).merge()
     .setValue('PARTE DIARIO DE TALLER')
