@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '238';
+const CURRENT_APP_VERSION = '239';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1694,7 +1694,12 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
   modal.classList.add('open');
   // Reset form
   document.getElementById('work-order-form').reset();
-  
+  document.querySelectorAll('.tipo-lavado-btn').forEach(btn => {
+    btn.style.outline = '';
+    btn.style.fontWeight = '';
+    btn.style.boxShadow = '';
+  });
+
   // Set up input vs select based on user sector
   setupAllFieldsForSector();
 
@@ -1758,10 +1763,12 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
   const clasificacionEl = document.getElementById('form-clasificacion');
   if (clasificacionEl) {
     const isHerreriaTabOrUser = isHerreria || currentSelectedSector === 'Herrería';
+    const isLavaderoTabOrUser = currentSelectedSector === 'Lavadero';
     // Edilicio has no real Taxes clasificacion value (see server.js's getOrderSector) - that
     // sector is identified by the task's Centro de Costo, not by this field, so it defaults
-    // to "Correctivo" same as Taller.
-    clasificacionEl.value = presetClasificacion || (isHerreriaTabOrUser ? 'Herrería' : 'Correctivo');
+    // to "Correctivo" same as Taller. Lavadero DOES have a real Taxes value (like Herrería),
+    // and always uses it - there's no picker shown for it (see setupAllFieldsForSector).
+    clasificacionEl.value = isLavaderoTabOrUser ? 'Lavadero' : (presetClasificacion || (isHerreriaTabOrUser ? 'Herrería' : 'Correctivo'));
   }
 
   // 4.5 Pre-select Responsable with whoever is logged in - the payload used to always send
@@ -2454,6 +2461,7 @@ async function fetchCatalogs() {
     // Render the bulk vehicle selector list
     renderBulkVehicleSelector();
     fetchCustomPreventivos();
+    fetchTiposLavado();
 
     // Update catalog status UI now that cachedCatalogs is populated
     if (lastKnownSettings) {
@@ -2825,6 +2833,16 @@ function renderTaskTimerHistory(card) {
   }
 }
 
+// Accesos rapidos para los lavadores que mas se repiten en Lavadero - misma idea que
+// quickAddElastiqueroEmpleado, pero mas simple: acá hay un solo select de empleado por tarea
+// (no filas repetibles), asi que solo hace falta encontrarlo y setearlo.
+function quickSetTaskEmpleado(taskId, empleadoValue) {
+  const card = document.getElementById(taskId);
+  if (!card) return;
+  const select = card.querySelector('.task-emp');
+  if (select) setSearchableSelectValue(select, empleadoValue);
+}
+
 function addTaskField(taskData = null, forceNew = false) {
   try {
     const container = document.getElementById('modal-tasks-list');
@@ -2847,6 +2865,7 @@ function addTaskField(taskData = null, forceNew = false) {
     // alone decide isEdilicioTask.
     const isHerreriaTask = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || activeClasif === 'Herrería');
     const isEdilicioTask = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio');
+    const isLavaderoTask = (userSector === 'Lavadero' || currentSelectedSector === 'Lavadero' || activeClasif === 'Lavadero');
     let defaultCcVal = "15"; // default to MECANICA
     if (isHerreriaTask) {
       const herrOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "11" || opt.value === "HERRERIA" || (opt.label && String(opt.label).toLowerCase().includes("herrer"))));
@@ -2858,6 +2877,11 @@ function addTaskField(taskData = null, forceNew = false) {
       if (ediOpt) {
         defaultCcVal = ediOpt.value;
       }
+    } else if (isLavaderoTask) {
+      const lavOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "13" || (opt.label && String(opt.label).toLowerCase().includes("lavader"))));
+      if (lavOpt) {
+        defaultCcVal = lavOpt.value;
+      }
     }
 
     // The "Insumos / Repuestos Utilizados" checklist (Aceite Motor, Refrigerante, etc.) is
@@ -2868,8 +2892,8 @@ function addTaskField(taskData = null, forceNew = false) {
       ? (cachedCatalogs.centrosCosto || []).find(opt => opt && opt.value === taskData.centroCosto)
       : null;
     const hideInsumosSection = existingCcOpt
-      ? /herrer|edil/i.test(String(existingCcOpt.label || ''))
-      : (isHerreriaTask || isEdilicioTask);
+      ? /herrer|edil|lavader/i.test(String(existingCcOpt.label || ''))
+      : (isHerreriaTask || isEdilicioTask || isLavaderoTask);
 
     // Build select option strings
     let ccOptions = `<option value="">Seleccionar Centro Costo...</option>`;
@@ -2940,11 +2964,11 @@ function addTaskField(taskData = null, forceNew = false) {
           ${isLocked ? `<div class="task-locked-overlay" onclick="showLockedTaskAlert()" title="Tarea cerrada y verificada — no se puede modificar" style="position:absolute; inset:0; z-index:5; cursor:not-allowed;"></div>` : ''}
 
           <div class="form-row">
-            <div class="form-group col-6">
+            <div class="form-group ${isLavaderoTask ? 'col-12' : 'col-6'}">
               <label>Fecha Tarea</label>
               <input type="date" class="task-date" value="${taskDateVal}" ${dateLockedAttr}>
             </div>
-            <div class="form-group col-6">
+            <div class="form-group col-6" style="${isLavaderoTask ? 'display:none;' : ''}">
               <label>Centro de Costo *</label>
               <select class="task-cc" required ${lockedAttr}>
                 ${ccOptions}
@@ -2953,7 +2977,14 @@ function addTaskField(taskData = null, forceNew = false) {
           </div>
 
           <div class="form-group">
-            <label>Empleado Asignado *</label>
+            <label>${isLavaderoTask ? 'Lavador *' : 'Empleado Asignado *'}</label>
+            ${isLavaderoTask ? `
+            <div style="display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-secondary btn-xs" onclick="quickSetTaskEmpleado('${taskId}', '531')" style="border-radius:999px;">+ Santiago</button>
+              <button type="button" class="btn btn-secondary btn-xs" onclick="quickSetTaskEmpleado('${taskId}', '262')" style="border-radius:999px;">+ Martín</button>
+              <button type="button" class="btn btn-secondary btn-xs" onclick="quickSetTaskEmpleado('${taskId}', '606')" style="border-radius:999px;">+ Pablo</button>
+              <button type="button" class="btn btn-secondary btn-xs" onclick="quickSetTaskEmpleado('${taskId}', '540')" style="border-radius:999px;">+ Thiago</button>
+            </div>` : ''}
             <select class="task-emp" required ${lockedAttr}>
               <option value="">Seleccionar Empleado...</option>
             </select>
@@ -9150,6 +9181,11 @@ window.switchSector = function(sector) {
   if (typeof updateStats === 'function') updateStats();
   if (typeof setupAllFieldsForSector === 'function') setupAllFieldsForSector();
   if (typeof renderHistoryOrders === 'function') renderHistoryOrders();
+  // The Clasificación <option> list (bulk/pre-form/form) only had the sector active at LOGIN
+  // baked in (see checkUserSession) - without refreshing it here too, switching tabs afterward
+  // left options from whatever sector was active at page load (e.g. no "Lavadero" option at
+  // all if login happened as Taller), so setting .value to it later silently failed.
+  if (typeof updateClassificationSelectOptions === 'function') updateClassificationSelectOptions();
   updateHomeFleetSectionVisibility();
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -9887,7 +9923,7 @@ function checkUserSession() {
   // sector view by default, not the generic Taller one - otherwise the Clasificación
   // dropdown shows the wrong option set until they manually click their sector tab.
   const loginSector = getSectorByUsername(username);
-  if (loginSector === 'Herrería' || loginSector === 'Edilicio') {
+  if (loginSector === 'Herrería' || loginSector === 'Edilicio' || loginSector === 'Lavadero') {
     currentSelectedSector = loginSector;
   }
   updateHomeFleetSectionVisibility();
@@ -11221,6 +11257,97 @@ async function submitCrearPreventivo() {
   }
 }
 
+// --- Tipos de lavado (Lavadero) ---
+let tiposLavado = [];
+
+async function fetchTiposLavado() {
+  try {
+    const res = await fetch('/api/tipos-lavado');
+    if (!res.ok) return;
+    const data = await res.json();
+    tiposLavado = data.tipos || [];
+    renderTipoLavadoChips();
+  } catch (e) {
+    console.error('Error cargando tipos de lavado:', e);
+  }
+}
+
+function renderTipoLavadoChips() {
+  const container = document.getElementById('form-tipo-lavado-chips');
+  if (!container) return;
+  const chips = tiposLavado.map(t => `
+    <button type="button" class="btn btn-secondary btn-xs tipo-lavado-btn" data-key="${t.key}" onclick="applyTipoLavado('${t.key}')" style="border-radius:999px;">${escapeHtml(t.label)}</button>
+  `).join('');
+  container.innerHTML = chips + `
+    <button type="button" class="btn btn-secondary btn-xs" onclick="openCrearTipoLavadoModal()" style="border-radius:999px; border-style:dashed;">
+      <span class="material-icons" style="font-size:13px; vertical-align:-2px;">add</span> Crear tipo de lavado
+    </button>
+  `;
+}
+
+// Aplica el tipo de lavado elegido a la primera tarea de la orden (Lavadero siempre es un solo
+// camion/un solo trabajo, no hace falta elegir en cual tarea) - autocompleta la descripcion con
+// el texto que despues se ve en Taxes, y marca visualmente el chip elegido.
+function applyTipoLavado(key) {
+  const tipo = tiposLavado.find(t => t.key === key);
+  if (!tipo) return;
+
+  document.querySelectorAll('.tipo-lavado-btn').forEach(btn => {
+    const active = btn.dataset.key === key;
+    btn.style.outline = active ? '2px solid currentColor' : '';
+    btn.style.fontWeight = active ? '700' : '';
+    btn.style.boxShadow = active ? 'inset 0 0 0 2px currentColor' : '';
+  });
+
+  const container = document.getElementById('modal-tasks-list');
+  let card = container ? container.querySelector('.task-item-card') : null;
+  if (!card) {
+    addTaskField();
+    card = container ? container.querySelector('.task-item-card') : null;
+  }
+  if (!card) return;
+  const descField = card.querySelector('.task-desc');
+  if (descField) {
+    descField.value = `Lavado ${tipo.label}${tipo.descripcion ? `: ${tipo.descripcion}` : ''}`;
+  }
+}
+
+function openCrearTipoLavadoModal() {
+  document.getElementById('ctl-nombre').value = '';
+  document.getElementById('ctl-descripcion').value = '';
+  document.getElementById('crear-tipo-lavado-modal').classList.add('open');
+}
+
+function closeCrearTipoLavadoModal() {
+  document.getElementById('crear-tipo-lavado-modal').classList.remove('open');
+}
+
+async function submitCrearTipoLavado() {
+  const label = document.getElementById('ctl-nombre').value.trim();
+  const descripcion = document.getElementById('ctl-descripcion').value.trim();
+  if (!label) {
+    return showToast('Ingresá un nombre para el tipo de lavado.', 'danger');
+  }
+  try {
+    const res = await fetch('/api/tipos-lavado', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label, descripcion })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Error al crear el tipo de lavado');
+    }
+    const data = await res.json();
+    tiposLavado.push(data.tipo);
+    renderTipoLavadoChips();
+    closeCrearTipoLavadoModal();
+    showToast(`Tipo de lavado "${data.tipo.label}" creado.`, 'success');
+  } catch (e) {
+    showToast(e.message, 'danger');
+  }
+}
+
 // Fuente de verdad unica de que controles (fijos o custom) estan activos ahora mismo, segun los
 // botones de preventivo apretados - la usan tanto updateBulkInsumosGrid (que columnas mostrar)
 // como submitBulkOrders (que controles marcar "OK" al enviar), para que nunca queden
@@ -11618,6 +11745,19 @@ function setupAllFieldsForSector() {
   const formClasif = document.getElementById('form-clasificacion') ? document.getElementById('form-clasificacion').value : '';
   const isHerreria = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || preClasif === 'Herrería' || formClasif === 'Herrería');
   const isEdilicio = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio' || preClasif === 'Edilicio' || formClasif === 'Edilicio');
+  const isLavadero = (userSector === 'Lavadero' || currentSelectedSector === 'Lavadero' || preClasif === 'Lavadero' || formClasif === 'Lavadero');
+
+  // Lavadero siempre es Lavadero - no hace falta elegir Clasificación, se fija sola y se
+  // oculta el selector (a diferencia de Herrería/Edilicio, donde el usuario puede elegir
+  // otra clasificación real como Correctivo/Preventivo/Auxilio para ese mismo camion).
+  const formClasifGroup = document.getElementById('form-clasificacion') ? document.getElementById('form-clasificacion').closest('.form-group') : null;
+  if (formClasifGroup) formClasifGroup.style.display = isLavadero ? 'none' : '';
+  if (isLavadero && document.getElementById('form-clasificacion')) {
+    document.getElementById('form-clasificacion').value = 'Lavadero';
+  }
+
+  const tipoLavadoGroup = document.getElementById('form-tipo-lavado-group');
+  if (tipoLavadoGroup) tipoLavadoGroup.style.display = isLavadero ? 'block' : 'none';
 
   // 1. Main modal: Rodado
   const rodadoSelectGroup = document.getElementById('form-rodado-group-select');

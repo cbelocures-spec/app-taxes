@@ -1505,7 +1505,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.11.0</div>
+      <div class="sidebar-version">Versión 1.11.1</div>
     </div>
   </aside>
 
@@ -1817,6 +1817,29 @@
     </div>
   </div>
 
+  <div class="popup-modal-backdrop" id="crear-tipo-lavado-modal">
+    <div class="modal-content" style="max-width: 420px; margin: auto; padding: 24px; border-radius: 16px; background: var(--card-bg); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: slideUp 0.3s ease-out;">
+      <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 4px;">Crear tipo de lavado</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 18px;">Se agrega como botón permanente en Lavadero.</p>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label for="ctl-nombre" style="font-weight: 600; font-size: 12px; color: var(--text-main); text-transform: uppercase;">Nombre</label>
+        <input type="text" id="ctl-nombre" placeholder="Ej: Premium" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 6px; box-sizing: border-box;">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label for="ctl-descripcion" style="font-weight: 600; font-size: 12px; color: var(--text-main); text-transform: uppercase;">Descripción del lavado</label>
+        <textarea id="ctl-descripcion" rows="3" placeholder="Ej: se lava cabina interior, exterior, encerado" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 6px; box-sizing: border-box;"></textarea>
+        <p style="font-size: 11px; color: var(--text-muted); margin: 6px 0 0;">Va a aparecer en la tarea como "Lavado [nombre]: [descripción]".</p>
+      </div>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary" onclick="closeCrearTipoLavadoModal()" style="padding: 10px 18px; border-radius: 8px;">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="submitCrearTipoLavado()" style="padding: 10px 18px; border-radius: 8px;">Crear tipo de lavado</button>
+      </div>
+    </div>
+  </div>
+
   <!-- FULLSCREEN NEW ORDER MODAL -->
   <div class="fullscreen-modal" id="new-order-modal">
     <div class="modal-header">
@@ -1905,6 +1928,11 @@
             <div id="form-area-edilicio-new-row" style="display: none; margin: -8px 0 12px; gap: 8px; align-items: center;">
               <input type="text" id="form-area-edilicio-new-input" placeholder="Nombre del área/sector (ej: Baño)" style="flex: 1; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; height: 38px;">
               <button type="button" class="btn btn-primary btn-sm" onclick="saveNewAreaEdilicio()">Guardar</button>
+            </div>
+
+            <div id="form-tipo-lavado-group" class="form-group" style="display: none;">
+              <label>Tipo de lavado</label>
+              <div id="form-tipo-lavado-chips" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;"></div>
             </div>
 
             <div class="form-group" style="display: none;">
@@ -2528,6 +2556,6 @@
     }
   </style>
 
-  <script src="app.js?v=238"></script>
+  <script src="app.js?v=239"></script>
 </body>
 </html>

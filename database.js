@@ -307,7 +307,8 @@ const DEFAULT_DB = {
   activeMechanics: DEFAULT_MECHANICS,
   users: {},
   insumosPendientes: [],
-  preventivosMasivaCustom: []
+  preventivosMasivaCustom: [],
+  tiposLavado: []
 };
 
 // Thread-safe read/write helper
@@ -1276,6 +1277,41 @@ class LocalDB {
       item.necesitaHoja = !!necesitaHoja;
       item.hoja = item.necesitaHoja ? (item.hoja || item.label) : item.hoja;
     }
+    this.write(db);
+    return item;
+  }
+
+  // --- Tipos de lavado (Lavadero) ---
+  // Definidos a mano por el usuario (nombre + descripción del lavado) - se agregan como
+  // botones permanentes en la Nueva Orden de Lavadero, y su descripción se usa para
+  // autocompletar la tarea (ej: "Lavado Premium: se lava cabina interior, exterior, encerado").
+  getTiposLavado() {
+    const db = this.read();
+    return db.tiposLavado || [];
+  }
+
+  addTipoLavado({ label, descripcion }) {
+    const db = this.read();
+    if (!Array.isArray(db.tiposLavado)) db.tiposLavado = [];
+    const cleanLabel = String(label || '').trim();
+    if (!cleanLabel) throw new Error('El nombre del tipo de lavado no puede estar vacío.');
+    const cleanDescripcion = String(descripcion || '').trim();
+
+    const slugBase = cleanLabel
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'lavado';
+    let key = slugBase;
+    let suffix = 1;
+    const existingKeys = new Set(db.tiposLavado.map(t => t.key));
+    while (existingKeys.has(key)) {
+      suffix++;
+      key = `${slugBase}_${suffix}`;
+    }
+
+    const item = { key, label: cleanLabel, descripcion: cleanDescripcion, createdAt: new Date().toISOString() };
+    db.tiposLavado.push(item);
     this.write(db);
     return item;
   }
