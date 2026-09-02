@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '255';
+const CURRENT_APP_VERSION = '256';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13168,6 +13168,7 @@ function adjustPtStateLists(state) {
         interno: order.interno || 'Sin numero',
         rodado: order.rodado || '',
         tipo: guessUnitTypeFromCatalog(order.interno),
+        area: order.area || '',
         dia_parado: new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
         dias_en_reparacion: 0
       };
@@ -13968,7 +13969,7 @@ function renderParteTallerDashboard(state) {
 
         return `<tr>
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEditBtnHtml(internoPT, 'transito')}</div></td>
-          <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
+          <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td>${targetBadge}</td>
           <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
@@ -14039,7 +14040,7 @@ function renderParteTallerDashboard(state) {
           }
           return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:var(--card-bg); border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
-              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
+              <div><strong style="font-size:16px;">${internoPT}</strong>${item.area ? `<span style="font-size:12px; color:#7c3aed; font-weight:600; margin-left:6px;">(${item.area})</span>` : (item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : '')}</div>
               ${targetBadge}
             </div>
             <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>En ruta desde: <strong>${desde}</strong></span></div>
@@ -14099,7 +14100,7 @@ function renderParteTallerDashboard(state) {
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         return `<tr>
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEstadoTrabajoBadgeHtml(item)} ${getEditBtnHtml(internoPT, 'fuera_de_servicio')}</div></td>
-          <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
+          <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
           <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
@@ -14118,7 +14119,7 @@ function renderParteTallerDashboard(state) {
           const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
           return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:var(--card-bg); border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
-              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}${getEstadoTrabajoBadgeHtml(item)}</div>
+              <div><strong style="font-size:16px;">${internoPT}</strong>${item.area ? `<span style="font-size:12px; color:#7c3aed; font-weight:600; margin-left:6px;">(${item.area})</span>` : (item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : '')}${getEstadoTrabajoBadgeHtml(item)}</div>
               ${getDiasParadoHtml(item, desde)}
             </div>
             <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>Ingreso: <strong>${desde}</strong></span></div>
@@ -14149,7 +14150,7 @@ function renderParteTallerDashboard(state) {
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         return `<tr>
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEstadoTrabajoBadgeHtml(item)} ${getEditBtnHtml(internoPT, 'reparacion')}</div></td>
-          <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
+          <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
           <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
@@ -14168,7 +14169,7 @@ function renderParteTallerDashboard(state) {
           const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
           return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:var(--card-bg); border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
-              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}${getEstadoTrabajoBadgeHtml(item)}</div>
+              <div><strong style="font-size:16px;">${internoPT}</strong>${item.area ? `<span style="font-size:12px; color:#7c3aed; font-weight:600; margin-left:6px;">(${item.area})</span>` : (item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : '')}${getEstadoTrabajoBadgeHtml(item)}</div>
               ${getDiasParadoHtml(item, desde)}
             </div>
             <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>Ingreso: <strong>${desde}</strong></span></div>
@@ -14197,7 +14198,7 @@ function renderParteTallerDashboard(state) {
         const servicio = item.servicio || item.tipo_servicio || '—';
         return `<tr>
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEditBtnHtml(internoPT, 'servicios_pendientes')}</div></td>
-          <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
+          <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
           <td><span style="font-size:12px;">${servicio}</span></td>
@@ -14215,7 +14216,7 @@ function renderParteTallerDashboard(state) {
           const servicio = item.servicio || item.tipo_servicio || '—';
           return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:var(--card-bg); border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
-              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
+              <div><strong style="font-size:16px;">${internoPT}</strong>${item.area ? `<span style="font-size:12px; color:#7c3aed; font-weight:600; margin-left:6px;">(${item.area})</span>` : (item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : '')}</div>
               <span class="badge" style="background:#2196f3;color:white;font-size:11px;">${servicio}</span>
             </div>
             <div style="margin:10px 0; padding:8px; background:var(--card-bg); border-radius:6px; border:1px solid #e2e8f0;">
@@ -14243,7 +14244,7 @@ function renderParteTallerDashboard(state) {
         const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
         return `<tr>
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${getEditBtnHtml(internoPT, 'inversiones')} <strong>${internoPT}</strong></div></td>
-          <td><span style="font-size:11px;">${item.tipo || '—'}</span></td>
+          <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtmlWithProgress(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
           <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
@@ -14262,7 +14263,7 @@ function renderParteTallerDashboard(state) {
           const desde = item.dia_parado || item.fecha_ingreso || item.ingreso || '—';
           return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:var(--card-bg); border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
-              <div><strong style="font-size:16px;">${internoPT}</strong>${item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : ''}</div>
+              <div><strong style="font-size:16px;">${internoPT}</strong>${item.area ? `<span style="font-size:12px; color:#7c3aed; font-weight:600; margin-left:6px;">(${item.area})</span>` : (item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : '')}</div>
               ${getDiasParadoHtml(item, desde)}
             </div>
             <div style="margin-top:4px; font-size:12px; color:var(--text-muted);">Ingresó el: <strong>${desde}</strong></div>
