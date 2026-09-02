@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '239';
+const CURRENT_APP_VERSION = '240';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -885,13 +885,34 @@ function openPreOrderModal() {
   // propio de clasificacion en Taxes - ese sector se identifica por el Centro de Costo de la
   // tarea, no por este campo.
   const clsEl = document.getElementById('pre-form-clasificacion');
+  const currentUserForCls = localStorage.getItem('currentUserUsername');
+  const userSectorForCls = getSectorByUsername(currentUserForCls);
+  const isLavaderoUserForPreOrder = (userSectorForCls === 'Lavadero' || currentSelectedSector === 'Lavadero');
   if (clsEl) {
-    const currentUser = localStorage.getItem('currentUserUsername');
-    const userSector = getSectorByUsername(currentUser);
-    if (userSector === 'Herrería' || currentSelectedSector === 'Herrería') {
+    if (isLavaderoUserForPreOrder) {
+      clsEl.value = 'Lavadero';
+    } else if (userSectorForCls === 'Herrería' || currentSelectedSector === 'Herrería') {
       clsEl.value = 'Herrería';
     } else {
       clsEl.value = '';
+    }
+    const clsGroup = clsEl.closest('.form-group');
+    if (clsGroup) clsGroup.style.display = isLavaderoUserForPreOrder ? 'none' : '';
+  }
+
+  // Lavadero pide Tipo de lavado y Lavador ya en esta primera pantalla, en vez de recien en la
+  // pantalla completa - por pedido explicito: "quiero que este todo aca al principio".
+  const preTipoLavadoGroup = document.getElementById('pre-tipo-lavado-group');
+  const preLavadorGroup = document.getElementById('pre-lavador-group');
+  if (preTipoLavadoGroup) preTipoLavadoGroup.style.display = isLavaderoUserForPreOrder ? 'block' : 'none';
+  if (preLavadorGroup) preLavadorGroup.style.display = isLavaderoUserForPreOrder ? 'block' : 'none';
+  if (isLavaderoUserForPreOrder) {
+    window._preSelectedTipoLavado = null;
+    renderTipoLavadoChips();
+    const preLavadorSelect = document.getElementById('pre-form-lavador');
+    if (preLavadorSelect) {
+      populateSelect('pre-form-lavador', cachedCatalogs.empleados || [], 'Seleccionar empleado...');
+      preLavadorSelect.value = '';
     }
   }
 
@@ -1485,6 +1506,20 @@ async function submitPreOrderCheck() {
     }
   }
 
+  const isLavaderoUserForPreOrder = (userSector === 'Lavadero' || currentSelectedSector === 'Lavadero');
+  let preLavadorVal = "";
+  if (isLavaderoUserForPreOrder) {
+    preLavadorVal = document.getElementById('pre-form-lavador') ? document.getElementById('pre-form-lavador').value.trim() : "";
+    if (!window._preSelectedTipoLavado) {
+      showToast("Por favor, elegí el tipo de lavado.", "danger");
+      return;
+    }
+    if (!preLavadorVal) {
+      showToast("Por favor, elegí quién lava.", "danger");
+      return;
+    }
+  }
+
   const isCarmona = currentUser === 'jcarmona@contenedoreshugo.com.ar' || currentUser === 'j.carmona@contenedoreshugo.com.ar';
 
   let existingOrder = null;
@@ -1501,15 +1536,19 @@ async function submitPreOrderCheck() {
       const isSameClasif = String(o.clasificacion || '').trim().toLowerCase() === String(clasificacion || '').trim().toLowerCase();
       if (!isSameClasif) return false;
 
-      // Separate Herrería/Edilicio from Taller:
+      // Separate Herrería/Edilicio/Lavadero from Taller:
       const orderIsHerreria = isHerreriaOrder(o);
       const orderIsEdilicio = isEdilicioOrder(o);
+      const orderIsLavadero = isLavaderoOrder(o);
 
       let matched;
       let branch;
       if (userSector === 'Herrería') {
         branch = 'userSector===Herrería';
         matched = orderIsHerreria;
+      } else if (isLavaderoUserForPreOrder) {
+        branch = 'isLavaderoUserForPreOrder';
+        matched = orderIsLavadero;
       } else if (isEdilicioUserForPreOrder) {
         // A building can hold several separate open O.T.s at once, one per área - matching
         // only by interno/clasificacion here (like Taller does) would reopen whichever área's
@@ -1525,9 +1564,9 @@ async function submitPreOrderCheck() {
         // an Edilicio order, regardless of what its own clasificacion/sector text says, so it
         // must never be reused as a fallback "Taller" match.
         branch = 'Taller fallback';
-        matched = !orderIsHerreria && !orderIsEdilicio && !o.area;
+        matched = !orderIsHerreria && !orderIsEdilicio && !orderIsLavadero && !o.area;
       }
-      console.log(`[submitPreOrderCheck][DEBUG] candidate id=${o.id} area=${JSON.stringify(o.area)} orderIsEdilicio=${orderIsEdilicio} orderIsHerreria=${orderIsHerreria} branch=${branch} matched=${matched}`);
+      console.log(`[submitPreOrderCheck][DEBUG] candidate id=${o.id} area=${JSON.stringify(o.area)} orderIsEdilicio=${orderIsEdilicio} orderIsHerreria=${orderIsHerreria} orderIsLavadero=${orderIsLavadero} branch=${branch} matched=${matched}`);
       return matched;
     });
     console.log('[submitPreOrderCheck][DEBUG] FINAL existingOrder:', existingOrder ? existingOrder.id : null);
@@ -1596,6 +1635,20 @@ async function submitPreOrderCheck() {
       // de Costo - passing an object with centroCosto:"" bypassed that default entirely, since
       // addTaskField only uses it when taskData is exactly null.
       addTaskField();
+    }
+
+    // Lavadero ya eligió Tipo de lavado y Lavador en "Filtro de Unidad y Tipo" - aplicarlos a
+    // la tarea recién creada y arrancar el cronómetro de una, en vez de hacer que se repita el
+    // trabajo (o encima aprete "Iniciar") en la pantalla completa. Esa pantalla queda disponible
+    // solo por si hace falta modificar algo antes de enviar.
+    if (isLavaderoUserForPreOrder) {
+      const taskCard = document.querySelector('#modal-tasks-list .task-item-card');
+      if (taskCard) {
+        const empSelect = taskCard.querySelector('.task-emp');
+        if (empSelect) setSearchableSelectValue(empSelect, preLavadorVal);
+        if (window._preSelectedTipoLavado) applyTipoLavado(window._preSelectedTipoLavado);
+        if (typeof toggleTaskTimer === 'function') await toggleTaskTimer(taskCard.id);
+      }
     }
   }
 }
@@ -11272,17 +11325,37 @@ async function fetchTiposLavado() {
   }
 }
 
+// Se renderiza en dos lugares: la pantalla completa (form-tipo-lavado-chips, aplica directo a
+// la tarea) y la pantalla rapida "Filtro de Unidad y Tipo" (pre-tipo-lavado-chips, todavia no
+// hay tarea creada - solo guarda la eleccion en window._preSelectedTipoLavado hasta que
+// submitPreOrderCheck arme la orden). Class distinta por contexto para que resaltar un chip en
+// una pantalla no afecte al otro.
 function renderTipoLavadoChips() {
-  const container = document.getElementById('form-tipo-lavado-chips');
-  if (!container) return;
-  const chips = tiposLavado.map(t => `
-    <button type="button" class="btn btn-secondary btn-xs tipo-lavado-btn" data-key="${t.key}" onclick="applyTipoLavado('${t.key}')" style="border-radius:999px;">${escapeHtml(t.label)}</button>
-  `).join('');
-  container.innerHTML = chips + `
-    <button type="button" class="btn btn-secondary btn-xs" onclick="openCrearTipoLavadoModal()" style="border-radius:999px; border-style:dashed;">
-      <span class="material-icons" style="font-size:13px; vertical-align:-2px;">add</span> Crear tipo de lavado
-    </button>
-  `;
+  const targets = [
+    { containerId: 'form-tipo-lavado-chips', cls: 'tipo-lavado-btn', handler: 'applyTipoLavado' },
+    { containerId: 'pre-tipo-lavado-chips', cls: 'tipo-lavado-pre-btn', handler: 'applyTipoLavadoPre' }
+  ];
+  targets.forEach(({ containerId, cls, handler }) => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const chips = tiposLavado.map(t => `
+      <button type="button" class="btn btn-secondary btn-xs ${cls}" data-key="${t.key}" onclick="${handler}('${t.key}')" style="border-radius:999px;">${escapeHtml(t.label)}</button>
+    `).join('');
+    container.innerHTML = chips + `
+      <button type="button" class="btn btn-secondary btn-xs" onclick="openCrearTipoLavadoModal()" style="border-radius:999px; border-style:dashed;">
+        <span class="material-icons" style="font-size:13px; vertical-align:-2px;">add</span> Crear tipo de lavado
+      </button>
+    `;
+  });
+}
+
+function highlightTipoLavadoChip(cls, key) {
+  document.querySelectorAll(`.${cls}`).forEach(btn => {
+    const active = btn.dataset.key === key;
+    btn.style.outline = active ? '2px solid currentColor' : '';
+    btn.style.fontWeight = active ? '700' : '';
+    btn.style.boxShadow = active ? 'inset 0 0 0 2px currentColor' : '';
+  });
 }
 
 // Aplica el tipo de lavado elegido a la primera tarea de la orden (Lavadero siempre es un solo
@@ -11291,13 +11364,7 @@ function renderTipoLavadoChips() {
 function applyTipoLavado(key) {
   const tipo = tiposLavado.find(t => t.key === key);
   if (!tipo) return;
-
-  document.querySelectorAll('.tipo-lavado-btn').forEach(btn => {
-    const active = btn.dataset.key === key;
-    btn.style.outline = active ? '2px solid currentColor' : '';
-    btn.style.fontWeight = active ? '700' : '';
-    btn.style.boxShadow = active ? 'inset 0 0 0 2px currentColor' : '';
-  });
+  highlightTipoLavadoChip('tipo-lavado-btn', key);
 
   const container = document.getElementById('modal-tasks-list');
   let card = container ? container.querySelector('.task-item-card') : null;
@@ -11310,6 +11377,19 @@ function applyTipoLavado(key) {
   if (descField) {
     descField.value = `Lavado ${tipo.label}${tipo.descripcion ? `: ${tipo.descripcion}` : ''}`;
   }
+}
+
+// Version para "Filtro de Unidad y Tipo": todavia no existe ninguna tarea, asi que solo guarda
+// la eleccion - submitPreOrderCheck la aplica despues de crear la tarea en la pantalla completa.
+function applyTipoLavadoPre(key) {
+  if (!tiposLavado.find(t => t.key === key)) return;
+  window._preSelectedTipoLavado = key;
+  highlightTipoLavadoChip('tipo-lavado-pre-btn', key);
+}
+
+function quickSetPreLavador(value) {
+  const select = document.getElementById('pre-form-lavador');
+  if (select) select.value = value;
 }
 
 function openCrearTipoLavadoModal() {
