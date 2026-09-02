@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '259';
+const CURRENT_APP_VERSION = '260';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13634,54 +13634,70 @@ const PT_AREA_COLOR_PALETTE = [
 ];
 let ptPendientesPorAreaState = { items: {}, openArea: null };
 
+// Se pinta dos veces con los mismos datos: una vez en Parte Taller (pt-pend-por-area-*) y otra
+// en Inicio (home-pend-por-area-*), para verlo sin tener que entrar a la pantalla de Parte
+// Taller. Mismo estado (ptPendientesPorAreaState) compartido entre ambas copias.
+const PT_AREA_WIDGET_TARGETS = [
+  { container: 'pt-pend-por-area', pills: 'pt-pend-por-area-pills', detail: 'pt-pend-por-area-detail' },
+  { container: 'home-pend-por-area-edilicio', pills: 'home-pend-por-area-pills', detail: 'home-pend-por-area-detail' }
+];
+
 function renderPtPendientesPorArea(pendientes) {
-  const container = document.getElementById('pt-pend-por-area');
-  const pillsEl = document.getElementById('pt-pend-por-area-pills');
-  const detailEl = document.getElementById('pt-pend-por-area-detail');
-  if (!container || !pillsEl || !detailEl) return;
-
   if (!pendientes || pendientes.length === 0) {
-    container.style.display = 'none';
     ptPendientesPorAreaState = { items: {}, openArea: null };
-    return;
-  }
-
-  const grouped = {};
-  pendientes.forEach(item => {
-    const area = item.area || 'Sin área';
-    if (!grouped[area]) grouped[area] = [];
-    grouped[area].push(item);
-  });
-  const areas = Object.keys(grouped);
-  const openArea = (ptPendientesPorAreaState.openArea && grouped[ptPendientesPorAreaState.openArea]) ? ptPendientesPorAreaState.openArea : null;
-  ptPendientesPorAreaState = { items: grouped, openArea };
-
-  container.style.display = 'block';
-  pillsEl.innerHTML = areas.map((area, idx) => {
-    const color = PT_AREA_COLOR_PALETTE[idx % PT_AREA_COLOR_PALETTE.length];
-    const isOpen = openArea === area;
-    const bg = isOpen ? color.activo : color.base;
-    const safeArea = area.replace(/'/g, "\\'");
-    return `<button type="button" onclick="togglePtPendientesArea('${safeArea}')" style="cursor:pointer; border:none; border-radius:999px; padding:7px 14px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:7px; background:${bg}; color:#ffffff;">${area} <span style="background:rgba(255,255,255,0.3); border-radius:999px; padding:1px 8px; font-size:12px;">${grouped[area].length}</span></button>`;
-  }).join('');
-
-  if (!openArea) {
-    detailEl.style.display = 'none';
-    detailEl.innerHTML = '';
   } else {
-    const colorIdx = areas.indexOf(openArea) % PT_AREA_COLOR_PALETTE.length;
-    const color = PT_AREA_COLOR_PALETTE[colorIdx];
-    detailEl.style.display = 'block';
-    detailEl.innerHTML = `<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;">Pendientes en ${openArea}</div>` +
-      grouped[openArea].map(item => {
-        const internoPT = String(item.interno || '');
-        const rodadoLabel = resolvePtUnitDisplayLabel(item, internoPT);
-        const lines = String(item.novedad || '').split('\n')
-          .map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim())
-          .filter(Boolean);
-        return lines.map(l => `<div style="display:flex; align-items:flex-start; gap:8px; padding:4px 0; font-size:13px;"><span style="color:${color.base}; margin-top:2px;">&bull;</span><span>${l} <span style="color:var(--text-muted); font-size:11px;">(${rodadoLabel})</span></span></div>`).join('');
-      }).join('');
+    const grouped = {};
+    pendientes.forEach(item => {
+      const area = item.area || 'Sin área';
+      if (!grouped[area]) grouped[area] = [];
+      grouped[area].push(item);
+    });
+    const openArea = (ptPendientesPorAreaState.openArea && grouped[ptPendientesPorAreaState.openArea]) ? ptPendientesPorAreaState.openArea : null;
+    ptPendientesPorAreaState = { items: grouped, openArea };
   }
+
+  const grouped = ptPendientesPorAreaState.items;
+  const areas = Object.keys(grouped);
+  const openArea = ptPendientesPorAreaState.openArea;
+
+  PT_AREA_WIDGET_TARGETS.forEach(ids => {
+    const container = document.getElementById(ids.container);
+    const pillsEl = document.getElementById(ids.pills);
+    const detailEl = document.getElementById(ids.detail);
+    if (!container || !pillsEl || !detailEl) return;
+
+    if (areas.length === 0) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = 'block';
+    pillsEl.innerHTML = areas.map((area, idx) => {
+      const color = PT_AREA_COLOR_PALETTE[idx % PT_AREA_COLOR_PALETTE.length];
+      const isOpen = openArea === area;
+      const bg = isOpen ? color.activo : color.base;
+      const safeArea = area.replace(/'/g, "\\'");
+      return `<button type="button" onclick="togglePtPendientesArea('${safeArea}')" style="cursor:pointer; border:none; border-radius:999px; padding:7px 14px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:7px; background:${bg}; color:#ffffff;">${area} <span style="background:rgba(255,255,255,0.3); border-radius:999px; padding:1px 8px; font-size:12px;">${grouped[area].length}</span></button>`;
+    }).join('');
+
+    if (!openArea) {
+      detailEl.style.display = 'none';
+      detailEl.innerHTML = '';
+    } else {
+      const colorIdx = areas.indexOf(openArea) % PT_AREA_COLOR_PALETTE.length;
+      const color = PT_AREA_COLOR_PALETTE[colorIdx];
+      detailEl.style.display = 'block';
+      detailEl.innerHTML = `<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;">Pendientes en ${openArea}</div>` +
+        grouped[openArea].map(item => {
+          const internoPT = String(item.interno || '');
+          const rodadoLabel = resolvePtUnitDisplayLabel(item, internoPT);
+          const lines = String(item.novedad || '').split('\n')
+            .map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim())
+            .filter(Boolean);
+          return lines.map(l => `<div style="display:flex; align-items:flex-start; gap:8px; padding:4px 0; font-size:13px;"><span style="color:${color.base}; margin-top:2px;">&bull;</span><span>${l} <span style="color:var(--text-muted); font-size:11px;">(${rodadoLabel})</span></span></div>`).join('');
+        }).join('');
+    }
+  });
 }
 
 function togglePtPendientesArea(area) {

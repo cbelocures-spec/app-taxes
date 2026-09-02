@@ -249,6 +249,14 @@
         </button>
       </div>
 
+      <!-- HOME: Edilicio-only widget, mismo resumen "Servicios pendientes por área" que Parte
+           Taller, para verlo sin entrar a esa pantalla (ver renderPtPendientesPorArea). -->
+      <div id="home-pend-por-area-edilicio" style="display: none; background:var(--card-bg); border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; margin-bottom:20px;">
+        <div style="font-size:12px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Servicios pendientes por área</div>
+        <div id="home-pend-por-area-pills" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+        <div id="home-pend-por-area-detail" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;"></div>
+      </div>
+
       <!-- OPERATOR DASHBOARD SECTION -->
       <div class="dashboard-section">
         <div class="dashboard-header-row" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
@@ -1532,7 +1540,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.15.0</div>
+      <div class="sidebar-version">Versión 1.15.1</div>
     </div>
   </aside>
 
@@ -2634,6 +2642,6 @@
     }
   </style>
 
-  <script src="app.js?v=259"></script>
+  <script src="app.js?v=260"></script>
 </body>
 </html>
