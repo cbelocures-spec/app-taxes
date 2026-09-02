@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '261';
+const CURRENT_APP_VERSION = '262';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13792,8 +13792,9 @@ function renderParteTallerDashboard(state) {
 
   const pageTitleEl = document.getElementById('pt-page-title');
   if (pageTitleEl) {
-    pageTitleEl.textContent = currentSelectedSector === 'Edilicio' ? 'Parte Edilicio'
-      : currentSelectedSector === 'Herrería' ? 'Parte Herrería'
+    pageTitleEl.textContent = currentSelectedSector === 'Edilicio' ? 'Parte Diario de Edilicio'
+      : currentSelectedSector === 'Herrería' ? 'Parte Diario de Herrería'
+      : currentSelectedSector === 'Lavadero' ? 'Parte Diario de Lavadero'
       : 'Parte Diario de Taller';
   }
 
