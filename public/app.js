@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '235';
+const CURRENT_APP_VERSION = '236';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -5857,8 +5857,8 @@ function renderDashboard() {
               </button>
               <div class="timeline-top-row">
                 <span class="interno-chip working">
-                  <span class="interno-chip-label">${t.area ? 'SECTOR' : 'INTERNO'}</span>
-                  <span class="interno-chip-number">${t.area || t.interno}</span>
+                  <span class="interno-chip-label"${t.area ? ' style="color:#7c3aed;"' : ''}>${t.area ? 'SECTOR' : 'INTERNO'}</span>
+                  <span class="interno-chip-number"${t.area ? ' style="color:#7c3aed;"' : ''}>${t.area || t.interno}</span>
                 </span>
                 <div class="timeline-top-right">
                   ${t.clasificacion ? `<span class="badge-tag">${t.clasificacion}</span>` : ''}
@@ -5916,8 +5916,8 @@ function renderDashboard() {
               </button>
               <div class="timeline-top-row">
                 <span class="interno-chip paused">
-                  <span class="interno-chip-label">${t.area ? 'SECTOR' : 'INTERNO'}</span>
-                  <span class="interno-chip-number">${t.area || t.interno}</span>
+                  <span class="interno-chip-label"${t.area ? ' style="color:#7c3aed;"' : ''}>${t.area ? 'SECTOR' : 'INTERNO'}</span>
+                  <span class="interno-chip-number"${t.area ? ' style="color:#7c3aed;"' : ''}>${t.area || t.interno}</span>
                 </span>
                 <div class="timeline-top-right">
                   ${t.clasificacion ? `<span class="badge-tag">${t.clasificacion}</span>` : ''}
