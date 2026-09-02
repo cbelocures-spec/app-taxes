@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '260';
+const CURRENT_APP_VERSION = '261';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13633,6 +13633,10 @@ const PT_AREA_COLOR_PALETTE = [
   { base: '#BA7517', activo: '#854F0B' }
 ];
 let ptPendientesPorAreaState = { items: {}, openArea: null };
+// Visible en cuanto se está parado en el tablero de Edilicio, aunque no haya ningún pendiente
+// todavía - antes se ocultaba directamente con 0 items, y eso se confundía con "el widget está
+// roto" en vez de "no hay nada pendiente ahora mismo".
+let ptPendientesPorAreaVisible = false;
 
 // Se pinta dos veces con los mismos datos: una vez en Parte Taller (pt-pend-por-area-*) y otra
 // en Inicio (home-pend-por-area-*), para verlo sin tener que entrar a la pantalla de Parte
@@ -13642,7 +13646,9 @@ const PT_AREA_WIDGET_TARGETS = [
   { container: 'home-pend-por-area-edilicio', pills: 'home-pend-por-area-pills', detail: 'home-pend-por-area-detail' }
 ];
 
-function renderPtPendientesPorArea(pendientes) {
+function renderPtPendientesPorArea(pendientes, visible) {
+  if (visible !== undefined) ptPendientesPorAreaVisible = visible;
+
   if (!pendientes || pendientes.length === 0) {
     ptPendientesPorAreaState = { items: {}, openArea: null };
   } else {
@@ -13666,12 +13672,19 @@ function renderPtPendientesPorArea(pendientes) {
     const detailEl = document.getElementById(ids.detail);
     if (!container || !pillsEl || !detailEl) return;
 
-    if (areas.length === 0) {
+    if (!ptPendientesPorAreaVisible) {
       container.style.display = 'none';
       return;
     }
-
     container.style.display = 'block';
+
+    if (areas.length === 0) {
+      pillsEl.innerHTML = '<span style="font-size:12px; color:var(--text-muted);">Sin pendientes por ahora.</span>';
+      detailEl.style.display = 'none';
+      detailEl.innerHTML = '';
+      return;
+    }
+
     pillsEl.innerHTML = areas.map((area, idx) => {
       const color = PT_AREA_COLOR_PALETTE[idx % PT_AREA_COLOR_PALETTE.length];
       const isOpen = openArea === area;
@@ -13776,6 +13789,13 @@ function renderParteTallerDashboard(state) {
 
   // Store state globally for editing (original state without live Taxes adjustments)
   window._ptState = state;
+
+  const pageTitleEl = document.getElementById('pt-page-title');
+  if (pageTitleEl) {
+    pageTitleEl.textContent = currentSelectedSector === 'Edilicio' ? 'Parte Edilicio'
+      : currentSelectedSector === 'Herrería' ? 'Parte Herrería'
+      : 'Parte Diario de Taller';
+  }
 
   // Clone state for rendering to dynamically merge/inject live active tasks from Taxes
   const displayState = JSON.parse(JSON.stringify(state));
@@ -14273,7 +14293,7 @@ function renderParteTallerDashboard(state) {
   // 3. Servicios pendientes
   const pendientes = separarOtros((displayState.servicios_pendientes || []).filter(matchesPtSector).filter(unitMatchesSearch), 'servicios_pendientes');
   if (el('pt-pend-count')) el('pt-pend-count').textContent = pendientes.length;
-  renderPtPendientesPorArea(isEdilicioBoard ? pendientes : []);
+  renderPtPendientesPorArea(pendientes, isEdilicioBoard);
   if (el('pt-pendientes-tbody')) {
     if (pendientes.length === 0) {
       el('pt-pendientes-tbody').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No hay servicios pendientes.</td></tr>';
