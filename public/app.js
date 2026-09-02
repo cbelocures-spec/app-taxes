@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '251';
+const CURRENT_APP_VERSION = '252';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -4911,7 +4911,8 @@ async function toggleOrderEstadoUnidad(event, orderId) {
           estado: newStatus,
           motivo: order.incidente || (newStatus === 'fuera_de_servicio' ? 'Fuera de servicio' : 'Operativo'),
           responsable: localStorage.getItem('currentUserUsername') || '',
-          sector: (typeof isHerreriaOrder === 'function' && isHerreriaOrder(order)) ? 'herreria' : 'taller'
+          sector: (typeof isHerreriaOrder === 'function' && isHerreriaOrder(order)) ? 'herreria'
+            : (typeof isEdilicioOrder === 'function' && isEdilicioOrder(order)) ? 'edilicio' : 'taller'
         })
       });
       if (typeof fetchParteTallerEstado === 'function') fetchParteTallerEstado();
@@ -5737,7 +5738,7 @@ function convertSelectToSearchable(selectEl) {
 let activeDashboardIntervals = {};
 
 function isItemMatchingCurrentPtSector(item) {
-  const currentPtSector = (currentSelectedSector === 'Herrería') ? 'herreria' : 'taller';
+  const currentPtSector = (currentSelectedSector === 'Herrería') ? 'herreria' : (currentSelectedSector === 'Edilicio') ? 'edilicio' : 'taller';
   if (!item || !item.sector) return true;
   return item.sector === currentPtSector;
 }
@@ -13046,6 +13047,7 @@ function adjustPtStateLists(state) {
 
   // Determine sector based on active tab/selected sector
   const isHerreriaAdj = (currentSelectedSector === 'Herrería');
+  const isEdilicioAdj = (currentSelectedSector === 'Edilicio');
 
   // Helper: does a task match the current sector?
   function taskMatchesSector(t) {
@@ -13053,22 +13055,25 @@ function adjustPtStateLists(state) {
     const ccOpt = cachedCatalogs.centrosCosto ? cachedCatalogs.centrosCosto.find(c => c.value === t.centroCosto) : null;
     const ccLabel = ccOpt ? ccOpt.label.toUpperCase() : String(t.centroCosto || '').toUpperCase();
     if (isHerreriaAdj) return ccLabel.includes('HERRER');
+    if (isEdilicioAdj) return ccLabel.includes('EDILI');
     return ccLabel.includes('MECAN') || t.centroCosto === '15' || (!ccLabel.includes('HERRER') && !ccLabel.includes('EDILI'));
   }
 
   // ============================================================
-  // HERRERÍA MODE: Only show live orders from Taxes as Fuera de Servicio
+  // HERRERÍA / EDILICIO MODE: Only show live orders from Taxes as Fuera de Servicio - same
+  // logic for both, just matched against each sector's own tasks/centro de costo, so Edilicio
+  // gets its propio tablero de novedades igual que Herrería en vez de compartir el de Taller.
   // ============================================================
-  if (isHerreriaAdj) {
-    // Clear all Google Sheet-based lists (not applicable for Herrería)
+  if (isHerreriaAdj || isEdilicioAdj) {
+    // Clear all Google Sheet-based lists (not applicable for Herrería/Edilicio)
     state.fuera_de_servicio = [];
     state.reparacion = [];
     state.servicios_pendientes = [];
 
-    // Find all open Herrería orders with active/paused tasks. A unit already marked
+    // Find all open sector orders with active/paused tasks. A unit already marked
     // "operativo" is out of here no matter what its task history looks like - that field is
     // the real-world signal that the unit is back in service, not leftover task state.
-    const herreriaOrders = activeOrders.filter(o => {
+    const sectorOrders = activeOrders.filter(o => {
       const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
       if (isClosed) return false;
       if (o.estadoUnidad === 'operativo') return false;
@@ -13078,8 +13083,8 @@ function adjustPtStateLists(state) {
       );
     });
 
-    // Create fuera_de_servicio entries from live Herrería orders
-    herreriaOrders.forEach(order => {
+    // Create fuera_de_servicio entries from live sector orders
+    sectorOrders.forEach(order => {
       const activeTasks = (order.tasks || [])
         .filter(taskMatchesSector)
         .filter(t => t.status !== 'Finalizada')
@@ -13125,7 +13130,7 @@ function adjustPtStateLists(state) {
       });
     });
 
-    // Clear totals (not applicable for Herrería view)
+    // Clear totals (not applicable for Herrería/Edilicio view)
     state.resumen = { totales: {} };
     return;
   }
@@ -13494,7 +13499,8 @@ function adjustPtStateLists(state) {
             estado: 'fuera_de_servicio',
             motivo: o.incidente || 'Fuera de servicio',
             responsable: localStorage.getItem('currentUserUsername') || '',
-            sector: (typeof isHerreriaOrder === 'function' && isHerreriaOrder(o)) ? 'herreria' : 'taller'
+            sector: (typeof isHerreriaOrder === 'function' && isHerreriaOrder(o)) ? 'herreria'
+              : (typeof isEdilicioOrder === 'function' && isEdilicioOrder(o)) ? 'edilicio' : 'taller'
           })
         }).then(res => {
           if (res.ok && typeof fetchParteTallerEstado === 'function') fetchParteTallerEstado();
@@ -13849,11 +13855,11 @@ function renderParteTallerDashboard(state) {
   }
 
   // Determine current sector for Pt filtering based on active tab/selected sector
-  const currentPtSector = (currentSelectedSector === 'Herrería') ? 'herreria' : 'taller';
+  const currentPtSector = (currentSelectedSector === 'Herrería') ? 'herreria' : (currentSelectedSector === 'Edilicio') ? 'edilicio' : 'taller';
 
-  // A Herrería-only work item (e.g. "12 verde", not a real Taxes-tracked asset) should stay
-  // out of Taller's board, but a real truck Herrería logged a novedad against still belongs
-  // on Taller's board too - it's still Taller's truck.
+  // A Herrería/Edilicio-only work item (e.g. "12 verde", not a real Taxes-tracked asset) should
+  // stay out of Taller's board, but a real truck Herrería/Edilicio logged a novedad against still
+  // belongs on Taller's board too - it's still Taller's truck.
   function esUnidadRealDeFlota(interno) {
     return !!(cachedCatalogs.rodados && cachedCatalogs.rodados.some(r => String(r.interno || '').trim() === String(interno || '').trim()));
   }
@@ -13861,17 +13867,22 @@ function renderParteTallerDashboard(state) {
   function matchesPtSector(item) {
     // If item has no sector tag, show to everyone (legacy data)
     if (!item.sector) return true;
-    if (item.sector === 'herreria' && currentPtSector === 'taller') {
+    if ((item.sector === 'herreria' || item.sector === 'edilicio') && currentPtSector === 'taller') {
       return esUnidadRealDeFlota(item.interno);
     }
     // A real truck's Parte Taller entry is tagged sector "taller" from when it was first added,
-    // but its CURRENT order can later become Herrería work (e.g. this same interno reused for a
-    // container/soldadura job) - surface it on the Herrería tab too in that case, alongside its
-    // normal Taller listing, instead of only wherever it happened to be created.
+    // but its CURRENT order can later become Herrería/Edilicio work (e.g. this same interno
+    // reused for a container/soldadura job) - surface it on that tab too in that case, alongside
+    // its normal Taller listing, instead of only wherever it happened to be created.
     if (item.sector === 'taller' && currentPtSector === 'herreria') {
       const cleanInterno = String(item.interno || '').trim().toUpperCase();
       const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInterno);
       return !!(matchingOrder && isHerreriaOrder(matchingOrder));
+    }
+    if (item.sector === 'taller' && currentPtSector === 'edilicio') {
+      const cleanInterno = String(item.interno || '').trim().toUpperCase();
+      const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInterno);
+      return !!(matchingOrder && isEdilicioOrder(matchingOrder));
     }
     return item.sector === currentPtSector;
   }
@@ -15229,7 +15240,8 @@ async function savePtUnit() {
           destinoIngreso: (estado === 'transito' ? destinoIngreso : null),
           motivo: novedadFormatted,
           responsable: currentUser,
-          sector: (getSectorByUsername(currentUser) === 'Herrería') ? 'herreria' : 'taller'
+          sector: (getSectorByUsername(currentUser) === 'Herrería') ? 'herreria'
+            : (getSectorByUsername(currentUser) === 'Edilicio') ? 'edilicio' : 'taller'
         })
       });
       if (!res.ok) throw new Error('Error al registrar la novedad en el Parte Taller.');
@@ -15256,12 +15268,17 @@ async function savePtUnit() {
         const incidentDesc = novedadFormatted.split('\n').map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()).filter(Boolean).join(', ');
 
         const autoSectorHerreria = (getSectorByUsername(currentUser) === 'Herrería');
+        // Taxes has no real "Edilicio" clasificacion value - Edilicio work is identified by the
+        // order's own `sector` field instead (see getOrderSector/isEdilicioOrder), never by
+        // writing "Edilicio" into clasificacion.
+        const autoSectorEdilicio = (getSectorByUsername(currentUser) === 'Edilicio');
 
         const orderPayload = {
           rodado: rodadoLabel,
           responsable: "AUTO",
           interno: internoVal,
           clasificacion: autoSectorHerreria ? "Herrería" : "Correctivo",
+          sector: autoSectorEdilicio ? "Edilicio" : undefined,
           fechaEntrega: today,
           horario: "12:00",
           incidente: incidentDesc || "Revisión en taller",

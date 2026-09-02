@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '251';
+const APP_VERSION = '252';
 
 // Middleware
 app.use(cors());
@@ -4193,8 +4193,9 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   const responsable = String(responsableRaw || '').trim();
   // Was never actually persisted on the unit before — every unit ended up with no sector
   // tag at all, so matchesPtSector's "legacy data, show to everyone" fallback made every
-  // Herrería-only item leak into the Taller board (and vice versa).
-  const sector = String(sectorRaw || 'taller').trim().toLowerCase() === 'herreria' ? 'herreria' : 'taller';
+  // Herrería/Edilicio-only item leak into the Taller board (and vice versa).
+  const sectorRawClean = String(sectorRaw || 'taller').trim().toLowerCase();
+  const sector = sectorRawClean === 'herreria' ? 'herreria' : sectorRawClean === 'edilicio' ? 'edilicio' : 'taller';
 
   const state = db.getParteTallerState();
   state.resumen = state.resumen || {};
