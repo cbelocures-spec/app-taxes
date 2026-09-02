@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '246';
+const APP_VERSION = '247';
 
 // Middleware
 app.use(cors());
@@ -4151,6 +4151,11 @@ function recalcularTotalesResumenLocal(state) {
 // app never reads this tab back - precisely to avoid the old Sheets-backed data-loss races
 // described above saveParteTallerState. Fire-and-forget: never awaited by callers, errors just
 // get logged so a Sheets hiccup can't block a real Parte Taller update.
+// Solo estos 4 tipos de camiones van a la Hoja - deja afuera los "buckets" internos que no son
+// unidades reales (IRINEO GRAL., VOLQUETE NICO, REPARACIONES INTERNAS: resolveTipoFromInterno
+// les da tipo null/vacío, así que el filtro los excluye solo).
+const TIPOS_PARTE_TALLER_SHEET = new Set(['COMPACTADOR', 'VOLQUETE', 'ROLL - OFF', 'PLANCHA']);
+
 function buildParteTallerFilas(state) {
   const catLabels = {
     fuera_de_servicio: 'Fuera de Servicio',
@@ -4162,6 +4167,7 @@ function buildParteTallerFilas(state) {
   const filas = [];
   Object.keys(catLabels).forEach(key => {
     (state[key] || []).forEach(u => {
+      if (!TIPOS_PARTE_TALLER_SHEET.has(String(u.tipo || '').trim().toUpperCase())) return;
       filas.push({
         categoria: catLabels[key],
         interno: u.interno || '',
