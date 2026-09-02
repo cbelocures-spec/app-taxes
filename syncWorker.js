@@ -3249,6 +3249,8 @@ async function syncWorkOrder(orderId) {
         autoSyncRetryCount: 0
       });
 
+      await maybeTriggerFuelServiceReset(orderId);
+
       console.log(`[Reconcile] Running verification for OT #${order.interno}...`);
       try {
         await verifyWorkOrderWithPage(page, orderId);
@@ -4059,6 +4061,8 @@ async function syncWorkOrder(orderId) {
       taxesOrderNumber: finalTaxesOrderNumber || null,
       tasks: updatedTasks
     });
+
+    await maybeTriggerFuelServiceReset(orderId);
 
     console.log(`Running post-sync verification for brand new OT #${order.interno}...`);
     try {
@@ -4911,12 +4915,66 @@ async function syncSingleTaskToTareasForm(orderId, taskIndex) {
     db.updateWorkOrder(orderId, { tasks });
     console.log(`[SyncTask] Tarea #${taskIndex + 1} de la OT #${order.taxesOrderNumber} guardada con éxito en Taxes (tilde verde ✔)!`);
 
+    await maybeTriggerFuelServiceReset(orderId);
+
     await browser.close(); releaseBrowserLock();
     return { success: true, message: `Tarea #${taskIndex + 1} sincronizada correctamente en Taxes.` };
   } catch (err) {
     if (browser) try { await browser.close(); } catch (_) {}
     releaseBrowserLock();
     return { success: false, message: err.message };
+  }
+}
+
+// Cuando un preventivo por combustible (5k/10k) termina de sincronizarse a Taxes, hay que
+// avisarle a la Hoja de Preventivos para que resetee el contador de litros de ese interno - si
+// no, la alerta "Realizar" queda prendida para siempre aunque el service ya se haya hecho. El
+// chequeo original solo vivia en el guardado inicial de la orden (POST/PUT /api/orders), pero en
+// ese momento la tarea recien creada todavia esta en "Pendiente" y sin sincronizar - nunca se
+// volvia a revisar despues, cuando de verdad terminaba de sincronizarse (que pasa aca, en
+// syncWorker, de forma asincrónica y bastante despues). Se llama desde cada punto donde una
+// tarea puede terminar de marcarse synced=true; es idempotente (chequea !triggered) asi que
+// llamarla desde varios lugares no genera resets duplicados.
+async function maybeTriggerFuelServiceReset(orderId) {
+  const order = db.getWorkOrderById(orderId);
+  if (!order || !order.combustibleReset || order.combustibleReset.triggered) return;
+
+  const tasks = Array.isArray(order.tasks) ? order.tasks : [];
+  const allDone = tasks.length > 0 && tasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada') && t.synced === true);
+  if (!allDone) return;
+
+  const { tipo, rowIndex, litrosTotales } = order.combustibleReset;
+  if (!tipo || !rowIndex || !litrosTotales) return;
+
+  const settings = db.getSettings();
+  const scriptUrl = settings.preventivoScriptUrl;
+  if (!scriptUrl) {
+    console.error('[Combustible Reset] URL de preventivo no configurada.');
+    return;
+  }
+
+  // Marcar triggered ANTES del fetch (no esperar la respuesta) para que una segunda llamada
+  // concurrente desde otro punto de sync no dispare el reset dos veces.
+  db.updateWorkOrder(orderId, { combustibleReset: { ...order.combustibleReset, triggered: true } });
+
+  try {
+    const litros5k = tipo === '5k' ? litrosTotales : '';
+    const litros10k = tipo === '10k' ? litrosTotales : '';
+    const params = new URLSearchParams({
+      accion: 'updateFuelService',
+      rowIndex: String(rowIndex),
+      interno: String(order.interno),
+      litros5k: String(litros5k),
+      litros10k: String(litros10k)
+    });
+    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${params.toString()}`;
+    console.log(`[Combustible Reset] Resetting fuel service: ${url}`);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Apps Script responded with status ${response.status}`);
+    const data = await response.json();
+    console.log('[Combustible Reset] Result:', data);
+  } catch (error) {
+    console.error('[Combustible Reset] Error resetting fuel service:', error.message);
   }
 }
 
@@ -4937,6 +4995,7 @@ async function syncCompletedTasksForOrder(orderId) {
     }
   }
 
+  await maybeTriggerFuelServiceReset(orderId);
   return { success: true, syncedAny };
 }
 
