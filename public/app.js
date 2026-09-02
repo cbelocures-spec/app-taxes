@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '269';
+const CURRENT_APP_VERSION = '270';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13880,31 +13880,34 @@ function renderParteTallerDashboard(state) {
 
   // Checklist helper
   function getChecklistHtml(item, internoPT) {
+    // Cada ítem conserva su propia fecha_ingreso (cuándo se cargó ESE ítem puntual, no la unidad
+    // entera) para poder ver cuánto tiempo lleva pendiente cada uno por separado.
     let pendingItems = [];
     if (Array.isArray(item.novedad_items) && item.novedad_items.length > 0) {
       pendingItems = item.novedad_items
         .filter(x => !x.hecho)
-        .map(x => x.texto.replace(/^\[\s*\]\s*/, '').trim())
-        .filter(Boolean);
+        .map(x => ({ texto: String(x.texto || '').replace(/^\[\s*\]\s*/, '').trim(), fecha_ingreso: x.fecha_ingreso || '' }))
+        .filter(x => x.texto);
     } else if (item.novedad) {
       item.novedad.split('\n').forEach(line => {
         const l = line.trim();
         if (l && !l.startsWith('[X]') && !l.startsWith('[x]')) {
           const clean = l.replace(/^\[\s*\]\s*/, '').trim();
-          if (clean) pendingItems.push(clean);
+          if (clean) pendingItems.push({ texto: clean, fecha_ingreso: '' });
         }
       });
     }
 
     if (pendingItems.length > 0) {
       return `<div style="display:flex; flex-direction:column; gap:5px;">
-        ${pendingItems.map((txt, idx) => {
+        ${pendingItems.map((it, idx) => {
           const safeId = `ptck_${internoPT}_${idx}`;
-          const safeTxt = txt.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+          const safeTxt = it.texto.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+          const fechaBadge = it.fecha_ingreso ? `<span style="color:var(--text-muted); font-size:10px; margin-left:4px;">(${it.fecha_ingreso})</span>` : '';
           return `<label style="display:flex; align-items:flex-start; gap:6px; font-size:12px; cursor:pointer;">
             <input type="checkbox" class="pt-item-checkbox" data-interno="${internoPT}" value="${safeTxt}"
               id="${safeId}" style="margin-top:2px; accent-color:var(--primary); flex-shrink:0;">
-            <span>${txt}</span>
+            <span>${it.texto}${fechaBadge}</span>
           </label>`;
         }).join('')}
         <button class="btn btn-secondary btn-xs" onclick="ptAsignarSeleccionados('${internoPT}')"
@@ -15661,11 +15664,20 @@ async function savePtUnit() {
         foundUnitObj.tipo = tipo;
         foundUnitObj.novedad = novedadFormatted;
         foundUnitObj.destinoIngreso = (estado === 'transito' ? destinoIngreso : null);
-        // Also update novedad_items so the checklist re-renders correctly
+        // Also update novedad_items so the checklist re-renders correctly. Preserve each
+        // item's own fecha_ingreso across re-saves (matched by texto) instead of losing it every
+        // time this array gets rebuilt from the textarea - a genuinely new line gets today's
+        // date, so items can be timed individually (cuánto tardó cada uno en resolverse).
+        const prevFechasPorTexto = {};
+        (foundUnitObj.novedad_items || []).forEach(it => {
+          if (it && it.texto && it.fecha_ingreso) prevFechasPorTexto[it.texto.trim().toUpperCase()] = it.fecha_ingreso;
+        });
+        const todayStrEdit = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
         foundUnitObj.novedad_items = novedadFormatted.split('\n').map(line => {
           const hecho = line.startsWith('[X]') || line.startsWith('[x]');
           const texto = line.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
-          return { texto, hecho };
+          const fecha_ingreso = prevFechasPorTexto[texto.toUpperCase()] || todayStrEdit;
+          return { texto, hecho, fecha_ingreso };
         }).filter(x => x.texto);
         // Preserve sector tag
         const userSectorForSave = getSectorByUsername(currentUser);

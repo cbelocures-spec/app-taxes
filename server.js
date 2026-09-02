@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '269';
+const APP_VERSION = '270';
 
 // Middleware
 app.use(cors());
@@ -4205,10 +4205,19 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   let existingNovedad = '';
   let existingSector = null;
   let existingArea = null;
+  let existingDiaParado = null;
+  let existingNovedadItems = null;
   let currentList = '';
   lists.forEach(listName => {
     const found = (state[listName] || []).find(u => String(u.interno).trim() === interno);
-    if (found) { currentList = listName; if (found.novedad) existingNovedad = found.novedad; if (found.sector) existingSector = found.sector; if (found.area) existingArea = found.area; }
+    if (found) {
+      currentList = listName;
+      if (found.novedad) existingNovedad = found.novedad;
+      if (found.sector) existingSector = found.sector;
+      if (found.area) existingArea = found.area;
+      if (found.dia_parado) existingDiaParado = found.dia_parado;
+      if (Array.isArray(found.novedad_items)) existingNovedadItems = found.novedad_items;
+    }
   });
   lists.forEach(listName => {
     state[listName] = (state[listName] || []).filter(u => String(u.interno).trim() !== interno);
@@ -4223,6 +4232,31 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   // guardaba en ninguno de los pushes de abajo, así que toda novedad de Edilicio terminaba
   // agrupada como "Sin área" en vez de bajo el área real que el usuario eligió.
   const finalArea = existingArea || String(areaRaw || '').trim();
+  // La fecha de ingreso a Reparación/Fuera de Servicio/Preparación se reseteaba a HOY en cada
+  // push, aunque la unidad ya viniera parada de antes - rebotar entre esas 3 listas (ej. un
+  // técnico empieza a trabajarla, la vuelve a marcar Fuera de Servicio, retoma) hacía perder la
+  // cuenta real de cuántos días lleva parada. Ahora se preserva la fecha original mientras se
+  // quede en cualquiera de esas 3 listas, y solo se limpia cuando de verdad vuelve a Operativo
+  // (esas dos ramas de abajo nunca ponen dia_parado, así que se pierde solo ahí).
+  const finalDiaParado = existingDiaParado || fechaStr;
+
+  // Guarda la fecha de alta de cada ítem individual de Servicios Pendientes (no de la unidad
+  // entera) para poder medir cuánto tardó cada uno en resolverse. Un ítem ya cargado antes
+  // conserva su fecha; uno nuevo (agregado recién en este guardado) se marca con hoy.
+  function appendMotivoConFecha(existingItems, nuevoMotivo, hoy) {
+    const items = Array.isArray(existingItems) ? existingItems.map(it => ({ ...it })) : [];
+    const normalize = s => String(s || '').replace(/^\[\s*[xX]?\s*\]\s*/, '').trim().toUpperCase();
+    String(nuevoMotivo || '').split('\n').map(l => l.trim()).filter(Boolean).forEach(linea => {
+      const texto = linea.replace(/^\[\s*[xX]?\s*\]\s*/, '').trim();
+      if (!texto) return;
+      const yaExiste = items.some(it => normalize(it.texto) === normalize(texto));
+      if (!yaExiste) items.push({ texto, hecho: false, fecha_ingreso: hoy });
+    });
+    return items;
+  }
+  function novedadItemsToString(items) {
+    return (items || []).map(it => `${it.hecho ? '[X]' : '[ ]'} ${it.texto}`).join('\n');
+  }
 
   // A unit the supervisor put in "En Preparación" (inversiones) has to STAY there no matter
   // what routine sync knocks on this endpoint next - a new task's timer starting, the order
@@ -4258,7 +4292,7 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   if (estadoEfectivo === 'reparacion' || estadoEfectivo === 'fuera_de_servicio' || estadoEfectivo === 'fuera de servicio') {
     const targetList = estadoEfectivo === 'reparacion' ? 'reparacion' : 'fuera_de_servicio';
     const newNovedad = appendMotivo(existingNovedad, motivo);
-    state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector, area: finalArea });
+    state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: finalDiaParado, dias_en_reparacion: 0, sector: finalSector, area: finalArea });
   } else if (estadoEfectivo === 'operativo') {
     let newNovedad;
     if (existingNovedad) {
@@ -4280,15 +4314,16 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
     const targetList = (sector === 'edilicio')
       ? 'servicios_pendientes'
       : (currentList === 'reparacion' || currentList === 'fuera_de_servicio') ? currentList : 'servicios_pendientes';
-    const newNovedad = appendMotivo(existingNovedad, motivo);
     if (targetList === 'reparacion' || targetList === 'fuera_de_servicio') {
-      state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector, area: finalArea });
+      const newNovedad = appendMotivo(existingNovedad, motivo);
+      state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: finalDiaParado, dias_en_reparacion: 0, sector: finalSector, area: finalArea });
     } else {
-      state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '', sector: finalSector, area: finalArea });
+      const newItems = appendMotivoConFecha(existingNovedadItems, motivo, fechaStr);
+      state.servicios_pendientes.push({ interno, tipo, novedad: novedadItemsToString(newItems), novedad_items: newItems, servicio: '', sector: finalSector, area: finalArea });
     }
   } else if (estadoEfectivo === 'inversiones' || estadoEfectivo === 'en_preparacion') {
     const newNovedad = appendMotivo(existingNovedad, motivo);
-    state.inversiones.push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector, area: finalArea });
+    state.inversiones.push({ interno, tipo, novedad: newNovedad, dia_parado: finalDiaParado, dias_en_reparacion: 0, sector: finalSector, area: finalArea });
   } else if (estadoEfectivo === 'transito') {
     // Was missing entirely: the unit got cleared from every list above (the same step every
     // other estado goes through) but nothing ever put it back anywhere, since no branch here
