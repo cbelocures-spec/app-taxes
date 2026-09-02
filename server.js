@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '237';
+const APP_VERSION = '238';
 
 // Middleware
 app.use(cors());
@@ -142,14 +142,17 @@ function getSectorByUsername(username) {
     return 'Herrería';
   }
   if (
-    cleanUsername.includes('ftoledo') || 
+    cleanUsername.includes('ftoledo') ||
     cleanUsername.includes('toledo') ||
     cleanUsername.includes('edil')
   ) {
     return 'Edilicio';
   }
+  if (cleanUsername.includes('lavader')) {
+    return 'Lavadero';
+  }
   if (
-    cleanUsername.includes('sergios') || 
+    cleanUsername.includes('sergios') ||
     cleanUsername.includes('taller')
   ) {
     return 'Taller';
@@ -159,6 +162,7 @@ function getSectorByUsername(username) {
     if (userPerms && Array.isArray(userPerms.allowedSectors)) {
       if (userPerms.allowedSectors.some(s => isHerreria(s))) return 'Herrería';
       if (userPerms.allowedSectors.some(s => isEdilicio(s))) return 'Edilicio';
+      if (userPerms.allowedSectors.some(s => isLavadero(s))) return 'Lavadero';
     }
   } catch (e) {}
   return 'Taller';
@@ -174,6 +178,12 @@ function isEdilicio(cls) {
   if (!cls) return false;
   const norm = String(cls).toLowerCase().trim();
   return norm.includes('edilici') || norm.includes('edilicio');
+}
+
+function isLavadero(cls) {
+  if (!cls) return false;
+  const norm = String(cls).toLowerCase().trim();
+  return norm.includes('lavader');
 }
 
 // "Horas Estimadas" se guarda como H,MM (no decimal) - ej. 1,30 son 1h30m, no 1.3h. Estos dos
@@ -334,6 +344,7 @@ function getCentroCostoSector(centroCosto, centrosCostoList) {
   const ccLabel = (ccOpt && ccOpt.label ? ccOpt.label : cleanCc).toUpperCase();
   if (ccLabel.includes('HERRER')) return 'Herrería';
   if (ccLabel.includes('EDIL')) return 'Edilicio';
+  if (ccLabel.includes('LAVADER')) return 'Lavadero';
   return 'Taller';
 }
 
@@ -345,6 +356,7 @@ function getCentroCostoSector(centroCosto, centrosCostoList) {
 function getOrderSector(clasificacion, sectorField) {
   if (isHerreria(clasificacion) || isHerreria(sectorField)) return 'Herrería';
   if (isEdilicio(sectorField) || isEdilicio(clasificacion)) return 'Edilicio';
+  if (isLavadero(sectorField) || isLavadero(clasificacion)) return 'Lavadero';
   return 'Taller';
 }
 
@@ -357,6 +369,7 @@ function inferOrderSectorFromTasks(tasks, centrosCostoList) {
   const sectors = (tasks || []).map(t => t && getCentroCostoSector(t.centroCosto, centrosCostoList)).filter(Boolean);
   if (sectors.includes('Herrería')) return 'Herrería';
   if (sectors.includes('Edilicio')) return 'Edilicio';
+  if (sectors.includes('Lavadero')) return 'Lavadero';
   return 'Taller';
 }
 
@@ -367,7 +380,7 @@ function inferOrderSectorFromTasks(tasks, centrosCostoList) {
 // with no centro de costo recorded always stays put.
 function splitTasksBySector(tasks, homeSector, centrosCostoList) {
   const own = [];
-  const foreign = { 'Herrería': [], 'Edilicio': [], 'Taller': [] };
+  const foreign = { 'Herrería': [], 'Edilicio': [], 'Taller': [], 'Lavadero': [] };
   (tasks || []).forEach(t => {
     if (!t) return;
     const sec = getCentroCostoSector(t.centroCosto, centrosCostoList);
@@ -386,10 +399,10 @@ function routeForeignTasksToSiblingOrder(sector, tasksForSector, ctx) {
   if (!tasksForSector || tasksForSector.length === 0) return null;
   console.log(`[routeForeignTasksToSiblingOrder][DEBUG] CALLED for sector=${sector} interno=${ctx.interno} area=${JSON.stringify(ctx.area)} taskCount=${tasksForSector.length} excludeOrderId=${ctx.excludeOrderId}`);
 
-  // Herrería genuinely exists as a Taxes clasificacion value, so a Herrería sibling carries it
-  // directly. Edilicio does not (see getOrderSector) - an Edilicio sibling gets "Correctivo"
-  // here, same as a Taller sibling would, and is identified by its `sector` field instead.
-  const siblingClasificacion = sector === 'Herrería' ? 'Herrería' : 'Correctivo';
+  // Herrería y Lavadero existen como clasificacion real de Taxes, asi que ese sibling la lleva
+  // directo. Edilicio no (ver getOrderSector) - un sibling de Edilicio recibe "Correctivo" como
+  // un sibling de Taller, y se identifica por su campo `sector` en cambio.
+  const siblingClasificacion = (sector === 'Herrería' || sector === 'Lavadero') ? sector : 'Correctivo';
   const cleanInterno = String(ctx.interno || '').trim().toLowerCase();
 
   const cleanArea = String(ctx.area || '').trim().toLowerCase();
@@ -839,13 +852,15 @@ app.get('/api/orders', (req, res) => {
       // is Correctivo/Preventivo/Auxilio, since that field is no longer forced.
       const effectivelyHerreria = isHerreria(cls) || isHerreria(o.sector) || isExclusiveHerreriaEquipment;
       const effectivelyEdilicio = isEdilicio(cls) || isEdilicio(o.sector);
+      const effectivelyLavadero = isLavadero(cls) || isLavadero(o.sector);
       if (sector === 'Admin') return true;
       if (allowed.some(s => isHerreria(s)) && effectivelyHerreria) return true;
       if (allowed.some(s => isEdilicio(s)) && effectivelyEdilicio) return true;
+      if (allowed.some(s => isLavadero(s)) && effectivelyLavadero) return true;
       if (allowed.some(s => s === 'Taller')) {
-        // Taller sees only non-Herreria, non-Edilicio orders. Herrería orders are private to
-        // Herrería (and Admin) regardless of vehicle type — no cross-visibility exception.
-        if (!effectivelyHerreria && !effectivelyEdilicio) return true;
+        // Taller sees only non-Herreria, non-Edilicio, non-Lavadero orders. Esos sectores son
+        // privados (y Admin) sin importar el tipo de vehiculo — sin excepcion de visibilidad cruzada.
+        if (!effectivelyHerreria && !effectivelyEdilicio && !effectivelyLavadero) return true;
       }
       return false;
     });
@@ -887,6 +902,8 @@ app.post('/api/orders', (req, res) => {
     let finalClasificacion = clasificacion;
     if (isHerreria(clasificacion)) {
       finalClasificacion = 'Herrería';
+    } else if (isLavadero(clasificacion)) {
+      finalClasificacion = 'Lavadero';
     } else if (isEdilicio(clasificacion)) {
       // Taxes has no "Edilicio" clasificacion value - that sector is identified by `sector`
       // below and by each task's own centro de costo, not by this field (see getOrderSector).
@@ -955,7 +972,7 @@ app.post('/api/orders', (req, res) => {
     // conflicts here too, not just on later edits.
     autoPauseConflictingTimers(newOrder.id, newOrder.tasks, null);
 
-    ['Herrería', 'Edilicio', 'Taller'].forEach(foreignSector => {
+    ['Herrería', 'Edilicio', 'Taller', 'Lavadero'].forEach(foreignSector => {
       if (foreignSector === homeSector) return;
       routeForeignTasksToSiblingOrder(foreignSector, foreignTasksForNewOrder[foreignSector], {
         excludeOrderId: newOrder.id,
@@ -1326,6 +1343,8 @@ app.put('/api/orders/:id', (req, res) => {
 
     if (isHerreria(clasificacion)) {
       finalClasificacion = 'Herrería';
+    } else if (isLavadero(clasificacion)) {
+      finalClasificacion = 'Lavadero';
     } else if (isEdilicio(clasificacion) || isEdilicioOnlyUser) {
       finalClasificacion = 'Correctivo';
     }
@@ -1423,7 +1442,7 @@ app.put('/api/orders/:id', (req, res) => {
     // `sector` or before this self-heal existed - "Taller" passed every earlier check here as
     // already-valid, even when every one of its tasks was clearly Edilicio). Only fall back to
     // the stored/creator sector when the tasks themselves give no non-Taller signal at all.
-    const VALID_SECTORS = ['Taller', 'Herrería', 'Edilicio'];
+    const VALID_SECTORS = ['Taller', 'Herrería', 'Edilicio', 'Lavadero'];
     const inferredSector = inferOrderSectorFromTasks(mergedTasks, centrosCostoList);
     let resolvedSectorField;
     if (inferredSector !== 'Taller') {
@@ -1437,7 +1456,7 @@ app.put('/api/orders/:id', (req, res) => {
     const homeSector = getOrderSector(finalClasificacion, resolvedSectorField);
     const { own: finalTasksToSave, foreign: foreignTasksBySector } = splitTasksBySector(mergedTasks, homeSector, centrosCostoList);
 
-    ['Herrería', 'Edilicio', 'Taller'].forEach(foreignSector => {
+    ['Herrería', 'Edilicio', 'Taller', 'Lavadero'].forEach(foreignSector => {
       if (foreignSector === homeSector) return;
       routeForeignTasksToSiblingOrder(foreignSector, foreignTasksBySector[foreignSector], {
         excludeOrderId: existing.id,

@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '237';
+const CURRENT_APP_VERSION = '238';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -67,6 +67,11 @@ function isEdilicio(cls) {
   if (!cls) return false;
   const norm = String(cls).toLowerCase().trim();
   return norm.includes('edil');
+}
+function isLavadero(cls) {
+  if (!cls) return false;
+  const norm = String(cls).toLowerCase().trim();
+  return norm.includes('lavader');
 }
 
 // Intercept fetch to automatically include supervisor username header and handle 401s
@@ -274,6 +279,7 @@ function getTaskCentroCostoSector(centroCosto, fallbackSector) {
   const ccLabel = (ccOpt && ccOpt.label ? ccOpt.label : cleanCc).toUpperCase();
   if (ccLabel.includes('HERRER')) return 'Herrería';
   if (ccLabel.includes('EDIL')) return 'Edilicio';
+  if (ccLabel.includes('LAVADER')) return 'Lavadero';
   return 'Taller';
 }
 
@@ -5738,7 +5744,7 @@ function renderDashboard() {
           // shared: several people from different sectors each log their own task under the
           // very same OT/order, so the order's overall clasificacion/sector must not decide
           // where an individual task's card ends up - only that task's own centro de costo does.
-          const orderFallbackSector = isHerreriaOrder(order) ? 'Herrería' : (isEdilicioOrder(order) ? 'Edilicio' : 'Taller');
+          const orderFallbackSector = isHerreriaOrder(order) ? 'Herrería' : (isEdilicioOrder(order) ? 'Edilicio' : (isLavaderoOrder(order) ? 'Lavadero' : 'Taller'));
           const taskSector = getTaskCentroCostoSector(task.centroCosto, orderFallbackSector);
           if ((currentSelectedSector || 'Taller') !== taskSector) {
             return; // Esta tarea pertenece al tablero de otro sector
@@ -9019,6 +9025,7 @@ function getSectorByUsername(username) {
   }
   if (cleanUsername.includes('herrer') || cleanUsername.includes('carmona') || cleanUsername.includes('jcarmona')) return 'Herrería';
   if (cleanUsername.includes('toledo') || cleanUsername.includes('edilic')) return 'Edilicio';
+  if (cleanUsername.includes('lavader')) return 'Lavadero';
   return 'Admin';
 }
 
@@ -9043,6 +9050,15 @@ function updateClassificationSelectOptions() {
         <option value="Preventivo">Preventivo</option>
         <option value="Auxilio">Auxilio</option>
         <option value="Herrería" selected>Herrería</option>
+      `;
+    } else if (sector === 'Lavadero') {
+      // Igual que Herrería: Taxes tiene "Lavadero" como clasificacion real en su catalogo.
+      html = `
+        <option value="">${sel.defaultText}</option>
+        <option value="Correctivo">Correctivo</option>
+        <option value="Preventivo">Preventivo</option>
+        <option value="Auxilio">Auxilio</option>
+        <option value="Lavadero" selected>Lavadero</option>
       `;
     } else {
       // Taller / Admin / Edilicio - Taxes has no real "Edilicio" clasificacion value (only
@@ -9107,6 +9123,13 @@ function isEdilicioOrder(order) {
   return cls.includes('edilic') || sec.includes('edilic');
 }
 
+function isLavaderoOrder(order) {
+  if (!order) return false;
+  const cls = String(order.clasificacion || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const sec = String(order.sector || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  return cls.includes('lavader') || sec.includes('lavader');
+}
+
 window.switchSector = function(sector) {
   if (!sector) return;
   currentSelectedSector = sector;
@@ -9154,8 +9177,11 @@ function getFilteredActiveOrders() {
     if (sectorFilter === 'Edilicio') {
       return isEdilicioOrder(o);
     }
-    // Taller tab: Includes all orders except explicit Herrería/Edilicio
-    return !isHerreriaOrder(o) && !isEdilicioOrder(o);
+    if (sectorFilter === 'Lavadero') {
+      return isLavaderoOrder(o);
+    }
+    // Taller tab: Includes all orders except explicit Herrería/Edilicio/Lavadero
+    return !isHerreriaOrder(o) && !isEdilicioOrder(o) && !isLavaderoOrder(o);
   });
 }
 
@@ -9185,8 +9211,11 @@ function getFilteredArchivedOrders() {
     if (sectorFilter === 'Edilicio') {
       return isEdilicioOrder(o);
     }
-    // Taller tab: EXCLUDE all Herrería and Edilicio orders
-    return !isHerreriaOrder(o) && !isEdilicioOrder(o);
+    if (sectorFilter === 'Lavadero') {
+      return isLavaderoOrder(o);
+    }
+    // Taller tab: EXCLUDE all Herrería, Edilicio and Lavadero orders
+    return !isHerreriaOrder(o) && !isEdilicioOrder(o) && !isLavaderoOrder(o);
   });
 }
 
@@ -9196,7 +9225,7 @@ let currentUserPermissions = {
   canViewHistory: true,
   canViewMasivas: true,
   canViewParteTaller: true,
-  allowedSectors: ['Herrería', 'Edilicio', 'Taller']
+  allowedSectors: ['Herrería', 'Edilicio', 'Lavadero', 'Taller']
 };
 
 async function loadUserPermissionsUI() {
@@ -9259,6 +9288,13 @@ async function loadUserPermissionsUI() {
       } else {
         tab.style.display = 'none';
       }
+    } else if (userSector === 'Lavadero') {
+      // Usuario de Lavadero ve ÚNICAMENTE Lavadero
+      if (text.includes('lavader')) {
+        tab.style.display = 'inline-block';
+      } else {
+        tab.style.display = 'none';
+      }
     } else {
       // Usuario de Taller ve ÚNICAMENTE Taller
       if (text.includes('taller')) {
@@ -9269,7 +9305,7 @@ async function loadUserPermissionsUI() {
     }
   });
 
-  if (userSector === 'Herrería' || userSector === 'Edilicio') {
+  if (userSector === 'Herrería' || userSector === 'Edilicio' || userSector === 'Lavadero') {
     switchSector(userSector);
   } else if (userSector === 'Taller') {
     switchSector('Taller');
@@ -9655,6 +9691,7 @@ async function renderUserAuthorizationsTable() {
             <th style="padding:8px; text-align:center;" title="Recuperar órdenes desde respaldo de 7 días">🔄 Backup</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Herrería">🛠️ Herrería</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Edilicio">🏗️ Edilicio</th>
+            <th style="padding:8px; text-align:center;" title="Ver órdenes de Lavadero">🧽 Lavadero</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Taller">🔧 Taller</th>
           </tr>
         </thead>
@@ -9666,6 +9703,7 @@ async function renderUserAuthorizationsTable() {
       const allowed = p.allowedSectors || [];
       const hasHerreria = allowed.some(s => isHerreria(s));
       const hasEdilicio = allowed.some(s => isEdilicio(s));
+      const hasLavadero = allowed.some(s => isLavadero(s));
       const hasTaller = allowed.some(s => s === 'Taller');
 
       html += `
@@ -9712,6 +9750,9 @@ async function renderUserAuthorizationsTable() {
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-sector-Edilicio" ${hasEdilicio ? 'checked' : ''}>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" class="chk-sector-Lavadero" ${hasLavadero ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-sector-Taller" ${hasTaller ? 'checked' : ''}>
@@ -9764,6 +9805,7 @@ async function saveAllUserAuthorizations() {
       const allowedSectors = [];
       if (row.querySelector('.chk-sector-Herreria')?.checked) allowedSectors.push('Herrería');
       if (row.querySelector('.chk-sector-Edilicio')?.checked) allowedSectors.push('Edilicio');
+      if (row.querySelector('.chk-sector-Lavadero')?.checked) allowedSectors.push('Lavadero');
       if (row.querySelector('.chk-sector-Taller')?.checked) allowedSectors.push('Taller');
 
       const permissions = {

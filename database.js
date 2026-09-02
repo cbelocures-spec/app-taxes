@@ -103,7 +103,7 @@ function getDefaultUserPermissions(username, sector) {
       canViewParteTaller: true,
       canViewPreventivos: true,
       canRestoreBackup: true,
-      allowedSectors: ['Herrería', 'Edilicio', 'Taller']
+      allowedSectors: ['Herrería', 'Edilicio', 'Lavadero', 'Taller']
     };
   }
   
@@ -575,6 +575,7 @@ class LocalDB {
         const low = String(s).toLowerCase();
         if (low.includes('herrer')) return 'Herrería';
         if (low.includes('edil')) return 'Edilicio';
+        if (low.includes('lavader')) return 'Lavadero';
         if (low.includes('taller')) return 'Taller';
         return s;
       });
@@ -583,7 +584,7 @@ class LocalDB {
       // is empty or was saved without it by mistake (e.g. via the Autorizaciones panel) -
       // being locked out of your own work is worse than over-granting a view your role already
       // implies.
-      if ((sector === 'Herrería' || sector === 'Edilicio') && !allowedSectors.some(s => s === sector)) {
+      if ((sector === 'Herrería' || sector === 'Edilicio' || sector === 'Lavadero') && !allowedSectors.some(s => s === sector)) {
         allowedSectors = [...allowedSectors, sector];
       }
       return {
