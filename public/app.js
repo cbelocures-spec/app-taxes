@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '264';
+const CURRENT_APP_VERSION = '265';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13154,12 +13154,20 @@ function adjustPtStateLists(state) {
   if (isEdilicioAdj) {
     state.fuera_de_servicio = [];
     state.reparacion = [];
-    // state.servicios_pendientes queda intacto (lo que ya trae del server).
+    // Servicios Pendientes no se reconstruye, pero SÍ hay que filtrarlo por sector explícito -
+    // dejarlo "tal cual" sin este filtro hacía que entrara CUALQUIER pendiente viejo sin sector
+    // tageado (legacy, de cualquier sector) por el fallback "sin tag, mostrar a todos" que tiene
+    // matchesPtSector más abajo. Acá exigimos el tag 'edilicio' explícito, sin excepción.
+    state.servicios_pendientes = (state.servicios_pendientes || []).filter(item => item.sector === 'edilicio');
 
     const edilicioOrders = activeOrders.filter(o => {
       const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
       if (isClosed) return false;
       if (o.estadoUnidad === 'operativo') return false;
+      // La orden tiene que ser realmente de Edilicio - agregar el chequeo de estadoUnidad
+      // 'fuera_de_servicio' sin esto de filtro colaba CUALQUIER camión de Taller marcado fuera
+      // de servicio (que son muchos) al tablero de Edilicio.
+      if (!isEdilicioOrder(o)) return false;
       const tasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
       const hasMatchingTask = tasks.filter(taskMatchesSector).some(t => t.status !== 'Finalizada');
       return hasMatchingTask || o.estadoUnidad === 'fuera_de_servicio';
