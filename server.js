@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '268';
+const APP_VERSION = '269';
 
 // Middleware
 app.use(cors());
@@ -4270,7 +4270,16 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
     }
     state.servicios_pendientes.push({ interno, tipo, novedad: newNovedad, servicio: '', sector: finalSector, area: finalArea });
   } else if (estadoEfectivo === 'servicios_pendientes' || estadoEfectivo === 'servicios pendientes') {
-    const targetList = (currentList === 'reparacion' || currentList === 'fuera_de_servicio') ? currentList : 'servicios_pendientes';
+    // Para Taller/Herrería esto queda "pegado" a Reparación/Fuera de Servicio a propósito (evita
+    // que un sync de rutina baje por error a un camión realmente roto a "todavía operativo"). En
+    // Edilicio, Servicios Pendientes es una lista de notas a futuro independiente del estado de
+    // cualquier orden real - un intento anterior guardado como Fuera de Servicio no debe impedir
+    // jamás anotar un nuevo pendiente ahí. era EXACTAMENTE el bug: "Av. Piedra 3550" quedó
+    // pegado en Fuera de Servicio de un intento previo y todo pendiente nuevo terminaba ahí en
+    // vez de en Servicios Pendientes.
+    const targetList = (sector === 'edilicio')
+      ? 'servicios_pendientes'
+      : (currentList === 'reparacion' || currentList === 'fuera_de_servicio') ? currentList : 'servicios_pendientes';
     const newNovedad = appendMotivo(existingNovedad, motivo);
     if (targetList === 'reparacion' || targetList === 'fuera_de_servicio') {
       state[targetList].push({ interno, tipo, novedad: newNovedad, dia_parado: fechaStr, dias_en_reparacion: 0, sector: finalSector, area: finalArea });
