@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '226';
+const CURRENT_APP_VERSION = '227';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7775,6 +7775,10 @@ function addElastiqueroCubiertaRow(btn) {
       <span class="elastiquero-cubierta-posicion-badge" style="display:none; font-size:12px; font-weight:700; padding:4px 12px; border-radius:999px;"></span>
       <input type="text" class="elastiquero-cubierta-posicion-otro" placeholder="Escribir posición" style="width:100%; margin-top:6px; display:none;">
     </div>
+    <div class="form-group" style="margin-bottom:10px;">
+      <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Descripción</label>
+      <textarea class="elastiquero-cubierta-descripcion" rows="2" placeholder="Ej: se notó desgaste irregular, se aprovechó para rotar" style="width:100%;"></textarea>
+    </div>
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
       <div>
         <label style="font-size:11px; font-weight:700; color:var(--danger); text-transform:uppercase; display:block; margin-bottom:6px;">Se sacó</label>
@@ -7846,10 +7850,12 @@ function buildElastiqueroCubiertaDescription(block) {
     const eMarca = field(row, 'elastiquero-cubierta-entrada-marca');
     const eMedida = field(row, 'elastiquero-cubierta-entrada-medida');
     const eEstado = field(row, 'elastiquero-cubierta-entrada-estado');
-    if (!sFuego && !eFuego) return null;
+    const descripcion = field(row, 'elastiquero-cubierta-descripcion');
+    if (!sFuego && !eFuego && !descripcion) return null;
     const prefix = rows.length > 1 ? `Cambio cubierta ${idx + 1}` : 'Cambio cubierta';
     const posSuffix = posicion ? ` (${posicion})` : '';
-    return `${prefix}${posSuffix}: se sacó N° Fuego ${sFuego || '-'} - Tipo ${sTipo || '-'} - Marca ${sMarca || '-'} - Medida ${sMedida || '-'} - Estado ${sEstado || '-'} = se colocó = N° Fuego ${eFuego || '-'} - Tipo ${eTipo || '-'} - Marca ${eMarca || '-'} - Medida ${eMedida || '-'} - Estado ${eEstado || '-'}`;
+    const descSuffix = descripcion ? ` - ${descripcion}` : '';
+    return `${prefix}${posSuffix}: se sacó N° Fuego ${sFuego || '-'} - Tipo ${sTipo || '-'} - Marca ${sMarca || '-'} - Medida ${sMedida || '-'} - Estado ${sEstado || '-'} = se colocó = N° Fuego ${eFuego || '-'} - Tipo ${eTipo || '-'} - Marca ${eMarca || '-'} - Medida ${eMedida || '-'} - Estado ${eEstado || '-'}${descSuffix}`;
   }).filter(Boolean);
   return lines.join('\n');
 }
