@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '253';
+const CURRENT_APP_VERSION = '254';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13139,11 +13139,11 @@ function adjustPtStateLists(state) {
   }
 
   // ============================================================
-  // EDILICIO MODE: separa las tareas en Reparación (arrancadas o pausadas) y Servicios
-  // Pendientes (asignadas pero todavía sin arrancar) - a diferencia de Herrería, un
-  // mantenimiento edilicio no es un vehículo que "sale de servicio", así que usa las mismas
-  // dos categorías que ya tiene el tablero de Taller en vez de un único bucket "Fuera de
-  // Servicio" que no describe bien el trabajo.
+  // EDILICIO MODE: 3 categorías, según cómo lo definió el usuario -
+  //   Reparación        = tarea con el cronómetro ANDANDO ahora mismo.
+  //   Fuera de Servicio = tarea que se empezó y se pausó, pero sigue sin terminar (quedó a
+  //                       mitad de camino, no es trabajo activo ni algo todavía sin tocar).
+  //   Servicios Pendientes = tarea asignada que nunca se arrancó (novedad a futuro).
   // ============================================================
   if (isEdilicioAdj) {
     state.fuera_de_servicio = [];
@@ -13160,8 +13160,9 @@ function adjustPtStateLists(state) {
 
     edilicioOrders.forEach(order => {
       const tasks = (order.tasks || []).filter(taskMatchesSector).filter(t => t.status !== 'Finalizada');
-      const enCurso = tasks.filter(t => t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0));
-      const sinIniciar = tasks.filter(t => !(t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0)));
+      const enCurso = tasks.filter(t => t.timerStart > 0);
+      const pausadas = tasks.filter(t => !(t.timerStart > 0) && (t.timerStarted || (t.timerHistory && t.timerHistory.length > 0)));
+      const sinIniciar = tasks.filter(t => !(t.timerStart > 0) && !t.timerStarted && !(t.timerHistory && t.timerHistory.length > 0));
 
       const entryBase = {
         interno: order.interno || 'Sin numero',
@@ -13173,6 +13174,9 @@ function adjustPtStateLists(state) {
 
       if (enCurso.length > 0) {
         state.reparacion.push({ ...entryBase, ...buildNovedadFromTasks(enCurso) });
+      }
+      if (pausadas.length > 0) {
+        state.fuera_de_servicio.push({ ...entryBase, ...buildNovedadFromTasks(pausadas) });
       }
       if (sinIniciar.length > 0) {
         state.servicios_pendientes.push({ ...entryBase, servicio: '', ...buildNovedadFromTasks(sinIniciar) });
