@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '240';
+const CURRENT_APP_VERSION = '241';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1683,6 +1683,15 @@ function refreshPreOrderPendingItems() {
   const group = document.getElementById('pre-order-pending-items-group');
   const list = document.getElementById('pre-order-pending-items-list');
   if (!group || !list) return;
+
+  // Lavadero no tiene tickets/averias mecanicas que retomar - ese listado solo confunde ahi.
+  const currentUserForPending = localStorage.getItem('currentUserUsername');
+  if (getSectorByUsername(currentUserForPending) === 'Lavadero' || currentSelectedSector === 'Lavadero') {
+    group.style.display = 'none';
+    list.innerHTML = '';
+    window._preOrderPendingItems = [];
+    return;
+  }
 
   const preInternoSelect = document.getElementById('pre-form-interno');
   const preInternoText = document.getElementById('pre-form-interno-text');
