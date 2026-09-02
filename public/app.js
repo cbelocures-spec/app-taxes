@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '233';
+const CURRENT_APP_VERSION = '234';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11012,11 +11012,11 @@ const BULK_INSUMO_TYPES = [
   { key: 'grasa_caja', cls: 'col-ac-caja', label: 'Grasa Caja', hoja: 'Grasa Caja' },
   { key: 'grasa_diferencial', cls: 'col-ac-dif', label: 'Grasa Diferencial', hoja: 'Grasa Diferencial' },
   { key: 'hco_direccion', cls: 'col-hco-dir', label: 'Hco Dirección', hoja: 'Hco Direccion' },
-  { key: 'hco_equipo', cls: 'col-hco-equipo', label: 'Hco Equipo', hoja: 'Hco Equipo' },
-  { key: 'vigia', cls: 'col-vigia', label: 'Vigía', hoja: 'Vigia' },
-  { key: 'luces', cls: 'col-luces', label: 'Luces', hoja: 'Luces' },
-  { key: 'bateria', cls: 'col-bateria', label: 'Batería', hoja: 'Bateria' },
-  { key: 'alternador', cls: 'col-alternador', label: 'Alternador', hoja: 'Alternador' }
+  { key: 'hco_equipo', cls: 'col-hco-equipo', label: 'Hco Equipo', hoja: 'Hco Equipo', type: 'H' },
+  { key: 'vigia', cls: 'col-vigia', label: 'Vigía', hoja: 'Vigia', type: 'V' },
+  { key: 'luces', cls: 'col-luces', label: 'Luces', hoja: 'Luces', type: 'L' },
+  { key: 'bateria', cls: 'col-bateria', label: 'Batería', hoja: 'Bateria', type: 'B' },
+  { key: 'alternador', cls: 'col-alternador', label: 'Alternador', hoja: 'Alternador', type: 'AL' }
 ];
 const BULK_INSUMO_LABELS = Object.fromEntries(BULK_INSUMO_TYPES.map(t => [t.key, t.label]));
 
@@ -11199,8 +11199,13 @@ function getActiveInsumoKeys() {
     grasa_diferencial: isAActive || isDActive,
     hco_direccion: isAActive || isHDActive
   };
+  // Los 5 controles no agrupados (Hco Equipo/Vigia/Luces/Bateria/Alternador) tienen un botón
+  // de preventivo con un código corto propio (H/V/L/B/AL) que NO coincide con su key de datos
+  // (hco_equipo/vigia/luces/bateria/alternador) - t.type guarda ese código para poder
+  // comparar correctamente. Los preventivos custom no tienen t.type: su botón usa la key
+  // directamente como código, así que activePreventivoTypes.has(t.key) ya los cubre bien.
   return BULK_INSUMO_TYPES
-    .filter(t => Object.prototype.hasOwnProperty.call(GROUPED_SHOW, t.key) ? GROUPED_SHOW[t.key] : activePreventivoTypes.has(t.key))
+    .filter(t => Object.prototype.hasOwnProperty.call(GROUPED_SHOW, t.key) ? GROUPED_SHOW[t.key] : activePreventivoTypes.has(t.type || t.key))
     .map(t => t.key);
 }
 
