@@ -23,7 +23,7 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     if (accion === 'actualizarParteTaller') {
-      actualizarParteTaller(body.resumen || {}, body.filas || []);
+      actualizarParteTaller(body.resumen || {}, body.resumenTipos || [], body.filas || []);
       return ContentService.createTextOutput(JSON.stringify({ ok: true }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -75,23 +75,63 @@ function agregarLectura(fecha, hora, turno, lectura, registradoPor) {
   return consumo;
 }
 
+var NUM_COLS_PARTE_TALLER = HEADERS_PARTE_TALLER.length; // 8
+
+// Colores por tipo de camión, iguales a las tarjetas del "Parte Diario de Taller" adentro de
+// la app, para que la Hoja se lea igual de un vistazo.
+var COLOR_TIPO = {
+  'COMPACTADOR': '#3b82f6',
+  'VOLQUETE': '#8b5cf6',
+  'ROLL - OFF': '#06b6d4',
+  'PLANCHA': '#f97316'
+};
+
 // Copia en vivo del Parte Taller: esta pestaña se REESCRIBE por completo en cada cambio (no
 // acumula filas como Medidor de Agua) porque siempre representa el estado ACTUAL del taller,
 // no un historial. La app nunca lee esta hoja de vuelta - es solo una vidriera de consulta -
 // así que un problema puntual con la Hoja jamás puede afectar los datos reales de la app.
-function actualizarParteTaller(resumen, filas) {
+function actualizarParteTaller(resumen, resumenTipos, filas) {
   var sheet = obtenerHoja(NOMBRE_HOJA_PARTE_TALLER, HEADERS_PARTE_TALLER);
-  var ahora = Utilities.formatDate(new Date(), 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy HH:mm:ss');
-
   sheet.clear();
-  sheet.getRange(1, 1).setValue('Parte Taller - actualizado: ' + ahora).setFontWeight('bold');
-  sheet.getRange(2, 1).setValue(
-    'Responsable: ' + (resumen.responsable || '-') +
-    '   |   Fecha: ' + (resumen.fecha || '-') +
-    '   |   Hora: ' + (resumen.hora || '-')
-  );
-  sheet.getRange(4, 1, 1, HEADERS_PARTE_TALLER.length).setValues([HEADERS_PARTE_TALLER]).setFontWeight('bold');
-  sheet.setFrozenRows(4);
+
+  // --- Encabezado tipo "Parte Diario de Taller" ---
+  sheet.getRange(1, 1, 1, NUM_COLS_PARTE_TALLER).merge()
+    .setValue('PARTE DIARIO DE TALLER')
+    .setBackground('#1e293b').setFontColor('#ffffff').setFontWeight('bold')
+    .setFontSize(13).setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sheet.setRowHeight(1, 30);
+
+  var mitad = Math.floor(NUM_COLS_PARTE_TALLER / 2);
+  sheet.getRange(2, 1, 1, mitad).merge()
+    .setValue('Responsable: ' + (resumen.responsable || '-'))
+    .setBackground('#eff6ff').setFontColor('#1d4ed8').setFontWeight('bold');
+  sheet.getRange(2, mitad + 1, 1, NUM_COLS_PARTE_TALLER - mitad).merge()
+    .setValue('Actualizado: ' + (resumen.fecha || '-') + ' ' + (resumen.hora || '-'))
+    .setBackground('#ecfdf5').setFontColor('#047857').setFontWeight('bold');
+
+  // --- Tarjetas de resumen por tipo de camión ---
+  var filaEncabezadoStats = 4;
+  var headersStats = ['Tipo', 'Operativos', 'En Reparación', 'Fuera Servicio', 'En Preparación', 'Flota Total', 'Disponibilidad'];
+  sheet.getRange(filaEncabezadoStats, 1, 1, headersStats.length).setValues([headersStats])
+    .setFontWeight('bold').setBackground('#f1f5f9');
+
+  (resumenTipos || []).forEach(function (t, idx) {
+    var fila = filaEncabezadoStats + 1 + idx;
+    var color = COLOR_TIPO[t.tipo] || '#334155';
+    sheet.getRange(fila, 1).setValue(t.tipo || '').setBackground(color).setFontColor('#ffffff').setFontWeight('bold');
+    sheet.getRange(fila, 2).setValue(t.operativos || 0).setFontColor('#16a34a').setFontWeight('bold').setHorizontalAlignment('center');
+    sheet.getRange(fila, 3).setValue(t.reparacion || 0).setFontColor('#f97316').setFontWeight('bold').setHorizontalAlignment('center');
+    sheet.getRange(fila, 4).setValue(t.fueraServicio || 0).setFontColor('#dc2626').setFontWeight('bold').setHorizontalAlignment('center');
+    sheet.getRange(fila, 5).setValue(t.preparacion || 0).setFontColor('#d97706').setFontWeight('bold').setHorizontalAlignment('center');
+    sheet.getRange(fila, 6).setValue(t.total || 0).setHorizontalAlignment('center');
+    sheet.getRange(fila, 7).setValue((t.disponibilidad || 0) + '%').setFontWeight('bold').setHorizontalAlignment('center');
+  });
+
+  // --- Detalle de unidades (Tránsito / Reparación / Fuera de Servicio / Preparación) ---
+  var filaDetalle = filaEncabezadoStats + 1 + (resumenTipos || []).length + 2;
+  sheet.getRange(filaDetalle, 1, 1, NUM_COLS_PARTE_TALLER).setValues([HEADERS_PARTE_TALLER])
+    .setFontWeight('bold').setBackground('#f1f5f9');
+  sheet.setFrozenRows(filaDetalle);
 
   if (filas && filas.length > 0) {
     var rows = filas.map(function (f) {
@@ -100,6 +140,6 @@ function actualizarParteTaller(resumen, filas) {
         f.sector || '', f.dia_parado || '', f.dias_en_reparacion || '', f.destino || ''
       ];
     });
-    sheet.getRange(5, 1, rows.length, HEADERS_PARTE_TALLER.length).setValues(rows);
+    sheet.getRange(filaDetalle + 1, 1, rows.length, NUM_COLS_PARTE_TALLER).setValues(rows);
   }
 }

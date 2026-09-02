@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '248';
+const APP_VERSION = '249';
 
 // Middleware
 app.use(cors());
@@ -4185,6 +4185,24 @@ function buildParteTallerFilas(state) {
   return filas;
 }
 
+// Mismo cálculo que adjustPtStateLists() en app.js (las 4 tarjetas de arriba de Parte Taller /
+// Inicio): parte de los totales de flota ya calculados en state.resumen.totales[tipo].total y
+// separa Fuera de Servicio/Reparación/Preparación como conteos independientes en vez del
+// "fuera" combinado que guarda recalcularTotalesResumenLocal.
+function buildParteTallerResumenTipos(state) {
+  const esUnidadDeFlotaReal = u => !INTERNOS_NO_FLOTA.has(String(u.interno || '').trim().toUpperCase());
+  const totales = (state.resumen || {}).totales || {};
+  return ['COMPACTADOR', 'VOLQUETE', 'ROLL - OFF', 'PLANCHA'].map(tipo => {
+    const totalFlota = totales[tipo] && totales[tipo].total !== undefined ? parseInt(totales[tipo].total) || 0 : 0;
+    const fueraServicio = (state.fuera_de_servicio || []).filter(esUnidadDeFlotaReal).filter(u => String(u.tipo).trim().toUpperCase() === tipo).length;
+    const reparacion = (state.reparacion || []).filter(esUnidadDeFlotaReal).filter(u => String(u.tipo).trim().toUpperCase() === tipo).length;
+    const preparacion = (state.inversiones || []).filter(esUnidadDeFlotaReal).filter(u => String(u.tipo).trim().toUpperCase() === tipo).length;
+    const operativos = Math.max(0, totalFlota - fueraServicio - reparacion - preparacion);
+    const disponibilidad = totalFlota > 0 ? Math.round((operativos / totalFlota) * 100) : 0;
+    return { tipo, operativos, reparacion, fueraServicio, preparacion, total: totalFlota, disponibilidad };
+  });
+}
+
 async function syncParteTallerToSheet(state) {
   try {
     const settings = db.getSettings();
@@ -4197,6 +4215,7 @@ async function syncParteTallerToSheet(state) {
       body: JSON.stringify({
         accion: 'actualizarParteTaller',
         resumen: { responsable: resumen.responsable || '', fecha: resumen.fecha || '', hora: resumen.hora || '' },
+        resumenTipos: buildParteTallerResumenTipos(state),
         filas: buildParteTallerFilas(state)
       })
     });
