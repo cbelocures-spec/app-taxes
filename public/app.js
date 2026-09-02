@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '262';
+const CURRENT_APP_VERSION = '263';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13797,6 +13797,10 @@ function renderParteTallerDashboard(state) {
       : currentSelectedSector === 'Lavadero' ? 'Parte Diario de Lavadero'
       : 'Parte Diario de Taller';
   }
+  // Edilicio no tiene camiones - el resumen "Servicios pendientes por área" ocupa ese lugar
+  // arriba de todo en vez de la tabla de Compactador/Volquete/Roll-Off/Plancha.
+  const statGridEl = document.getElementById('pt-stat-grid-taller');
+  if (statGridEl) statGridEl.style.display = (currentSelectedSector === 'Edilicio') ? 'none' : 'grid';
 
   // Clone state for rendering to dynamically merge/inject live active tasks from Taxes
   const displayState = JSON.parse(JSON.stringify(state));
@@ -15301,8 +15305,12 @@ function ptOnSectorChange() {
   if (elastiqueroGroup) elastiqueroGroup.style.display = isEdilicio ? 'none' : 'block';
   const transitoOpt = document.getElementById('pt-unit-estado-transito');
   if (transitoOpt) transitoOpt.hidden = isEdilicio;
+  // "En Preparación" tampoco existe para Edilicio (el tablero solo entiende Reparación/Fuera de
+  // Servicio/Servicios Pendientes - una unidad guardada como "inversiones" nunca aparecería).
+  const inversionesOpt = document.getElementById('pt-unit-estado-inversiones');
+  if (inversionesOpt) inversionesOpt.hidden = isEdilicio;
   const estadoSelect = document.getElementById('pt-unit-estado');
-  if (isEdilicio && estadoSelect && estadoSelect.value === 'transito') {
+  if (isEdilicio && estadoSelect && (estadoSelect.value === 'transito' || estadoSelect.value === 'inversiones')) {
     estadoSelect.value = 'servicios_pendientes';
     ptOnEstadoChange();
   }
@@ -15478,8 +15486,13 @@ async function savePtUnit() {
       });
       if (!res.ok) throw new Error('Error al registrar la novedad en el Parte Taller.');
 
-      // 2. Automatically generate a Correctivo work order in Taxes if reparación or fuera_de_servicio
-      if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
+      // 2. Automatically generate a Correctivo work order in Taxes if reparación o fuera_de_servicio.
+      // Edilicio también entra por Servicios Pendientes: a diferencia de Taller/Herrería (que
+      // muestran directo lo guardado arriba en el paso 1), el tablero de Edilicio se arma 100%
+      // a partir de tareas reales de órdenes activas (adjustPtStateLists) - sin una orden con
+      // una tarea de verdad acá, la novedad recién guardada nunca aparecería en ningún lado.
+      const isEdilicioAdd = (sectorSel === 'edilicio');
+      if (estado === 'reparacion' || estado === 'fuera_de_servicio' || (isEdilicioAdd && estado === 'servicios_pendientes')) {
         let rodadoLabel = '';
         let internoVal = '';
         if (empresa === 'irineo') {
@@ -15505,6 +15518,27 @@ async function savePtUnit() {
         // writing "Edilicio" into clasificacion.
         const autoSectorEdilicio = (sectorSel === 'edilicio');
 
+        // Edilicio SÍ necesita una tarea real (con centro de costo Edilicio) para que
+        // adjustPtStateLists la encuentre y la clasifique en Reparación/Fuera de Servicio/
+        // Servicios Pendientes según su cronómetro. Taller/Herrería no la necesitan - ahí lo
+        // guardado en el paso 1 ya es lo que se muestra, así que siguen sin tareas de relleno
+        // (el empleado/horas quedaban con un valor ficticio que no era real).
+        let autoTasks = [];
+        if (autoSectorEdilicio) {
+          const ediCcOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "8" || (opt.label && String(opt.label).toLowerCase().includes("edilic"))));
+          const task = {
+            descripcion: incidentDesc || "Revisión",
+            centroCosto: ediCcOpt ? ediCcOpt.value : "8",
+            status: 'Pendiente'
+          };
+          if (estado === 'reparacion') {
+            task.timerStart = Date.now();
+          } else if (estado === 'fuera_de_servicio') {
+            task.timerStarted = true;
+          }
+          autoTasks = [task];
+        }
+
         const orderPayload = {
           rodado: rodadoLabel,
           responsable: "AUTO",
@@ -15515,10 +15549,7 @@ async function savePtUnit() {
           fechaEntrega: today,
           horario: "12:00",
           incidente: incidentDesc || "Revisión en taller",
-          // No se auto-generan tareas: el empleado/horas quedaban con un valor de relleno
-          // (el primer empleado del catálogo, 1hs fija) que no era real. La orden se crea
-          // vacía de tareas, igual que en el modo edición, y el usuario las carga a mano.
-          tasks: [],
+          tasks: autoTasks,
           // This block only runs for estado 'reparacion' or 'fuera_de_servicio' (see the `if`
           // above) - both mean the unit is NOT operational, so the auto-created order always
           // has to start Fuera de Servicio. Checking only the literal string 'fuera_de_servicio'

@@ -1123,8 +1123,16 @@
         </div>
       </div>
 
+      <!-- Edilicio no tiene camiones - este bloque ocupa el lugar de la tabla de totales de
+           arriba de todo para ese sector (ver pt-stat-grid-taller, oculto ahí abajo). -->
+      <div id="pt-pend-por-area" style="display:none; background:var(--card-bg); border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; margin-bottom:20px;">
+        <div style="font-size:12px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Servicios pendientes por área</div>
+        <div id="pt-pend-por-area-pills" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+        <div id="pt-pend-por-area-detail" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;"></div>
+      </div>
+
       <!-- Totales Table (Compactador, Volquete, Roll-off, Plancha) -->
-      <div class="pt-stat-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:12px; margin-bottom:20px;">
+      <div id="pt-stat-grid-taller" class="pt-stat-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:12px; margin-bottom:20px;">
         <div class="pt-stat-card" data-pt-type="comp" style="background:#1e293b; border:1px solid #334155; border-radius:14px; padding:16px 18px; border-left:4px solid #3b82f6;">
           <div style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:3px 10px; border-radius:20px; margin-bottom:12px; background:rgba(59,130,246,.15); color:#60a5fa; border:1px solid rgba(59,130,246,.25);">🗜️ COMPACTADOR</div>
           <div style="display:flex; gap:18px; align-items:flex-end;">
@@ -1324,12 +1332,6 @@
         </div>
         <span class="material-icons" id="pt-pend-toggle-icon" style="color:var(--text-muted); font-size:20px;">expand_more</span>
       </div>
-      <div id="pt-pend-por-area" style="display:none; background:var(--card-bg); border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; margin-bottom:12px;">
-        <div style="font-size:12px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Servicios pendientes por área</div>
-        <div id="pt-pend-por-area-pills" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
-        <div id="pt-pend-por-area-detail" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;"></div>
-      </div>
-
       <div id="pt-pend-mobile-cards" class="pt-mobile-cards-list">
         <!-- Mobile dynamic -->
       </div>
@@ -1540,7 +1542,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.15.3</div>
+      <div class="sidebar-version">Versión 1.15.4</div>
     </div>
   </aside>
 
@@ -2533,7 +2535,7 @@
             <option value="servicios_pendientes">📋 Servicios Pendientes (unidad operativa)</option>
             <option value="reparacion">🔧 En Reparación (unidad inactiva)</option>
             <option value="fuera_de_servicio">❌ Fuera de Servicio (unidad inactiva)</option>
-            <option value="inversiones">🏗️ En Preparación (unidad recién comprada)</option>
+            <option value="inversiones" id="pt-unit-estado-inversiones">🏗️ En Preparación (unidad recién comprada)</option>
           </select>
         </div>
         <div class="form-group" id="pt-unit-elastiquero-group" style="margin-top: 6px; background: rgba(250, 204, 21, 0.1); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(202, 138, 4, 0.4);">
@@ -2642,6 +2644,6 @@
     }
   </style>
 
-  <script src="app.js?v=262"></script>
+  <script src="app.js?v=263"></script>
 </body>
 </html>
