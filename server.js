@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '244';
+const APP_VERSION = '245';
 
 // Middleware
 app.use(cors());
@@ -1072,6 +1072,41 @@ app.post('/api/tipos-lavado', (req, res) => {
     res.status(201).json({ tipo: item });
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// Lectura del medidor de agua de Lavadero - va directo a una Hoja de Google (no se guarda nada
+// localmente, a pedido explicito: "esos numeros lo tiene que poner en una hoja google sheets").
+// El Apps Script del lado de la Hoja calcula el consumo restando la ultima lectura ya cargada.
+app.post('/api/agua/lectura', async (req, res) => {
+  try {
+    const settings = db.getSettings();
+    const scriptUrl = settings.aguaScriptUrl;
+    if (!scriptUrl) {
+      return res.status(400).json({ error: "URL del script del medidor de agua no configurada en Ajustes." });
+    }
+    const lectura = parseFloat(String(req.body.lectura || '').replace(',', '.'));
+    if (isNaN(lectura) || lectura < 0) {
+      return res.status(400).json({ error: "Ingresá un número de lectura válido." });
+    }
+    const requestingUser = req.headers['x-user-username'] || '';
+    const now = new Date();
+    const fecha = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+    const hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' });
+    const turno = db.getTurnoForDate(now);
+
+    const response = await fetch(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accion: 'agregarLectura', fecha, hora, turno, lectura, registradoPor: requestingUser })
+    });
+    if (!response.ok) throw new Error(`Google Apps Script respondió con estado ${response.status}`);
+    const data = await response.json();
+    if (data && data.ok === false) throw new Error(data.error || 'Error al guardar en la Hoja.');
+    res.json({ success: true, turno, consumo: data ? data.consumo : undefined });
+  } catch (error) {
+    console.error('[Agua] Error guardando lectura:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -2659,6 +2694,7 @@ app.get('/api/settings', (req, res) => {
       parteTallerScriptUrl: settings.parteTallerScriptUrl || "",
       controlesMasivaScriptUrl: settings.controlesMasivaScriptUrl || "",
       controlesMasivaSheetUrl: settings.controlesMasivaSheetUrl || "",
+      aguaScriptUrl: settings.aguaScriptUrl || "",
       geminiApiKey: settings.geminiApiKey || "",
       claudeApiKey: settings.claudeApiKey || "",
       catalogSyncStatus: catalogStatus,
@@ -2676,7 +2712,7 @@ app.get('/api/settings', (req, res) => {
 // Save connection settings
 app.post('/api/settings', (req, res) => {
   try {
-    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, controlesMasivaScriptUrl, controlesMasivaSheetUrl, geminiApiKey, claudeApiKey, employeeMappings } = req.body;
+    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, controlesMasivaScriptUrl, controlesMasivaSheetUrl, aguaScriptUrl, geminiApiKey, claudeApiKey, employeeMappings } = req.body;
     const requestingUser = req.headers['x-user-username'] || null;
     const current = db.getSettings();
     
@@ -2693,7 +2729,8 @@ app.post('/api/settings', (req, res) => {
       preventivoScriptUrl: preventivoScriptUrl !== undefined ? preventivoScriptUrl : current.preventivoScriptUrl,
       parteTallerScriptUrl: parteTallerScriptUrl !== undefined ? parteTallerScriptUrl : current.parteTallerScriptUrl,
       controlesMasivaScriptUrl: controlesMasivaScriptUrl !== undefined ? controlesMasivaScriptUrl : current.controlesMasivaScriptUrl,
-      controlesMasivaSheetUrl: controlesMasivaSheetUrl !== undefined ? controlesMasivaSheetUrl : current.controlesMasivaSheetUrl
+      controlesMasivaSheetUrl: controlesMasivaSheetUrl !== undefined ? controlesMasivaSheetUrl : current.controlesMasivaSheetUrl,
+      aguaScriptUrl: aguaScriptUrl !== undefined ? aguaScriptUrl : current.aguaScriptUrl
     };
 
     if (geminiApiKey !== undefined) {
@@ -2726,7 +2763,7 @@ app.post('/api/settings', (req, res) => {
     }
 
     const saved = db.saveSettings(updates);
-    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl, googleActiveTasksUrl: saved.googleActiveTasksUrl, preventivoScriptUrl: saved.preventivoScriptUrl, parteTallerScriptUrl: saved.parteTallerScriptUrl, controlesMasivaScriptUrl: saved.controlesMasivaScriptUrl, controlesMasivaSheetUrl: saved.controlesMasivaSheetUrl, employeeMappings: saved.employeeMappings || null } });
+    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl, googleActiveTasksUrl: saved.googleActiveTasksUrl, preventivoScriptUrl: saved.preventivoScriptUrl, parteTallerScriptUrl: saved.parteTallerScriptUrl, controlesMasivaScriptUrl: saved.controlesMasivaScriptUrl, controlesMasivaSheetUrl: saved.controlesMasivaSheetUrl, aguaScriptUrl: saved.aguaScriptUrl, employeeMappings: saved.employeeMappings || null } });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

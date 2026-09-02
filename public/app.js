@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '244';
+const CURRENT_APP_VERSION = '245';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -2183,6 +2183,8 @@ async function fetchSettings() {
     const controlesSheetInput = document.getElementById('set-controles-masiva-sheet-url');
     if (controlesSheetInput) controlesSheetInput.value = data.controlesMasivaSheetUrl || "";
     window._controlesMasivaSheetUrl = data.controlesMasivaSheetUrl || "";
+    const aguaScriptInput = document.getElementById('set-agua-script-url');
+    if (aguaScriptInput) aguaScriptInput.value = data.aguaScriptUrl || "";
     const geminiApiKeyInput = document.getElementById('set-gemini-api-key');
     if (geminiApiKeyInput) geminiApiKeyInput.value = data.geminiApiKey || "";
     const claudeApiKeyInput = document.getElementById('set-claude-api-key');
@@ -2227,6 +2229,7 @@ async function saveSettings(e) {
   const parteTallerScriptUrl = document.getElementById('set-partetaller-script-url')?.value || '';
   const controlesMasivaScriptUrl = document.getElementById('set-controles-masiva-script-url')?.value || '';
   const controlesMasivaSheetUrl = document.getElementById('set-controles-masiva-sheet-url')?.value || '';
+  const aguaScriptUrl = document.getElementById('set-agua-script-url')?.value || '';
   const geminiApiKey = document.getElementById('set-gemini-api-key')?.value || '';
   const claudeApiKey = document.getElementById('set-claude-api-key')?.value || '';
   const currentUsername = localStorage.getItem('currentUserUsername') || '';
@@ -2238,7 +2241,7 @@ async function saveSettings(e) {
         'Content-Type': 'application/json',
         'x-user-username': currentUsername  // Tell server which user is saving
       },
-      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, controlesMasivaScriptUrl, controlesMasivaSheetUrl, geminiApiKey, claudeApiKey })
+      body: JSON.stringify({ portalUrl, username, password, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, controlesMasivaScriptUrl, controlesMasivaSheetUrl, aguaScriptUrl, geminiApiKey, claudeApiKey })
     });
 
     if (!res.ok) {
@@ -9275,8 +9278,15 @@ window.switchSector = function(sector) {
 // a ese sector y solo confunden.
 function updateHomeFleetSectionVisibility() {
   const section = document.getElementById('home-fleet-summary-section');
-  if (!section) return;
-  section.style.display = (currentSelectedSector === 'Edilicio' || currentSelectedSector === 'Lavadero') ? 'none' : 'block';
+  if (section) {
+    section.style.display = (currentSelectedSector === 'Edilicio' || currentSelectedSector === 'Lavadero') ? 'none' : 'block';
+  }
+  // Lavadero no tiene flota que resumir, pero sí un medidor de agua propio - ocupa ese mismo
+  // espacio arriba del todo en Inicio, en vez de dejarlo vacío.
+  const aguaSection = document.getElementById('home-agua-lavadero-section');
+  if (aguaSection) {
+    aguaSection.style.display = (currentSelectedSector === 'Lavadero') ? 'block' : 'none';
+  }
 }
 
 function getFilteredActiveOrders() {
@@ -11494,6 +11504,50 @@ async function submitCrearTipoLavado() {
     renderTipoLavadoChips();
     closeCrearTipoLavadoModal();
     showToast(`Tipo de lavado "${data.tipo.label}" creado.`, 'success');
+  } catch (e) {
+    showToast(e.message, 'danger');
+  }
+}
+
+// --- Medidor de agua (Lavadero) ---
+// Mismo criterio que el servidor (database.js getTurnoForDate) - solo para mostrarlo en el
+// modal antes de guardar; el servidor vuelve a calcularlo al guardar, este es solo informativo.
+function getTurnoActualLabel() {
+  const hour = parseInt(new Date().toLocaleTimeString('es-AR', { hour: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' }), 10);
+  if (hour >= 6 && hour < 14) return 'Mañana';
+  if (hour >= 14 && hour < 22) return 'Tarde';
+  return 'Noche';
+}
+
+function openLecturaAguaModal() {
+  document.getElementById('lectura-agua-turno').textContent = getTurnoActualLabel();
+  document.getElementById('lectura-agua-valor').value = '';
+  document.getElementById('lectura-agua-modal').classList.add('open');
+}
+
+function closeLecturaAguaModal() {
+  document.getElementById('lectura-agua-modal').classList.remove('open');
+}
+
+async function submitLecturaAgua() {
+  const valorInput = document.getElementById('lectura-agua-valor');
+  const lectura = valorInput.value.trim();
+  if (!lectura) {
+    return showToast('Ingresá la lectura del medidor.', 'danger');
+  }
+  try {
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const res = await fetch('/api/agua/lectura', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-username': currentUsername },
+      body: JSON.stringify({ lectura })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Error al guardar la lectura.');
+    }
+    closeLecturaAguaModal();
+    showToast('Lectura guardada en la Hoja de Agua.', 'success');
   } catch (e) {
     showToast(e.message, 'danger');
   }
