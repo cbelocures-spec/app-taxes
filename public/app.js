@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '278';
+const CURRENT_APP_VERSION = '279';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -3058,6 +3058,9 @@ function addTaskField(taskData = null, forceNew = false) {
           ` : `
             <span class="material-icons task-lock-icon" style="color: var(--text-muted); font-size: 18px;" title="Pendiente de verificar en el próximo control.">lock_open</span>
           `}
+          <button type="button" class="task-duplicate-btn" title="Duplicar tarea (misma descripción y Centro de Costo, para asignarle otro empleado)" onclick="duplicateTaskField('${taskId}')">
+            <span class="material-icons">content_copy</span>
+          </button>
           <button type="button" class="task-delete-btn" onclick="${isLocked ? 'showLockedTaskAlert()' : `removeTaskField('${taskId}')`}">
             <span class="material-icons">delete</span>
           </button>
@@ -3788,6 +3791,25 @@ function removeTaskField(cardId) {
 
     updateTaskCountBadge();
   }
+}
+
+// Cuando varias personas hacen el mismo trabajo (ej: Elastiquero con 3 operarios en el mismo
+// cambio de cubiertas), tipear la misma descripción larga 3 veces era la única opción - esto
+// clona Centro de Costo + Descripción en una tarea nueva, dejando Empleado y Horas en blanco
+// para completar por esa persona.
+function duplicateTaskField(cardId) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  const ccEl = card.querySelector('.task-cc');
+  const descEl = card.querySelector('.task-desc');
+  addTaskField({
+    centroCosto: ccEl ? ccEl.value : '',
+    empleado: '',
+    horasEstimadas: 0,
+    status: 'Pendiente',
+    descripcion: descEl ? descEl.value : ''
+  }, true);
+  showToast('Tarea duplicada - elegí el empleado y las horas.', 'success');
 }
 
 // 7. GET AND RENDER WORK ORDERS

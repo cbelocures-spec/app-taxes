@@ -1204,6 +1204,14 @@ body {
   display: inline-flex;
 }
 
+.task-duplicate-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+}
+
 /* OVERLAY DIALOGS (Error Modal) */
 .modal-overlay {
   position: fixed;
@@ -1948,6 +1956,7 @@ body {
 #new-order-modal.readonly-mode .modal-header button.btn-success,
 #new-order-modal.readonly-mode .card-title-header button,
 #new-order-modal.readonly-mode .task-item-header .task-delete-btn,
+#new-order-modal.readonly-mode .task-item-header .task-duplicate-btn,
 #new-order-modal.readonly-mode .timer-container-row {
   display: none !important;
 }
