@@ -103,10 +103,16 @@ function getDefaultUserPermissions(username, sector) {
       canViewParteTaller: true,
       canViewPreventivos: true,
       canRestoreBackup: true,
+      canViewOrders: true,
+      canViewGomeria: true,
+      canViewElastiquero: true,
+      canManageGoogleConfig: true,
+      canManageEmployees: true,
+      canManageUsers: true,
       allowedSectors: ['Herrería', 'Edilicio', 'Lavadero', 'Taller']
     };
   }
-  
+
   // Default for sector users
   const defaultSector = sector || 'Herrería';
   return {
@@ -119,6 +125,18 @@ function getDefaultUserPermissions(username, sector) {
     canViewParteTaller: true,
     canViewPreventivos: true,
     canRestoreBackup: false,
+    // Órdenes/Gomería/Elastiquero/Google Sheets config/Mapeo de Empleados were previously
+    // unconditional (visible to anyone, no flag existed) - defaulting these to true preserves
+    // that exact behavior for every existing user until an Admin explicitly turns one off.
+    canViewOrders: true,
+    canViewGomeria: true,
+    canViewElastiquero: true,
+    canManageGoogleConfig: true,
+    canManageEmployees: true,
+    // canManageUsers stays false by default - this is what previously let ONLY the hardcoded
+    // 'Admin' sector see/edit Autorizaciones de Usuarios and create accounts. An Admin has to
+    // explicitly grant it per-user now, same as any other sensitive flag here.
+    canManageUsers: false,
     allowedSectors: [defaultSector]
   };
 }
@@ -598,6 +616,12 @@ class LocalDB {
         canViewParteTaller: userObj.permissions.canViewParteTaller !== undefined ? !!userObj.permissions.canViewParteTaller : defaults.canViewParteTaller,
         canViewPreventivos: userObj.permissions.canViewPreventivos !== undefined ? !!userObj.permissions.canViewPreventivos : defaults.canViewPreventivos,
         canRestoreBackup: userObj.permissions.canRestoreBackup !== undefined ? !!userObj.permissions.canRestoreBackup : defaults.canRestoreBackup,
+        canViewOrders: userObj.permissions.canViewOrders !== undefined ? !!userObj.permissions.canViewOrders : defaults.canViewOrders,
+        canViewGomeria: userObj.permissions.canViewGomeria !== undefined ? !!userObj.permissions.canViewGomeria : defaults.canViewGomeria,
+        canViewElastiquero: userObj.permissions.canViewElastiquero !== undefined ? !!userObj.permissions.canViewElastiquero : defaults.canViewElastiquero,
+        canManageGoogleConfig: userObj.permissions.canManageGoogleConfig !== undefined ? !!userObj.permissions.canManageGoogleConfig : defaults.canManageGoogleConfig,
+        canManageEmployees: userObj.permissions.canManageEmployees !== undefined ? !!userObj.permissions.canManageEmployees : defaults.canManageEmployees,
+        canManageUsers: userObj.permissions.canManageUsers !== undefined ? !!userObj.permissions.canManageUsers : defaults.canManageUsers,
         allowedSectors
       };
     }

@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '270';
+const APP_VERSION = '274';
 
 // Middleware
 app.use(cors());
@@ -716,8 +716,11 @@ app.post('/api/users/create', (req, res) => {
     const requester = req.headers['x-user-username'] || null;
     const sector = getSectorByUsername(requester);
     const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
-    
-    if (!isPaniol) {
+    // Enforced here too, not just by hiding the UI section client-side - otherwise anyone could
+    // call this endpoint directly regardless of what the Autorizaciones table shows them.
+    const canManageUsers = isPaniol || db.getUserPermissions(requester).canManageUsers === true;
+
+    if (!canManageUsers) {
       return res.status(403).json({ error: "Solo Pañol / Admin puede agregar usuarios." });
     }
 
@@ -744,8 +747,11 @@ app.post('/api/users/permissions', (req, res) => {
     const requester = req.headers['x-user-username'] || null;
     const sector = getSectorByUsername(requester);
     const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
-    
-    if (!isPaniol) {
+    // Enforced here too, not just by hiding the UI section client-side - otherwise anyone could
+    // call this endpoint directly regardless of what the Autorizaciones table shows them.
+    const canManageUsers = isPaniol || db.getUserPermissions(requester).canManageUsers === true;
+
+    if (!canManageUsers) {
       return res.status(403).json({ error: "Solo Pañol / Admin puede modificar autorizaciones de usuarios." });
     }
 

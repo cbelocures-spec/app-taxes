@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '270';
+const CURRENT_APP_VERSION = '274';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -257,6 +257,46 @@ function getSectorEmployees(sector) {
   });
 
   return baseDefaults;
+}
+
+function cleanEmployeeName(str) {
+  if (typeof str !== 'string') return '';
+  return str.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+}
+
+// Builds the employee list for a task's dropdown: ALWAYS every employee in the catalog (plus any
+// sector-roster name missing from it), sorted with `sectorName`'s own roster first. This used to
+// be a hard filter that dropped anyone not on the sector's fixed HERRERIA_EMPLOYEES/
+// MECANICA_EMPLOYEES/EDILICIO_EMPLOYEES roster - which broke the moment someone genuinely helped
+// across sectors (e.g. a Herrería employee logging an hour on a Taller truck): they just
+// silently weren't selectable, with no error, until the Centro de Costo happened to fall through
+// to no sector match at all. Sorting instead of excluding keeps the common case (sector's own
+// people on top) without ever blocking a real cross-sector assignment.
+function getEmployeesForSectorDropdown(sectorName) {
+  const all = [...(cachedCatalogs.empleados || [])];
+  if (!sectorName) return all;
+
+  const sectorNames = getSectorEmployees(sectorName);
+  const sectorNamesCleaned = new Set(sectorNames.map(cleanEmployeeName));
+  const isSectorMatch = (label) => {
+    const cleaned = cleanEmployeeName(label);
+    if (sectorNamesCleaned.has(cleaned)) return true;
+    for (const n of sectorNamesCleaned) {
+      if (cleaned.includes(n) || n.includes(cleaned)) return true;
+    }
+    return false;
+  };
+
+  // Add any sector-roster name that isn't in the catalog at all, so it's still selectable.
+  sectorNames.forEach(name => {
+    const exists = all.some(emp => emp && emp.label && cleanEmployeeName(emp.label) === cleanEmployeeName(name));
+    if (!exists) all.push({ value: name, label: name });
+  });
+
+  return all
+    .map((emp, idx) => ({ emp, idx, match: emp && emp.label ? isSectorMatch(emp.label) : false }))
+    .sort((a, b) => (a.match === b.match) ? (a.idx - b.idx) : (a.match ? -1 : 1))
+    .map(x => x.emp);
 }
 
 // Used only by the Inicio dashboard board (one card per task) to decide which sector's board
@@ -2725,73 +2765,12 @@ function updateEmployeeDropdownForCard(card) {
       return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
     };
 
-    if (isHerreriaCC) {
-      // Herrería filter with dynamic mapped employees
-      const herreriaNames = getSectorEmployees('Herrería');
-      const herreriaNamesCleaned = new Set(herreriaNames.map(name => cleanName(name)));
-      
-      let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
-        if (!emp || !emp.label) return false;
-        const empCleaned = cleanName(emp.label);
-        if (herreriaNamesCleaned.has(empCleaned)) return true;
-        for (const hName of herreriaNamesCleaned) {
-          if (empCleaned.includes(hName) || hName.includes(empCleaned)) {
-            return true;
-          }
-        }
-        return false;
-      });
-
-      herreriaNames.forEach(name => {
-        const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
-        if (!exists) {
-          matchedEmployees.push({ value: name, label: name });
-        }
-      });
-
-      filteredEmployees = matchedEmployees;
-
-    } else if (isMecanicaCC) { // MECANICA
-      const mecanicaNames = getSectorEmployees('Taller');
-      const mecanicaNamesCleaned = new Set(mecanicaNames.map(name => cleanName(name)));
-      let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
-        if (!emp || !emp.label) return false;
-        const empCleaned = cleanName(emp.label);
-        if (mecanicaNamesCleaned.has(empCleaned)) return true;
-        for (const mName of mecanicaNamesCleaned) {
-          if (empCleaned.includes(mName) || mName.includes(empCleaned)) {
-            return true;
-          }
-        }
-        return false;
-      });
-
-      mecanicaNames.forEach(name => {
-        const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
-        if (!exists) {
-          matchedEmployees.push({ value: name, label: name });
-        }
-      });
-
-      filteredEmployees = matchedEmployees;
-    } else if (isEdilicioCC) {
-      const edilicioNames = getSectorEmployees('Edilicio');
-      const edilicioNamesCleaned = new Set(edilicioNames.map(name => cleanName(name)));
-      let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
-        if (!emp || !emp.label) return false;
-        const empCleaned = cleanName(emp.label);
-        return edilicioNamesCleaned.has(empCleaned);
-      });
-
-      edilicioNames.forEach(name => {
-        const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
-        if (!exists) {
-          matchedEmployees.push({ value: name, label: name });
-        }
-      });
-
-      filteredEmployees = matchedEmployees;
-    }
+    // Always the full roster - sorted with the detected sector's own people first, never
+    // excluding anyone (see getEmployeesForSectorDropdown: staff sometimes help across
+    // sectors, and hiding them from this dropdown used to make the assignment impossible
+    // with no error shown at all).
+    const detectedSector = isHerreriaCC ? 'Herrería' : isMecanicaCC ? 'Taller' : isEdilicioCC ? 'Edilicio' : null;
+    filteredEmployees = getEmployeesForSectorDropdown(detectedSector);
 
     // Populate options
     let empOptions = `<option value="">Seleccionar Empleado...</option>`;
@@ -2925,6 +2904,34 @@ function quickSetTaskEmpleado(taskId, empleadoValue) {
   if (select) setSearchableSelectValue(select, empleadoValue);
 }
 
+// Picks the right Centro de Costo catalog code for the sector currently in context
+// (Herrería/Edilicio/Lavadero/Taller). Shared by addTaskField's own new-task default AND by any
+// caller that builds a task object itself (e.g. ptAsignarSeleccionados) - a caller that hardcoded
+// "15" (Mecánica) regardless of sector used to make the server's own sector-detection see a
+// Herrería/Edilicio task as Taller and silently split it into a sibling order for that interno,
+// so the task vanished from the order (and board) the person was actually working in.
+function getDefaultCentroCostoForCurrentSector() {
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+  const activeClasifEl = document.getElementById('form-clasificacion');
+  const activeClasif = activeClasifEl ? activeClasifEl.value : '';
+  const isHerreriaCtx = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || activeClasif === 'Herrería');
+  const isEdilicioCtx = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio');
+  const isLavaderoCtx = (userSector === 'Lavadero' || currentSelectedSector === 'Lavadero' || activeClasif === 'Lavadero');
+
+  if (isHerreriaCtx) {
+    const herrOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "11" || opt.value === "HERRERIA" || (opt.label && String(opt.label).toLowerCase().includes("herrer"))));
+    if (herrOpt) return herrOpt.value;
+  } else if (isEdilicioCtx) {
+    const ediOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "8" || opt.value === "EDILICIO" || (opt.label && String(opt.label).toLowerCase().includes("edilic"))));
+    if (ediOpt) return ediOpt.value;
+  } else if (isLavaderoCtx) {
+    const lavOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "13" || (opt.label && String(opt.label).toLowerCase().includes("lavader"))));
+    if (lavOpt) return lavOpt.value;
+  }
+  return "15";
+}
+
 function addTaskField(taskData = null, forceNew = false) {
   try {
     const container = document.getElementById('modal-tasks-list');
@@ -2948,23 +2955,7 @@ function addTaskField(taskData = null, forceNew = false) {
     const isHerreriaTask = (userSector === 'Herrería' || currentSelectedSector === 'Herrería' || activeClasif === 'Herrería');
     const isEdilicioTask = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio');
     const isLavaderoTask = (userSector === 'Lavadero' || currentSelectedSector === 'Lavadero' || activeClasif === 'Lavadero');
-    let defaultCcVal = "15"; // default to MECANICA
-    if (isHerreriaTask) {
-      const herrOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "11" || opt.value === "HERRERIA" || (opt.label && String(opt.label).toLowerCase().includes("herrer"))));
-      if (herrOpt) {
-        defaultCcVal = herrOpt.value;
-      }
-    } else if (isEdilicioTask) {
-      const ediOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "8" || opt.value === "EDILICIO" || (opt.label && String(opt.label).toLowerCase().includes("edilic"))));
-      if (ediOpt) {
-        defaultCcVal = ediOpt.value;
-      }
-    } else if (isLavaderoTask) {
-      const lavOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "13" || (opt.label && String(opt.label).toLowerCase().includes("lavader"))));
-      if (lavOpt) {
-        defaultCcVal = lavOpt.value;
-      }
-    }
+    const defaultCcVal = getDefaultCentroCostoForCurrentSector();
 
     // The "Insumos / Repuestos Utilizados" checklist (Aceite Motor, Refrigerante, etc.) is
     // Taller/Mecánica-specific - irrelevant to Herrería/Edilicio work. When editing an existing
@@ -3226,38 +3217,12 @@ function addTaskField(taskData = null, forceNew = false) {
       const isMecanicaCC = ccLabelUpper.includes('MECAN') || taskData.centroCosto === '15';
       const isEdilicioCC = ccLabelUpper.includes('EDILIC') || taskData.centroCosto === '8';
 
-      // Uses getSectorEmployees() (same as updateEmployeeDropdownForCard, the live onchange
-      // filter for brand-new tasks) instead of the raw MECANICA_EMPLOYEES/HERRERIA_EMPLOYEES/
-      // EDILICIO_EMPLOYEES constants - those don't include names added in Ajustes > Mapeo de
-      // Empleados (currentEmployeeMappings), so a custom-mapped employee (e.g. "Aguilar
-      // Sebastian") showed up fine when assigning a brand-new task but disappeared from the
-      // dropdown when reopening an existing task to fix a wrong assignment.
-      const buildFilteredEmployees = (sectorName) => {
-        const names = getSectorEmployees(sectorName);
-        const namesCleaned = new Set(names.map(name => cleanName(name)));
-        const matched = (cachedCatalogs.empleados || []).filter(emp => {
-          if (!emp || !emp.label) return false;
-          const empCleaned = cleanName(emp.label);
-          if (namesCleaned.has(empCleaned)) return true;
-          for (const n of namesCleaned) {
-            if (empCleaned.includes(n) || n.includes(empCleaned)) return true;
-          }
-          return false;
-        });
-        names.forEach(name => {
-          const exists = matched.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
-          if (!exists) matched.push({ value: name, label: name });
-        });
-        return matched;
-      };
-
-      if (isMecanicaCC) {
-        filteredEmployees = buildFilteredEmployees('Taller');
-      } else if (isHerreriaCC) {
-        filteredEmployees = buildFilteredEmployees('Herrería');
-      } else if (isEdilicioCC) {
-        filteredEmployees = buildFilteredEmployees('Edilicio');
-      }
+      // Always the full roster, sorted with the detected sector's own people first - never
+      // excludes anyone (see getEmployeesForSectorDropdown: staff sometimes help across
+      // sectors, and hiding them from this dropdown used to make re-assigning an existing
+      // task impossible with no error shown at all).
+      const detectedSector = isMecanicaCC ? 'Taller' : isHerreriaCC ? 'Herrería' : isEdilicioCC ? 'Edilicio' : null;
+      filteredEmployees = getEmployeesForSectorDropdown(detectedSector);
       let empOptions = `<option value="">Seleccionar Empleado...</option>`;
       filteredEmployees.forEach(opt => {
         if (!opt) return;
@@ -4719,6 +4684,13 @@ async function submitWorkOrder() {
     const prefixMsg = currentEditingOrderId ? "Fallo al actualizar la orden" : "Fallo al crear la orden";
     showToast(`${prefixMsg}: ${error.message}`, "danger");
     console.error(error);
+    // The toast alone auto-dismisses in 3.5s and is easy to miss in a busy shop floor - a save
+    // failure here means NOTHING in this edit was persisted (not the new task, not any other
+    // field), so this has to force acknowledgment instead of silently going unnoticed like a
+    // task that looked added but never actually saved. The modal stays open (see above: it's
+    // only closed on the success path) so nothing typed gets lost - just retry "Guardar" once
+    // this is dismissed.
+    alert(`No se pudo guardar la orden:\n\n${error.message}\n\nNADA de lo que cargaste en esta edición se guardó todavía. Los datos siguen en el formulario: volvé a apretar "Guardar" para reintentar.`);
   } finally {
     isSubmittingWorkOrder = false;
     if (submitBtn) submitBtn.disabled = false;
@@ -9351,6 +9323,12 @@ let currentUserPermissions = {
   canViewHistory: true,
   canViewMasivas: true,
   canViewParteTaller: true,
+  canViewOrders: true,
+  canViewGomeria: true,
+  canViewElastiquero: true,
+  canManageGoogleConfig: true,
+  canManageEmployees: true,
+  canManageUsers: false,
   allowedSectors: ['Herrería', 'Edilicio', 'Lavadero', 'Taller']
 };
 
@@ -9382,7 +9360,10 @@ async function loadUserPermissionsUI() {
     { id: 'nav-bulk', flag: 'canViewMasivas' },
     { id: 'nav-preventivos', flag: 'canViewPreventivos' },
     { id: 'nav-partetaller', flag: 'canViewParteTaller' },
-    { id: 'nav-settings', flag: 'canViewSettings' }
+    { id: 'nav-settings', flag: 'canViewSettings' },
+    { id: 'nav-orders', flag: 'canViewOrders' },
+    { id: 'nav-gomeria', flag: 'canViewGomeria' },
+    { id: 'nav-elastiquero', flag: 'canViewElastiquero' }
   ];
   navPermGates.forEach(({ id, flag }) => {
     const el = document.getElementById(id);
@@ -9390,6 +9371,18 @@ async function loadUserPermissionsUI() {
       el.style.display = 'none';
     }
   });
+
+  // Dentro de Ajustes: la config de Google Sheets/Taxes y el Mapeo de Empleados eran visibles
+  // para cualquiera que pudiera entrar a Ajustes (ningún flag los controlaba). Ahora se ocultan
+  // igual que el resto si el Admin les saca el permiso explícitamente.
+  const googleConfigForm = document.getElementById('settings-form');
+  if (googleConfigForm) {
+    googleConfigForm.style.display = (currentUserPermissions.canManageGoogleConfig === false) ? 'none' : '';
+  }
+  const empMapSection = document.getElementById('employee-mappings-section');
+  if (empMapSection) {
+    empMapSection.style.display = (currentUserPermissions.canManageEmployees === false) ? 'none' : 'block';
+  }
 
   const sectorTabsBar = document.getElementById('sector-tabs-bar');
   if (sectorTabsBar) sectorTabsBar.style.display = 'flex';
@@ -9437,13 +9430,15 @@ async function loadUserPermissionsUI() {
     switchSector('Taller');
   }
 
-  // "Autorizaciones de Usuarios" (Ajustes) is Pañol/Admin-only and starts hidden in the HTML -
-  // nothing else ever un-hid it, so it was permanently unreachable regardless of who was
-  // logged in. Show it only for Admin, and populate it right away instead of waiting for some
-  // action inside it (create user / save permissions) to trigger the first render.
+  // "Autorizaciones de Usuarios" (Ajustes) starts hidden in the HTML - nothing else ever un-hid
+  // it, so it was permanently unreachable regardless of who was logged in. Show it for Admin
+  // (always, can't lock itself out) OR anyone an Admin explicitly granted canManageUsers to via
+  // this same table - letting a trusted non-Admin also add/authorize other users without
+  // needing the fixed 'Admin' sector. Populate it right away instead of waiting for some action
+  // inside it (create user / save permissions) to trigger the first render.
   const userAuthSection = document.getElementById('user-authorizations-section');
   if (userAuthSection) {
-    if (userSector === 'Admin') {
+    if (userSector === 'Admin' || currentUserPermissions.canManageUsers === true) {
       userAuthSection.style.display = 'block';
       renderUserAuthorizationsTable();
     } else {
@@ -9814,7 +9809,13 @@ async function renderUserAuthorizationsTable() {
             <th style="padding:8px; text-align:center;" title="Ver pestaña Parte Taller">🚜 Parte Taller</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Preventivos">⚙️ Preventivos</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Ajustes">🔧 Ajustes</th>
+            <th style="padding:8px; text-align:center;" title="Ver pestaña Órdenes">📄 Órdenes</th>
+            <th style="padding:8px; text-align:center;" title="Ver pestaña Gomería">🛞 Gomería</th>
+            <th style="padding:8px; text-align:center;" title="Ver pestaña Elastiquero">🔗 Elástico</th>
             <th style="padding:8px; text-align:center;" title="Recuperar órdenes desde respaldo de 7 días">🔄 Backup</th>
+            <th style="padding:8px; text-align:center;" title="Ver/editar URLs de Google Sheets, credenciales de Taxes y claves de API en Ajustes">📊 Config. Sheets</th>
+            <th style="padding:8px; text-align:center;" title="Ver/editar el Mapeo de Empleados por Sector en Ajustes">👷 Agregar Empleados</th>
+            <th style="padding:8px; text-align:center;" title="Ver y modificar esta misma tabla: crear usuarios y cambiar permisos de otros">🛡️ Agregar Supervisor</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Herrería">🛠️ Herrería</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Edilicio">🏗️ Edilicio</th>
             <th style="padding:8px; text-align:center;" title="Ver órdenes de Lavadero">🧽 Lavadero</th>
@@ -9869,7 +9870,25 @@ async function renderUserAuthorizationsTable() {
             <input type="checkbox" class="chk-canViewSettings" ${p.canViewSettings !== false ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
+            <input type="checkbox" class="chk-canViewOrders" ${p.canViewOrders !== false ? 'checked' : ''}>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" class="chk-canViewGomeria" ${p.canViewGomeria !== false ? 'checked' : ''}>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" class="chk-canViewElastiquero" ${p.canViewElastiquero !== false ? 'checked' : ''}>
+          </td>
+          <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-canRestoreBackup" ${p.canRestoreBackup ? 'checked' : ''}>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" class="chk-canManageGoogleConfig" ${p.canManageGoogleConfig !== false ? 'checked' : ''}>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" class="chk-canManageEmployees" ${p.canManageEmployees !== false ? 'checked' : ''}>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" class="chk-canManageUsers" ${p.canManageUsers ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-sector-Herreria" ${hasHerreria ? 'checked' : ''}>
@@ -9927,7 +9946,13 @@ async function saveAllUserAuthorizations() {
       const canViewParteTaller = row.querySelector('.chk-canViewParteTaller')?.checked || false;
       const canViewPreventivos = row.querySelector('.chk-canViewPreventivos')?.checked || false;
       const canRestoreBackup = row.querySelector('.chk-canRestoreBackup')?.checked || false;
-      
+      const canViewOrders = row.querySelector('.chk-canViewOrders')?.checked || false;
+      const canViewGomeria = row.querySelector('.chk-canViewGomeria')?.checked || false;
+      const canViewElastiquero = row.querySelector('.chk-canViewElastiquero')?.checked || false;
+      const canManageGoogleConfig = row.querySelector('.chk-canManageGoogleConfig')?.checked || false;
+      const canManageEmployees = row.querySelector('.chk-canManageEmployees')?.checked || false;
+      const canManageUsers = row.querySelector('.chk-canManageUsers')?.checked || false;
+
       const allowedSectors = [];
       if (row.querySelector('.chk-sector-Herreria')?.checked) allowedSectors.push('Herrería');
       if (row.querySelector('.chk-sector-Edilicio')?.checked) allowedSectors.push('Edilicio');
@@ -9944,6 +9969,12 @@ async function saveAllUserAuthorizations() {
         canViewParteTaller,
         canViewPreventivos,
         canRestoreBackup,
+        canViewOrders,
+        canViewGomeria,
+        canViewElastiquero,
+        canManageGoogleConfig,
+        canManageEmployees,
+        canManageUsers,
         allowedSectors
       };
 
@@ -13966,20 +13997,27 @@ function renderParteTallerDashboard(state) {
     return internoPT;
   }
 
-  // Order button helper
-  function getOrdenBtnHtml(internoPT) {
+  // Order button helper. `area` only applies to Edilicio units - a building can have several
+  // open orders at once, one per área (same rule already enforced in ptAsignarSeleccionados/
+  // submitPreOrderCheck/routeForeignTasksToSiblingOrder), so matching by interno alone here
+  // reopened whichever área's order happened to already be open, gluing an unrelated pending
+  // novelty onto it instead of ever offering to create that área's own order.
+  function getOrdenBtnHtml(internoPT, area) {
     const taxesInterno = resolveTaxesInterno(internoPT);
+    const cleanArea = String(area || '').trim().toLowerCase();
     const openOrder = activeOrders && activeOrders.find(o =>
       String(o.interno || '').trim() === taxesInterno &&
-      (!o.estado || o.estado.toLowerCase() !== 'cerrada')
+      (!o.estado || o.estado.toLowerCase() !== 'cerrada') &&
+      (!cleanArea || String(o.area || '').trim().toLowerCase() === cleanArea)
     );
+    const areaArg = String(area || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     if (openOrder) {
       return `<button class="btn btn-xs" onclick="editOrder('${openOrder.id}')"
            style="background:#0288d1; color:white; border-color:#0288d1; font-size:11px; white-space:nowrap; display:inline-flex; align-items:center; gap:3px;">
            <span class="material-icons" style="font-size:12px;">open_in_browser</span> Abrir Orden
          </button>`;
     }
-    return `<button class="btn btn-xs" onclick="ptCrearOrden('${internoPT}')"
+    return `<button class="btn btn-xs" onclick="ptCrearOrden('${internoPT}', '${areaArg}')"
          style="background:#00897b; color:white; border-color:#00897b; font-size:11px; white-space:nowrap; display:inline-flex; align-items:center; gap:3px;">
          <span class="material-icons" style="font-size:12px;">add_circle</span> Crear Orden
        </button>`;
@@ -14229,7 +14267,7 @@ function renderParteTallerDashboard(state) {
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEstadoTrabajoBadgeHtml(item)} ${getEditBtnHtml(internoPT, 'fuera_de_servicio')}</div></td>
           <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
-          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
           <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
           <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
         </tr>`;
@@ -14255,7 +14293,7 @@ function renderParteTallerDashboard(state) {
               ${getChecklistHtml(item, internoPT)}
             </div>
             <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
-              ${getOrdenBtnHtml(internoPT)}
+              ${getOrdenBtnHtml(internoPT, item.area)}
               ${getEditBtnHtml(internoPT, 'fuera_de_servicio')}
             </div>
           </div>`;
@@ -14279,7 +14317,7 @@ function renderParteTallerDashboard(state) {
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEstadoTrabajoBadgeHtml(item)} ${getEditBtnHtml(internoPT, 'reparacion')}</div></td>
           <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
-          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
           <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
           <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
         </tr>`;
@@ -14305,7 +14343,7 @@ function renderParteTallerDashboard(state) {
               ${getChecklistHtml(item, internoPT)}
             </div>
             <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
-              ${getOrdenBtnHtml(internoPT)}
+              ${getOrdenBtnHtml(internoPT, item.area)}
               ${getEditBtnHtml(internoPT, 'reparacion')}
             </div>
           </div>`;
@@ -14328,7 +14366,7 @@ function renderParteTallerDashboard(state) {
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEditBtnHtml(internoPT, 'servicios_pendientes')}</div></td>
           <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
-          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
           <td><span style="font-size:12px;">${servicio}</span></td>
         </tr>`;
       }).join('');
@@ -14352,7 +14390,7 @@ function renderParteTallerDashboard(state) {
               ${getChecklistHtml(item, internoPT)}
             </div>
             <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
-              ${getOrdenBtnHtml(internoPT)}
+              ${getOrdenBtnHtml(internoPT, item.area)}
               ${getEditBtnHtml(internoPT, 'servicios_pendientes')}
             </div>
           </div>`;
@@ -14374,7 +14412,7 @@ function renderParteTallerDashboard(state) {
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${getEditBtnHtml(internoPT, 'inversiones')} <strong>${internoPT}</strong></div></td>
           <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtmlWithProgress(item, internoPT)}</td>
-          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
           <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
           <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
         </tr>`;
@@ -14400,7 +14438,7 @@ function renderParteTallerDashboard(state) {
               ${getChecklistHtmlWithProgress(item, internoPT)}
             </div>
             <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
-              ${getOrdenBtnHtml(internoPT)}
+              ${getOrdenBtnHtml(internoPT, item.area)}
               ${getEditBtnHtml(internoPT, 'inversiones')}
             </div>
           </div>`;
@@ -14667,7 +14705,7 @@ function resolvePtTaxesInterno(internoPT) {
 }
 
 // Opens the new-order modal pre-filled with an interno from Parte Taller
-function ptCrearOrden(internoPT) {
+function ptCrearOrden(internoPT, area) {
   // Resolve the Taxes interno (Irineo -> IRINEO GRAL., Nico -> VOLQUETE NICO)
   const taxesInterno = resolvePtTaxesInterno(internoPT);
 
@@ -14712,6 +14750,18 @@ function ptCrearOrden(internoPT) {
   if (clasificacionEl) {
     clasificacionEl.value = 'Correctivo';
     if (clasificacionEl.rebuildSearchable) clasificacionEl.rebuildSearchable();
+  }
+  // Preselect the área this pending item actually belongs to - without this, "Crear Orden" for
+  // an Edilicio building left Área blank, so the new order didn't carry the área that
+  // getOrdenBtnHtml/routeForeignTasksToSiblingOrder rely on to tell that building's several
+  // open orders apart, and the very next pending item for a DIFFERENT área of the same
+  // building would wrongly reuse this one.
+  if (area) {
+    const areaSelectEl = document.getElementById('form-area-edilicio');
+    if (areaSelectEl) {
+      areaSelectEl.value = area;
+      if (areaSelectEl.rebuildSearchable) areaSelectEl.rebuildSearchable();
+    }
   }
 }
 
@@ -14841,13 +14891,13 @@ async function ptAsignarSeleccionados(interno) {
   if (existingOrder) {
     editOrder(existingOrder.id);
     setTimeout(() => {
-      addTaskField({ descripcion: combinedDesc, centroCosto: '15', status: 'Pendiente' }, true);
+      addTaskField({ descripcion: combinedDesc, centroCosto: getDefaultCentroCostoForCurrentSector(), status: 'Pendiente' }, true);
       showToast(`Ítem(s) agregado(s) a la Orden de Trabajo del Interno ${interno} ✓`, 'success');
     }, 200);
   } else {
     ptCrearOrden(interno);
     setTimeout(() => {
-      addTaskField({ descripcion: combinedDesc, centroCosto: '15', status: 'Pendiente' }, true);
+      addTaskField({ descripcion: combinedDesc, centroCosto: getDefaultCentroCostoForCurrentSector(), status: 'Pendiente' }, true);
       showToast(`Orden creada con los ítems seleccionados para Interno ${interno} ✓`, 'success');
     }, 200);
   }
@@ -15189,58 +15239,9 @@ async function ingresarUnidadTransito(interno) {
     console.error('Error updating Parte Taller state on unit arrival:', e);
   }
 
-  // 5. If moving to fuera_de_servicio or reparacion, auto-create Correctivo work order in Taxes if none exists
-  if (targetEstado === 'reparacion' || targetEstado === 'fuera_de_servicio') {
-    try {
-      const cleanInterno = String(interno).replace(/^(Irineo|Nico)\s+/i, '');
-      const hasOpenOrder = activeOrders && activeOrders.some(o =>
-        String(o.interno || '').trim() === cleanInterno &&
-        (!o.estado || o.estado.toLowerCase() !== 'cerrada')
-      );
-      if (!hasOpenOrder) {
-        const today = new Date().toISOString().split('T')[0];
-        let incidentDesc = unit.novedad || 'Ingreso desde En Tránsito';
-        if (Array.isArray(unit.novedad_items)) {
-          incidentDesc = unit.novedad_items.map(x => x.texto).join(', ');
-        }
-        incidentDesc = incidentDesc.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim();
-
-        let rodadoLabel = `Interno ${cleanInterno}`;
-        const rodadoOpt = cachedCatalogs.rodados
-          ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(cleanInterno).trim())
-          : null;
-        if (rodadoOpt) rodadoLabel = rodadoOpt.label;
-
-        const orderPayload = {
-          rodado: rodadoLabel,
-          responsable: "AUTO",
-          interno: cleanInterno,
-          clasificacion: "Correctivo",
-          fechaEntrega: today,
-          horario: "12:00",
-          incidente: incidentDesc,
-          tasks: [],
-          // This block only runs for targetEstado 'reparacion' or 'fuera_de_servicio' (see the
-          // `if` above) - both mean the unit isn't operational, so the order always has to
-          // start Fuera de Servicio. The same COMPACTADOR/'operativo'-style literal-string bug
-          // as savePtUnit() had: checking only 'fuera_de_servicio' let 'reparacion' fall through
-          // to 'operativo' by mistake.
-          estadoUnidad: 'fuera_de_servicio'
-        };
-
-        await fetch('/api/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-username': currentUser
-          },
-          body: JSON.stringify(orderPayload)
-        });
-      }
-    } catch(err) {
-      console.error('Error auto-creating work order on arrival:', err);
-    }
-  }
+  // El ingreso a Reparación/Fuera de Servicio ya NO crea la orden acá - queda como anotación
+  // (misma lógica que Servicios Pendientes) hasta que alguien la asigna de verdad desde
+  // "Asignar Seleccionados", que sí crea la orden real y reutiliza cualquiera ya abierta.
 
   showToast(`Unidad Interno ${interno} ingresó al taller y pasó a ${targetLabel} ✓`, 'success');
   renderParteTallerDashboard(state);
@@ -15525,69 +15526,42 @@ async function savePtUnit() {
         throw new Error(serverMsg || `Error al registrar la novedad en el Parte Taller (HTTP ${res.status}).`);
       }
 
-      // 2. Automatically generate a Correctivo work order in Taxes if reparación o fuera_de_servicio.
-      // Servicios Pendientes NUNCA crea orden/tarea todavía, ni siquiera para Edilicio - es solo
-      // una anotación a futuro hasta que alguien decida ponerse a trabajarla de verdad (ver
-      // ptAsignarSeleccionados, que sí crea la orden real en ese momento).
+      // 2. Reparación/Fuera de Servicio ya NO crean la orden acá - es solo una anotación a
+      // futuro (igual que Servicios Pendientes) hasta que alguien decida ponerse a trabajarla
+      // de verdad (ver ptAsignarSeleccionados, que sí crea la orden real en ese momento y
+      // reutiliza cualquier orden abierta existente en vez de duplicarla). Excepción: Edilicio
+      // SÍ necesita una tarea real ya (con centro de costo Edilicio y cronómetro) para que
+      // adjustPtStateLists la encuentre y la clasifique en Reparación/Fuera de Servicio/
+      // Servicios Pendientes - no tiene una pantalla de "Asignar Seleccionados" equivalente
+      // para arrancarla después.
       const isEdilicioAdd = (sectorSel === 'edilicio');
-      if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
-        let rodadoLabel = '';
-        let internoVal = '';
-        if (empresa === 'irineo') {
-          rodadoLabel = 'IRINEO GRAL. IRINEO GRAL. Interno IRINEO GRAL.';
-          internoVal = 'IRINEO GRAL.';
-        } else if (empresa === 'nico') {
-          rodadoLabel = 'VOLQUETE NICO VOLQUETE NICO Interno VOLQUETE NICO';
-          internoVal = 'VOLQUETE NICO';
-        } else {
-          const rodadoOpt = cachedCatalogs.rodados
-            ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
-            : null;
-          rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
-          internoVal = interno;
-        }
-
+      if (isEdilicioAdd && (estado === 'reparacion' || estado === 'fuera_de_servicio')) {
         const today = new Date().toISOString().split('T')[0];
         const incidentDesc = novedadFormatted.split('\n').map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()).filter(Boolean).join(', ');
 
-        const autoSectorHerreria = (sectorSel === 'herreria');
-        // Taxes has no real "Edilicio" clasificacion value - Edilicio work is identified by the
-        // order's own `sector` field instead (see getOrderSector/isEdilicioOrder), never by
-        // writing "Edilicio" into clasificacion.
-        const autoSectorEdilicio = (sectorSel === 'edilicio');
-
-        // Edilicio SÍ necesita una tarea real (con centro de costo Edilicio) para que
-        // adjustPtStateLists la encuentre y la clasifique en Reparación/Fuera de Servicio/
-        // Servicios Pendientes según su cronómetro. Taller/Herrería no la necesitan - ahí lo
-        // guardado en el paso 1 ya es lo que se muestra, así que siguen sin tareas de relleno
-        // (el empleado/horas quedaban con un valor ficticio que no era real).
-        let autoTasks = [];
-        if (autoSectorEdilicio) {
-          const ediCcOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "8" || (opt.label && String(opt.label).toLowerCase().includes("edilic"))));
-          const task = {
-            descripcion: incidentDesc || "Revisión",
-            centroCosto: ediCcOpt ? ediCcOpt.value : "8",
-            status: 'Pendiente'
-          };
-          if (estado === 'reparacion') {
-            task.timerStart = Date.now();
-          } else if (estado === 'fuera_de_servicio') {
-            task.timerStarted = true;
-          }
-          autoTasks = [task];
+        const ediCcOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "8" || (opt.label && String(opt.label).toLowerCase().includes("edilic"))));
+        const task = {
+          descripcion: incidentDesc || "Revisión",
+          centroCosto: ediCcOpt ? ediCcOpt.value : "8",
+          status: 'Pendiente'
+        };
+        if (estado === 'reparacion') {
+          task.timerStart = Date.now();
+        } else if (estado === 'fuera_de_servicio') {
+          task.timerStarted = true;
         }
 
         const orderPayload = {
-          rodado: rodadoLabel,
+          rodado: `Interno ${interno}`,
           responsable: "AUTO",
-          interno: internoVal,
-          clasificacion: autoSectorHerreria ? "Herrería" : "Correctivo",
-          sector: autoSectorEdilicio ? "Edilicio" : undefined,
-          area: autoSectorEdilicio ? areaEdilicio : undefined,
+          interno: interno,
+          clasificacion: "Correctivo",
+          sector: "Edilicio",
+          area: areaEdilicio,
           fechaEntrega: today,
           horario: "12:00",
           incidente: incidentDesc || "Revisión en taller",
-          tasks: autoTasks,
+          tasks: [task],
           // This block only runs for estado 'reparacion' or 'fuera_de_servicio' (see the `if`
           // above) - both mean the unit is NOT operational, so the auto-created order always
           // has to start Fuera de Servicio. Checking only the literal string 'fuera_de_servicio'
@@ -15599,7 +15573,7 @@ async function savePtUnit() {
 
         const orderRes = await fetch('/api/orders', {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'x-user-username': localStorage.getItem('currentUserUsername') || ''
           },
@@ -15610,6 +15584,8 @@ async function savePtUnit() {
         } else {
           showToast(`Unidad registrada y Orden de Trabajo Correctiva creada ✓`, 'success');
         }
+      } else if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
+        showToast(`Unidad #${saveInterno} registrada en ${estado === 'reparacion' ? 'Reparación' : 'Fuera de Servicio'} ✓ La orden se crea al asignar la tarea.`, 'success');
       } else if (estado === 'transito') {
         showToast(`Unidad #${saveInterno} agregada a En Tránsito ✓`, 'success');
       } else {
@@ -15714,78 +15690,28 @@ async function savePtUnit() {
       });
       if (!res.ok) throw new Error('Error al guardar los cambios en el Parte Taller.');
 
-      // 4. Auto-create work order if state changed to reparación or fuera_de_servicio and there's no open order
+      // Reparación/Fuera de Servicio ya NO crean la orden acá - queda como anotación hasta que
+      // alguien la asigna de verdad desde "Asignar Seleccionados". Si YA existe una orden
+      // abierta para este interno, seguimos sincronizando el flag pendingElastiquero en ella.
       if (hasNoItems) {
         showToast(`Unidad ${saveInterno} quedó operativa al resolverse todos sus ítems pendientes ✓`, 'success');
       } else if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
         let internoVal = (empresa === 'irineo') ? 'IRINEO GRAL.' : (empresa === 'nico' ? 'VOLQUETE NICO' : interno);
-        const hasOpenOrder = activeOrders && activeOrders.some(o =>
+        const existingOrderForFlag = activeOrders && activeOrders.find(o =>
           String(o.interno || '').trim() === internoVal &&
           (!o.estado || o.estado.toLowerCase() !== 'cerrada')
         );
-        if (!hasOpenOrder) {
-          let rodadoLabel = '';
-          if (empresa === 'irineo') {
-            rodadoLabel = 'IRINEO GRAL. IRINEO GRAL. Interno IRINEO GRAL.';
-          } else if (empresa === 'nico') {
-            rodadoLabel = 'VOLQUETE NICO VOLQUETE NICO Interno VOLQUETE NICO';
-          } else {
-            const rodadoOpt = cachedCatalogs.rodados
-              ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === String(interno).trim())
-              : null;
-            rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
-          }
-
-          const today = new Date().toISOString().split('T')[0];
-          const incidentDesc = novedadFormatted.split('\n').map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()).filter(Boolean).join(', ');
-
-          const orderPayload = {
-            rodado: rodadoLabel,
-            responsable: "AUTO",
-            interno: internoVal,
-            clasificacion: "Correctivo",
-            fechaEntrega: today,
-            horario: "12:00",
-            incidente: incidentDesc,
-            tasks: [],
-            // This only runs for estado 'reparacion' or 'fuera_de_servicio' (see the `else if`
-            // above) - both mean the unit is NOT operational, so the auto-created order always
-            // has to start Fuera de Servicio. Checking only the literal string
-            // 'fuera_de_servicio' left 'reparacion' falling through to 'operativo' by mistake -
-            // same bug already fixed for the "brand-new unit" path above.
-            estadoUnidad: 'fuera_de_servicio',
-            pendingElastiquero: pendingElastiqueroFlag
-          };
-
-          await fetch('/api/orders', {
-            method: 'POST',
+        if (existingOrderForFlag) {
+          await fetch(`/api/orders/${existingOrderForFlag.id}`, {
+            method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
               'x-user-username': localStorage.getItem('currentUserUsername') || ''
             },
-            body: JSON.stringify(orderPayload)
+            body: JSON.stringify({ pendingElastiquero: pendingElastiqueroFlag })
           });
-          showToast(`Unidad actualizada y Orden de Trabajo Correctiva creada ✓`, 'success');
-        } else {
-          // An order already exists - the switch might just be toggling this flag on an order
-          // that's not otherwise changing right now, so update it directly instead of silently
-          // ignoring whatever the user just set.
-          const existingOrderForFlag = activeOrders && activeOrders.find(o =>
-            String(o.interno || '').trim() === internoVal &&
-            (!o.estado || o.estado.toLowerCase() !== 'cerrada')
-          );
-          if (existingOrderForFlag) {
-            await fetch(`/api/orders/${existingOrderForFlag.id}`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-user-username': localStorage.getItem('currentUserUsername') || ''
-              },
-              body: JSON.stringify({ pendingElastiquero: pendingElastiqueroFlag })
-            });
-          }
-          showToast('Unidad actualizada con éxito.', 'success');
         }
+        showToast('Unidad actualizada con éxito.', 'success');
       } else {
         showToast('Unidad actualizada con éxito.', 'success');
       }
