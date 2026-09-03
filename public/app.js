@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '276';
+const CURRENT_APP_VERSION = '277';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -303,6 +303,29 @@ function getEmployeesForSectorDropdown(sectorName) {
     .map((emp, idx) => ({ emp, idx, match: emp && emp.label ? isSectorMatch(emp.label) : false }))
     .sort((a, b) => (a.match === b.match) ? (a.idx - b.idx) : (a.match ? -1 : 1))
     .map(x => x.emp);
+}
+
+// Unlike Taller/Herrería/Edilicio (where showing the full company and just prioritizing the
+// sector's own people is right, since staff sometimes genuinely help across sectors), Lavadero's
+// "Lavador" picker in Identificar Unidad is for a small fixed team - the rest of the company's
+// catalog there is pure noise, never a real answer. Returns ONLY the sector's own roster.
+function getOnlySectorEmployees(sectorName) {
+  const sectorNames = getSectorEmployees(sectorName);
+  const sectorNamesCleaned = new Set(sectorNames.map(cleanEmployeeName));
+  const isMatch = (label) => {
+    const cleaned = cleanEmployeeName(label);
+    if (sectorNamesCleaned.has(cleaned)) return true;
+    for (const n of sectorNamesCleaned) {
+      if (cleaned.includes(n) || n.includes(cleaned)) return true;
+    }
+    return false;
+  };
+  const matched = (cachedCatalogs.empleados || []).filter(emp => emp && emp.label && isMatch(emp.label));
+  sectorNames.forEach(name => {
+    const exists = matched.some(emp => emp && emp.label && cleanEmployeeName(emp.label) === cleanEmployeeName(name));
+    if (!exists) matched.push({ value: name, label: name });
+  });
+  return matched;
 }
 
 // Used only by the Inicio dashboard board (one card per task) to decide which sector's board
@@ -11412,7 +11435,7 @@ function addPreLavadorRow() {
   row.innerHTML = `
     <select class="pre-lavador-select" style="flex:1; padding:10px; font-size:16px; border:1px solid var(--border-color); border-radius:8px;">
       <option value="">Seleccionar empleado...</option>
-      ${getEmployeesForSectorDropdown('Lavadero').map(e => `<option value="${e.value}">${e.label}</option>`).join('')}
+      ${getOnlySectorEmployees('Lavadero').map(e => `<option value="${e.value}">${e.label}</option>`).join('')}
     </select>
     <button type="button" onclick="removePreLavadorRow(this)" style="border:none; background:none; color:var(--danger); cursor:pointer; padding:6px;" title="Quitar este lavador">
       <span class="material-icons" style="font-size:18px;">close</span>
