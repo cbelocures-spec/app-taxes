@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '275';
+const CURRENT_APP_VERSION = '276';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -2765,6 +2765,7 @@ function updateEmployeeDropdownForCard(card) {
     const isHerreriaCC = selectedLabel.includes('HERRER') || selectedCc === "HERRERIA" || selectedCc === "16" || userSector === 'Herrería';
     const isMecanicaCC = selectedLabel.includes('MECAN') || selectedCc === "15" || selectedCc === "MECANICA";
     const isEdilicioCC = selectedLabel.includes('EDILIC') || selectedCc === "EDILICIO" || selectedCc === "8" || userSector === 'Edilicio';
+    const isLavaderoCC = selectedLabel.includes('LAVADER') || selectedCc === "LAVADERO" || selectedCc === "13" || userSector === 'Lavadero';
 
     const cleanName = (str) => {
       if (typeof str !== 'string') return '';
@@ -2775,7 +2776,7 @@ function updateEmployeeDropdownForCard(card) {
     // excluding anyone (see getEmployeesForSectorDropdown: staff sometimes help across
     // sectors, and hiding them from this dropdown used to make the assignment impossible
     // with no error shown at all).
-    const detectedSector = isHerreriaCC ? 'Herrería' : isMecanicaCC ? 'Taller' : isEdilicioCC ? 'Edilicio' : null;
+    const detectedSector = isHerreriaCC ? 'Herrería' : isMecanicaCC ? 'Taller' : isEdilicioCC ? 'Edilicio' : isLavaderoCC ? 'Lavadero' : null;
     filteredEmployees = getEmployeesForSectorDropdown(detectedSector);
 
     // Populate options
@@ -3222,12 +3223,13 @@ function addTaskField(taskData = null, forceNew = false) {
       const isHerreriaCC = ccLabelUpper.includes('HERRER');
       const isMecanicaCC = ccLabelUpper.includes('MECAN') || taskData.centroCosto === '15';
       const isEdilicioCC = ccLabelUpper.includes('EDILIC') || taskData.centroCosto === '8';
+      const isLavaderoCC = ccLabelUpper.includes('LAVADER') || taskData.centroCosto === '13';
 
       // Always the full roster, sorted with the detected sector's own people first - never
       // excludes anyone (see getEmployeesForSectorDropdown: staff sometimes help across
       // sectors, and hiding them from this dropdown used to make re-assigning an existing
       // task impossible with no error shown at all).
-      const detectedSector = isMecanicaCC ? 'Taller' : isHerreriaCC ? 'Herrería' : isEdilicioCC ? 'Edilicio' : null;
+      const detectedSector = isMecanicaCC ? 'Taller' : isHerreriaCC ? 'Herrería' : isEdilicioCC ? 'Edilicio' : isLavaderoCC ? 'Lavadero' : null;
       filteredEmployees = getEmployeesForSectorDropdown(detectedSector);
       let empOptions = `<option value="">Seleccionar Empleado...</option>`;
       filteredEmployees.forEach(opt => {
@@ -7127,79 +7129,15 @@ function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
     const isHerreriaCC = selectedLabel.includes('HERRER') || selectedCc === "HERRERIA" || selectedCc === "16" || userSector === 'Herrería';
     const isMecanicaCC = selectedLabel.includes('MECAN') || selectedCc === "15" || selectedCc === "MECANICA";
     const isEdilicioCC = selectedLabel.includes('EDILIC') || selectedCc === "EDILICIO" || selectedCc === "8" || userSector === 'Edilicio';
+    const isLavaderoCC = selectedLabel.includes('LAVADER') || selectedCc === "LAVADERO" || selectedCc === "13" || userSector === 'Lavadero';
 
     const cleanName = (str) => {
       if (typeof str !== 'string') return '';
       return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
     };
 
-    if (isHerreriaCC) {
-      // Herrería filter
-      const herreriaNames = getSectorEmployees('Herrería');
-      const herreriaNamesCleaned = new Set(herreriaNames.map(name => cleanName(name)));
-      
-      let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
-        if (!emp || !emp.label) return false;
-        const empCleaned = cleanName(emp.label);
-        if (herreriaNamesCleaned.has(empCleaned)) return true;
-        for (const hName of herreriaNamesCleaned) {
-          if (empCleaned.includes(hName) || hName.includes(empCleaned)) {
-            return true;
-          }
-        }
-        return false;
-      });
-
-      herreriaNames.forEach(name => {
-        const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
-        if (!exists) {
-          matchedEmployees.push({ value: name, label: name });
-        }
-      });
-
-      filteredEmployees = matchedEmployees.length >= 1 ? matchedEmployees : (cachedCatalogs.empleados || []);
-
-    } else if (isMecanicaCC) { // MECANICA
-      const mecanicaNames = getSectorEmployees('Taller');
-      const mecanicaNamesCleaned = new Set(mecanicaNames.map(name => cleanName(name)));
-      let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
-        if (!emp || !emp.label) return false;
-        const empCleaned = cleanName(emp.label);
-        if (mecanicaNamesCleaned.has(empCleaned)) return true;
-        for (const mName of mecanicaNamesCleaned) {
-          if (empCleaned.includes(mName) || mName.includes(empCleaned)) {
-            return true;
-          }
-        }
-        return false;
-      });
-
-      mecanicaNames.forEach(name => {
-        const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
-        if (!exists) {
-          matchedEmployees.push({ value: name, label: name });
-        }
-      });
-
-      filteredEmployees = matchedEmployees.length >= 1 ? matchedEmployees : (cachedCatalogs.empleados || []);
-    } else if (isEdilicioCC) {
-      const edilicioNames = getSectorEmployees('Edilicio');
-      const edilicioNamesCleaned = new Set(edilicioNames.map(name => cleanName(name)));
-      let matchedEmployees = (cachedCatalogs.empleados || []).filter(emp => {
-        if (!emp || !emp.label) return false;
-        const empCleaned = cleanName(emp.label);
-        return edilicioNamesCleaned.has(empCleaned);
-      });
-
-      edilicioNames.forEach(name => {
-        const exists = matchedEmployees.some(emp => emp && emp.label && cleanName(emp.label) === cleanName(name));
-        if (!exists) {
-          matchedEmployees.push({ value: name, label: name });
-        }
-      });
-
-      filteredEmployees = matchedEmployees.length >= 1 ? matchedEmployees : (cachedCatalogs.empleados || []);
-    }
+    const detectedSector = isHerreriaCC ? 'Herrería' : isMecanicaCC ? 'Taller' : isEdilicioCC ? 'Edilicio' : isLavaderoCC ? 'Lavadero' : null;
+    filteredEmployees = getEmployeesForSectorDropdown(detectedSector);
 
     // Populate options
     let empOptions = `<option value="">Seleccionar Empleado...</option>`;
@@ -11474,7 +11412,7 @@ function addPreLavadorRow() {
   row.innerHTML = `
     <select class="pre-lavador-select" style="flex:1; padding:10px; font-size:16px; border:1px solid var(--border-color); border-radius:8px;">
       <option value="">Seleccionar empleado...</option>
-      ${(cachedCatalogs.empleados || []).map(e => `<option value="${e.value}">${e.label}</option>`).join('')}
+      ${getEmployeesForSectorDropdown('Lavadero').map(e => `<option value="${e.value}">${e.label}</option>`).join('')}
     </select>
     <button type="button" onclick="removePreLavadorRow(this)" style="border:none; background:none; color:var(--danger); cursor:pointer; padding:6px;" title="Quitar este lavador">
       <span class="material-icons" style="font-size:18px;">close</span>
