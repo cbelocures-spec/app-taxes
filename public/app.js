@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '277';
+const CURRENT_APP_VERSION = '278';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11228,7 +11228,23 @@ function applyCustomPreventivos() {
 
 function renderCustomPreventivoButton(p) {
   const container = document.getElementById('bulk-preventivo-custom-container');
-  if (!container || document.getElementById(`bulk-btn-${p.key}`)) return;
+  if (!container) return;
+
+  // Already rendered (e.g. a second applyCustomPreventivos() pass) - just refresh its label/
+  // sector/title instead of skipping outright, so an edit shows up immediately without a reload.
+  const existingBtn = document.getElementById(`bulk-btn-${p.key}`);
+  if (existingBtn) {
+    existingBtn.dataset.sector = p.sector;
+    existingBtn.title = p.label;
+    existingBtn.innerHTML = `<span class="material-icons" style="font-size: 14px;">playlist_add_check</span> ${p.label}`;
+    applyBulkSectorFilterToButton(existingBtn);
+    return;
+  }
+
+  const wrapper = document.createElement('span');
+  wrapper.className = 'bulk-custom-preventivo-wrap';
+  wrapper.style.cssText = 'display: inline-flex; align-items: center; gap: 2px;';
+
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.id = `bulk-btn-${p.key}`;
@@ -11241,7 +11257,21 @@ function renderCustomPreventivoButton(p) {
   // to highlight when active - same as every hardcoded preventivo button.
   btn.setAttribute('onclick', `loadPreventivoIntoBulkTasks('${p.key}')`);
   btn.innerHTML = `<span class="material-icons" style="font-size: 14px;">playlist_add_check</span> ${p.label}`;
-  container.appendChild(btn);
+
+  // Sin esto, un preventivo creado con un dato mal cargado (ej: "Necesita hoja" sin querer
+  // destildado) quedaba así para siempre - no había ningún botón para corregirlo, solo se
+  // podía volver a crear otro con otro nombre.
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'btn btn-secondary btn-xs';
+  editBtn.title = `Editar "${p.label}"`;
+  editBtn.style.cssText = 'padding: 4px 6px; min-width: auto;';
+  editBtn.setAttribute('onclick', `openEditarPreventivoModal('${p.key}')`);
+  editBtn.innerHTML = `<span class="material-icons" style="font-size: 14px;">edit</span>`;
+
+  wrapper.appendChild(btn);
+  wrapper.appendChild(editBtn);
+  container.appendChild(wrapper);
   applyBulkSectorFilterToButton(btn);
 }
 
@@ -11275,7 +11305,17 @@ function ensureBulkSectorKnown(sector) {
 
 function applyBulkSectorFilterToButton(btn) {
   const matches = bulkSectorFilter === 'Todos' || btn.dataset.sector === bulkSectorFilter;
-  btn.style.display = matches ? '' : 'none';
+  // A custom preventivo's button lives inside a wrapper span alongside its edit icon - hide
+  // that whole wrapper, not just the button, or the lápiz is left floating with nothing next
+  // to it once its sibling button disappears. The wrapper's own default display is
+  // inline-flex (see renderCustomPreventivoButton), so restore that exact value rather than ''
+  // (which would fall back to a plain inline span and lose the gap between button and icon).
+  const wrap = btn.closest('.bulk-custom-preventivo-wrap');
+  if (wrap) {
+    wrap.style.display = matches ? 'inline-flex' : 'none';
+  } else {
+    btn.style.display = matches ? '' : 'none';
+  }
 }
 
 function setBulkSectorFilter(sector) {
@@ -11297,7 +11337,14 @@ function toggleCpSectorNuevo() {
   if (isNuevo) input.focus();
 }
 
+// null mientras se está CREANDO uno nuevo; la key del preventivo cuando el modal (reutilizado)
+// está EDITANDO uno existente en su lugar - ver openEditarPreventivoModal.
+let editingPreventivoKey = null;
+
 function openCrearPreventivoModal() {
+  editingPreventivoKey = null;
+  document.getElementById('cp-modal-title').textContent = 'Crear preventivo';
+  document.getElementById('cp-submit-btn').textContent = 'Crear preventivo';
   document.getElementById('cp-label').value = '';
   document.getElementById('cp-sector').value = 'Mecanica';
   document.getElementById('cp-sector-nuevo').value = '';
@@ -11306,8 +11353,28 @@ function openCrearPreventivoModal() {
   document.getElementById('crear-preventivo-modal').classList.add('open');
 }
 
+// Reutiliza el mismo modal de "Crear preventivo" para editar uno ya existente - hasta ahora
+// no había ninguna forma de corregir el nombre/sector/"necesita hoja" de un preventivo una vez
+// creado, ni siquiera para arreglar un dato mal tildado sin querer.
+function openEditarPreventivoModal(key) {
+  const p = customPreventivos.find(cp => cp.key === key);
+  if (!p) return;
+  editingPreventivoKey = key;
+  document.getElementById('cp-modal-title').textContent = `Editar "${p.label}"`;
+  document.getElementById('cp-submit-btn').textContent = 'Guardar cambios';
+  document.getElementById('cp-label').value = p.label;
+  const sectorSelect = document.getElementById('cp-sector');
+  ensureBulkSectorKnown(p.sector);
+  sectorSelect.value = p.sector;
+  document.getElementById('cp-sector-nuevo').value = '';
+  document.getElementById('cp-sector-nuevo').style.display = 'none';
+  document.getElementById('cp-necesita-hoja').checked = !!p.necesitaHoja;
+  document.getElementById('crear-preventivo-modal').classList.add('open');
+}
+
 function closeCrearPreventivoModal() {
   document.getElementById('crear-preventivo-modal').classList.remove('open');
+  editingPreventivoKey = null;
 }
 
 async function submitCrearPreventivo() {
@@ -11324,6 +11391,29 @@ async function submitCrearPreventivo() {
     return showToast('Ingresá un nombre para el sector nuevo.', 'danger');
   }
   try {
+    if (editingPreventivoKey) {
+      const key = editingPreventivoKey;
+      const res = await fetch(`/api/preventivos-masiva/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label, sector, necesitaHoja })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Error al guardar los cambios');
+      }
+      const data = await res.json();
+      const idx = customPreventivos.findIndex(cp => cp.key === key);
+      if (idx !== -1) customPreventivos[idx] = data.preventivo;
+      applyCustomPreventivos();
+      const tbody = document.getElementById('bulk-insumos-grid-body');
+      if (tbody) tbody.innerHTML = '';
+      updateBulkInsumosGrid();
+      closeCrearPreventivoModal();
+      showToast(`Preventivo "${data.preventivo.label}" actualizado.`, 'success');
+      return;
+    }
+
     const res = await fetch('/api/preventivos-masiva', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

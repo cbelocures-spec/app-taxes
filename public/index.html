@@ -1549,7 +1549,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.17.3</div>
+      <div class="sidebar-version">Versión 1.18.0</div>
     </div>
   </aside>
 
@@ -1847,7 +1847,7 @@
   <!-- CREAR PREVENTIVO MODAL (Carga Masiva) -->
   <div class="popup-modal-backdrop" id="crear-preventivo-modal">
     <div class="modal-content" style="max-width: 420px; margin: auto; padding: 24px; border-radius: 16px; background: var(--card-bg); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: slideUp 0.3s ease-out;">
-      <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 4px;">Crear preventivo</h3>
+      <h3 id="cp-modal-title" style="font-size: 18px; font-weight: 700; margin: 0 0 4px;">Crear preventivo</h3>
       <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 18px;">Se agrega como botón permanente en Carga Masiva.</p>
 
       <div class="form-group" style="margin-bottom: 14px;">
@@ -1875,7 +1875,7 @@
 
       <div style="display: flex; gap: 8px; justify-content: flex-end;">
         <button type="button" class="btn btn-secondary" onclick="closeCrearPreventivoModal()" style="padding: 10px 18px; border-radius: 8px;">Cancelar</button>
-        <button type="button" class="btn btn-primary" onclick="submitCrearPreventivo()" style="padding: 10px 18px; border-radius: 8px;">Crear preventivo</button>
+        <button type="button" id="cp-submit-btn" class="btn btn-primary" onclick="submitCrearPreventivo()" style="padding: 10px 18px; border-radius: 8px;">Crear preventivo</button>
       </div>
     </div>
   </div>
@@ -2652,6 +2652,6 @@
     }
   </style>
 
-  <script src="app.js?v=277"></script>
+  <script src="app.js?v=278"></script>
 </body>
 </html>
