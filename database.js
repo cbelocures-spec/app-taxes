@@ -144,34 +144,55 @@ function getDefaultUserPermissions(username, sector) {
 function getSectorByUsername(username) {
   if (!username) return 'Taller';
   const cleanUsername = String(username).split(',')[0].trim().toLowerCase();
-  
+
   if (
-    cleanUsername.includes('paniol') || 
-    cleanUsername.includes('panol') || 
+    cleanUsername.includes('paniol') ||
+    cleanUsername.includes('panol') ||
     cleanUsername.includes('pañol') ||
     cleanUsername.includes('admin')
   ) {
     return 'Admin';
   }
   if (
-    cleanUsername.includes('jcarmona') || 
+    cleanUsername.includes('jcarmona') ||
     cleanUsername.includes('carmona')
   ) {
     return 'Herrería';
   }
   if (
-    cleanUsername.includes('ftoledo') || 
+    cleanUsername.includes('ftoledo') ||
     cleanUsername.includes('toledo')
   ) {
     return 'Edilicio';
   }
+  if (cleanUsername.includes('lavader')) {
+    return 'Lavadero';
+  }
   if (
-    cleanUsername.includes('sergios') || 
+    cleanUsername.includes('sergios') ||
     cleanUsername.includes('taller') ||
     cleanUsername.includes('ibrahim')
   ) {
     return 'Taller';
   }
+
+  // No name fragment matched (e.g. "gaston@..." picked Lavadero as Sector Predeterminado when
+  // created, but the name itself gives no hint of that) - fall back to whatever sector was
+  // actually assigned at creation time and saved into allowedSectors, instead of always
+  // defaulting to Taller. Reads storage directly rather than going through getUserPermissions()
+  // (which calls back into this same function) to avoid recursion.
+  try {
+    const key = normalizeEmail(cleanUsername);
+    const users = module.exports.read().users || {};
+    const allowedSectors = users[key] && users[key].permissions ? users[key].permissions.allowedSectors : null;
+    if (Array.isArray(allowedSectors) && allowedSectors.length > 0) {
+      const norm = s => String(s || '').toLowerCase();
+      if (allowedSectors.some(s => norm(s).includes('herrer'))) return 'Herrería';
+      if (allowedSectors.some(s => norm(s).includes('edil'))) return 'Edilicio';
+      if (allowedSectors.some(s => norm(s).includes('lavader'))) return 'Lavadero';
+    }
+  } catch (e) {}
+
   return 'Taller';
 }
 

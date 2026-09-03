@@ -776,6 +776,7 @@
             <button type="button" class="emp-map-tab-btn active" id="emp-tab-taller" onclick="switchEmpMapTab('Taller')" style="padding: 7px 16px; font-size: 13px; font-weight: 600; border: none; border-bottom: 2px solid var(--primary); background: transparent; color: var(--primary); cursor: pointer; border-radius: 4px 4px 0 0;">🔧 Taller</button>
             <button type="button" class="emp-map-tab-btn" id="emp-tab-herreria" onclick="switchEmpMapTab('Herrería')" style="padding: 7px 16px; font-size: 13px; font-weight: 600; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 4px 4px 0 0;">🔨 Herrería</button>
             <button type="button" class="emp-map-tab-btn" id="emp-tab-edilicio" onclick="switchEmpMapTab('Edilicio')" style="padding: 7px 16px; font-size: 13px; font-weight: 600; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 4px 4px 0 0;">🏗️ Edilicio</button>
+            <button type="button" class="emp-map-tab-btn" id="emp-tab-lavadero" onclick="switchEmpMapTab('Lavadero')" style="padding: 7px 16px; font-size: 13px; font-weight: 600; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 4px 4px 0 0;">🧽 Lavadero</button>
           </div>
 
           <!-- Tables per sector (shown/hidden by tab) -->
@@ -795,6 +796,12 @@
             <div id="emp-map-rows-Edilicio" style="margin-bottom: 10px;"></div>
             <button type="button" class="btn btn-secondary" onclick="addEmployeeMappingRow('Edilicio')" style="width:100%; padding:8px; font-size:13px; display:flex; align-items:center; justify-content:center; gap:6px;">
               <span class="material-icons" style="font-size:17px;">person_add</span> Agregar empleado — Edilicio
+            </button>
+          </div>
+          <div id="emp-map-table-Lavadero" class="emp-map-table-panel" style="display:none;">
+            <div id="emp-map-rows-Lavadero" style="margin-bottom: 10px;"></div>
+            <button type="button" class="btn btn-secondary" onclick="addEmployeeMappingRow('Lavadero')" style="width:100%; padding:8px; font-size:13px; display:flex; align-items:center; justify-content:center; gap:6px;">
+              <span class="material-icons" style="font-size:17px;">person_add</span> Agregar empleado — Lavadero
             </button>
           </div>
 
@@ -1542,7 +1549,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.17.0</div>
+      <div class="sidebar-version">Versión 1.17.1</div>
     </div>
   </aside>
 
@@ -2644,6 +2651,6 @@
     }
   </style>
 
-  <script src="app.js?v=274"></script>
+  <script src="app.js?v=275"></script>
 </body>
 </html>

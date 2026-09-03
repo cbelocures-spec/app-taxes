@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '274';
+const CURRENT_APP_VERSION = '275';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -240,11 +240,17 @@ const CREATOR_USERNAME_TO_RESPONSABLE = {
 function getSectorEmployees(sector) {
   const isHerreria = (sector === 'Herrería');
   const isEdilicio = (sector === 'Edilicio');
+  const isLavadero = (sector === 'Lavadero');
+  // Lavadero has no fixed roster constant (unlike Herrería/Edilicio/Mecánica) - it's whoever
+  // gets mapped in Ajustes > Mapeo de Empleados > Lavadero, same idea as Edilicio's own empty
+  // starting point.
   const baseDefaults = isHerreria
     ? [...HERRERIA_EMPLOYEES, "Federico", "Luciano", "Digno"]
     : isEdilicio
       ? [...EDILICIO_EMPLOYEES]
-      : [...MECANICA_EMPLOYEES];
+      : isLavadero
+        ? []
+        : [...MECANICA_EMPLOYEES];
 
   const mapped = (currentEmployeeMappings && currentEmployeeMappings[sector]) ? currentEmployeeMappings[sector] : [];
   mapped.forEach(m => {
@@ -9450,7 +9456,7 @@ async function loadUserPermissionsUI() {
 let currentBackupData = [];
 
 // ── EMPLOYEE MAPPINGS (Pañol Settings) ─────────────────────────────────────────
-let currentEmployeeMappings = { Taller: [], Herrería: [], Edilicio: [] };
+let currentEmployeeMappings = { Taller: [], Herrería: [], Edilicio: [], Lavadero: [] };
 let activeEmpMapTab = 'Taller';
 
 const EMP_MAP_DEFAULTS = {
@@ -9469,7 +9475,8 @@ const EMP_MAP_DEFAULTS = {
     { appName: 'Luciano',  taxesName: 'Carmona González, Juan Manuel' },
     { appName: 'Digno',    taxesName: 'García, Yamandú Liborio' }
   ],
-  Edilicio: []
+  Edilicio: [],
+  Lavadero: []
 };
 
 function switchEmpMapTab(sector) {
@@ -9479,14 +9486,14 @@ function switchEmpMapTab(sector) {
     btn.style.borderBottom = '2px solid transparent';
     btn.style.color = 'var(--text-muted)';
   });
-  const sectorIdMap = { 'Taller': 'emp-tab-taller', 'Herrería': 'emp-tab-herreria', 'Edilicio': 'emp-tab-edilicio' };
+  const sectorIdMap = { 'Taller': 'emp-tab-taller', 'Herrería': 'emp-tab-herreria', 'Edilicio': 'emp-tab-edilicio', 'Lavadero': 'emp-tab-lavadero' };
   const activeBtn = document.getElementById(sectorIdMap[sector]);
   if (activeBtn) {
     activeBtn.style.borderBottom = '2px solid var(--primary)';
     activeBtn.style.color = 'var(--primary)';
   }
   // Show/hide panels
-  ['Taller', 'Herrería', 'Edilicio'].forEach(s => {
+  ['Taller', 'Herrería', 'Edilicio', 'Lavadero'].forEach(s => {
     const panel = document.getElementById(`emp-map-table-${s}`);
     if (panel) panel.style.display = s === sector ? 'block' : 'none';
   });
@@ -9557,11 +9564,12 @@ async function loadAndRenderEmployeeMappings() {
     if (!res.ok) throw new Error('Error cargando ajustes');
     const data = await res.json();
     const saved = data.employeeMappings;
-    if (saved && (saved.Taller || saved.Herrería || saved.Edilicio)) {
+    if (saved && (saved.Taller || saved.Herrería || saved.Edilicio || saved.Lavadero)) {
       currentEmployeeMappings = {
         Taller:    Array.isArray(saved.Taller)    ? saved.Taller    : EMP_MAP_DEFAULTS.Taller,
         Herrería:  Array.isArray(saved.Herrería)  ? saved.Herrería  : EMP_MAP_DEFAULTS.Herrería,
-        Edilicio:  Array.isArray(saved.Edilicio)  ? saved.Edilicio  : EMP_MAP_DEFAULTS.Edilicio
+        Edilicio:  Array.isArray(saved.Edilicio)  ? saved.Edilicio  : EMP_MAP_DEFAULTS.Edilicio,
+        Lavadero:  Array.isArray(saved.Lavadero)  ? saved.Lavadero  : EMP_MAP_DEFAULTS.Lavadero
       };
     } else {
       // First time: pre-load defaults
@@ -9571,7 +9579,7 @@ async function loadAndRenderEmployeeMappings() {
     console.warn('Could not load employee mappings, using defaults:', err.message);
     currentEmployeeMappings = JSON.parse(JSON.stringify(EMP_MAP_DEFAULTS));
   }
-  ['Taller', 'Herrería', 'Edilicio'].forEach(s => renderEmpMapRows(s));
+  ['Taller', 'Herrería', 'Edilicio', 'Lavadero'].forEach(s => renderEmpMapRows(s));
 }
 
 async function saveEmployeeMappings() {
@@ -9591,7 +9599,7 @@ async function saveEmployeeMappings() {
       setTimeout(() => { msgEl.style.display = 'none'; }, 3500);
     }
     // Re-render to update visual indicators
-    ['Taller', 'Herrería', 'Edilicio'].forEach(s => renderEmpMapRows(s));
+    ['Taller', 'Herrería', 'Edilicio', 'Lavadero'].forEach(s => renderEmpMapRows(s));
   } catch (err) {
     if (msgEl) {
       msgEl.textContent = '✗ Error al guardar: ' + err.message;
