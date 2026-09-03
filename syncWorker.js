@@ -2845,10 +2845,6 @@ async function syncWorkOrder(orderId) {
       console.log(`[Reconcile] Final Card to App Map:`, JSON.stringify(cardToAppMap));
 
       // 6. Update each remaining card with correct employee, description, hours, and realizada state
-      // Varias tareas seguidas con la MISMA descripcion (ej: 3 operarios en el mismo trabajo de
-      // Elastiquero) no necesitan el delay de tecleo humano completo otra vez una vez que ya se
-      // demostro que ese texto pasa bien por el v-model de Vue en la tarjeta anterior.
-      let lastTypedTaskDescription = null;
       for (let ci = 0; ci < formCards.length; ci++) {
         const appIdx = cardToAppMap[ci];
         if (appIdx === undefined || appIdx === null || appIdx < 0) continue;
@@ -2981,9 +2977,14 @@ async function syncWorkOrder(orderId) {
             await page.keyboard.up('Control');
             await page.keyboard.press('Backspace');
             await delay(200);
-            const isRepeatDescription = lastTypedTaskDescription !== null && finalDescription === lastTypedTaskDescription;
-            await page.type(sel, finalDescription, { delay: isRepeatDescription ? 0 : 15 });
-            lastTypedTaskDescription = finalDescription;
+            // Comparar contra la tarea anterior no sirve para detectar "mismo trabajo, otro
+            // empleado": resolveAndMapEmployee le agrega a cada una su propio "Realizó: <nombre
+            // real>" al final (ej: proxy a "Vera, Domingo Sergio"), así que el string final
+            // nunca coincide letra por letra aunque el texto grande sea idéntico. En vez de
+            // depender de esa comparación frágil, se tipea rápido siempre - el mecanismo (tecleo
+            // real, no paste/DOM directo) es lo que hace falta para el v-model de Vue, no la
+            // pausa entre letras.
+            await page.type(sel, finalDescription, { delay: 2 });
             await page.keyboard.press('Tab').catch(() => {});
             await delay(350);
 
@@ -3672,11 +3673,6 @@ async function syncWorkOrder(orderId) {
 
     // 4. ADD TASKS (Tareas a Realizar)
     console.log(`Adding ${order.tasks.length} tasks...`);
-    // Varias tareas seguidas con la MISMA descripcion (ej: 3 operarios en el mismo trabajo de
-    // Elastiquero) no necesitan el delay de tecleo humano completo otra vez - ya se demostro
-    // que ese mismo texto pasa bien por el v-model de Vue en la tarea anterior, asi que repetirlo
-    // puede ir practicamente instantaneo en vez de re-tipear caracter por caracter a 50ms.
-    let lastTypedTaskDescription = null;
     for (let i = 0; i < order.tasks.length; i++) {
       const task = order.tasks[i];
       console.log(`Adding Task #${i+1}: ${task.descripcion}`);
@@ -3875,9 +3871,13 @@ async function syncWorkOrder(orderId) {
       await page.keyboard.press('A');
       await page.keyboard.up('Control');
       await page.keyboard.press('Backspace');
-      const isRepeatDescription = lastTypedTaskDescription !== null && finalDescription === lastTypedTaskDescription;
-      await page.type(descSelector, finalDescription, { delay: isRepeatDescription ? 0 : 50 });
-      lastTypedTaskDescription = finalDescription;
+      // No comparar contra la descripción anterior para decidir la velocidad: cada tarea le
+      // agrega su propio "Realizó: <nombre real>" al final (resolveAndMapEmployee, para el caso
+      // de empleados con proxy tipo "Vera, Domingo Sergio"), así que el string final nunca
+      // coincide letra por letra entre dos empleados distintos aunque el texto grande sea
+      // idéntico. Tipear siempre rápido evita depender de esa comparación frágil - lo que hace
+      // falta para el v-model de Vue es el tecleo real en sí, no la pausa entre letras.
+      await page.type(descSelector, finalDescription, { delay: 2 });
 
       await delay(1000);
 
