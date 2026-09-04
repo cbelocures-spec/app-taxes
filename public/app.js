@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '293';
+const CURRENT_APP_VERSION = '294';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13276,17 +13276,25 @@ function adjustPtStateLists(state) {
     state.reparacion = [];
     state.servicios_pendientes = [];
 
-    // Find all open Herrería orders with active/paused tasks. A unit already marked
+    // Find all open Herrería orders that belong in the parte. A unit already marked
     // "operativo" is out of here no matter what its task history looks like - that field is
     // the real-world signal that the unit is back in service, not leftover task state.
+    // Two ways in: (a) it has a Herrería task with its timer running/paused (the original
+    // rule), or (b) the ORDER ITSELF is classified Herrería and its own switch says Fuera de
+    // Servicio, even if nobody started any task's timer yet - without (b), a unit just
+    // transferred/created as a Herrería order sat invisible on Herrería's own board until
+    // someone clicked "Iniciar" on its task, which is exactly backwards: the order already says
+    // it's down, that alone should be enough to show up in the parte.
     const herreriaOrders = activeOrders.filter(o => {
       const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
       if (isClosed) return false;
       if (o.estadoUnidad === 'operativo') return false;
       const tasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
-      return tasks.filter(taskMatchesSector).some(
+      const hasActiveHerreriaTask = tasks.filter(taskMatchesSector).some(
         t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0))
       );
+      if (hasActiveHerreriaTask) return true;
+      return o.estadoUnidad === 'fuera_de_servicio' && isHerreriaOrder(o);
     });
 
     // Create fuera_de_servicio entries from live Herrería orders
@@ -13296,14 +13304,22 @@ function adjustPtStateLists(state) {
         .filter(t => t.status !== 'Finalizada')
         .filter(t => t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0));
 
-      state.fuera_de_servicio.push({
+      const entryBase = {
         interno: order.interno || 'Sin numero',
         rodado: order.rodado || '',
         tipo: guessUnitTypeFromCatalog(order.interno),
-        ...buildNovedadFromTasks(activeTasks),
         dia_parado: new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
         dias_en_reparacion: 0
-      });
+      };
+
+      if (activeTasks.length > 0) {
+        state.fuera_de_servicio.push({ ...entryBase, ...buildNovedadFromTasks(activeTasks) });
+      } else {
+        // Let in only via the estadoUnidad fallback above - no Herrería task has its timer
+        // going yet, so show the order's own incidente text instead of an empty checklist.
+        const texto = order.incidente || 'Fuera de servicio';
+        state.fuera_de_servicio.push({ ...entryBase, novedad: `[ ] ${texto}`, novedad_items: [{ texto, hecho: false }] });
+      }
     });
 
     // Clear totals (not applicable for Herrería view)
