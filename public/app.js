@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '283';
+const CURRENT_APP_VERSION = '285';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9243,6 +9243,13 @@ function updateHomeFleetSectionVisibility() {
   if (section) {
     section.style.display = (currentSelectedSector === 'Edilicio' || currentSelectedSector === 'Lavadero') ? 'none' : 'block';
   }
+  // El acceso directo "Pasar Unidad a Herrería" solo tiene sentido parado en la pestaña
+  // Taller (o para un usuario de Taller, que arranca fijo en esa pestaña) - es Taller quien
+  // detecta que un camión necesita Herrería, no al revés.
+  const pasarHerreriaBtn = document.getElementById('home-btn-pasar-herreria-wrap');
+  if (pasarHerreriaBtn) {
+    pasarHerreriaBtn.style.display = (currentSelectedSector === 'Taller') ? 'block' : 'none';
+  }
   // Lavadero no tiene flota que resumir, pero sí un medidor de agua propio - ocupa ese mismo
   // espacio arriba del todo en Inicio, en vez de dejarlo vacío.
   const aguaSection = document.getElementById('home-agua-lavadero-section');
@@ -14381,6 +14388,44 @@ function renderParteTallerDashboard(state) {
         }).join('');
   }
 
+  // HOME (Inicio): compact Fuera de Servicio - reusa la misma lista `fueraDeServicio` (ya
+  // filtrada por sector vía matchesPtSector) y los mismos getChecklistHtml/getOrdenBtnHtml de
+  // la tabla completa de arriba. Así, una unidad que Taller carga con Sector=Herrería (botón
+  // "Pasar Unidad a Herrería") aparece acá cuando Herrería está parado en su propio Inicio,
+  // con el mismo botón "Crear Orden"/"Abrir Orden" de siempre.
+  if (el('home-fs-count')) el('home-fs-count').textContent = fueraDeServicio.length;
+  if (el('home-fs-tbody')) {
+    if (fueraDeServicio.length === 0) {
+      el('home-fs-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades fuera de servicio.</td></tr>';
+    } else {
+      el('home-fs-tbody').innerHTML = fueraDeServicio.map(item => {
+        const internoPT = String(item.interno || '');
+        const displayLabel = resolvePtUnitDisplayLabel(item, internoPT);
+        return `<tr>
+          <td><strong>${displayLabel}</strong></td>
+          <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+  const homeFsMobile = el('home-fs-mobile-cards');
+  if (homeFsMobile) {
+    homeFsMobile.innerHTML = fueraDeServicio.length === 0
+      ? '<p style="text-align:center;color:var(--text-muted);padding:12px 0;">No hay unidades fuera de servicio.</p>'
+      : fueraDeServicio.map(item => {
+          const internoPT = String(item.interno || '');
+          const displayLabel = resolvePtUnitDisplayLabel(item, internoPT);
+          return `<div class="pt-mobile-card">
+            <div class="pt-mobile-card-header">
+              <strong style="font-size:15px;">${displayLabel}</strong>
+              ${getOrdenBtnHtml(internoPT, item.area)}
+            </div>
+            <div class="pt-mobile-card-row" style="margin-top:6px;">${getChecklistHtml(item, internoPT)}</div>
+          </div>`;
+        }).join('');
+  }
+
   // 2. En reparación
   const reparacion = separarOtros((displayState.reparacion || []).filter(matchesPtSector).filter(unitMatchesSearch), 'reparacion')
     .sort((a, b) => getDaysValue(b) - getDaysValue(a));
@@ -15039,6 +15084,18 @@ function openPtAddUnitModal() {
   }
 
   document.getElementById('pt-unit-modal').classList.add('open');
+}
+
+// Atajo desde Inicio de Taller ("Pasar Unidad a Herrería"): abre el mismo modal "Agregar
+// Unidad" del Parte Taller, pero ya parado en Sector=Herrería y Estado=Fuera de Servicio,
+// para no tener que ir a buscar esos selectores a mano.
+function openPasarAHerreriaModal() {
+  openPtAddUnitModal();
+  document.getElementById('pt-unit-modal-title').textContent = 'Pasar Unidad a Herrería';
+  document.getElementById('pt-unit-sector').value = 'herreria';
+  ptOnSectorChange();
+  document.getElementById('pt-unit-estado').value = 'fuera_de_servicio';
+  ptOnEstadoChange();
 }
 
 function ptOnEstadoChange() {

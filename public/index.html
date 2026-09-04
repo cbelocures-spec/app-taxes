@@ -95,6 +95,16 @@
            Edilicio (mantenimiento de edificios, no tiene flota de camiones). -->
       <div id="home-fleet-summary-section">
 
+      <!-- HOME: acceso rápido de Taller para marcar una unidad fuera de servicio para
+           Herrería - abre el mismo modal "Agregar Unidad" del Parte Taller, ya preseleccionado
+           en Sector=Herrería y Estado=Fuera de Servicio. Solo visible en la pestaña Taller,
+           ver updateHomeFleetSectionVisibility(). -->
+      <div id="home-btn-pasar-herreria-wrap" style="display:none; margin-bottom:18px;">
+        <button class="btn" onclick="openPasarAHerreriaModal()" style="width:100%; background:#ef4444; color:#fff; border:none; padding:10px 14px; font-weight:600; font-size:13px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+          <span class="material-icons" style="font-size:18px;">local_shipping</span> Pasar Unidad a Herrería
+        </button>
+      </div>
+
       <!-- HOME: EN TRÁNSITO (resumido) -->
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
         <span class="badge" style="background:#9333ea; color:#fff;" id="home-trans-count">0</span>
@@ -117,6 +127,32 @@
         </table>
       </div>
       <div id="home-transito-mobile-cards" class="pt-mobile-cards-list"></div>
+
+      <!-- HOME: FUERA DE SERVICIO (resumido) - reusa la misma lista `fuera_de_servicio` del
+           Parte Taller, ya filtrada por sector. Así, una unidad que Taller carga con
+           Sector=Herrería aparece acá cuando Herrería está parado en su Inicio, con el mismo
+           botón "Crear Orden"/"Abrir Orden" de siempre. -->
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <span class="badge" style="background:#ef4444; color:#fff;" id="home-fs-count">0</span>
+        <h3 style="margin:0; font-size:14px; font-weight:700; color:#ef4444;">Fuera de Servicio</h3>
+      </div>
+      <div class="prev-table-container" style="margin-bottom:18px;">
+        <table class="prev-table">
+          <thead>
+            <tr>
+              <th>Interno</th>
+              <th>Novedad</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody id="home-fs-tbody">
+            <tr>
+              <td colspan="3" style="text-align: center; padding: 20px;">No hay unidades fuera de servicio.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="home-fs-mobile-cards" class="pt-mobile-cards-list"></div>
 
       <!-- HOME: RESUMEN POR TIPO DE UNIDAD -->
       <!-- Desktop: las 4 tarjetas completas oscuras, igual que en Parte Taller -->
@@ -1549,7 +1585,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.18.5</div>
+      <div class="sidebar-version">Versión 1.19.1</div>
     </div>
   </aside>
 
@@ -2652,6 +2688,6 @@
     }
   </style>
 
-  <script src="app.js?v=283"></script>
+  <script src="app.js?v=285"></script>
 </body>
 </html>

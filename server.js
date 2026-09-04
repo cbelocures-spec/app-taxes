@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '283';
+const APP_VERSION = '285';
 
 // Middleware
 app.use(cors());
@@ -4702,6 +4702,9 @@ async function sendHistoricalOrderToGoogleSheet(order, step) {
         accion: 'confirmar_ot',
         interno: String(order.interno || "—"),
         ot_numero: String(order.taxesOrderNumber || order.taxesOtId || "—"),
+        // Mandado para que el script busque directo en la pestaña de este empleado (una hoja
+        // por empleado) en vez de recorrerlas todas.
+        empleado: mechanicName || "—",
         // Recién acá, al confirmar, la tarea ya tiene su valor final real - esto es lo que
         // corrige el "0.01" fijo de la fila creada en el paso "crear" (ver arriba).
         horas: String(task.horasEstimadas || "0"),
