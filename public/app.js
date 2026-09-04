@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '286';
+const CURRENT_APP_VERSION = '287';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9198,6 +9198,31 @@ function isEdilicioOrder(order) {
   return cls.includes('edilic') || sec.includes('edilic');
 }
 
+// Determines the sector the unit is ACTUALLY being worked in right now, for display in the
+// Parte Taller tables. item.sector reflects where the Parte Taller entry was first created,
+// but a unit can later get reclassified onto a Herrería/Edilicio order (see the Taller ->
+// Herrería traspaso) without its Parte Taller entry moving - the matching activeOrders entry,
+// when present, is the source of truth over the stale item.sector tag.
+function getUnitCurrentSectorLabel(item) {
+  const cleanInterno = String((item && item.interno) || '').trim().toUpperCase();
+  const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInterno);
+  if (matchingOrder) {
+    if (isHerreriaOrder(matchingOrder)) return 'Herrería';
+    if (isEdilicioOrder(matchingOrder)) return 'Edilicio';
+    return 'Taller';
+  }
+  if (item && item.sector === 'herreria') return 'Herrería';
+  if (item && item.sector === 'edilicio') return 'Edilicio';
+  return 'Taller';
+}
+
+function getSectorBadgeHtml(item) {
+  const label = getUnitCurrentSectorLabel(item);
+  const colors = { 'Herrería': '#7c3aed', 'Edilicio': '#0891b2', 'Taller': '#f97316' };
+  const color = colors[label] || '#64748b';
+  return `<span class="badge" style="background:${color}; color:white; font-size:10px; white-space:nowrap;">${label}</span>`;
+}
+
 function isLavaderoOrder(order) {
   if (!order) return false;
   const cls = String(order.clasificacion || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -13918,10 +13943,10 @@ async function syncParteTallerResumenSheetLive(displayState, resumenTipos) {
 
 function renderParteTallerDashboard(state) {
   if (!state) {
-    const noData = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos registrados aún.</td></tr>';
+    const noData = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos registrados aún.</td></tr>';
     const el = id => document.getElementById(id);
     if (el('pt-fuera-tbody')) el('pt-fuera-tbody').innerHTML = noData;
-    if (el('pt-reparacion-tbody')) el('pt-reparacion-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos.</td></tr>';
+    if (el('pt-reparacion-tbody')) el('pt-reparacion-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos.</td></tr>';
     if (el('pt-pendientes-tbody')) el('pt-pendientes-tbody').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Sin datos.</td></tr>';
     return;
   }
@@ -14351,7 +14376,7 @@ function renderParteTallerDashboard(state) {
   if (el('stat-total-taller')) el('stat-total-taller').textContent = fueraDeServicio.length;
   if (el('pt-fuera-tbody')) {
     if (fueraDeServicio.length === 0) {
-      el('pt-fuera-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades fuera de servicio.</td></tr>';
+      el('pt-fuera-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades fuera de servicio.</td></tr>';
     } else {
       el('pt-fuera-tbody').innerHTML = fueraDeServicio.map(item => {
         const internoPT = String(item.interno || '');
@@ -14361,6 +14386,7 @@ function renderParteTallerDashboard(state) {
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEstadoTrabajoBadgeHtml(item)} ${getEditBtnHtml(internoPT, 'fuera_de_servicio')}</div></td>
           <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
+          <td style="white-space:nowrap;">${getSectorBadgeHtml(item)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
           <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
           <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
@@ -14379,7 +14405,7 @@ function renderParteTallerDashboard(state) {
           return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:var(--card-bg); border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
               <div><strong style="font-size:16px;">${internoPT}</strong>${item.area ? `<span style="font-size:12px; color:#7c3aed; font-weight:600; margin-left:6px;">(${item.area})</span>` : (item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : '')}${getEstadoTrabajoBadgeHtml(item)}</div>
-              ${getDiasParadoHtml(item, desde)}
+              <div style="display:flex; align-items:center; gap:6px;">${getSectorBadgeHtml(item)}${getDiasParadoHtml(item, desde)}</div>
             </div>
             <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>Ingreso: <strong>${desde}</strong></span></div>
             <div style="margin:10px 0; padding:8px; background:var(--card-bg); border-radius:6px; border:1px solid #e2e8f0;">
@@ -14439,7 +14465,7 @@ function renderParteTallerDashboard(state) {
   if (el('stat-active-orders')) el('stat-active-orders').textContent = reparacion.length;
   if (el('pt-reparacion-tbody')) {
     if (reparacion.length === 0) {
-      el('pt-reparacion-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades en reparación.</td></tr>';
+      el('pt-reparacion-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades en reparación.</td></tr>';
     } else {
       el('pt-reparacion-tbody').innerHTML = reparacion.map(item => {
         const internoPT = String(item.interno || '');
@@ -14449,6 +14475,7 @@ function renderParteTallerDashboard(state) {
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEstadoTrabajoBadgeHtml(item)} ${getEditBtnHtml(internoPT, 'reparacion')}</div></td>
           <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
+          <td style="white-space:nowrap;">${getSectorBadgeHtml(item)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
           <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
           <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
@@ -14467,7 +14494,7 @@ function renderParteTallerDashboard(state) {
           return `<div class="pt-mobile-card" style="padding:12px; margin-bottom:10px; background:var(--card-bg); border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div class="pt-mobile-card-header" style="display:flex; justify-content:space-between; align-items:center;">
               <div><strong style="font-size:16px;">${internoPT}</strong>${item.area ? `<span style="font-size:12px; color:#7c3aed; font-weight:600; margin-left:6px;">(${item.area})</span>` : (item.tipo ? `<span style="font-size:12px; color:var(--text-muted); margin-left:6px;">(${item.tipo})</span>` : '')}${getEstadoTrabajoBadgeHtml(item)}</div>
-              ${getDiasParadoHtml(item, desde)}
+              <div style="display:flex; align-items:center; gap:6px;">${getSectorBadgeHtml(item)}${getDiasParadoHtml(item, desde)}</div>
             </div>
             <div class="pt-mobile-card-row" style="margin-top:4px; font-size:12px; color:var(--text-muted);"><span>Ingreso: <strong>${desde}</strong></span></div>
             <div style="margin:10px 0; padding:8px; background:var(--card-bg); border-radius:6px; border:1px solid #e2e8f0;">
