@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '306';
+const CURRENT_APP_VERSION = '307';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9414,21 +9414,24 @@ async function loadUserPermissionsUI() {
     if (permsRes.ok) {
       currentUserPermissions = await permsRes.json();
       // getSectorByUsername only recognizes a handful of hardcoded name fragments
-      // (herrer/carmona, toledo/edilic, lavader, taller/paniol/admin/...) - an account whose
-      // username gives no hint at all (ej. "gaston@...", created with Sector predeterminado
-      // Lavadero) falls through to its 'Admin' default, showing every sector tab instead of
-      // being locked to the one it was actually set up for. allowedSectors (set at creation/in
-      // Autorizaciones) is the real source of truth here - the server's own getSectorByUsername
-      // already falls back to it; this mirrors that for the client's tab-locking below. Only
-      // overrides when the username genuinely matched nothing (still 'Admin' here) and the
-      // account is locked to exactly one non-Taller sector - a real Admin/Taller account keeps
-      // seeing everything as before.
+      // (herrer/carmona, toledo/edilic, lavader, taller/paniol/admin/...) and - crucially -
+      // treats "taller" and "no fragment matched at all" as the SAME 'Admin' bucket (there's no
+      // distinct 'Taller' return value from it), so a plain Taller worker whose username matches
+      // nothing (ej. "a.brahim@...", "gaston@...") saw every sector tab and the Autorizaciones
+      // panel exactly like a real Admin, instead of being locked to their own single board the
+      // same way Herrería/Edilicio/Lavadero users already are. allowedSectors (set at creation/
+      // in Autorizaciones) is the real source of truth - the server's own getSectorByUsername
+      // already falls back to it; this mirrors that here for the client's tab-locking below.
+      // Only overrides when the username genuinely matched nothing (still 'Admin' here) AND the
+      // account is locked to exactly one sector - an account explicitly granted more than one
+      // sector in Autorizaciones (a real supervisor/Admin) keeps seeing everything as before.
       if (userSector === 'Admin') {
         const allowed = currentUserPermissions.allowedSectors || [];
-        if (allowed.length === 1 && !allowed.some(s => s === 'Taller')) {
+        if (allowed.length === 1) {
           if (isHerreria(allowed[0])) userSector = 'Herrería';
           else if (isEdilicio(allowed[0])) userSector = 'Edilicio';
           else if (isLavadero(allowed[0])) userSector = 'Lavadero';
+          else if (allowed[0] === 'Taller') userSector = 'Taller';
         }
       }
     }
