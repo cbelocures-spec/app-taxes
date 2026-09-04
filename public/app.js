@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '291';
+const CURRENT_APP_VERSION = '292';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9198,20 +9198,40 @@ function isEdilicioOrder(order) {
   return cls.includes('edilic') || sec.includes('edilic');
 }
 
+// An interno can have more than one open (non-cerrada) order at once - typically an older
+// Taller order plus a separate one opened by a Herrería/Edilicio traspaso. Matching by interno
+// alone and grabbing whichever the array lists first (the usual .find()) silently picks
+// whichever order happens to be older, which is wrong exactly in the traspaso case: it opened/
+// reported on the stale Taller order instead of the real Herrería/Edilicio one. This picks the
+// open order that actually matches the unit's own known sector tag when there's more than one
+// candidate, falling back to "just take one" only when none of them do (or the tag is
+// unknown/legacy/taller with no Taller-classified order among the candidates either).
+function findRelevantOrderForInterno(interno, sector, extraFilterFn) {
+  const cleanInterno = String(interno || '').trim().toUpperCase();
+  let candidates = (activeOrders || []).filter(o =>
+    String(o.interno || '').trim().toUpperCase() === cleanInterno &&
+    (!o.estado || o.estado.toLowerCase() !== 'cerrada')
+  );
+  if (typeof extraFilterFn === 'function') candidates = candidates.filter(extraFilterFn);
+  if (candidates.length <= 1) return candidates[0] || null;
+  if (sector === 'herreria') return candidates.find(isHerreriaOrder) || candidates[0];
+  if (sector === 'edilicio') return candidates.find(isEdilicioOrder) || candidates[0];
+  return candidates.find(o => !isHerreriaOrder(o) && !isEdilicioOrder(o)) || candidates[0];
+}
+
 // Determines the sector the unit is ACTUALLY being worked in right now, for display in the
 // Parte Taller tables. The Parte Taller entry's own sector tag is the source of truth whenever
 // it's explicitly Herrería/Edilicio (set directly, e.g. via "Pasar Unidad a Herrería") - it must
 // win even when the Taxes order underneath is still classified as Taller (the traspaso can
 // happen before/without anyone reclassifying that order). Only when the item itself is still
-// tagged (or defaults to) "taller" do we fall back to checking whether its matching order was
-// separately reclassified onto Herrería/Edilicio work, to catch that traspaso too - this must
-// stay consistent with matchesPtSector()'s own priority order, or a unit can show up filtered
-// into one tab while its badge here disagrees about which sector it's in.
+// tagged (or defaults to) "taller" do we fall back to checking whether it has an open order that
+// was separately reclassified onto Herrería/Edilicio work, to catch that traspaso too - this
+// must stay consistent with matchesPtSector()'s own priority order, or a unit can show up
+// filtered into one tab while its badge here disagrees about which sector it's in.
 function getUnitCurrentSectorLabel(item) {
   if (item && item.sector === 'herreria') return 'Herrería';
   if (item && item.sector === 'edilicio') return 'Edilicio';
-  const cleanInterno = String((item && item.interno) || '').trim().toUpperCase();
-  const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInterno);
+  const matchingOrder = findRelevantOrderForInterno((item && item.interno), (item && item.sector));
   if (matchingOrder) {
     if (isHerreriaOrder(matchingOrder)) return 'Herrería';
     if (isEdilicioOrder(matchingOrder)) return 'Edilicio';
@@ -14123,14 +14143,17 @@ function renderParteTallerDashboard(state) {
   // open orders at once, one per área (same rule already enforced in ptAsignarSeleccionados/
   // submitPreOrderCheck/routeForeignTasksToSiblingOrder), so matching by interno alone here
   // reopened whichever área's order happened to already be open, gluing an unrelated pending
-  // novelty onto it instead of ever offering to create that área's own order.
-  function getOrdenBtnHtml(internoPT, area) {
+  // novelty onto it instead of ever offering to create that área's own order. `sector` (the
+  // unit's own Parte Taller sector tag) disambiguates the OTHER way an interno can have more
+  // than one open order at once: a traspaso to Herrería/Edilicio leaves the old Taller order
+  // open alongside the new one, and this must open the one that actually matches, not whichever
+  // was created first - otherwise "Abrir Orden" on a unit just passed to Herrería kept opening
+  // its stale Taller order.
+  function getOrdenBtnHtml(internoPT, area, sector) {
     const taxesInterno = resolveTaxesInterno(internoPT);
     const cleanArea = String(area || '').trim().toLowerCase();
-    const openOrder = activeOrders && activeOrders.find(o =>
-      String(o.interno || '').trim() === taxesInterno &&
-      (!o.estado || o.estado.toLowerCase() !== 'cerrada') &&
-      (!cleanArea || String(o.area || '').trim().toLowerCase() === cleanArea)
+    const openOrder = findRelevantOrderForInterno(taxesInterno, sector, o =>
+      !cleanArea || String(o.area || '').trim().toLowerCase() === cleanArea
     );
     const areaArg = String(area || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     if (openOrder) {
@@ -14215,15 +14238,18 @@ function renderParteTallerDashboard(state) {
       return item.sector === 'taller';
     }
     // Herrería/Edilicio only show units actually tagged for that sector, plus real traspasos:
-    // a Taller-tagged (or untagged/legacy) unit whose CURRENT order got reclassified as
-    // Herrería/Edilicio work (e.g. this same interno reused for a container/soldadura job).
+    // a Taller-tagged (or untagged/legacy) unit that ALSO has an open order reclassified as
+    // Herrería/Edilicio work (e.g. this same interno reused for a container/soldadura job) -
+    // an interno can have more than one open order at once, so this must check all of them
+    // (.some), not just whichever happens to come first in the array (.find would silently
+    // miss the traspaso whenever the pre-existing Taller order was listed before it).
     // Being untagged is no longer a free pass into these tabs - it must be a genuine traspaso.
     if (item.sector === currentPtSector) return true;
     const cleanInterno = String(item.interno || '').trim().toUpperCase();
-    const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInterno);
-    if (!matchingOrder) return false;
-    if (currentPtSector === 'herreria') return isHerreriaOrder(matchingOrder);
-    if (currentPtSector === 'edilicio') return isEdilicioOrder(matchingOrder);
+    const matchingOrders = (activeOrders || []).filter(o => String(o.interno || '').trim().toUpperCase() === cleanInterno);
+    if (matchingOrders.length === 0) return false;
+    if (currentPtSector === 'herreria') return matchingOrders.some(isHerreriaOrder);
+    if (currentPtSector === 'edilicio') return matchingOrders.some(isEdilicioOrder);
     return false;
   }
 
@@ -14391,7 +14417,7 @@ function renderParteTallerDashboard(state) {
           <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getSectorBadgeHtml(item)}</td>
-          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area, item.sector)}</td>
           <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
           <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
         </tr>`;
@@ -14417,7 +14443,7 @@ function renderParteTallerDashboard(state) {
               ${getChecklistHtml(item, internoPT)}
             </div>
             <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
-              ${getOrdenBtnHtml(internoPT, item.area)}
+              ${getOrdenBtnHtml(internoPT, item.area, item.sector)}
               ${getEditBtnHtml(internoPT, 'fuera_de_servicio')}
             </div>
           </div>`;
@@ -14441,7 +14467,7 @@ function renderParteTallerDashboard(state) {
           <td><strong>${displayLabel}</strong></td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getSectorBadgeHtml(item)}</td>
-          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area, item.sector)}</td>
         </tr>`;
       }).join('');
     }
@@ -14456,7 +14482,7 @@ function renderParteTallerDashboard(state) {
           return `<div class="pt-mobile-card">
             <div class="pt-mobile-card-header">
               <strong style="font-size:15px;">${displayLabel}</strong>
-              ${getOrdenBtnHtml(internoPT, item.area)}
+              ${getOrdenBtnHtml(internoPT, item.area, item.sector)}
             </div>
             <div class="pt-mobile-card-row" style="margin-top:6px;">${getChecklistHtml(item, internoPT)}</div>
           </div>`;
@@ -14481,7 +14507,7 @@ function renderParteTallerDashboard(state) {
           <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getSectorBadgeHtml(item)}</td>
-          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area, item.sector)}</td>
           <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
           <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
         </tr>`;
@@ -14507,7 +14533,7 @@ function renderParteTallerDashboard(state) {
               ${getChecklistHtml(item, internoPT)}
             </div>
             <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
-              ${getOrdenBtnHtml(internoPT, item.area)}
+              ${getOrdenBtnHtml(internoPT, item.area, item.sector)}
               ${getEditBtnHtml(internoPT, 'reparacion')}
             </div>
           </div>`;
@@ -14531,7 +14557,7 @@ function renderParteTallerDashboard(state) {
           <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
           <td style="white-space:nowrap;">${getSectorBadgeHtml(item)}</td>
-          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area, item.sector)}</td>
           <td><span style="font-size:12px;">${servicio}</span></td>
         </tr>`;
       }).join('');
@@ -14555,7 +14581,7 @@ function renderParteTallerDashboard(state) {
               ${getChecklistHtml(item, internoPT)}
             </div>
             <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
-              ${getOrdenBtnHtml(internoPT, item.area)}
+              ${getOrdenBtnHtml(internoPT, item.area, item.sector)}
               ${getEditBtnHtml(internoPT, 'servicios_pendientes')}
             </div>
           </div>`;
@@ -14577,7 +14603,7 @@ function renderParteTallerDashboard(state) {
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${getEditBtnHtml(internoPT, 'inversiones')} <strong>${internoPT}</strong></div></td>
           <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtmlWithProgress(item, internoPT)}</td>
-          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area, item.sector)}</td>
           <td style="white-space:nowrap;">${getDiasParadoHtml(item, desde)}</td>
           <td style="white-space:nowrap; color:var(--text-muted); font-size:12px;">${desde}</td>
         </tr>`;
@@ -14603,7 +14629,7 @@ function renderParteTallerDashboard(state) {
               ${getChecklistHtmlWithProgress(item, internoPT)}
             </div>
             <div style="display:flex; gap:8px; margin-top:8px; align-items:center; justify-content:space-between;">
-              ${getOrdenBtnHtml(internoPT, item.area)}
+              ${getOrdenBtnHtml(internoPT, item.area, item.sector)}
               ${getEditBtnHtml(internoPT, 'inversiones')}
             </div>
           </div>`;
