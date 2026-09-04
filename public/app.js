@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '299';
+const CURRENT_APP_VERSION = '300';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -13280,10 +13280,23 @@ function adjustPtStateLists(state) {
   // HERRERÍA MODE: Only show live orders from Taxes as Fuera de Servicio
   // ============================================================
   if (isHerreriaAdj) {
-    // Clear all Google Sheet-based lists (not applicable for Herrería)
-    state.fuera_de_servicio = [];
-    state.reparacion = [];
-    state.servicios_pendientes = [];
+    // Keep Herrería-tagged Parte Taller annotations (e.g. "Pasar Unidad a Herrería" on a unit
+    // that has no real order yet) instead of wiping them outright - the order creation for
+    // those has to stay manual (a supervisor pressing "Crear Orden"/"Asignar Seleccionados"),
+    // so a tagged unit with no order yet still has to show up here on its own, from the tag
+    // alone. Live Herrería orders get merged in below on top of these, without duplicating an
+    // interno that's already represented by its own sheet annotation.
+    const sheetInternosHerreria = new Set();
+    function keepHerreriaTagged(list) {
+      return (list || []).filter(item => {
+        if (item.sector !== 'herreria') return false;
+        sheetInternosHerreria.add(String(item.interno || '').trim().toUpperCase());
+        return true;
+      });
+    }
+    state.fuera_de_servicio = keepHerreriaTagged(state.fuera_de_servicio);
+    state.reparacion = keepHerreriaTagged(state.reparacion);
+    state.servicios_pendientes = keepHerreriaTagged(state.servicios_pendientes);
 
     // Find all open Herrería orders that belong in the parte. A unit already marked
     // "operativo" is out of here no matter what its task history looks like - that field is
@@ -13298,6 +13311,8 @@ function adjustPtStateLists(state) {
       const isClosed = o.estado && o.estado.toLowerCase() === 'cerrada';
       if (isClosed) return false;
       if (o.estadoUnidad === 'operativo') return false;
+      const cleanInterno = String(o.interno || '').trim().toUpperCase();
+      if (sheetInternosHerreria.has(cleanInterno)) return false; // ya representada por su anotación del Parte
       const tasks = (o.tasks || []).filter(t => t !== null && t !== undefined);
       const hasActiveHerreriaTask = tasks.filter(taskMatchesSector).some(
         t => t.status !== 'Finalizada' && (t.timerStart > 0 || t.timerStarted || (t.timerHistory && t.timerHistory.length > 0))
@@ -13317,6 +13332,7 @@ function adjustPtStateLists(state) {
         interno: order.interno || 'Sin numero',
         rodado: order.rodado || '',
         tipo: guessUnitTypeFromCatalog(order.interno),
+        sector: 'herreria',
         dia_parado: new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
         dias_en_reparacion: 0
       };
