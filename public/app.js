@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '289';
+const CURRENT_APP_VERSION = '290';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -15225,6 +15225,11 @@ function openPtEditUnitModal(interno, listName) {
   document.getElementById('pt-unit-interno').disabled = false;
   document.getElementById('pt-unit-tipo').value = item.tipo || 'COMPACTADOR';
   document.getElementById('pt-unit-estado').value = listName;
+  // Restore the record's own sector into the selector (instead of leaving whatever value a
+  // previous, unrelated use of this same modal left behind) so a plain edit-and-save doesn't
+  // accidentally overwrite the unit's real sector with a stale dropdown value.
+  document.getElementById('pt-unit-sector').value = item.sector || 'taller';
+  ptOnSectorChange();
   const elastiqueroCheck = document.getElementById('pt-unit-elastiquero');
   if (elastiqueroCheck) {
     const matchingOrder = [...(activeOrders || []), ...(archivedOrders || [])].find(o =>
@@ -15829,10 +15834,13 @@ async function savePtUnit() {
           const fecha_ingreso = prevFechasPorTexto[texto.toUpperCase()] || todayStrEdit;
           return { texto, hecho, fecha_ingreso };
         }).filter(x => x.texto);
-        // Preserve sector tag
-        const userSectorForSave = getSectorByUsername(currentUser);
-        if (userSectorForSave === 'Herrería') foundUnitObj.sector = 'herreria';
-        else if (!foundUnitObj.sector) foundUnitObj.sector = 'taller';
+        // Sector tag: trust the modal's own Sector selector over re-deriving it from whoever
+        // happens to be logged in and hits Guardar. openPtEditUnitModal restores it from the
+        // record's current sector, and "Pasar Unidad a Herrería" explicitly presets it to
+        // 'herreria' before this save runs - re-deriving it from the current user's own sector
+        // here silently discarded every "Pasar Unidad a Herrería" traspaso whenever a Taller
+        // user (not tagged Herrería) was the one saving it.
+        foundUnitObj.sector = sectorSel || foundUnitObj.sector || 'taller';
         
         // If moved from operative to inoperative, update dia_parado
         const oldWasOperative = (currentEditingPtOriginalList === 'servicios_pendientes');
