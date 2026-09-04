@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '285';
+const CURRENT_APP_VERSION = '286';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9249,6 +9249,12 @@ function updateHomeFleetSectionVisibility() {
   const pasarHerreriaBtn = document.getElementById('home-btn-pasar-herreria-wrap');
   if (pasarHerreriaBtn) {
     pasarHerreriaBtn.style.display = (currentSelectedSector === 'Taller') ? 'block' : 'none';
+  }
+  // La sección "Fuera de Servicio" de Inicio es el lado Herrería del traspaso - Taller ya
+  // tiene su propia lista completa en Parte Taller, no hace falta repetirla en su Inicio.
+  const fsSectionWrap = document.getElementById('home-fs-section-wrap');
+  if (fsSectionWrap) {
+    fsSectionWrap.style.display = (currentSelectedSector === 'Herrería') ? 'block' : 'none';
   }
   // Lavadero no tiene flota que resumir, pero sí un medidor de agua propio - ocupa ese mismo
   // espacio arriba del todo en Inicio, en vez de dejarlo vacío.
