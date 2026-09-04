@@ -124,9 +124,10 @@ body {
   height: var(--header-height);
   background-color: var(--card-bg);
   border-bottom: 1px solid var(--border-color);
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
+  column-gap: 8px;
   padding: 0 16px;
   position: fixed;
   top: 0;
@@ -140,6 +141,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .header-logo-img {
@@ -149,15 +151,16 @@ body {
 }
 
 .header-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Grid cell (not absolutely positioned over its siblings) so it only ever gets the space
+     actually left over between the logo and the action icons - on a narrow phone the logo's own
+     width used to eat into the fixed 45%-of-full-header band this centered on, so the title text
+     rendered right on top of the logo image instead of next to it. */
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  pointer-events: none;
-  width: 45%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .header-middle-title {
@@ -167,6 +170,9 @@ body {
   color: #0d233a;
   line-height: 1.1;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .header-middle-user {
@@ -184,9 +190,6 @@ body {
   .header-logo-img {
     height: 38px;
     max-width: 140px;
-  }
-  .header-center {
-    width: 50%;
   }
   .header-middle-title {
     font-size: 16px;
