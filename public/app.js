@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '287';
+const CURRENT_APP_VERSION = '288';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -14267,7 +14267,7 @@ function renderParteTallerDashboard(state) {
   if (el('home-trans-count')) el('home-trans-count').textContent = transito.length;
   if (el('home-transito-tbody')) {
     if (transito.length === 0) {
-      el('home-transito-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades en tránsito.</td></tr>';
+      el('home-transito-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades en tránsito.</td></tr>';
     } else {
       el('home-transito-tbody').innerHTML = transito.map(item => {
         const internoPT = String(item.interno || '');
@@ -14281,6 +14281,7 @@ function renderParteTallerDashboard(state) {
         return `<tr>
           <td><strong>${internoPT}</strong></td>
           <td style="font-size:12px; color:var(--text-muted);">${novedadText}</td>
+          <td>${getSectorBadgeHtml(item)}</td>
           <td>${ingresarBtn}</td>
         </tr>`;
       }).join('');
@@ -14428,7 +14429,7 @@ function renderParteTallerDashboard(state) {
   if (el('home-fs-count')) el('home-fs-count').textContent = fueraDeServicio.length;
   if (el('home-fs-tbody')) {
     if (fueraDeServicio.length === 0) {
-      el('home-fs-tbody').innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades fuera de servicio.</td></tr>';
+      el('home-fs-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades fuera de servicio.</td></tr>';
     } else {
       el('home-fs-tbody').innerHTML = fueraDeServicio.map(item => {
         const internoPT = String(item.interno || '');
@@ -14436,6 +14437,7 @@ function renderParteTallerDashboard(state) {
         return `<tr>
           <td><strong>${displayLabel}</strong></td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
+          <td style="white-space:nowrap;">${getSectorBadgeHtml(item)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
         </tr>`;
       }).join('');
@@ -14515,7 +14517,7 @@ function renderParteTallerDashboard(state) {
   renderPtPendientesPorArea(pendientes, isEdilicioBoard);
   if (el('pt-pendientes-tbody')) {
     if (pendientes.length === 0) {
-      el('pt-pendientes-tbody').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No hay servicios pendientes.</td></tr>';
+      el('pt-pendientes-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No hay servicios pendientes.</td></tr>';
     } else {
       el('pt-pendientes-tbody').innerHTML = pendientes.map(item => {
         const internoPT = String(item.interno || '');
@@ -14525,6 +14527,7 @@ function renderParteTallerDashboard(state) {
           <td><div style="display:flex; align-items:center; gap:4px; line-height:1.2;">${displayLabel} ${getEditBtnHtml(internoPT, 'servicios_pendientes')}</div></td>
           <td>${item.area ? `<span style="font-size:11px; color:#7c3aed; font-weight:600;">${item.area}</span>` : `<span style="font-size:11px;">${item.tipo || '—'}</span>`}</td>
           <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
+          <td style="white-space:nowrap;">${getSectorBadgeHtml(item)}</td>
           <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area)}</td>
           <td><span style="font-size:12px;">${servicio}</span></td>
         </tr>`;
