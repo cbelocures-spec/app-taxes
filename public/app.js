@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '298';
+const CURRENT_APP_VERSION = '299';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -15660,6 +15660,88 @@ function ptOnInternoChange() {
   }
 }
 
+// Herrería/Edilicio's own boards are built purely from live Taxes orders - adjustPtStateLists
+// wipes the Parte Taller sheet lists outright for those two sectors and rebuilds them only from
+// activeOrders. A unit tagged sector='herreria'/'edilicio' there with NO real order behind it
+// can NEVER show up on that board no matter what, regardless of the sector tag itself being
+// correct - "Pasar Unidad a Herrería"/switching a unit's sector in the modal used to only ever
+// touch the sheet tag (Edilicio had a special-cased exception for brand-new units, Herrería had
+// none at all, and neither covered an EXISTING sheet unit switching sector via edit). This
+// creates a minimal real order when one doesn't already exist, mirroring what
+// ptAsignarSeleccionados does when a checklist item gets worked for real, so the traspaso
+// actually takes effect end-to-end instead of only cosmetically re-coloring a badge that never
+// reaches Herrería's/Edilicio's own board.
+async function ensureLiveOrderForSectorTraspaso(interno, sectorSel, estado, novedadFormatted, areaEdilicio, pendingElastiqueroFlag) {
+  if (sectorSel !== 'herreria' && sectorSel !== 'edilicio') return;
+  if (estado !== 'reparacion' && estado !== 'fuera_de_servicio') return;
+
+  const isHerreriaTraspaso = sectorSel === 'herreria';
+  const taxesInterno = resolvePtTaxesInterno(interno);
+  const alreadyOpen = (activeOrders || []).some(o =>
+    String(o.interno || '').trim().toUpperCase() === String(taxesInterno).trim().toUpperCase() &&
+    (!o.estado || o.estado.toLowerCase() !== 'cerrada') &&
+    (isHerreriaTraspaso ? isHerreriaOrder(o) : isEdilicioOrder(o))
+  );
+  if (alreadyOpen) return; // Ya hay una orden en vivo del sector correcto - nada que crear.
+
+  const today = new Date().toISOString().split('T')[0];
+  const incidentDesc = String(novedadFormatted || '').split('\n')
+    .map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim())
+    .filter(Boolean).join(', ');
+
+  const ccOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (
+    isHerreriaTraspaso
+      ? (opt.value === "11" || opt.value === "HERRERIA" || (opt.label && String(opt.label).toLowerCase().includes("herrer")))
+      : (opt.value === "8" || (opt.label && String(opt.label).toLowerCase().includes("edilic")))
+  ));
+  const task = {
+    descripcion: incidentDesc || "Revisión",
+    centroCosto: ccOpt ? ccOpt.value : (isHerreriaTraspaso ? "11" : "8"),
+    status: 'Pendiente'
+  };
+  if (estado === 'reparacion') task.timerStart = Date.now();
+  else if (estado === 'fuera_de_servicio') task.timerStarted = true;
+
+  const rodadoOpt = (typeof findRodadoForInterno === 'function') ? findRodadoForInterno(interno) : null;
+  const rodadoLabel = (rodadoOpt && rodadoOpt.label) || `Interno ${interno}`;
+
+  const orderPayload = {
+    rodado: rodadoLabel,
+    responsable: "AUTO",
+    interno: interno,
+    clasificacion: isHerreriaTraspaso ? "Herrería" : "Correctivo",
+    sector: isHerreriaTraspaso ? "Herrería" : "Edilicio",
+    area: isHerreriaTraspaso ? undefined : areaEdilicio,
+    fechaEntrega: today,
+    horario: "12:00",
+    incidente: incidentDesc || "Revisión en taller",
+    tasks: [task],
+    // El switch de la orden siempre arranca Fuera de Servicio: este helper solo corre para
+    // estado 'reparacion'/'fuera_de_servicio' (ver el early-return de arriba), y ambos significan
+    // que la unidad NO está operativa.
+    estadoUnidad: 'fuera_de_servicio',
+    pendingElastiquero: pendingElastiqueroFlag
+  };
+
+  try {
+    const orderRes = await fetch('/api/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-username': localStorage.getItem('currentUserUsername') || ''
+      },
+      body: JSON.stringify(orderPayload)
+    });
+    if (orderRes.ok) {
+      showToast(`Orden de Trabajo ${isHerreriaTraspaso ? 'de Herrería' : 'Correctiva'} creada para el Interno ${interno} ✓`, 'success');
+    } else {
+      console.error('Error auto-creating work order for sector traspaso.');
+    }
+  } catch (err) {
+    console.error('Error auto-creating work order for sector traspaso:', err);
+  }
+}
+
 // Submits the unit add/edit data
 async function savePtUnit() {
   const saveBtn = document.getElementById('btn-save-pt-unit');
@@ -15784,64 +15866,18 @@ async function savePtUnit() {
         throw new Error(serverMsg || `Error al registrar la novedad en el Parte Taller (HTTP ${res.status}).`);
       }
 
-      // 2. Reparación/Fuera de Servicio ya NO crean la orden acá - es solo una anotación a
-      // futuro (igual que Servicios Pendientes) hasta que alguien decida ponerse a trabajarla
-      // de verdad (ver ptAsignarSeleccionados, que sí crea la orden real en ese momento y
-      // reutiliza cualquier orden abierta existente en vez de duplicarla). Excepción: Edilicio
-      // SÍ necesita una tarea real ya (con centro de costo Edilicio y cronómetro) para que
-      // adjustPtStateLists la encuentre y la clasifique en Reparación/Fuera de Servicio/
-      // Servicios Pendientes - no tiene una pantalla de "Asignar Seleccionados" equivalente
-      // para arrancarla después.
-      const isEdilicioAdd = (sectorSel === 'edilicio');
-      if (isEdilicioAdd && (estado === 'reparacion' || estado === 'fuera_de_servicio')) {
-        const today = new Date().toISOString().split('T')[0];
-        const incidentDesc = novedadFormatted.split('\n').map(l => l.replace(/^\[\s*\]\s*/, '').replace(/^\[X\]\s*/i, '').trim()).filter(Boolean).join(', ');
-
-        const ediCcOpt = (cachedCatalogs.centrosCosto || []).find(opt => opt && (opt.value === "8" || (opt.label && String(opt.label).toLowerCase().includes("edilic"))));
-        const task = {
-          descripcion: incidentDesc || "Revisión",
-          centroCosto: ediCcOpt ? ediCcOpt.value : "8",
-          status: 'Pendiente'
-        };
-        if (estado === 'reparacion') {
-          task.timerStart = Date.now();
-        } else if (estado === 'fuera_de_servicio') {
-          task.timerStarted = true;
-        }
-
-        const orderPayload = {
-          rodado: `Interno ${interno}`,
-          responsable: "AUTO",
-          interno: interno,
-          clasificacion: "Correctivo",
-          sector: "Edilicio",
-          area: areaEdilicio,
-          fechaEntrega: today,
-          horario: "12:00",
-          incidente: incidentDesc || "Revisión en taller",
-          tasks: [task],
-          // This block only runs for estado 'reparacion' or 'fuera_de_servicio' (see the `if`
-          // above) - both mean the unit is NOT operational, so the auto-created order always
-          // has to start Fuera de Servicio. Checking only the literal string 'fuera_de_servicio'
-          // here left 'reparacion' falling through to 'operativo' by mistake - the order's own
-          // switch showed Operativo for a unit that was actually down for repair.
-          estadoUnidad: 'fuera_de_servicio',
-          pendingElastiquero: pendingElastiqueroFlag
-        };
-
-        const orderRes = await fetch('/api/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-username': localStorage.getItem('currentUserUsername') || ''
-          },
-          body: JSON.stringify(orderPayload)
-        });
-        if (!orderRes.ok) {
-          console.error('Error auto-creating work order in Taxes.');
-        } else {
-          showToast(`Unidad registrada y Orden de Trabajo Correctiva creada ✓`, 'success');
-        }
+      // Reparación/Fuera de Servicio ya NO crean la orden acá para Taller - es solo una
+      // anotación a futuro (igual que Servicios Pendientes) hasta que alguien decida ponerse a
+      // trabajarla de verdad (ver ptAsignarSeleccionados, que sí crea la orden real en ese
+      // momento y reutiliza cualquier orden abierta existente en vez de duplicarla). Excepción:
+      // Herrería/Edilicio SÍ necesitan una orden real ya (con centro de costo propio y
+      // cronómetro) para que adjustPtStateLists las encuentre - esos dos sectores arman su
+      // tablero SOLO a partir de órdenes en vivo, descartando esta misma anotación por completo,
+      // así que sin esto la unidad quedaba "traspasada" solo de forma cosmética y nunca
+      // aparecía en el tablero real de Herrería/Edilicio.
+      const needsLiveOrder = (sectorSel === 'herreria' || sectorSel === 'edilicio') && (estado === 'reparacion' || estado === 'fuera_de_servicio');
+      if (needsLiveOrder) {
+        await ensureLiveOrderForSectorTraspaso(interno, sectorSel, estado, novedadFormatted, areaEdilicio, pendingElastiqueroFlag);
       } else if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
         showToast(`Unidad #${saveInterno} registrada en ${estado === 'reparacion' ? 'Reparación' : 'Fuera de Servicio'} ✓ La orden se crea al asignar la tarea.`, 'success');
       } else if (estado === 'transito') {
@@ -15957,6 +15993,15 @@ async function savePtUnit() {
       if (hasNoItems) {
         showToast(`Unidad ${saveInterno} quedó operativa al resolverse todos sus ítems pendientes ✓`, 'success');
       } else if (estado === 'reparacion' || estado === 'fuera_de_servicio') {
+        // Herrería/Edilicio arman su tablero SOLO a partir de órdenes en vivo (adjustPtStateLists
+        // descarta esta misma anotación por completo para esos dos sectores) - una unidad que ya
+        // existía como anotación de Taller y se pasa a Herrería/Edilicio por acá (ej. "Pasar
+        // Unidad a Herrería" detectando un duplicado) necesita una orden real igual que si fuera
+        // nueva, o el traspaso queda solo cosmético (el tag cambia, pero nunca aparece en el
+        // tablero real del sector al que se la pasó).
+        if (sectorSel === 'herreria' || sectorSel === 'edilicio') {
+          await ensureLiveOrderForSectorTraspaso(interno, sectorSel, estado, novedadFormatted, areaEdilicio, pendingElastiqueroFlag);
+        }
         let internoVal = (empresa === 'irineo') ? 'IRINEO GRAL.' : (empresa === 'nico' ? 'VOLQUETE NICO' : interno);
         const existingOrderForFlag = activeOrders && activeOrders.find(o =>
           String(o.interno || '').trim() === internoVal &&
