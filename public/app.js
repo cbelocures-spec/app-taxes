@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '301';
+const CURRENT_APP_VERSION = '302';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9300,6 +9300,10 @@ function updateHomeFleetSectionVisibility() {
   if (fleetTypeDesktop) fleetTypeDesktop.style.display = (currentSelectedSector === 'Herrería') ? 'none' : 'grid';
   const fleetTypeMobile = document.getElementById('home-type-summary-mobile');
   if (fleetTypeMobile) fleetTypeMobile.style.display = (currentSelectedSector === 'Herrería') ? 'none' : '';
+  // "Preventivos Vencidos" es un resumen de flota de Taller (mantenimientos preventivos de
+  // camiones) - no aplica a Herrería, que no gestiona esos vencimientos.
+  const preventivosDashboard = document.getElementById('stats-dashboard-container');
+  if (preventivosDashboard) preventivosDashboard.style.display = (currentSelectedSector === 'Herrería') ? 'none' : 'grid';
   // El acceso directo "Pasar Unidad a Herrería" solo tiene sentido parado en la pestaña
   // Taller (o para un usuario de Taller, que arranca fijo en esa pestaña) - es Taller quien
   // detecta que un camión necesita Herrería, no al revés.
@@ -14502,45 +14506,6 @@ function renderParteTallerDashboard(state) {
         }).join('');
   }
 
-  // HOME (Inicio): compact Fuera de Servicio - reusa la misma lista `fueraDeServicio` (ya
-  // filtrada por sector vía matchesPtSector) y los mismos getChecklistHtml/getOrdenBtnHtml de
-  // la tabla completa de arriba. Así, una unidad que Taller carga con Sector=Herrería (botón
-  // "Pasar Unidad a Herrería") aparece acá cuando Herrería está parado en su propio Inicio,
-  // con el mismo botón "Crear Orden"/"Abrir Orden" de siempre.
-  if (el('home-fs-count')) el('home-fs-count').textContent = fueraDeServicio.length;
-  if (el('home-fs-tbody')) {
-    if (fueraDeServicio.length === 0) {
-      el('home-fs-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades fuera de servicio.</td></tr>';
-    } else {
-      el('home-fs-tbody').innerHTML = fueraDeServicio.map(item => {
-        const internoPT = String(item.interno || '');
-        const displayLabel = resolvePtUnitDisplayLabel(item, internoPT);
-        return `<tr>
-          <td><strong>${displayLabel}</strong></td>
-          <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
-          <td style="white-space:nowrap;">${getSectorBadgeHtml(item)}</td>
-          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area, item.sector)}</td>
-        </tr>`;
-      }).join('');
-    }
-  }
-  const homeFsMobile = el('home-fs-mobile-cards');
-  if (homeFsMobile) {
-    homeFsMobile.innerHTML = fueraDeServicio.length === 0
-      ? '<p style="text-align:center;color:var(--text-muted);padding:12px 0;">No hay unidades fuera de servicio.</p>'
-      : fueraDeServicio.map(item => {
-          const internoPT = String(item.interno || '');
-          const displayLabel = resolvePtUnitDisplayLabel(item, internoPT);
-          return `<div class="pt-mobile-card">
-            <div class="pt-mobile-card-header">
-              <strong style="font-size:15px;">${displayLabel}</strong>
-              ${getOrdenBtnHtml(internoPT, item.area, item.sector)}
-            </div>
-            <div class="pt-mobile-card-row" style="margin-top:6px;">${getChecklistHtml(item, internoPT)}</div>
-          </div>`;
-        }).join('');
-  }
-
   // 2. En reparación
   const reparacion = separarOtros((displayState.reparacion || []).filter(matchesPtSector).filter(unitMatchesSearch), 'reparacion')
     .sort((a, b) => getDaysValue(b) - getDaysValue(a));
@@ -14588,6 +14553,49 @@ function renderParteTallerDashboard(state) {
               ${getOrdenBtnHtml(internoPT, item.area, item.sector)}
               ${getEditBtnHtml(internoPT, 'reparacion')}
             </div>
+          </div>`;
+        }).join('');
+  }
+
+  // HOME (Inicio): compact Fuera de Servicio - reusa las mismas listas `fueraDeServicio` y
+  // `reparacion` (ya filtradas por sector vía matchesPtSector) y los mismos getChecklistHtml/
+  // getOrdenBtnHtml de las tablas completas de arriba. Así, una unidad que Taller carga con
+  // Sector=Herrería (botón "Pasar Unidad a Herrería") aparece acá cuando Herrería está parado en
+  // su propio Inicio, con el mismo botón "Crear Orden"/"Abrir Orden" de siempre. El Inicio de
+  // Herrería solo tiene ESTE widget compacto (no uno separado para "En Reparación"), así que un
+  // camión ahí (ej. en reparación) nunca tenía dónde aparecer si solo se miraba fueraDeServicio -
+  // para Herrería se combinan ambas listas en una sola.
+  const homeFsUnidades = (currentSelectedSector === 'Herrería') ? fueraDeServicio.concat(reparacion) : fueraDeServicio;
+  if (el('home-fs-count')) el('home-fs-count').textContent = homeFsUnidades.length;
+  if (el('home-fs-tbody')) {
+    if (homeFsUnidades.length === 0) {
+      el('home-fs-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades fuera de servicio.</td></tr>';
+    } else {
+      el('home-fs-tbody').innerHTML = homeFsUnidades.map(item => {
+        const internoPT = String(item.interno || '');
+        const displayLabel = resolvePtUnitDisplayLabel(item, internoPT);
+        return `<tr>
+          <td><strong>${displayLabel}</strong></td>
+          <td style="min-width:220px;">${getChecklistHtml(item, internoPT)}</td>
+          <td style="white-space:nowrap;">${getSectorBadgeHtml(item)}</td>
+          <td style="white-space:nowrap;">${getOrdenBtnHtml(internoPT, item.area, item.sector)}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+  const homeFsMobile = el('home-fs-mobile-cards');
+  if (homeFsMobile) {
+    homeFsMobile.innerHTML = homeFsUnidades.length === 0
+      ? '<p style="text-align:center;color:var(--text-muted);padding:12px 0;">No hay unidades fuera de servicio.</p>'
+      : homeFsUnidades.map(item => {
+          const internoPT = String(item.interno || '');
+          const displayLabel = resolvePtUnitDisplayLabel(item, internoPT);
+          return `<div class="pt-mobile-card">
+            <div class="pt-mobile-card-header">
+              <strong style="font-size:15px;">${displayLabel}</strong>
+              ${getOrdenBtnHtml(internoPT, item.area, item.sector)}
+            </div>
+            <div class="pt-mobile-card-row" style="margin-top:6px;">${getChecklistHtml(item, internoPT)}</div>
           </div>`;
         }).join('');
   }
