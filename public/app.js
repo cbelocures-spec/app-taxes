@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '308';
+const CURRENT_APP_VERSION = '309';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1842,6 +1842,13 @@ function openNewOrderModal(presetInterno = "", presetClasificacion = "") {
   modal.classList.add('open');
   // Reset form
   document.getElementById('work-order-form').reset();
+  // No puede quedar activo el modo Lavado Particular de una orden anterior - cada "Nueva Orden"
+  // arranca en el flujo normal (camión real) hasta que alguien lo togglee de vuelta.
+  window._lavadoParticularActive = false;
+  const btnLPLabel = document.getElementById('btn-lavado-particular-label');
+  if (btnLPLabel) btnLPLabel.textContent = 'Lavado Particular';
+  const personaGroupReset = document.getElementById('form-lavado-particular-persona-group');
+  if (personaGroupReset) personaGroupReset.style.display = 'none';
   document.querySelectorAll('.tipo-lavado-btn').forEach(btn => {
     btn.style.outline = '';
     btn.style.fontWeight = '';
@@ -2613,6 +2620,7 @@ async function fetchCatalogs() {
     renderBulkVehicleSelector();
     fetchCustomPreventivos();
     fetchTiposLavado();
+    fetchPersonasLavadoAP();
 
     // Update catalog status UI now that cachedCatalogs is populated
     if (lastKnownSettings) {
@@ -4556,10 +4564,28 @@ async function submitWorkOrder() {
       }
     }
 
+    // Lavado Particular (Lavadero): no es un camión de flota, así que no tiene Rodado ni Interno
+    // reales - se saltean esas dos validaciones y en su lugar se exige la persona elegida.
+    let lavadoParticularPersonaVal = '';
+    if (window._lavadoParticularActive) {
+      const personaEl = document.getElementById('form-lavado-particular-persona');
+      lavadoParticularPersonaVal = personaEl ? personaEl.value.trim() : '';
+      if (!lavadoParticularPersonaVal || lavadoParticularPersonaVal === '__add__') {
+        return showToast("Por favor, seleccioná de quién es el auto.", "danger");
+      }
+    }
+
     // Manual validations for touch optimization
-    if (!rodadoVal) return showToast("Por favor, selecciona un Rodado.", "danger");
-    if (!internoVal) return showToast("Por favor, selecciona el Interno de Unidad.", "danger");
+    if (!window._lavadoParticularActive) {
+      if (!rodadoVal) return showToast("Por favor, selecciona un Rodado.", "danger");
+      if (!internoVal) return showToast("Por favor, selecciona el Interno de Unidad.", "danger");
+    }
     if (!clasificacionEl.value) return showToast("Por favor, selecciona una Clasificación.", "danger");
+
+    // El Rodado/Interno que realmente se mandan: "Lavado" fijo y sin interno para Lavado
+    // Particular (no hay camión real detrás), o los valores normales del formulario si no.
+    const finalRodadoLabel = window._lavadoParticularActive ? 'Lavado' : rodadoLabel;
+    const finalInternoVal = window._lavadoParticularActive ? '' : internoVal;
    
     // Collect tasks safely
     const tasks = [];
@@ -4671,14 +4697,15 @@ async function submitWorkOrder() {
     }
    
     const payload = {
-      rodado: rodadoLabel,
+      rodado: finalRodadoLabel,
       // The select's own value is a numeric catalog id (e.g. "507"), not a name - send the
       // option's visible label text, which is what syncWorker.js actually matches against
       // Taxes' Responsable field.
       responsable: (responsableEl && responsableEl.value && responsableEl.selectedIndex >= 0)
         ? responsableEl.options[responsableEl.selectedIndex].textContent.trim()
         : "AUTO",
-      interno: internoVal,
+      interno: finalInternoVal,
+      lavadoParticularPersona: window._lavadoParticularActive ? lavadoParticularPersonaVal : null,
       clasificacion: clasificacionEl.value,
       fechaEntrega: fechaEl ? fechaEl.value : '',
       horario: horaEl ? horaEl.value : '',
@@ -11740,6 +11767,138 @@ async function submitCrearTipoLavado() {
   }
 }
 
+// --- Menú de categorías con foto (Lavadero) ---
+// Primera pantalla al crear una orden en Lavadero (botón "+"), antes de cualquier formulario.
+// Solo "Camiones" (el flujo de siempre) y "Autos Particulares" están configurados por ahora -
+// el resto se van a ir armando de a poco.
+function handleCreateOrderFabClick() {
+  const currentUser = localStorage.getItem('currentUserUsername');
+  const userSector = getSectorByUsername(currentUser);
+  const isLavadero = (userSector === 'Lavadero' || currentSelectedSector === 'Lavadero');
+  switchView('orders');
+  if (isLavadero) {
+    document.getElementById('lavadero-categoria-modal').classList.add('open');
+  } else {
+    openPreOrderModal();
+  }
+}
+
+function closeLavaderoCategoriaModal() {
+  document.getElementById('lavadero-categoria-modal').classList.remove('open');
+}
+
+function selectLavaderoCategoria(categoria) {
+  if (categoria === 'camiones') {
+    closeLavaderoCategoriaModal();
+    openPreOrderModal();
+  } else if (categoria === 'particular') {
+    closeLavaderoCategoriaModal();
+    openNewOrderModal();
+    toggleLavadoParticular();
+  } else {
+    showToast('Esta categoría todavía no está configurada - decime cómo querés que funcione.', 'warning');
+  }
+}
+
+// --- Lavado Particular (Lavadero) ---
+// Un lavado que no es de un camión de flota sino del auto de un empleado - no tiene Rodado ni
+// Interno reales, así que ambos se saltean; en su lugar se elige DE QUIÉN es el auto, y ese
+// nombre se sube a Taxes como título de la orden ("Lavado A.P.: <nombre>") en vez del interno.
+let personasLavadoAP = [];
+
+async function fetchPersonasLavadoAP() {
+  try {
+    const res = await fetch('/api/personas-lavado-ap');
+    if (!res.ok) return;
+    const data = await res.json();
+    personasLavadoAP = data.personas || [];
+    renderPersonaLavadoSelect();
+  } catch (e) {
+    console.error('Error cargando personas de lavado particular:', e);
+  }
+}
+
+function renderPersonaLavadoSelect() {
+  const select = document.getElementById('form-lavado-particular-persona');
+  if (!select) return;
+  const currentValue = select.value;
+  const options = personasLavadoAP.map(p => `<option value="${escapeHtml(p.label)}">${escapeHtml(p.label)}</option>`).join('');
+  select.innerHTML = `<option value="">Seleccionar persona...</option>${options}<option value="__add__">+ Agregar persona</option>`;
+  const stillExists = Array.from(select.options).some(opt => opt.value === currentValue);
+  if (stillExists) select.value = currentValue;
+}
+
+function toggleLavadoParticular() {
+  window._lavadoParticularActive = !window._lavadoParticularActive;
+  const active = window._lavadoParticularActive;
+
+  const btnLabel = document.getElementById('btn-lavado-particular-label');
+  if (btnLabel) btnLabel.textContent = active ? 'Lavado Particular (activo, tocá para volver a un camión)' : 'Lavado Particular';
+
+  const personaGroup = document.getElementById('form-lavado-particular-persona-group');
+  if (personaGroup) personaGroup.style.display = active ? 'block' : 'none';
+
+  // Reemplaza el Rodado normal (select o texto, según cuál esté activo) y el Interno Unidad -
+  // ninguno de los dos existe de verdad para un auto particular.
+  if (active) {
+    const rodadoSelectGroup = document.getElementById('form-rodado-group-select');
+    const rodadoTextGroup = document.getElementById('form-rodado-group-text');
+    const internoSelectGroup = document.getElementById('form-interno-group-select');
+    const internoTextGroup = document.getElementById('form-interno-group-text');
+    if (rodadoSelectGroup) rodadoSelectGroup.style.display = 'none';
+    if (rodadoTextGroup) rodadoTextGroup.style.display = 'none';
+    if (internoSelectGroup) internoSelectGroup.style.display = 'none';
+    if (internoTextGroup) internoTextGroup.style.display = 'none';
+  } else {
+    // Al desactivar, dejá que setupAllFieldsForSector recalcule cuál de los dos (select/texto)
+    // corresponde mostrar - evita reintroducir esta misma lógica acá.
+    setupAllFieldsForSector();
+  }
+}
+
+function onLavadoParticularPersonaChange() {
+  const select = document.getElementById('form-lavado-particular-persona');
+  if (select && select.value === '__add__') {
+    select.value = '';
+    openCrearPersonaLavadoModal();
+  }
+}
+
+function openCrearPersonaLavadoModal() {
+  document.getElementById('cpl-nombre').value = '';
+  document.getElementById('crear-persona-lavado-modal').classList.add('open');
+}
+
+function closeCrearPersonaLavadoModal() {
+  document.getElementById('crear-persona-lavado-modal').classList.remove('open');
+}
+
+async function submitCrearPersonaLavado() {
+  const label = document.getElementById('cpl-nombre').value.trim();
+  if (!label) {
+    return showToast('Ingresá un nombre.', 'danger');
+  }
+  try {
+    const res = await fetch('/api/personas-lavado-ap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Error al agregar la persona');
+    }
+    const data = await res.json();
+    personasLavadoAP.push(data.persona);
+    renderPersonaLavadoSelect();
+    document.getElementById('form-lavado-particular-persona').value = data.persona.label;
+    closeCrearPersonaLavadoModal();
+    showToast(`"${data.persona.label}" agregado.`, 'success');
+  } catch (e) {
+    showToast(e.message, 'danger');
+  }
+}
+
 // --- Medidor de agua (Lavadero) ---
 // Mismo criterio que el servidor (database.js getTurnoForDate) - solo para mostrarlo en el
 // modal antes de guardar; el servidor vuelve a calcularlo al guardar, este es solo informativo.
@@ -12194,6 +12353,18 @@ function setupAllFieldsForSector() {
 
   const tipoLavadoGroup = document.getElementById('form-tipo-lavado-group');
   if (tipoLavadoGroup) tipoLavadoGroup.style.display = isLavadero ? 'block' : 'none';
+
+  const lavadoParticularToggleGroup = document.getElementById('form-lavado-particular-toggle-group');
+  if (lavadoParticularToggleGroup) lavadoParticularToggleGroup.style.display = isLavadero ? 'block' : 'none';
+  if (!isLavadero && window._lavadoParticularActive) {
+    // Salió del contexto Lavadero (cambió de sector/clasificación) - no puede quedar activo el
+    // modo Lavado Particular de otro sector.
+    window._lavadoParticularActive = false;
+    const personaGroupOut = document.getElementById('form-lavado-particular-persona-group');
+    if (personaGroupOut) personaGroupOut.style.display = 'none';
+    const btnLabelOut = document.getElementById('btn-lavado-particular-label');
+    if (btnLabelOut) btnLabelOut.textContent = 'Lavado Particular';
+  }
 
   // 1. Main modal: Rodado
   const rodadoSelectGroup = document.getElementById('form-rodado-group-select');

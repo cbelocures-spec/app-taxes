@@ -994,6 +994,9 @@ class LocalDB {
       // already went back to Operativo - lets Elastiquero find and reopen THIS exact order later
       // instead of guessing by a time window or creating a disconnected duplicate.
       pendingElastiquero: !!orderData.pendingElastiquero,
+      // Nombre de la persona elegida en "Lavado Particular" (Lavadero) - reemplaza el interno
+      // real (que no existe para un auto que no es de flota) como título de la orden en Taxes.
+      lavadoParticularPersona: orderData.lavadoParticularPersona || null,
       archived: !!orderData.archived,
       deleted: !!orderData.deleted,
       deletedAt: orderData.deletedAt || null
@@ -1383,6 +1386,49 @@ class LocalDB {
 
     const item = { key, label: cleanLabel, descripcion: cleanDescripcion, createdAt: new Date().toISOString() };
     db.tiposLavado.push(item);
+    this.write(db);
+    return item;
+  }
+
+  // --- Personas de Lavado Particular (Lavadero) ---
+  // Lista de nombres para el botón "Lavado Particular" de Nueva Orden - un lavado que no es de
+  // un camión de flota sino de un auto de un empleado. El nombre elegido se sube a Taxes como
+  // título de la orden ("Lavado A.P.: <nombre>") en vez del interno real, que no existe para
+  // este caso. Arranca con 3 nombres sembrados a pedido; el "+" del desplegable agrega más.
+  getPersonasLavadoAP() {
+    const db = this.read();
+    if (!Array.isArray(db.personasLavadoAP) || db.personasLavadoAP.length === 0) {
+      db.personasLavadoAP = ['Vanni Hugo', 'Belocures César', 'Schirripa Sergio'].map(label => ({
+        key: label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_'),
+        label,
+        createdAt: new Date().toISOString()
+      }));
+      this.write(db);
+    }
+    return db.personasLavadoAP;
+  }
+
+  addPersonaLavadoAP({ label }) {
+    const db = this.read();
+    if (!Array.isArray(db.personasLavadoAP)) db.personasLavadoAP = [];
+    const cleanLabel = String(label || '').trim();
+    if (!cleanLabel) throw new Error('El nombre no puede estar vacío.');
+
+    const slugBase = cleanLabel
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'persona';
+    let key = slugBase;
+    let suffix = 1;
+    const existingKeys = new Set(db.personasLavadoAP.map(p => p.key));
+    while (existingKeys.has(key)) {
+      suffix++;
+      key = `${slugBase}_${suffix}`;
+    }
+
+    const item = { key, label: cleanLabel, createdAt: new Date().toISOString() };
+    db.personasLavadoAP.push(item);
     this.write(db);
     return item;
   }

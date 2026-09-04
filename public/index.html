@@ -1595,7 +1595,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.20.5</div>
+      <div class="sidebar-version">Versión 1.21.0</div>
     </div>
   </aside>
 
@@ -1605,9 +1605,43 @@
   </button>
 
   <!-- FLOATING CREATE ORDER BUTTON -->
-  <button class="voice-fab" id="create-order-fab" onclick="switchView('orders'); openPreOrderModal();" title="Crear orden de trabajo">
+  <button class="voice-fab" id="create-order-fab" onclick="handleCreateOrderFabClick()" title="Crear orden de trabajo">
     <span class="material-icons">add</span>
   </button>
+
+  <!-- LAVADERO: menú de categorías con foto - primera pantalla al crear una orden en Lavadero,
+       antes del formulario de siempre. -->
+  <div class="popup-modal-backdrop" id="lavadero-categoria-modal">
+    <div class="modal-content" style="max-width: 460px; margin: auto; padding: 20px; border-radius: 16px; background: var(--card-bg); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: slideUp 0.3s ease-out;">
+      <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 14px;">¿Qué se lava?</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('volquetes')" style="all: unset; cursor: pointer; border-radius: 12px; overflow: hidden; position: relative; height: 96px; display: flex; align-items: flex-end; background-image: url('lavadero/volquetes.jpg'); background-size: cover; background-position: center;">
+          <span style="width: 100%; padding: 8px 10px; font-size: 13px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.6)); box-sizing: border-box;">Lavado Volquetes</span>
+        </button>
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('tachos')" style="all: unset; cursor: pointer; border-radius: 12px; overflow: hidden; position: relative; height: 96px; display: flex; align-items: flex-end; background-image: url('lavadero/tachos.jpg'); background-size: cover; background-position: center;">
+          <span style="width: 100%; padding: 8px 10px; font-size: 13px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.6)); box-sizing: border-box;">Lavado de Tachos</span>
+        </button>
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('prensa_rolloff')" style="all: unset; cursor: pointer; border-radius: 12px; overflow: hidden; position: relative; height: 96px; display: flex; align-items: flex-end; background-image: url('lavadero/prensa_rolloff.jpg'); background-size: cover; background-position: center;">
+          <span style="width: 100%; padding: 8px 10px; font-size: 13px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.6)); box-sizing: border-box;">Lavado de Prensas Roll-Off</span>
+        </button>
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('prensa_volquete')" style="all: unset; cursor: pointer; border-radius: 12px; overflow: hidden; position: relative; height: 96px; display: flex; align-items: flex-end; background-image: url('lavadero/prensa_volquete.jpg'); background-size: cover; background-position: center;">
+          <span style="width: 100%; padding: 8px 10px; font-size: 13px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.6)); box-sizing: border-box;">Lavado de Prensas Volquete</span>
+        </button>
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('camiones')" style="all: unset; cursor: pointer; border-radius: 12px; overflow: hidden; position: relative; height: 96px; display: flex; align-items: flex-end; background-image: url('lavadero/camiones.jpg'); background-size: cover; background-position: center;">
+          <span style="width: 100%; padding: 8px 10px; font-size: 13px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.6)); box-sizing: border-box;">Lavado de Camiones</span>
+        </button>
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('particular')" style="all: unset; cursor: pointer; border-radius: 12px; overflow: hidden; position: relative; height: 96px; display: flex; align-items: flex-end; background-image: url('lavadero/particular.jpg'); background-size: cover; background-position: center;">
+          <span style="width: 100%; padding: 8px 10px; font-size: 13px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.6)); box-sizing: border-box;">Lavado de Autos Particulares</span>
+        </button>
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('playa')" style="all: unset; cursor: pointer; border-radius: 12px; overflow: hidden; position: relative; height: 96px; display: flex; align-items: flex-end; background-image: url('lavadero/playa.jpg'); background-size: cover; background-position: center; grid-column: span 2;">
+          <span style="width: 100%; padding: 8px 10px; font-size: 13px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.6)); box-sizing: border-box;">Lavado de Playa</span>
+        </button>
+      </div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeLavaderoCategoriaModal()" style="padding: 10px 18px; border-radius: 8px;">Cancelar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- PRE-ORDER CHECK MODAL -->
   <div class="fullscreen-modal" id="pre-order-modal" style="z-index: 1050;">
@@ -1949,6 +1983,23 @@
     </div>
   </div>
 
+  <div class="popup-modal-backdrop" id="crear-persona-lavado-modal">
+    <div class="modal-content" style="max-width: 420px; margin: auto; padding: 24px; border-radius: 16px; background: var(--card-bg); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: slideUp 0.3s ease-out;">
+      <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 4px;">Agregar persona</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 18px;">Se agrega como opción permanente para Lavado Particular.</p>
+
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label for="cpl-nombre" style="font-weight: 600; font-size: 12px; color: var(--text-main); text-transform: uppercase;">Nombre</label>
+        <input type="text" id="cpl-nombre" placeholder="Ej: Belocures César" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 6px; box-sizing: border-box;">
+      </div>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary" onclick="closeCrearPersonaLavadoModal()" style="padding: 10px 18px; border-radius: 8px;">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="submitCrearPersonaLavado()" style="padding: 10px 18px; border-radius: 8px;">Agregar persona</button>
+      </div>
+    </div>
+  </div>
+
   <div class="popup-modal-backdrop" id="lectura-agua-modal">
     <div class="modal-content" style="max-width: 380px; margin: auto; padding: 24px; border-radius: 16px; background: var(--card-bg); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: slideUp 0.3s ease-out;">
       <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 4px;">Lectura del medidor de agua</h3>
@@ -1989,6 +2040,21 @@
               <h3>Datos Generales</h3>
             </div>
             
+            <div class="form-group" id="form-lavado-particular-toggle-group" style="display: none;">
+              <button type="button" id="btn-lavado-particular" onclick="toggleLavadoParticular()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: 8px; border: 1px solid var(--primary); background: var(--card-bg); color: var(--primary); font-size: 14px; font-weight: 600; cursor: pointer;">
+                <span class="material-icons" style="font-size: 18px;">directions_car</span>
+                <span id="btn-lavado-particular-label">Lavado Particular</span>
+              </button>
+            </div>
+
+            <div class="form-group" id="form-lavado-particular-persona-group" style="display: none;">
+              <label for="form-lavado-particular-persona">De quién es el auto *</label>
+              <select id="form-lavado-particular-persona" onchange="onLavadoParticularPersonaChange()">
+                <option value="">Seleccionar persona...</option>
+                <option value="__add__">+ Agregar persona</option>
+              </select>
+            </div>
+
             <div class="form-group" id="form-rodado-group-select">
               <label for="form-rodado">Rodado *</label>
               <select id="form-rodado" required>
@@ -2698,6 +2764,6 @@
     }
   </style>
 
-  <script src="app.js?v=308"></script>
+  <script src="app.js?v=309"></script>
 </body>
 </html>

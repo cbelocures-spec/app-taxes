@@ -3638,7 +3638,12 @@ async function syncWorkOrder(orderId) {
     // these two texts get combined with the área; `order.rodado` (the Rodado searchable-select,
     // handled separately above) must stay an exact, untouched catalog match for Puppeteer.
     const areaPrefix = order.area ? String(order.area).trim() : '';
-    const internoForTaxes = areaPrefix ? `${areaPrefix} - ${order.interno}` : order.interno;
+    // "Lavado Particular" (Lavadero): un lavado que no es de un camión de flota, así que no
+    // tiene un interno real para poner ahí - el Título pasa a ser directamente
+    // "Lavado A.P.: <persona>" en vez de derivarse de order.interno.
+    const internoForTaxes = order.lavadoParticularPersona
+      ? `Lavado A.P.: ${order.lavadoParticularPersona}`
+      : (areaPrefix ? `${areaPrefix} - ${order.interno}` : order.interno);
     const incidenteForTaxes = areaPrefix ? `[${areaPrefix}] ${order.incidente || ''}`.trim() : (order.incidente || '');
 
     await safeEvaluate(page, (clasificacionVal, internoVal, incidenteVal) => {

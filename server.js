@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '308';
+const APP_VERSION = '309';
 
 // Middleware
 app.use(cors());
@@ -951,7 +951,7 @@ app.get('/api/orders', (req, res) => {
 
 app.post('/api/orders', (req, res) => {
   try {
-    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset, sector: sectorFromClient, area, pendingElastiquero } = req.body;
+    const { rodado, responsable, fechaEntrega, horario, interno, clasificacion, incidente, tasks, estadoUnidad, combustibleReset, sector: sectorFromClient, area, pendingElastiquero, lavadoParticularPersona } = req.body;
 
     if (!rodado || !responsable || !clasificacion) {
       return res.status(400).json({ error: "Faltan campos obligatorios: rodado, responsable y clasificacion son requeridos." });
@@ -1040,7 +1040,8 @@ app.post('/api/orders', (req, res) => {
       combustibleReset,
       sector,
       area: area || null,
-      pendingElastiquero: !!pendingElastiquero
+      pendingElastiquero: !!pendingElastiquero,
+      lavadoParticularPersona: lavadoParticularPersona ? String(lavadoParticularPersona).trim() : null
     });
 
     // Guard: a new task can be created with its timer already running (started while
@@ -1146,6 +1147,24 @@ app.post('/api/tipos-lavado', (req, res) => {
     const { label, descripcion } = req.body;
     const item = db.addTipoLavado({ label, descripcion });
     res.status(201).json({ tipo: item });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/personas-lavado-ap', (req, res) => {
+  try {
+    res.json({ personas: db.getPersonasLavadoAP() });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/personas-lavado-ap', (req, res) => {
+  try {
+    const { label } = req.body;
+    const item = db.addPersonaLavadoAP({ label });
+    res.status(201).json({ persona: item });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
