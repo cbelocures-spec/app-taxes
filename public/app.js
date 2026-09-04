@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '297';
+const CURRENT_APP_VERSION = '298';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9291,6 +9291,15 @@ function updateHomeFleetSectionVisibility() {
   if (section) {
     section.style.display = (currentSelectedSector === 'Edilicio' || currentSelectedSector === 'Lavadero') ? 'none' : 'block';
   }
+  // Herrería SÍ se queda dentro de home-fleet-summary-section (necesita ver En Tránsito y Fuera
+  // de Servicio, que viven ahí adentro) pero no usa estos totales de flota por tipo - quedan
+  // siempre en 0 para ese modo (mismo motivo que ya llevó a ocultar pt-stat-grid-taller en Parte
+  // Taller) - así que solo esas tarjetas (desktop y mobile) se ocultan puntualmente para Herrería,
+  // sin tocar el resto de la sección.
+  const fleetTypeDesktop = document.getElementById('home-type-summary-desktop');
+  if (fleetTypeDesktop) fleetTypeDesktop.style.display = (currentSelectedSector === 'Herrería') ? 'none' : 'grid';
+  const fleetTypeMobile = document.getElementById('home-type-summary-mobile');
+  if (fleetTypeMobile) fleetTypeMobile.style.display = (currentSelectedSector === 'Herrería') ? 'none' : '';
   // El acceso directo "Pasar Unidad a Herrería" solo tiene sentido parado en la pestaña
   // Taller (o para un usuario de Taller, que arranca fijo en esa pestaña) - es Taller quien
   // detecta que un camión necesita Herrería, no al revés.
