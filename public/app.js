@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '288';
+const CURRENT_APP_VERSION = '289';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -14202,26 +14202,26 @@ function renderParteTallerDashboard(state) {
   }
 
   function matchesPtSector(item) {
-    // If item has no sector tag, show to everyone (legacy data)
-    if (!item.sector) return true;
-    if ((item.sector === 'herreria' || item.sector === 'edilicio') && currentPtSector === 'taller') {
-      return esUnidadRealDeFlota(item.interno);
+    if (currentPtSector === 'taller') {
+      // Legacy data (no sector tag) predates this tagging and was always Taller's - keep
+      // showing it there, but NOT on Herrería/Edilicio just because it's untagged.
+      if (!item.sector) return true;
+      if (item.sector === 'herreria' || item.sector === 'edilicio') {
+        return esUnidadRealDeFlota(item.interno);
+      }
+      return item.sector === 'taller';
     }
-    // A real truck's Parte Taller entry is tagged sector "taller" from when it was first added,
-    // but its CURRENT order can later become Herrería/Edilicio work (e.g. this same interno
-    // reused for a container/soldadura job) - surface it on that tab too in that case, alongside
-    // its normal Taller listing, instead of only wherever it happened to be created.
-    if (item.sector === 'taller' && currentPtSector === 'herreria') {
-      const cleanInterno = String(item.interno || '').trim().toUpperCase();
-      const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInterno);
-      return !!(matchingOrder && isHerreriaOrder(matchingOrder));
-    }
-    if (item.sector === 'taller' && currentPtSector === 'edilicio') {
-      const cleanInterno = String(item.interno || '').trim().toUpperCase();
-      const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInterno);
-      return !!(matchingOrder && isEdilicioOrder(matchingOrder));
-    }
-    return item.sector === currentPtSector;
+    // Herrería/Edilicio only show units actually tagged for that sector, plus real traspasos:
+    // a Taller-tagged (or untagged/legacy) unit whose CURRENT order got reclassified as
+    // Herrería/Edilicio work (e.g. this same interno reused for a container/soldadura job).
+    // Being untagged is no longer a free pass into these tabs - it must be a genuine traspaso.
+    if (item.sector === currentPtSector) return true;
+    const cleanInterno = String(item.interno || '').trim().toUpperCase();
+    const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInterno);
+    if (!matchingOrder) return false;
+    if (currentPtSector === 'herreria') return isHerreriaOrder(matchingOrder);
+    if (currentPtSector === 'edilicio') return isEdilicioOrder(matchingOrder);
+    return false;
   }
 
   // Deduplicate transito units in state
