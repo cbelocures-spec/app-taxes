@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '292';
+const CURRENT_APP_VERSION = '293';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -15105,7 +15105,12 @@ function openPtAddUnitModal() {
   currentEditingPtOriginalList = null;
   window._ptDuplicateEditInterno = null;
   window._ptDuplicateEditList = null;
-  
+  // Whether to move to Herrería/Edilicio is an explicit choice (set below by
+  // openPasarAHerreriaModal), NOT just "which tab happens to be open right now" - reset it here
+  // so a plain "Agregar Unidad" opened while parked on the Herrería tab doesn't get treated as
+  // a traspaso the moment it turns out to match an existing (Taller) interno.
+  window._ptForceSectorOnSave = null;
+
   document.getElementById('pt-unit-modal-title').textContent = 'Agregar Unidad a Taller';
   // Arranca en el sector de la pestaña donde está parado el usuario, no siempre "taller" - si
   // abre "Agregar Unidad" estando en Edilicio, tiene sentido que la novedad sea de Edilicio.
@@ -15161,6 +15166,10 @@ function openPasarAHerreriaModal() {
   ptOnSectorChange();
   document.getElementById('pt-unit-estado').value = 'fuera_de_servicio';
   ptOnEstadoChange();
+  // Explicit traspaso: if the interno typed next turns out to already be registered (as
+  // Taller), ptCheckForDuplicateUnit's auto-switch-to-edit must keep sector=herreria instead of
+  // reverting to the existing record's own (Taller) sector like it does for a plain edit.
+  window._ptForceSectorOnSave = 'herreria';
 }
 
 function ptOnEstadoChange() {
@@ -15234,7 +15243,8 @@ function openPtEditUnitModal(interno, listName) {
   currentEditingPtOriginalList = listName;
   window._ptDuplicateEditInterno = null;
   window._ptDuplicateEditList = null;
-  
+  window._ptForceSectorOnSave = null; // plain edit via the pencil is never a traspaso
+
   document.getElementById('pt-unit-modal-title').textContent = `Editar Unidad #${interno}`;
   
   // Detect company anywhere in the name (case-insensitive)
@@ -15493,6 +15503,18 @@ function ptCheckForDuplicateUnit() {
     document.getElementById('pt-unit-tipo').value = foundUnit.tipo || 'COMPACTADOR';
     document.getElementById('pt-unit-estado').value = foundList;
     ptOnEstadoChange();
+    // The Sector selector at this point may just be whatever tab the user happened to have
+    // open when they clicked "Agregar Unidad" (see openPtAddUnitModal) - that's not a real
+    // choice to move this EXISTING unit's sector. Only an explicit traspaso (window.
+    // _ptForceSectorOnSave, set by openPasarAHerreriaModal) should override it; otherwise
+    // restore the unit's own current sector so a plain "add a novedad" on a Taller truck typed
+    // in while standing on the Herrería tab doesn't silently reclassify it as Herrería.
+    if (window._ptForceSectorOnSave) {
+      document.getElementById('pt-unit-sector').value = window._ptForceSectorOnSave;
+    } else {
+      document.getElementById('pt-unit-sector').value = foundUnit.sector || 'taller';
+    }
+    ptOnSectorChange();
 
     // Load existing items into the same checkbox checklist "Editar Unidad" uses (not as raw
     // text in the "new item" textarea) - dumping them into that textarea let a save re-submit
