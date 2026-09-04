@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '290';
+const CURRENT_APP_VERSION = '291';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9199,20 +9199,23 @@ function isEdilicioOrder(order) {
 }
 
 // Determines the sector the unit is ACTUALLY being worked in right now, for display in the
-// Parte Taller tables. item.sector reflects where the Parte Taller entry was first created,
-// but a unit can later get reclassified onto a Herrería/Edilicio order (see the Taller ->
-// Herrería traspaso) without its Parte Taller entry moving - the matching activeOrders entry,
-// when present, is the source of truth over the stale item.sector tag.
+// Parte Taller tables. The Parte Taller entry's own sector tag is the source of truth whenever
+// it's explicitly Herrería/Edilicio (set directly, e.g. via "Pasar Unidad a Herrería") - it must
+// win even when the Taxes order underneath is still classified as Taller (the traspaso can
+// happen before/without anyone reclassifying that order). Only when the item itself is still
+// tagged (or defaults to) "taller" do we fall back to checking whether its matching order was
+// separately reclassified onto Herrería/Edilicio work, to catch that traspaso too - this must
+// stay consistent with matchesPtSector()'s own priority order, or a unit can show up filtered
+// into one tab while its badge here disagrees about which sector it's in.
 function getUnitCurrentSectorLabel(item) {
+  if (item && item.sector === 'herreria') return 'Herrería';
+  if (item && item.sector === 'edilicio') return 'Edilicio';
   const cleanInterno = String((item && item.interno) || '').trim().toUpperCase();
   const matchingOrder = (activeOrders || []).find(o => String(o.interno || '').trim().toUpperCase() === cleanInterno);
   if (matchingOrder) {
     if (isHerreriaOrder(matchingOrder)) return 'Herrería';
     if (isEdilicioOrder(matchingOrder)) return 'Edilicio';
-    return 'Taller';
   }
-  if (item && item.sector === 'herreria') return 'Herrería';
-  if (item && item.sector === 'edilicio') return 'Edilicio';
   return 'Taller';
 }
 
