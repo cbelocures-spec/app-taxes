@@ -1,6 +1,19 @@
 const fs = require('fs');
 const path = require('path');
 
+// Cuentas base que siempre existen, sin importar si alguna vez ya se logueo. /api/login (en
+// server.js) las usa para decidir si un username es "reconocido" y puede fijar su clave en el
+// primer login - un username que no esta ni acá ni ya creado por un Admin se rechaza en vez de
+// auto-registrarse solo (así se creó por accidente "jcarmona@coontenedoreshugo.com.ar", un typo
+// tipeado una sola vez al loguearse).
+const DEFAULT_KNOWN_USERNAMES = [
+  'paniol@contenedoreshugo.com.ar',
+  'sergios@contenedoreshugo.com.ar',
+  'jcarmona@contenedoreshugo.com.ar',
+  'ftoledo@contenedoreshugo.com.ar',
+  'a.brahim@contenedoreshugo.com.ar'
+];
+
 function genUniqueId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -557,6 +570,16 @@ class LocalDB {
     return db.users[key];
   }
 
+  deleteUser(username) {
+    if (!username) return false;
+    const db = this.read();
+    const key = normalizeEmail(username);
+    if (!db.users || !db.users[key]) return false;
+    delete db.users[key];
+    this.write(db);
+    return true;
+  }
+
   getAllUsers() {
     const db = this.read();
     if (!db.users) db.users = {};
@@ -568,16 +591,19 @@ class LocalDB {
       delete db.users['ibrahim@contenedoreshugo.com.ar'];
       this.write(db);
     }
+    // "jcarmona@coontenedoreshugo.com.ar" (double "o" - a typo of the real
+    // "jcarmona@contenedoreshugo.com.ar") got auto-provisioned as its own account the first time
+    // someone mistyped their email logging in, back when /api/login silently created an account
+    // for ANY username on first attempt. That auto-provisioning is gone now (see /api/login), so
+    // this can't recur, but this specific already-created typo account still needs a one-time
+    // cleanup - no real person logs in with it.
+    if (db.users['jcarmona@coontenedoreshugo.com.ar']) {
+      delete db.users['jcarmona@coontenedoreshugo.com.ar'];
+      this.write(db);
+    }
 
     // Ensure default system users exist in database
-    const defaultKnownUsers = [
-      'paniol@contenedoreshugo.com.ar',
-      'sergios@contenedoreshugo.com.ar',
-      'jcarmona@contenedoreshugo.com.ar',
-      'ftoledo@contenedoreshugo.com.ar',
-      'a.brahim@contenedoreshugo.com.ar'
-    ];
-    defaultKnownUsers.forEach(email => {
+    DEFAULT_KNOWN_USERNAMES.forEach(email => {
       if (!db.users[email]) {
         db.users[email] = { username: email };
       }
@@ -1533,3 +1559,4 @@ module.exports.genUniqueId = genUniqueId;
 // controles excel) write to the same durable volume instead of the bundled code directory,
 // which gets replaced wholesale on every deploy.
 module.exports.DB_PATH = DB_PATH;
+module.exports.DEFAULT_KNOWN_USERNAMES = DEFAULT_KNOWN_USERNAMES;

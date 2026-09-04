@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '302';
+const APP_VERSION = '303';
 
 // Middleware
 app.use(cors());
@@ -467,9 +467,21 @@ app.post('/api/login', async (req, res) => {
     const cleanUsername = String(username).trim().toLowerCase();
     let existingUser = db.getUser(cleanUsername);
 
-    // Auto-provision user on first login if not present in DB
+    // Solo cuentas reconocidas pueden entrar: la lista base de siempre (ver
+    // defaultKnownUsers en database.js) o una ya creada explícitamente por un Admin
+    // desde Autorizaciones (/api/users/create). Cualquier otro username (ej. un typo
+    // del email real, "jcarmona@coontenedoreshugo.com.ar") antes se auto-registraba
+    // solo con intentar entrar - eso es lo que generó esa cuenta fantasma. Ya no: un
+    // username desconocido se rechaza en vez de crear una cuenta nueva sola.
+    const isRecognized = !!existingUser || db.DEFAULT_KNOWN_USERNAMES.includes(cleanUsername);
+    if (!isRecognized) {
+      return res.status(401).json({ error: "Usuario no autorizado. Pedile a un Admin que te cree la cuenta en Autorizaciones." });
+    }
+
+    // Cuenta reconocida que todavía no tiene clave guardada (de la lista base, o recién
+    // creada por un Admin sin clave inicial) - el primer login la fija. Esto NO crea una
+    // cuenta nueva: isRecognized ya garantizó que el username es válido.
     if (!existingUser || !existingUser.password) {
-      console.log(`[Login] Auto-registering user credentials for: ${cleanUsername}`);
       db.saveUser(cleanUsername, password);
       existingUser = db.getUser(cleanUsername);
     }
@@ -487,10 +499,11 @@ app.post('/api/login', async (req, res) => {
       isMatch = (password === stored);
     }
 
+    // Una clave incorrecta para una cuenta que YA tiene clave guardada se rechaza -
+    // antes esto la reseteaba sola a lo que sea que se haya tipeado y dejaba entrar
+    // igual, lo que en la práctica significaba que la clave no protegía nada.
     if (!isMatch) {
-      console.log(`[Login] Password reset for user ${cleanUsername}. Access granted.`);
-      db.saveUser(cleanUsername, password);
-      isMatch = true;
+      return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
     }
 
     // Save this user's credentials in per-user store
@@ -737,6 +750,36 @@ app.post('/api/users/create', (req, res) => {
     db.saveUserPermissions(cleanUsername, finalPermissions);
 
     res.json({ success: true, message: `Usuario ${cleanUsername} creado exitosamente.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/users/delete', (req, res) => {
+  try {
+    const requester = req.headers['x-user-username'] || null;
+    const sector = getSectorByUsername(requester);
+    const isPaniol = sector === 'Admin' || (requester && (requester.toLowerCase().includes('paniol') || requester.toLowerCase().includes('panol') || requester.toLowerCase().includes('pañol')));
+    const canManageUsers = isPaniol || db.getUserPermissions(requester).canManageUsers === true;
+
+    if (!canManageUsers) {
+      return res.status(403).json({ error: "Solo Pañol / Admin puede eliminar usuarios." });
+    }
+
+    const { username } = req.body;
+    if (!username) {
+      return res.status(400).json({ error: "username es requerido." });
+    }
+    const cleanUsername = String(username).trim().toLowerCase();
+    if (cleanUsername === String(requester || '').trim().toLowerCase()) {
+      return res.status(400).json({ error: "No podés eliminar tu propia cuenta mientras estás logueado con ella." });
+    }
+
+    const deleted = db.deleteUser(cleanUsername);
+    if (!deleted) {
+      return res.status(404).json({ error: `Usuario ${cleanUsername} no encontrado.` });
+    }
+    res.json({ success: true, message: `Usuario ${cleanUsername} eliminado.` });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

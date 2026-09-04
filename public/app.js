@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '302';
+const CURRENT_APP_VERSION = '303';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9846,6 +9846,25 @@ async function addNewUserFromSettings() {
   }
 }
 
+async function deleteUserAuthorization(username) {
+  if (!confirm(`¿Eliminar la cuenta ${username}? Esta acción no se puede deshacer.`)) return;
+  try {
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const res = await originalFetch('/api/users/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-username': currentUsername },
+      body: JSON.stringify({ username })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'No se pudo eliminar el usuario.');
+    showToast(data.message || `Usuario ${username} eliminado.`, 'success');
+    renderUserAuthorizationsTable();
+  } catch (err) {
+    console.error('Error deleting user:', err);
+    showToast(err.message || 'No se pudo eliminar el usuario', 'danger');
+  }
+}
+
 async function renderUserAuthorizationsTable() {
   const container = document.getElementById('user-permissions-table-container');
   if (!container) return;
@@ -9865,6 +9884,7 @@ async function renderUserAuthorizationsTable() {
         <thead>
           <tr style="border-bottom:2px solid var(--border-color); color:var(--text-muted);">
             <th style="padding:8px;">Usuario / Sector</th>
+            <th style="padding:8px; text-align:center;" title="Eliminar esta cuenta">❌ Eliminar</th>
             <th style="padding:8px; text-align:center;" title="Cambiar o restablecer contraseña">🔑 Cambiar Clave</th>
             <th style="padding:8px; text-align:center;" title="Permite eliminar órdenes localmente">🗑️ Borrar</th>
             <th style="padding:8px; text-align:center;" title="Permite subir órdenes a Taxes">☁️ Sync</th>
@@ -9903,6 +9923,9 @@ async function renderUserAuthorizationsTable() {
           <td style="padding:8px; font-weight:600;">
             ${u.username}<br>
             <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">Sector predeterminado: ${u.sector}</span>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <button type="button" class="material-icons" onclick="deleteUserAuthorization('${u.username}')" title="Eliminar esta cuenta" style="background:none; border:none; cursor:pointer; color:var(--danger); font-size:18px;">delete</button>
           </td>
           <td style="padding:8px; text-align:center;">
             <div style="position:relative; display:inline-block; width:110px;">
