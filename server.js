@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '294';
+const APP_VERSION = '295';
 
 // Middleware
 app.use(cors());
@@ -4200,8 +4200,16 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
   // Was never actually persisted on the unit before — every unit ended up with no sector
   // tag at all, so matchesPtSector's "legacy data, show to everyone" fallback made every
   // Herrería/Edilicio-only item leak into the Taller board (and vice versa).
-  const sectorRawClean = String(sectorRaw || 'taller').trim().toLowerCase();
-  const sector = sectorRawClean === 'herreria' ? 'herreria' : sectorRawClean === 'edilicio' ? 'edilicio' : 'taller';
+  // sectorRaw is only omitted by routine/automatic callers (a chatbot novelty, a background
+  // sync) that have no real opinion about the unit's sector - those must NOT silently reset an
+  // existing Herrería/Edilicio tag back to Taller. But when it IS provided (the Agregar/Editar
+  // Unidad modal, "Pasar Unidad a Herrería") it's a real, explicit choice and must win even over
+  // whatever sector the unit was already tagged with - otherwise a traspaso to Herrería on a
+  // unit that already existed as Taller's silently stuck as Taller forever.
+  const sectorProvided = sectorRaw !== undefined && sectorRaw !== null && String(sectorRaw).trim() !== '';
+  const sectorRawClean = String(sectorRaw || '').trim().toLowerCase();
+  const explicitSector = sectorRawClean === 'herreria' ? 'herreria' : sectorRawClean === 'edilicio' ? 'edilicio' : sectorRawClean === 'taller' ? 'taller' : null;
+  const sector = sectorProvided ? (explicitSector || 'taller') : null;
 
   const state = db.getParteTallerState();
   state.resumen = state.resumen || {};
@@ -4231,9 +4239,13 @@ function actualizarEstadoFlotaLocal(internoRaw, estadoRaw, motivoRaw, responsabl
 
   const tipo = resolveTipoFromInterno(interno);
   const fechaStr = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
-  // Sticks to whichever sector originally logged this unit, so a Taller user closing out a
-  // Herrería-created item doesn't accidentally re-tag it as Taller's own.
-  const finalSector = existingSector || sector;
+  // An explicit sector (this call actually passed one - see sectorProvided above) always wins,
+  // even over an existing tag: that's the whole point of "Pasar Unidad a Herrería" on a unit
+  // that already existed as Taller's. Only fall back to sticking with whatever this unit was
+  // already tagged when nobody actually chose a sector for this call (a routine/automatic sync
+  // with no sector opinion of its own), so THAT case still can't silently re-tag a Herrería/
+  // Edilicio unit back to Taller.
+  const finalSector = sector || existingSector || 'taller';
   // El área/sector de Edilicio (Comedor, Baño, etc.) se estaba perdiendo del todo: nunca se
   // guardaba en ninguno de los pushes de abajo, así que toda novedad de Edilicio terminaba
   // agrupada como "Sin área" en vez de bajo el área real que el usuario eligió.
