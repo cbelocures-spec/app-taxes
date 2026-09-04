@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '300';
+const CURRENT_APP_VERSION = '301';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -14431,7 +14431,15 @@ function renderParteTallerDashboard(state) {
   function esUnidadDeFlotaTrackeada(item) {
     if (isEdilicioBoard) return true;
     const t = String((item && item.tipo) || '').trim().toUpperCase();
-    return t.includes('COMPAC') || t.includes('VOLQ') || t.includes('ROLL') || t.includes('PLANCHA');
+    const tipoLuceComoFlota = t.includes('COMPAC') || t.includes('VOLQ') || t.includes('ROLL') || t.includes('PLANCHA');
+    if (!tipoLuceComoFlota) return false;
+    // El campo "tipo" solo no alcanza: el modal "Agregar Unidad" arranca con "COMPACTADOR"
+    // tildado por default, así que un trabajo interno de Herrería sin un interno real cargado a
+    // mano (ej. "Caja verde 11", "REP. CAJA ROLL-OFF 144") terminaba "pareciendo" un camión de
+    // flota real por el texto del tipo y colándose en esta tabla en vez de ir al cajón genérico
+    // de abajo. Exigir que el interno exista de verdad en el catálogo de rodados es la señal
+    // confiable de que es un camión real, no solo texto que matchea una palabra clave.
+    return esUnidadRealDeFlota(item && item.interno);
   }
   const otrosItems = [];
   function separarOtros(lista, origenLista) {
