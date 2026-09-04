@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '295';
+const CURRENT_APP_VERSION = '296';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -14001,9 +14001,12 @@ function renderParteTallerDashboard(state) {
       : 'Parte Diario de Taller';
   }
   // Edilicio no tiene camiones - el resumen "Servicios pendientes por área" ocupa ese lugar
-  // arriba de todo en vez de la tabla de Compactador/Volquete/Roll-Off/Plancha.
+  // arriba de todo en vez de la tabla de Compactador/Volquete/Roll-Off/Plancha. Herrería tampoco
+  // usa esos totales (adjustPtStateLists los deja siempre en 0 para ese modo - ver "Clear
+  // totals (not applicable for Herrería view)" más abajo), así que mostrarla ahí solo ocupaba
+  // espacio con tarjetas vacías sin aportar nada.
   const statGridEl = document.getElementById('pt-stat-grid-taller');
-  if (statGridEl) statGridEl.style.display = (currentSelectedSector === 'Edilicio') ? 'none' : 'grid';
+  if (statGridEl) statGridEl.style.display = (currentSelectedSector === 'Edilicio' || currentSelectedSector === 'Herrería') ? 'none' : 'grid';
 
   // Clone state for rendering to dynamically merge/inject live active tasks from Taxes
   const displayState = JSON.parse(JSON.stringify(state));
