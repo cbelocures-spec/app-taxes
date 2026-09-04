@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '296';
+const APP_VERSION = '297';
 
 // Middleware
 app.use(cors());
@@ -845,6 +845,24 @@ app.get('/api/orders', (req, res) => {
       }
     });
 
+    // A mostly-Taller order can carry one loose task actually done by Herrería/Edilicio (its own
+    // centro de costo says so) without the order's own clasificacion/sector ever getting changed
+    // for that. An Admin account bypasses this whole filter and sees every order unfiltered, so
+    // Herrería/Edilicio's own board (built client-side straight from live tasks) already
+    // surfaces that one task for them - but a real Herrería/Edilicio-sector account hitting this
+    // endpoint directly never even received the order in the first place, since this filter used
+    // to look only at the order's own clasificacion/sector. That's why a unit showed up correctly
+    // whenever an Admin peeked at the Herrería tab, but stayed invisible to the actual Herrería
+    // user. Checking each task's centro de costo too closes that gap - additively, so a mostly-
+    // Taller order doesn't ALSO get hidden from Taller itself over one stray task (see the
+    // Taller branch below, which intentionally keeps using the order-level-only flags).
+    const centrosCostoCatalog = (db.read().catalogs || {}).centrosCosto || [];
+    function taskCentroCostoLabel(t) {
+      const ccVal = String((t && t.centroCosto) || '').trim();
+      const ccOpt = centrosCostoCatalog.find(c => String(c.value) === ccVal);
+      return (ccOpt ? String(ccOpt.label) : ccVal).toLowerCase();
+    }
+
     // Filter orders based on user's authorized sectors
     const filtered = orders.filter(o => {
       const cls = o.clasificacion;
@@ -856,17 +874,26 @@ app.get('/api/orders', (req, res) => {
       // `sector` (set at creation from the creator's own sector) also counts: a
       // Herrería-sector user's order routes to Herrería even if its clasificacion
       // is Correctivo/Preventivo/Auxilio, since that field is no longer forced.
-      const effectivelyHerreria = isHerreria(cls) || isHerreria(o.sector) || isExclusiveHerreriaEquipment;
-      const effectivelyEdilicio = isEdilicio(cls) || isEdilicio(o.sector);
-      const effectivelyLavadero = isLavadero(cls) || isLavadero(o.sector);
+      const orderIsHerreria = isHerreria(cls) || isHerreria(o.sector) || isExclusiveHerreriaEquipment;
+      const orderIsEdilicio = isEdilicio(cls) || isEdilicio(o.sector);
+      const orderIsLavadero = isLavadero(cls) || isLavadero(o.sector);
+      const tasks = o.tasks || [];
+      const hasHerreriaTask = tasks.some(t => taskCentroCostoLabel(t).includes('herrer'));
+      const hasEdilicioTask = tasks.some(t => taskCentroCostoLabel(t).includes('edil'));
+      const effectivelyHerreria = orderIsHerreria || hasHerreriaTask;
+      const effectivelyEdilicio = orderIsEdilicio || hasEdilicioTask;
+      const effectivelyLavadero = orderIsLavadero;
       if (sector === 'Admin') return true;
       if (allowed.some(s => isHerreria(s)) && effectivelyHerreria) return true;
       if (allowed.some(s => isEdilicio(s)) && effectivelyEdilicio) return true;
       if (allowed.some(s => isLavadero(s)) && effectivelyLavadero) return true;
       if (allowed.some(s => s === 'Taller')) {
         // Taller sees only non-Herreria, non-Edilicio, non-Lavadero orders. Esos sectores son
-        // privados (y Admin) sin importar el tipo de vehiculo — sin excepcion de visibilidad cruzada.
-        if (!effectivelyHerreria && !effectivelyEdilicio && !effectivelyLavadero) return true;
+        // privados (y Admin) sin importar el tipo de vehiculo — sin excepcion de visibilidad
+        // cruzada. Deliberately checks the ORDER-level flags only (not hasHerreriaTask/
+        // hasEdilicioTask) - a mostly-Taller order with one stray Herrería/Edilicio task must
+        // stay visible to Taller too.
+        if (!orderIsHerreria && !orderIsEdilicio && !orderIsLavadero) return true;
       }
       return false;
     });
