@@ -2969,30 +2969,42 @@ async function syncWorkOrder(orderId) {
             // Escribir con tecleo real en vez de manipular el DOM directamente: el manejo del
             // valor via DOM + dispatchEvent no quedaba registrado por el v-model de Vue para
             // este textarea en particular (a diferencia de Horas, que sí usa tecleo real y
-            // persiste bien) y el campo volvía a quedar vacío después de Guardar.
-            await page.focus(sel).catch(() => {});
-            await page.click(sel, { clickCount: 3 }).catch(() => {});
-            await page.keyboard.down('Control');
-            await page.keyboard.press('A');
-            await page.keyboard.up('Control');
-            await page.keyboard.press('Backspace');
-            await delay(200);
-            // Comparar contra la tarea anterior no sirve para detectar "mismo trabajo, otro
-            // empleado": resolveAndMapEmployee le agrega a cada una su propio "Realizó: <nombre
-            // real>" al final (ej: proxy a "Vera, Domingo Sergio"), así que el string final
-            // nunca coincide letra por letra aunque el texto grande sea idéntico. En vez de
-            // depender de esa comparación frágil, se tipea rápido siempre - el mecanismo (tecleo
-            // real, no paste/DOM directo) es lo que hace falta para el v-model de Vue, no la
-            // pausa entre letras.
-            await page.type(sel, finalDescription, { delay: 2 });
-            await page.keyboard.press('Tab').catch(() => {});
-            await delay(350);
+            // persiste bien) y el campo volvía a quedar vacío después de Guardar. Por eso, si el
+            // tecleo queda incompleto (texto largo cortado a mitad de palabra), el único fallback
+            // válido es reintentar el tecleo completo, no forzar el value por DOM.
+            let descFilledRc = false;
+            let descLastLenRc = 0;
+            for (let descAttemptRc = 1; descAttemptRc <= 3 && !descFilledRc; descAttemptRc++) {
+              await page.focus(sel).catch(() => {});
+              await page.click(sel, { clickCount: 3 }).catch(() => {});
+              await page.keyboard.down('Control');
+              await page.keyboard.press('A');
+              await page.keyboard.up('Control');
+              await page.keyboard.press('Backspace');
+              await delay(200);
+              // Comparar contra la tarea anterior no sirve para detectar "mismo trabajo, otro
+              // empleado": resolveAndMapEmployee le agrega a cada una su propio "Realizó: <nombre
+              // real>" al final (ej: proxy a "Vera, Domingo Sergio"), así que el string final
+              // nunca coincide letra por letra aunque el texto grande sea idéntico. En vez de
+              // depender de esa comparación frágil, se tipea rápido siempre - el mecanismo (tecleo
+              // real, no paste/DOM directo) es lo que hace falta para el v-model de Vue, no la
+              // pausa entre letras.
+              await page.type(sel, finalDescription, { delay: 2 });
+              await page.keyboard.press('Tab').catch(() => {});
+              await delay(350);
 
-            const verifyDesc = await safeEvaluate(page, (s) => {
-              const el = document.querySelector(s);
-              return el ? el.value : null;
-            }, sel).catch(() => null);
-            console.log(`[Reconcile] Description verify for card #${ci}: "${verifyDesc}"`);
+              const verifyDesc = await safeEvaluate(page, (s) => {
+                const el = document.querySelector(s);
+                return { found: !!el, value: el ? el.value : '' };
+              }, sel).catch(() => ({ found: false, value: '' }));
+
+              descFilledRc = verifyDesc.found && verifyDesc.value === finalDescription;
+              descLastLenRc = verifyDesc.value.length;
+              console.log(`[Reconcile] Description verify for card #${ci}, intento ${descAttemptRc}/3: "${verifyDesc.value}" (${descLastLenRc}/${finalDescription.length} caracteres) — éxito: ${descFilledRc}`);
+            }
+            if (!descFilledRc) {
+              throw new Error(`No se pudo completar la Descripción de la tarea (tarjeta #${ci}) tras 3 intentos de tecleo (quedó con ${descLastLenRc} de ${finalDescription.length} caracteres).`);
+            }
           } else {
             console.warn(`[Reconcile] COULD NOT FIND description element for card #${ci}!`);
           }
@@ -3864,22 +3876,51 @@ async function syncWorkOrder(orderId) {
       console.log(`Horas filled: ${hoursFilled}, value: ${hoursVal3}, inputs found: via querySelectorAll`);
 
       // 4. Fill Description
+      // Nota: para este textarea, manipular el value por DOM + dispatchEvent NO lo registra el
+      // v-model de Vue (ver el mismo problema documentado en el flujo de Reconcile más abajo) -
+      // el tecleo real via CDP es el único mecanismo que persiste, así que el fallback ante un
+      // tecleo incompleto tiene que ser REINTENTAR el tecleo, no "forzar" el valor por DOM.
       console.log(`Setting Descripción: "${finalDescription}"`);
       const descSelector = `textarea#descripcion_${i}`;
-      await page.focus(descSelector);
-      await page.keyboard.down('Control');
-      await page.keyboard.press('A');
-      await page.keyboard.up('Control');
-      await page.keyboard.press('Backspace');
-      // No comparar contra la descripción anterior para decidir la velocidad: cada tarea le
-      // agrega su propio "Realizó: <nombre real>" al final (resolveAndMapEmployee, para el caso
-      // de empleados con proxy tipo "Vera, Domingo Sergio"), así que el string final nunca
-      // coincide letra por letra entre dos empleados distintos aunque el texto grande sea
-      // idéntico. Tipear siempre rápido evita depender de esa comparación frágil - lo que hace
-      // falta para el v-model de Vue es el tecleo real en sí, no la pausa entre letras.
-      await page.type(descSelector, finalDescription, { delay: 2 });
+      let descFilled = false;
+      let descLastLen = 0;
+      for (let descAttempt = 1; descAttempt <= 3 && !descFilled; descAttempt++) {
+        await page.focus(descSelector).catch(() => {});
+        await page.click(descSelector, { clickCount: 3 }).catch(() => {});
+        await page.keyboard.down('Control');
+        await page.keyboard.press('A');
+        await page.keyboard.up('Control');
+        await page.keyboard.press('Backspace');
+        // No comparar contra la descripción anterior para decidir la velocidad: cada tarea le
+        // agrega su propio "Realizó: <nombre real>" al final (resolveAndMapEmployee, para el
+        // caso de empleados con proxy tipo "Vera, Domingo Sergio"), así que el string final
+        // nunca coincide letra por letra entre dos empleados distintos aunque el texto grande
+        // sea idéntico. Tipear siempre rápido evita depender de esa comparación frágil - lo que
+        // hace falta para el v-model de Vue es el tecleo real en sí, no la pausa entre letras.
+        await page.type(descSelector, finalDescription, { delay: 2 });
+        await delay(800);
 
-      await delay(1000);
+        // Verificación: una descripción larga (varios cientos de caracteres) tipeada caracter
+        // por caracter via CDP puede quedar CORTADA a mitad de palabra si el tab pierde foco,
+        // Vue tarda en re-renderizar en cada tecla, o se pierde algún evento - Taxes.com.ar igual
+        // deja avanzar el flujo (no lanza error en el momento), y recién se nota como "falta
+        // completar campo" al tocar Guardar, con un error genérico que no dice cuál tarea ni
+        // cuál campo. Releer el valor real y reintentar el tecleo completo si no coincide evita
+        // depender de que cada tecla individual haya llegado bien a la primera.
+        const descVerify = await safeEvaluate(page, (sel) => {
+          const el = document.querySelector(sel);
+          return { found: !!el, value: el ? el.value : '' };
+        }, descSelector).catch(() => ({ found: false, value: '' }));
+
+        descFilled = descVerify.found && descVerify.value === finalDescription;
+        descLastLen = descVerify.value.length;
+        if (!descFilled) {
+          console.warn(`[Descripción] Tarea #${i+1}, intento ${descAttempt}/3: tecleo incompleto (${descLastLen}/${finalDescription.length} caracteres). Reintentando...`);
+        }
+      }
+      if (!descFilled) {
+        throw new Error(`No se pudo completar la Descripción de la tarea ${i+1} tras 3 intentos de tecleo (quedó con ${descLastLen} de ${finalDescription.length} caracteres).`);
+      }
 
       // 5. Set Task Status (Toggle Switch if status is "Finalizada")
       // The toggle switch is a Bootstrap Vue custom-switch at the top of each task card.
