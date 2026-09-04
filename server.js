@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '303';
+const APP_VERSION = '304';
 
 // Middleware
 app.use(cors());
@@ -99,20 +99,24 @@ app.use((req, res, next) => {
   }
 
   const username = req.headers['x-user-username'];
-  // Only reject if a username IS provided but doesn't exist in the DB AT ALL.
-  // If the user exists but has a masked/old password, keep the username so the
-  // endpoint can still identify WHO is making the request (sector, permissions, etc.)
-  // The syncWorker's resolveCredentials will handle the credential lookup.
+  // Reject (401) if a username IS provided but isn't a recognized account - either an existing
+  // record in the DB (any password state - even masked/stale still identifies WHO is asking,
+  // the syncWorker's resolveCredentials handles the credential lookup) or one of the base
+  // accounts from DEFAULT_KNOWN_USERNAMES that always exist regardless of DB state. This used to
+  // just silently clear the header and let the request through "as anonymous" instead - meant
+  // for Railway's fresh DB with no users registered yet (now covered by DEFAULT_KNOWN_USERNAMES
+  // instead), but as a side effect it meant an account deleted from Autorizaciones (see
+  // /api/users/delete) kept working seamlessly forever for anyone still logged in with it - every
+  // request just quietly downgraded to anonymous rather than ever kicking them out. The client's
+  // global fetch wrapper already retries a 401 with a background re-login and force-logs-out if
+  // that also fails (see the `window.fetch` override at the top of app.js) - a real 401 here is
+  // what actually plugs into that existing mechanism.
   if (username && username.trim() !== '') {
-    const user = db.getUser(username);
-    if (!user) {
-      console.log(`[Auth Check] User "${username}" not found in DB. Allowing as anonymous.`);
-      // Don't block — just clear the username so the request proceeds as anonymous.
-      // This handles Railway's fresh DB where no users are registered yet.
-      req.headers['x-user-username'] = '';
+    const cleanUsername = String(username).trim().toLowerCase();
+    const isRecognized = !!db.getUser(cleanUsername) || db.DEFAULT_KNOWN_USERNAMES.includes(cleanUsername);
+    if (!isRecognized) {
+      return res.status(401).json({ error: "Usuario no autorizado." });
     }
-    // NOTE: If user exists but has masked/stale password, keep username intact.
-    // The worker will report a clear error if credentials can't be resolved.
   }
   next();
 });
