@@ -2802,17 +2802,14 @@ async function syncWorkOrder(orderId) {
               addBtn.id = id;
               addBtn.scrollIntoView({ block: 'center' });
               try { addBtn.focus(); } catch(_) {}
+              // Un solo click real: antes esto tambien disparaba un dispatchEvent('click')
+              // sintetico y despues un page.click() aparte, sumando hasta 3 clicks reales
+              // por iteracion y agregando 2-3 tarjetas de mas por cada una que hacia falta.
               try { addBtn.click(); } catch (_) {}
-              ['mousedown', 'mouseup', 'click'].forEach(evtName => {
-                try { addBtn.dispatchEvent(new MouseEvent(evtName, { bubbles: true, cancelable: true, view: window })); } catch (_) {}
-              });
               return id;
             }
             return null;
           });
-          if (addedId) {
-            await page.click(`#${addedId}`).catch(() => {});
-          }
           console.log(`[Reconcile] Added task card ${i + 1}: ${!!addedId}`);
           await delay(2000);
         }
