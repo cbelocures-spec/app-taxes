@@ -1595,7 +1595,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.21.1</div>
+      <div class="sidebar-version">Versión 1.21.7</div>
     </div>
   </aside>
 
@@ -1615,25 +1615,31 @@
     <div class="modal-content" style="max-width: 900px; width: 92vw; margin: auto; padding: 28px; border-radius: 20px; background: var(--card-bg); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: slideUp 0.3s ease-out;">
       <h3 style="font-size: 26px; font-weight: 700; margin: 0 0 20px;">¿Qué se lava?</h3>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px;">
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('camiones')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/camiones.jpg'); background-size: cover; background-position: center; grid-column: span 2;">
+          <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Camiones</span>
+        </button>
         <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('volquetes')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/volquetes.jpg'); background-size: cover; background-position: center;">
           <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado Volquetes</span>
         </button>
-        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('tachos')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/tachos.jpg'); background-size: cover; background-position: center;">
-          <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Tachos</span>
-        </button>
-        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('prensa_rolloff')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/prensa_rolloff.jpg'); background-size: cover; background-position: center;">
-          <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Prensas Roll-Off</span>
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('caja_rolloff')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/caja_rolloff.jpg'); background-size: cover; background-position: center;">
+          <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Caja Roll-Off</span>
         </button>
         <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('prensa_volquete')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/prensa_volquete.jpg'); background-size: cover; background-position: center;">
           <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Prensas Volquete</span>
         </button>
-        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('camiones')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/camiones.jpg'); background-size: cover; background-position: center;">
-          <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Camiones</span>
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('prensa_rolloff')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/prensa_rolloff.jpg'); background-size: cover; background-position: center;">
+          <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Prensas Roll-Off</span>
+        </button>
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('tachos')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/tachos.jpg'); background-size: cover; background-position: center;">
+          <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Tachos</span>
         </button>
         <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('particular')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/particular.jpg'); background-size: cover; background-position: center;">
           <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Autos Particulares</span>
         </button>
-        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('playa')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/playa.jpg'); background-size: cover; background-position: center; grid-column: span 2;">
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('otros')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/otros.jpg'); background-size: cover; background-position: center;">
+          <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Otros</span>
+        </button>
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('playa')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/playa.jpg'); background-size: cover; background-position: center;">
           <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Playa</span>
         </button>
       </div>
@@ -2764,6 +2770,6 @@
     }
   </style>
 
-  <script src="app.js?v=310"></script>
+  <script src="app.js?v=316"></script>
 </body>
 </html>

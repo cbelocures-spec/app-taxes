@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '310';
+const CURRENT_APP_VERSION = '316';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11795,6 +11795,34 @@ function selectLavaderoCategoria(categoria) {
     closeLavaderoCategoriaModal();
     openNewOrderModal();
     toggleLavadoParticular();
+  } else if (categoria === 'volquetes') {
+    closeLavaderoCategoriaModal();
+    openPreOrderModal();
+    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'Lavado volquetes');
+  } else if (categoria === 'prensa_volquete') {
+    closeLavaderoCategoriaModal();
+    openPreOrderModal();
+    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'Lavado Prensa Volquete');
+  } else if (categoria === 'prensa_rolloff') {
+    closeLavaderoCategoriaModal();
+    openPreOrderModal();
+    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'Lavado Prensa Roll-off');
+  } else if (categoria === 'playa') {
+    closeLavaderoCategoriaModal();
+    openPreOrderModal();
+    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'Lavado Playa');
+  } else if (categoria === 'tachos') {
+    closeLavaderoCategoriaModal();
+    openPreOrderModal();
+    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'Lavado Tachos');
+  } else if (categoria === 'caja_rolloff') {
+    closeLavaderoCategoriaModal();
+    openPreOrderModal();
+    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'lavado Caja Roll-Off');
+  } else if (categoria === 'otros') {
+    closeLavaderoCategoriaModal();
+    openPreOrderModal();
+    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'Lavado Otros');
   } else {
     showToast('Esta categoría todavía no está configurada - decime cómo querés que funcione.', 'warning');
   }
