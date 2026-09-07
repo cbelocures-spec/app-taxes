@@ -1193,17 +1193,13 @@ async function scrapeCatalogs(triggerUsername = null) {
   await acquireBrowserLock('scrapeCatalogs');
 
   const settings = db.getSettings();
-  let username = settings.username;
-  let password = settings.password;
-
-  if (triggerUsername) {
-    const cleanTriggerUsername = triggerUsername.split(',')[0].trim();
-    const user = db.getUser(cleanTriggerUsername);
-    if (user && user.password) {
-      username = user.username;
-      password = user.password;
-    }
-  }
+  // La sincronizacion de catalogos (vehiculos/empleados/centros de costo) SIEMPRE usa la
+  // cuenta admin configurada en Settings (Pañol) sin importar que usuario la dispare - las
+  // demas cuentas (ej. jcarmona) no tienen el modulo Flota habilitado en Taxes y esa
+  // pantalla les daba "no se pudo encontrar el boton NUEVO" al quedarse sin vehiculos. Esas
+  // cuentas solo generan O.T., no revisan Flota.
+  const username = settings.username;
+  const password = settings.password;
 
   if (!username || !password) {
     if (scrapeCatalogsAbandoned) {
