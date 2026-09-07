@@ -1497,8 +1497,10 @@ async function scrapeCatalogs(triggerUsername = null) {
     const nuevoClicked = await safeEvaluate(page, () => {
       const buttons = Array.from(document.querySelectorAll('button, a'));
       for (const btn of buttons) {
+        // Igualdad exacta fallaba en cuentas donde el boton se renderiza "+ NUEVO" (el "+"
+        // es texto real, no un icono aparte) - con includes() matchea en cualquier cuenta.
         const text = btn.textContent.trim().toUpperCase();
-        if (text === 'NUEVO' || text === 'NUEVA') {
+        if (text.includes('NUEVO') || text.includes('NUEVA')) {
           btn.click();
           return true;
         }
@@ -3433,8 +3435,10 @@ async function syncWorkOrder(orderId) {
     const nuevoClicked = await safeEvaluate(page, () => {
       const buttons = Array.from(document.querySelectorAll('button, a'));
       for (const btn of buttons) {
+        // Igualdad exacta fallaba en cuentas donde el boton se renderiza "+ NUEVO" (el "+"
+        // es texto real, no un icono aparte) - con includes() matchea en cualquier cuenta.
         const text = btn.textContent.trim().toUpperCase();
-        if (text === 'NUEVO' || text === 'NUEVA') {
+        if (text.includes('NUEVO') || text.includes('NUEVA')) {
           btn.click();
           return true;
         }
