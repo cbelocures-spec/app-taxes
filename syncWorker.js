@@ -497,7 +497,12 @@ async function fillSearchableSelect(page, labelText, searchValue) {
       }
     }
 
-    if (queriesToTry.length === 0) {
+    {
+      // Corre siempre, no solo cuando queriesToTry esta vacio: las queries especificas de
+      // arriba (rodado.interno tal cual esta en el catalogo local) pueden fallar por una
+      // diferencia de puntuacion contra la opcion real de Taxes (ej. catalogo local "Av
+      // Piedra 3550" vs Taxes "Av. Piedra 3550") - sin este fallback ese caso nunca llegaba
+      // a probar una variante sin puntuacion y quedaba en "No se encontraron opciones".
       // If it contains "Interno X", we try to search by the interno number FIRST as it is highly precise!
       const internoMatch = searchValue.match(/Interno\s+(\d+)/i);
       if (internoMatch) {
