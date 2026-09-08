@@ -1437,6 +1437,47 @@ class LocalDB {
     return item;
   }
 
+  // "Que se lava" para la categoria Otros (Lavadero) - catalogo que se va armando a medida que
+  // el supervisor agrega objetos (ej. "Caja de Velocidad", "Cilindros Hidraulicos"), mismo
+  // patron que personasLavadoAP.
+  getItemsLavadoOtros() {
+    const db = this.read();
+    if (!Array.isArray(db.itemsLavadoOtros) || db.itemsLavadoOtros.length === 0) {
+      db.itemsLavadoOtros = ['Caja de Velocidad', 'Cilindros Hidráulicos'].map(label => ({
+        key: label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_'),
+        label,
+        createdAt: new Date().toISOString()
+      }));
+      this.write(db);
+    }
+    return db.itemsLavadoOtros;
+  }
+
+  addItemLavadoOtros({ label }) {
+    const db = this.read();
+    if (!Array.isArray(db.itemsLavadoOtros)) db.itemsLavadoOtros = [];
+    const cleanLabel = String(label || '').trim();
+    if (!cleanLabel) throw new Error('El nombre no puede estar vacío.');
+
+    const slugBase = cleanLabel
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'item';
+    let key = slugBase;
+    let suffix = 1;
+    const existingKeys = new Set(db.itemsLavadoOtros.map(i => i.key));
+    while (existingKeys.has(key)) {
+      suffix++;
+      key = `${slugBase}_${suffix}`;
+    }
+
+    const item = { key, label: cleanLabel, createdAt: new Date().toISOString() };
+    db.itemsLavadoOtros.push(item);
+    this.write(db);
+    return item;
+  }
+
   // --- Audit Log for Auto-Deleted Verified Orders ---
   getDeletedOrdersLog() {
     const db = this.read();

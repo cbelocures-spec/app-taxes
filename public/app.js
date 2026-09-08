@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '321';
+const CURRENT_APP_VERSION = '322';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -999,6 +999,11 @@ function openPreOrderModal() {
   const prePersonaSelect = document.getElementById('pre-lavado-particular-persona');
   if (prePersonaGroup) prePersonaGroup.style.display = 'none';
   if (prePersonaSelect) prePersonaSelect.value = '';
+  // Reset del modo "Que se lava" (Lavado de Otros).
+  const preOtrosItemGroup = document.getElementById('pre-lavadero-otros-item-group');
+  const preOtrosItemSelect = document.getElementById('pre-lavadero-otros-item');
+  if (preOtrosItemGroup) preOtrosItemGroup.style.display = 'none';
+  if (preOtrosItemSelect) preOtrosItemSelect.value = '';
   if (isLavaderoUserForPreOrder) {
     window._preSelectedTipoLavado = null;
     renderTipoLavadoChips();
@@ -1610,6 +1615,21 @@ async function submitPreOrderCheck() {
     interno = 'Lavado';
   }
 
+  // Lavado de Otros: no hay numero de unidad, se elige QUE se lava de un catalogo propio (ej.
+  // "Caja de Velocidad"). El interno queda "Lavado Otros: <item>" - distinto item, distinta
+  // orden, nunca se reutiliza una existente (mismo motivo que Lavado Particular).
+  const preOtrosItemGroupCheck = document.getElementById('pre-lavadero-otros-item-group');
+  const isOtrosItemPreOrder = !!(preOtrosItemGroupCheck && preOtrosItemGroupCheck.style.display !== 'none');
+  if (isOtrosItemPreOrder) {
+    const itemEl = document.getElementById('pre-lavadero-otros-item');
+    const itemVal = itemEl ? itemEl.value.trim() : '';
+    if (!itemVal || itemVal === '__add__') {
+      showToast('Por favor, seleccioná qué se va a lavar.', 'danger');
+      return;
+    }
+    interno = `Lavado Otros: ${itemVal}`;
+  }
+
   const clasificacion = document.getElementById('pre-form-clasificacion').value;
   console.log("[submitPreOrderCheck] Final interno:", interno, "clasificacion:", clasificacion);
 
@@ -1648,10 +1668,11 @@ async function submitPreOrderCheck() {
   const isCarmona = currentUser === 'jcarmona@contenedoreshugo.com.ar' || currentUser === 'j.carmona@contenedoreshugo.com.ar';
 
   let existingOrder = null;
-  // Lavado Particular nunca reutiliza una orden existente: el interno "Lavado" es el mismo
-  // para todos los autos particulares, asi que matchear por interno mezclaria el lavado de una
-  // persona con el de otra - cada uno tiene que crear su propia orden nueva siempre.
-  if (!isCarmona && !isParticularPreOrder) {
+  // Lavado Particular y Lavado de Otros nunca reutilizan una orden existente: "Lavado" y
+  // "Lavado Otros: <item>" son internos compartidos por cualquier auto/objeto de ese mismo
+  // tipo, asi que matchear por interno mezclaria un lavado con otro sin relacion - cada uno
+  // tiene que crear su propia orden nueva siempre.
+  if (!isCarmona && !isParticularPreOrder && !isOtrosItemPreOrder) {
     // Only match existing order if it is fuera_de_servicio, belongs to the SAME sector group,
     // AND has the SAME clasificacion - a Correctivo/Preventivo/Auxilio for the same vehicle
     // are separate jobs and must always get their own order, never get merged into whichever
@@ -2689,6 +2710,7 @@ async function fetchCatalogs() {
     fetchCustomPreventivos();
     fetchTiposLavado();
     fetchPersonasLavadoAP();
+    fetchItemsLavadoOtros();
 
     // Update catalog status UI now that cachedCatalogs is populated
     if (lastKnownSettings) {
@@ -11868,7 +11890,7 @@ const LAVADERO_CATEGORIAS = {
   prensa_rolloff:  { imagen: 'lavadero/prensa_rolloff.jpg', rodado: 'Lavado Prensa Roll-off', numeradoPrefijo: 'Lavado Prensa Roll-Off', numeradoLabel: 'Número de Interno de la Prensa *' },
   tachos:          { imagen: 'lavadero/tachos.jpg', rodado: 'Lavado Tachos', numeradoPrefijo: 'Lavado Tachos', numeradoLabel: 'Número de Interno del Tacho *' },
   playa:           { imagen: 'lavadero/playa.jpg', rodado: 'Lavado Playa' },
-  otros:           { imagen: 'lavadero/otros.jpg', rodado: 'Lavado Otros' },
+  otros:           { imagen: 'lavadero/otros.jpg', rodado: 'Lavado Otros', otrosItemMode: true },
   particular:      { imagen: 'lavadero/particular.jpg', personaMode: true }
 };
 
@@ -11887,6 +11909,13 @@ function selectLavaderoCategoria(categoria) {
 
   if (config.rodado) {
     setSearchableSelectValue(document.getElementById('pre-form-interno'), config.rodado);
+    if (config.numeradoPrefijo || config.otrosItemMode) {
+      // El Rodado real (el "cajon" del catalogo de Taxes) queda fijo y oculto - se necesita de
+      // nuevo mas adelante para reaplicarlo en la pantalla completa, porque ahi el Rodado se
+      // deriva del Interno via el catalogo, y el interno custom (numerado o "Lavado Otros:
+      // <item>") no existe como entrada real ahi.
+      window._lavaderoNumberedRodado = config.rodado;
+    }
   }
 
   if (config.personaMode) {
@@ -11899,13 +11928,18 @@ function selectLavaderoCategoria(categoria) {
     if (personaGroup) personaGroup.style.display = 'block';
   }
 
+  if (config.otrosItemMode) {
+    // Lavado de Otros: no hay un numero de unidad ni una persona, sino un objeto suelto (ej.
+    // "Caja de Velocidad") - mismo desplegable-con-catalogo-propio que Persona, pero para "que
+    // se lava". El Rodado sigue fijo ("Lavado Otros") por debajo, solo se oculta de la vista.
+    const rodadoGroup = document.getElementById('pre-form-interno-group-select');
+    const itemGroup = document.getElementById('pre-lavadero-otros-item-group');
+    if (rodadoGroup) rodadoGroup.style.display = 'none';
+    if (itemGroup) itemGroup.style.display = 'block';
+  }
+
   if (config.numeradoPrefijo) {
     window._lavaderoNumberedPrefix = config.numeradoPrefijo;
-    // El Rodado real (el "cajon" del catalogo de Taxes) queda fijo y oculto - se necesita de
-    // nuevo mas adelante para reaplicarlo en la pantalla completa, porque ahi el Rodado se
-    // deriva del Interno via el catalogo, y el interno numerado (ej. "Lavado Volquete 55") no
-    // existe como entrada real ahi.
-    window._lavaderoNumberedRodado = config.rodado;
     const rodadoGroup = document.getElementById('pre-form-interno-group-select');
     const numberedGroup = document.getElementById('pre-lavadero-numbered-group');
     const numberedLabel = document.getElementById('pre-lavadero-numbered-label');
@@ -11953,6 +11987,78 @@ function renderPersonaLavadoSelect() {
     const stillExists = Array.from(select.options).some(opt => opt.value === currentValue);
     if (stillExists) select.value = currentValue;
   });
+}
+
+// --- Lavado de Otros (Lavadero) ---
+// "Que se lava" cuando no es ni un vehiculo/unidad numerada ni el auto de un empleado - un
+// objeto suelto (ej. "Caja de Velocidad") elegido de un catalogo que se va armando con lo que
+// el supervisor agrega, mismo patron que personasLavadoAP.
+let itemsLavadoOtros = [];
+
+async function fetchItemsLavadoOtros() {
+  try {
+    const res = await fetch('/api/items-lavado-otros');
+    if (!res.ok) return;
+    const data = await res.json();
+    itemsLavadoOtros = data.items || [];
+    renderItemLavadoOtrosSelect();
+  } catch (e) {
+    console.error('Error cargando items de Lavado de Otros:', e);
+  }
+}
+
+function renderItemLavadoOtrosSelect() {
+  const select = document.getElementById('pre-lavadero-otros-item');
+  if (!select) return;
+  const currentValue = select.value;
+  const options = itemsLavadoOtros.map(i => `<option value="${escapeHtml(i.label)}">${escapeHtml(i.label)}</option>`).join('');
+  select.innerHTML = `<option value="">Seleccionar...</option>${options}<option value="__add__">+ Agregar</option>`;
+  const stillExists = Array.from(select.options).some(opt => opt.value === currentValue);
+  if (stillExists) select.value = currentValue;
+}
+
+function onPreLavaderoOtrosItemChange() {
+  const select = document.getElementById('pre-lavadero-otros-item');
+  if (select && select.value === '__add__') {
+    select.value = '';
+    openCrearItemLavadoOtrosModal();
+  }
+}
+
+function openCrearItemLavadoOtrosModal() {
+  document.getElementById('cilo-nombre').value = '';
+  document.getElementById('crear-item-lavado-otros-modal').classList.add('open');
+}
+
+function closeCrearItemLavadoOtrosModal() {
+  document.getElementById('crear-item-lavado-otros-modal').classList.remove('open');
+}
+
+async function submitCrearItemLavadoOtros() {
+  const label = document.getElementById('cilo-nombre').value.trim();
+  if (!label) {
+    return showToast('Ingresá un nombre.', 'danger');
+  }
+  try {
+    const res = await fetch('/api/items-lavado-otros', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Error al agregar');
+    }
+    const data = await res.json();
+    itemsLavadoOtros.push(data.item);
+    renderItemLavadoOtrosSelect();
+    const select = document.getElementById('pre-lavadero-otros-item');
+    if (select) select.value = data.item.label;
+    closeCrearItemLavadoOtrosModal();
+    showToast(`"${data.item.label}" agregado.`, 'success');
+  } catch (e) {
+    showToast(e.message, 'danger');
+  }
 }
 
 function toggleLavadoParticular() {

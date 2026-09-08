@@ -1597,7 +1597,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.21.12</div>
+      <div class="sidebar-version">Versión 1.21.13</div>
     </div>
   </aside>
 
@@ -1687,6 +1687,13 @@
           <select id="pre-lavado-particular-persona" onchange="onPreLavadoParticularPersonaChange()" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
             <option value="">Seleccionar persona...</option>
             <option value="__add__">+ Agregar persona</option>
+          </select>
+        </div>
+        <div class="form-group" id="pre-lavadero-otros-item-group" style="margin-top: 15px; display: none;">
+          <label for="pre-lavadero-otros-item">Qué se va a lavar *</label>
+          <select id="pre-lavadero-otros-item" onchange="onPreLavaderoOtrosItemChange()" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
+            <option value="">Seleccionar...</option>
+            <option value="__add__">+ Agregar</option>
           </select>
         </div>
         <div class="form-group" style="margin-top: 15px;">
@@ -2016,6 +2023,23 @@
       <div style="display: flex; gap: 8px; justify-content: flex-end;">
         <button type="button" class="btn btn-secondary" onclick="closeCrearPersonaLavadoModal()" style="padding: 10px 18px; border-radius: 8px;">Cancelar</button>
         <button type="button" class="btn btn-primary" onclick="submitCrearPersonaLavado()" style="padding: 10px 18px; border-radius: 8px;">Agregar persona</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="popup-modal-backdrop" id="crear-item-lavado-otros-modal">
+    <div class="modal-content" style="max-width: 420px; margin: auto; padding: 24px; border-radius: 16px; background: var(--card-bg); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: slideUp 0.3s ease-out;">
+      <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 4px;">Agregar qué se lava</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 18px;">Se agrega como opción permanente para Lavado de Otros.</p>
+
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label for="cilo-nombre" style="font-weight: 600; font-size: 12px; color: var(--text-main); text-transform: uppercase;">Nombre</label>
+        <input type="text" id="cilo-nombre" placeholder="Ej: Caja de Velocidad" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 6px; box-sizing: border-box;">
+      </div>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary" onclick="closeCrearItemLavadoOtrosModal()" style="padding: 10px 18px; border-radius: 8px;">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="submitCrearItemLavadoOtros()" style="padding: 10px 18px; border-radius: 8px;">Agregar</button>
       </div>
     </div>
   </div>
@@ -2784,6 +2808,6 @@
     }
   </style>
 
-  <script src="app.js?v=321"></script>
+  <script src="app.js?v=322"></script>
 </body>
 </html>
