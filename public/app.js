@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '317';
+const CURRENT_APP_VERSION = '318';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9175,6 +9175,7 @@ function updateClassificationSelectOptions() {
         <option value="Auxilio">Auxilio</option>
         <option value="Correctivo">Correctivo</option>
         <option value="Herrería">Herrería</option>
+        <option value="Elastiquero">Elastiquero</option>
       `;
       if (sel.id === 'pre-form-clasificacion') {
         html = `
@@ -9183,6 +9184,7 @@ function updateClassificationSelectOptions() {
           <option value="Preventivo">Preventivo</option>
           <option value="Auxilio">Auxilio</option>
           <option value="Herrería">Herrería</option>
+          <option value="Elastiquero">Elastiquero</option>
         `;
       }
     }
