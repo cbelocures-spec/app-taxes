@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '316';
+const CURRENT_APP_VERSION = '317';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -12566,8 +12566,17 @@ async function fetchPreventivoFlota() {
   } catch (error) {
     console.error('Error fetching preventivos flota:', error);
     document.getElementById('prev-dashboard-tbody').innerHTML =
-      `<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}. Configure la URL del script en Ajustes.</td></tr>`;
+      `<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}. Configure la URL del script en Ajustes.</td></tr>`;
   }
+}
+
+// Formatea la fecha del ultimo service registrado desde la app (ultServiceFecha) para
+// mostrarla en las tablas de Flota/Livianas - '-' si todavia no se registro ninguno.
+function formatUltimoServiceFecha(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('es-AR');
 }
 
 function renderPrevFlotaTable() {
@@ -12597,7 +12606,7 @@ function renderPrevFlotaTable() {
   if (el('metric-ok')) el('metric-ok').textContent = total - urgentes;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">No se encontraron unidades.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">No se encontraron unidades.</td></tr>';
     if (cards) cards.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">No se encontraron unidades.</div>';
     return;
   }
@@ -12623,6 +12632,7 @@ function renderPrevFlotaTable() {
       <td>${hs}</td>
       <td>${rest}</td>
       <td><span class="badge-prev ${badgeClass}">${badgeText}</span></td>
+      <td>${formatUltimoServiceFecha(item.ultServiceFecha)}</td>
       <td style="text-align:right;">
         <div style="display:inline-flex; gap:6px;">
           <button class="btn btn-secondary btn-xs" onclick="prevFlotaOpenService(${ri})" style="display:inline-flex; align-items:center; gap:2px;">
@@ -12654,6 +12664,7 @@ function renderPrevFlotaTable() {
         <div class="prev-mobile-card-row"><span>KM Reales</span><strong>${Number(item.kmReales || 0).toLocaleString('es-AR')}</strong></div>
         <div class="prev-mobile-card-row"><span>Hs Reales</span><strong>${Number(item.hsReales || 0).toLocaleString('es-AR')}</strong></div>
         <div class="prev-mobile-card-row"><span>Restante</span><strong>${cardRest}</strong></div>
+        <div class="prev-mobile-card-row"><span>Última Fecha</span><strong>${formatUltimoServiceFecha(item.ultServiceFecha)}</strong></div>
         <div style="display:flex; gap:8px; margin-top:8px;">
           <button class="btn btn-secondary btn-sm" onclick="prevFlotaOpenService(${ri})" style="flex:1; display:flex; justify-content:center; align-items:center; gap:4px;">
             <span class="material-icons" style="font-size:14px;">build</span> Service
@@ -12825,7 +12836,7 @@ async function fetchPrevLivianas() {
     console.error('Error fetching livianas:', error);
     const tbody = document.getElementById('prev-livianas-tbody');
     if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}</td></tr>`;
     }
   }
 }
@@ -12872,7 +12883,7 @@ function renderPrevLivianasTable() {
   if (el('livianas-metric-ok')) el('livianas-metric-ok').textContent = total - urgentes;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">No se encontraron unidades livianas.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted);">No se encontraron unidades livianas.</td></tr>';
     if (cards) cards.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">No se encontraron unidades livianas.</div>';
     return;
   }
@@ -12898,6 +12909,7 @@ function renderPrevLivianasTable() {
       <td><strong>${kmHsStr}</strong></td>
       <td style="color:${isUrgente ? 'var(--danger)' : 'var(--text-color)'}; font-weight:${isUrgente ? 'bold' : 'normal'};">${item.faltante || '-'}</td>
       <td><span class="badge-prev ${badgeClass}">${badgeText}</span></td>
+      <td>${formatUltimoServiceFecha(item.ultServiceFecha)}</td>
       <td style="text-align:right;">
         <div style="display:inline-flex; gap:6px;">
           <button class="btn btn-secondary btn-xs" onclick="prevLivianasOpenService(${ri})" style="display:inline-flex; align-items:center; gap:2px;" title="Generar Orden de Trabajo y registrar Service">
@@ -12933,6 +12945,7 @@ function renderPrevLivianasTable() {
         <div class="prev-mobile-card-row"><span>Frecuencia</span><strong>${item.serviFreq || '-'}</strong></div>
         <div class="prev-mobile-card-row"><span>Lectura Actual</span><strong>${kmHsStr}</strong></div>
         <div class="prev-mobile-card-row"><span>Faltante</span><strong>${item.faltante || '-'}</strong></div>
+        <div class="prev-mobile-card-row"><span>Última Fecha</span><strong>${formatUltimoServiceFecha(item.ultServiceFecha)}</strong></div>
         <div style="display:flex; gap:8px; margin-top:8px;">
           <button class="btn btn-secondary btn-sm" onclick="prevLivianasOpenService(${ri})" style="flex:1; display:flex; justify-content:center; align-items:center; gap:4px;">
             <span class="material-icons" style="font-size:14px;">build</span> Servi / OT

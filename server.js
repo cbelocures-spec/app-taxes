@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '316';
+const APP_VERSION = '317';
 
 // Middleware
 app.use(cors());
@@ -3606,6 +3606,7 @@ function applyOdometerOverrides(data) {
       }
       if (ov.ultServiceKm !== undefined) patched.ultServiceKm = ov.ultServiceKm;
       if (ov.ultServiceHs !== undefined) patched.ultServiceHs = ov.ultServiceHs;
+      if (ov.ultServiceFecha) patched.ultServiceFecha = ov.ultServiceFecha;
     }
 
     const freqRaw = String(patched.serviFreq || '');
@@ -3894,6 +3895,13 @@ app.post('/api/preventivos/service', async (req, res) => {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
     const data = await response.json();
+
+    // Igual que el override de odometro: se guarda tambien local para que la fecha del
+    // ultimo service se vea al toque en la tabla, sin esperar al cache de Apps Script.
+    if (interno) {
+      db.setServiceOverride(interno, km, hs);
+    }
+
     res.json(data);
   } catch (error) {
     console.error("Error updating preventivos service:", error);

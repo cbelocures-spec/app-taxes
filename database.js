@@ -1217,6 +1217,10 @@ class LocalDB {
     const val = Number(String(km || hs || 0).replace(',', '.'));
     db.odometerOverrides[key].ultServiceKm = val;
     db.odometerOverrides[key].ultServiceHs = val;
+    // Campo aparte de updatedAt (que tambien pisa una simple lectura de odometro con
+    // "Actualizar") para que la fecha mostrada en la tabla sea la del ultimo SERVICE real,
+    // no la de cualquier actualizacion de km/hs posterior.
+    db.odometerOverrides[key].ultServiceFecha = new Date().toISOString();
     db.odometerOverrides[key].updatedAt = new Date().toISOString();
     this.write(db);
     return db.odometerOverrides[key];
