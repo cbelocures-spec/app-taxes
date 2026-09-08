@@ -345,7 +345,13 @@ function getCentroCostoSector(centroCosto, centrosCostoList) {
   if (ccLabel.includes('HERRER')) return 'Herrería';
   if (ccLabel.includes('EDIL')) return 'Edilicio';
   if (ccLabel.includes('LAVADER')) return 'Lavadero';
-  return 'Taller';
+  // Centro de costo generico/compartido (no menciona ningun sector en su nombre) - misma
+  // logica que arriba para el caso "sin centro de costo": no es evidencia de Taller, asi que
+  // se devuelve null en vez del string 'Taller' para que splitTasksBySector NO la saque de su
+  // orden. Antes esto devolvia 'Taller' fijo, y una tarea de Edilicio/Herreria con un centro
+  // de costo generico (ej. materiales/mano de obra compartida) terminaba movida a una orden
+  // sibling de Taller en cada guardado - por eso aparecia en el tablero equivocado.
+  return null;
 }
 
 // Taxes has no real "Edilicio" clasificacion value (only Correctivo/Preventivo/Auxilio, plus
