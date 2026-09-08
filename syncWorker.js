@@ -3044,6 +3044,11 @@ async function syncWorkOrder(orderId) {
           }, ci);
           if (hoursId) {
             const sel = `#${hoursId}`;
+            // Un solo metodo de escritura: antes esto ademas hacia triple-click + Backspace +
+            // retipear el mismo valor letra por letra sobre un campo reactivo de Taxes -
+            // escribirlo dos veces por dos caminos distintos es lo que terminaba corrompiendo
+            // el valor final (ej. "3.28" quedando como "3.28328" en Taxes), mismo patron que ya
+            // causo problemas con el boton AGREGAR TAREA en este mismo archivo.
             await safeEvaluate(page, (s, val) => {
               const el = document.querySelector(s);
               if (el) {
@@ -3058,21 +3063,6 @@ async function syncWorkOrder(orderId) {
                 el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
               }
             }, sel, expectedHours);
-
-            await page.focus(sel).catch(() => {});
-            await page.click(sel, { clickCount: 3 }).catch(() => {});
-            await page.keyboard.press('Backspace').catch(() => {});
-            await page.type(sel, expectedHours, { delay: 50 }).catch(() => {});
-            await page.keyboard.press('Tab').catch(() => {});
-
-            await safeEvaluate(page, (s) => {
-              const el = document.querySelector(s);
-              if (el) {
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-                el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-              }
-            }, sel);
             await delay(600);
           }
           appTask.needsHoursUpdate = false;
