@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '318';
+const CURRENT_APP_VERSION = '319';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -349,7 +349,10 @@ function getTaskCentroCostoSector(centroCosto, fallbackSector) {
   if (ccLabel.includes('HERRER')) return 'Herrería';
   if (ccLabel.includes('EDIL')) return 'Edilicio';
   if (ccLabel.includes('LAVADER')) return 'Lavadero';
-  return 'Taller';
+  // Centro de costo generico/compartido (ej. materiales, mano de obra) que no menciona
+  // ningun sector en su nombre - no es evidencia de que la tarea sea de Taller, asi que se
+  // respeta el sector conocido de la orden en vez de caer siempre en 'Taller' por defecto.
+  return fallbackSector || 'Taller';
 }
 
 function populateDatalist(datalistId, options) {
