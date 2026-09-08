@@ -1748,6 +1748,30 @@ app.patch('/api/orders/:id/tasks/:taskId', (req, res) => {
   }
 });
 
+// Corrige a mano el campo `sector` de una orden ya creada, sin tocar tareas/cronometros. El PUT
+// normal de edicion NUNCA lee un `sector` del cliente - lo infiere solo del centro de costo de
+// las tareas, y si ninguna da una señal clara (ej. un centro de costo generico como "MECANICA")
+// conserva el que ya tenia, asi que una orden que nacio con el sector equivocado (ej. creada
+// parado en la pestaña Taller para un interno que en realidad es de Edilicio) nunca se
+// autocorrige sola. Este endpoint es la unica forma de arreglar ese caso puntual.
+app.patch('/api/orders/:id/sector', (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const VALID_SECTORS = ['Taller', 'Herrería', 'Edilicio', 'Lavadero'];
+    const { sector } = req.body;
+    if (!VALID_SECTORS.includes(sector)) {
+      return res.status(400).json({ error: `sector debe ser uno de: ${VALID_SECTORS.join(', ')}` });
+    }
+    const updated = db.updateWorkOrder(req.params.id, { sector });
+    console.log(`[PATCH order sector] Order ${req.params.id}: "${order.sector}" -> "${sector}"`);
+    res.json({ success: true, order: updated });
+  } catch (err) {
+    console.error('[PATCH order sector] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Unlock task verification lock manually so it can be re-verified on next control run
 app.patch('/api/orders/:id/tasks/:taskId/unlock', (req, res) => {
   try {
