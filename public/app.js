@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '319';
+const CURRENT_APP_VERSION = '320';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -979,7 +979,20 @@ function openPreOrderModal() {
   const preLavaderoImage = document.getElementById('pre-lavadero-image');
   if (preTipoLavadoGroup) preTipoLavadoGroup.style.display = isLavaderoUserForPreOrder ? 'block' : 'none';
   if (preLavadorGroup) preLavadorGroup.style.display = isLavaderoUserForPreOrder ? 'block' : 'none';
-  if (preLavaderoImage) preLavaderoImage.style.display = isLavaderoUserForPreOrder ? 'block' : 'none';
+  if (preLavaderoImage) {
+    preLavaderoImage.style.display = isLavaderoUserForPreOrder ? 'block' : 'none';
+    preLavaderoImage.src = 'lavadero/camiones.jpg';
+  }
+  // Reset del campo "numero de interno de la unidad" (Volquetes/Cajas/Prensas/Tachos) - lo
+  // vuelve a mostrar selectLavaderoCategoria si la categoria elegida lo necesita.
+  window._lavaderoNumberedPrefix = null;
+  window._lavaderoNumberedRodado = null;
+  const preLavaderoNumberedGroup = document.getElementById('pre-lavadero-numbered-group');
+  const preLavaderoNumberedInput = document.getElementById('pre-lavadero-numbered-input');
+  if (preLavaderoNumberedGroup) preLavaderoNumberedGroup.style.display = 'none';
+  if (preLavaderoNumberedInput) preLavaderoNumberedInput.value = '';
+  const preInternoSelectGroupReset = document.getElementById('pre-form-interno-group-select');
+  if (preInternoSelectGroupReset) preInternoSelectGroupReset.style.display = '';
   if (isLavaderoUserForPreOrder) {
     window._preSelectedTipoLavado = null;
     renderTipoLavadoChips();
@@ -1561,6 +1574,19 @@ async function submitPreOrderCheck() {
     }
   }
 
+  // Categorias de Lavadero con numero propio (Volquetes/Cajas/Prensas/Tachos): el Interno de
+  // la orden no es el Rodado fijo del catalogo, es "<categoria> <numero tipeado>" (ej. "Lavado
+  // Volquete 55") - el Rodado real se reaplica mas abajo, despues de abrir la pantalla completa.
+  if (window._lavaderoNumberedPrefix) {
+    const numberedInput = document.getElementById('pre-lavadero-numbered-input');
+    const numero = numberedInput ? numberedInput.value.trim() : '';
+    if (!numero) {
+      showToast('Ingresá el número de interno de la unidad.', 'danger');
+      return;
+    }
+    interno = `${window._lavaderoNumberedPrefix} ${numero}`;
+  }
+
   const clasificacion = document.getElementById('pre-form-clasificacion').value;
   console.log("[submitPreOrderCheck] Final interno:", interno, "clasificacion:", clasificacion);
 
@@ -1700,6 +1726,12 @@ async function submitPreOrderCheck() {
     if (isEdilicioUserForPreOrder && preAreaVal) {
       const areaSelectInNewOrder = document.getElementById('form-area-edilicio');
       if (areaSelectInNewOrder) areaSelectInNewOrder.value = preAreaVal;
+    }
+    // openNewOrderModal deriva el Rodado buscando el Interno en el catalogo - un interno
+    // numerado (ej. "Lavado Volquete 55") no existe ahi, asi que queda en blanco. Se reaplica
+    // el Rodado fijo real de esta categoria a mano.
+    if (window._lavaderoNumberedRodado) {
+      setSearchableSelectValue(document.getElementById('form-rodado'), window._lavaderoNumberedRodado);
     }
 
     if (taskGroups.length > 0) {
@@ -11792,45 +11824,68 @@ function closeLavaderoCategoriaModal() {
   document.getElementById('lavadero-categoria-modal').classList.remove('open');
 }
 
+// Config por categoria del menu "Que se lava?" - las que tienen numeradoPrefijo piden el
+// numero de interno propio de esa unidad (ej. "Lavado Volquete 55") y ocultan el Rodado (que
+// queda fijo, apuntando siempre al mismo "cajon" del catalogo de Taxes para esa categoria).
+const LAVADERO_CATEGORIAS = {
+  camiones:        { imagen: 'lavadero/camiones.jpg' },
+  volquetes:       { imagen: 'lavadero/volquetes.jpg', rodado: 'Lavado volquetes', numeradoPrefijo: 'Lavado Volquete', numeradoLabel: 'Número de Interno del Volquete *' },
+  caja_rolloff:    { imagen: 'lavadero/caja_rolloff.jpg', rodado: 'lavado Caja Roll-Off', numeradoPrefijo: 'Lavado Caja Roll-Off', numeradoLabel: 'Número de Interno de la Caja *' },
+  prensa_volquete: { imagen: 'lavadero/prensa_volquete.jpg', rodado: 'Lavado Prensa Volquete', numeradoPrefijo: 'Lavado Prensa Volquete', numeradoLabel: 'Número de Interno de la Prensa *' },
+  prensa_rolloff:  { imagen: 'lavadero/prensa_rolloff.jpg', rodado: 'Lavado Prensa Roll-off', numeradoPrefijo: 'Lavado Prensa Roll-Off', numeradoLabel: 'Número de Interno de la Prensa *' },
+  tachos:          { imagen: 'lavadero/tachos.jpg', rodado: 'Lavado Tachos', numeradoPrefijo: 'Lavado Tachos', numeradoLabel: 'Número de Interno del Tacho *' },
+  playa:           { imagen: 'lavadero/playa.jpg', rodado: 'Lavado Playa' },
+  otros:           { imagen: 'lavadero/otros.jpg', rodado: 'Lavado Otros' }
+};
+
 function selectLavaderoCategoria(categoria) {
-  if (categoria === 'camiones') {
-    closeLavaderoCategoriaModal();
-    openPreOrderModal();
-  } else if (categoria === 'particular') {
+  if (categoria === 'particular') {
     closeLavaderoCategoriaModal();
     openNewOrderModal();
     toggleLavadoParticular();
-  } else if (categoria === 'volquetes') {
-    closeLavaderoCategoriaModal();
-    openPreOrderModal();
-    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'Lavado volquetes');
-  } else if (categoria === 'prensa_volquete') {
-    closeLavaderoCategoriaModal();
-    openPreOrderModal();
-    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'Lavado Prensa Volquete');
-  } else if (categoria === 'prensa_rolloff') {
-    closeLavaderoCategoriaModal();
-    openPreOrderModal();
-    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'Lavado Prensa Roll-off');
-  } else if (categoria === 'playa') {
-    closeLavaderoCategoriaModal();
-    openPreOrderModal();
-    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'Lavado Playa');
-  } else if (categoria === 'tachos') {
-    closeLavaderoCategoriaModal();
-    openPreOrderModal();
-    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'Lavado Tachos');
-  } else if (categoria === 'caja_rolloff') {
-    closeLavaderoCategoriaModal();
-    openPreOrderModal();
-    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'lavado Caja Roll-Off');
-  } else if (categoria === 'otros') {
-    closeLavaderoCategoriaModal();
-    openPreOrderModal();
-    setSearchableSelectValue(document.getElementById('pre-form-interno'), 'Lavado Otros');
-  } else {
-    showToast('Esta categoría todavía no está configurada - decime cómo querés que funcione.', 'warning');
+    return;
   }
+
+  const config = LAVADERO_CATEGORIAS[categoria];
+  if (!config) {
+    showToast('Esta categoría todavía no está configurada - decime cómo querés que funcione.', 'warning');
+    return;
+  }
+
+  closeLavaderoCategoriaModal();
+  openPreOrderModal();
+
+  const imageEl = document.getElementById('pre-lavadero-image');
+  if (imageEl && config.imagen) imageEl.src = config.imagen;
+
+  if (config.rodado) {
+    setSearchableSelectValue(document.getElementById('pre-form-interno'), config.rodado);
+  }
+
+  if (config.numeradoPrefijo) {
+    window._lavaderoNumberedPrefix = config.numeradoPrefijo;
+    // El Rodado real (el "cajon" del catalogo de Taxes) queda fijo y oculto - se necesita de
+    // nuevo mas adelante para reaplicarlo en la pantalla completa, porque ahi el Rodado se
+    // deriva del Interno via el catalogo, y el interno numerado (ej. "Lavado Volquete 55") no
+    // existe como entrada real ahi.
+    window._lavaderoNumberedRodado = config.rodado;
+    const rodadoGroup = document.getElementById('pre-form-interno-group-select');
+    const numberedGroup = document.getElementById('pre-lavadero-numbered-group');
+    const numberedLabel = document.getElementById('pre-lavadero-numbered-label');
+    if (rodadoGroup) rodadoGroup.style.display = 'none';
+    if (numberedGroup) numberedGroup.style.display = 'block';
+    if (numberedLabel) numberedLabel.textContent = config.numeradoLabel;
+    updateLavaderoNumberedPreview();
+  }
+}
+
+function updateLavaderoNumberedPreview() {
+  const input = document.getElementById('pre-lavadero-numbered-input');
+  const preview = document.getElementById('pre-lavadero-numbered-preview');
+  if (!input || !preview) return;
+  const num = input.value.trim();
+  const prefix = window._lavaderoNumberedPrefix || 'Lavado';
+  preview.textContent = `Título de la orden: ${prefix}${num ? ' ' + num : ''}`;
 }
 
 // --- Lavado Particular (Lavadero) ---

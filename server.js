@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '319';
+const APP_VERSION = '320';
 
 // Middleware
 app.use(cors());
@@ -4171,7 +4171,15 @@ function resolveTipoFlotaFromEquipo(equipoRaw) {
 // but they must never be counted as a COMPACTADOR/VOLQUETE/etc for fleet
 // totals (that inflated Compactador's Fuera de Servicio count by 2 and made
 // the total look like 64 instead of the real 62).
-const INTERNOS_NO_FLOTA = new Set(['IRINEO GRAL.', 'VOLQUETE NICO', 'REPARACIONES INTERNAS']);
+// Los "cajones" de Lavadero (categorias del menu "Que se lava?" que no son un camion real de
+// flota) tambien van acá: su Interno pasa a ser "<categoria> <numero>" (ej. "Lavado Volquete
+// 55"), que nunca va a existir como entrada real del catalogo - sin esto, guardar/editar esa
+// orden dejaba el Rodado en blanco (resolveRodadoForInterno no encontraba match y lo pisaba).
+const INTERNOS_NO_FLOTA = new Set([
+  'IRINEO GRAL.', 'VOLQUETE NICO', 'REPARACIONES INTERNAS',
+  'LAVADO VOLQUETES', 'LAVADO CAJA ROLL-OFF', 'LAVADO PRENSA VOLQUETE',
+  'LAVADO PRENSA ROLL-OFF', 'LAVADO TACHOS', 'LAVADO PLAYA', 'LAVADO OTROS'
+]);
 
 function esInternoDeFlotaReal(interno) {
   return !INTERNOS_NO_FLOTA.has(String(interno || '').trim().toUpperCase());
