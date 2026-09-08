@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '320';
+const CURRENT_APP_VERSION = '321';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -993,6 +993,12 @@ function openPreOrderModal() {
   if (preLavaderoNumberedInput) preLavaderoNumberedInput.value = '';
   const preInternoSelectGroupReset = document.getElementById('pre-form-interno-group-select');
   if (preInternoSelectGroupReset) preInternoSelectGroupReset.style.display = '';
+  // Reset del modo "De quien es el auto" (Lavado Particular) - selectLavaderoCategoria lo
+  // vuelve a mostrar si corresponde.
+  const prePersonaGroup = document.getElementById('pre-lavado-particular-persona-group');
+  const prePersonaSelect = document.getElementById('pre-lavado-particular-persona');
+  if (prePersonaGroup) prePersonaGroup.style.display = 'none';
+  if (prePersonaSelect) prePersonaSelect.value = '';
   if (isLavaderoUserForPreOrder) {
     window._preSelectedTipoLavado = null;
     renderTipoLavadoChips();
@@ -1587,6 +1593,23 @@ async function submitPreOrderCheck() {
     interno = `${window._lavaderoNumberedPrefix} ${numero}`;
   }
 
+  // Lavado Particular (auto de un empleado): no hay Rodado/Interno real - se pide de quien es
+  // el auto en su lugar. "Lavado" fijo solo para satisfacer la validacion de mas abajo; el
+  // valor real que importa es preLavadoParticularPersonaVal, aplicado despues de abrir la
+  // pantalla completa.
+  const preLavadoParticularPersonaGroup = document.getElementById('pre-lavado-particular-persona-group');
+  const isParticularPreOrder = !!(preLavadoParticularPersonaGroup && preLavadoParticularPersonaGroup.style.display !== 'none');
+  let preLavadoParticularPersonaVal = '';
+  if (isParticularPreOrder) {
+    const personaEl = document.getElementById('pre-lavado-particular-persona');
+    preLavadoParticularPersonaVal = personaEl ? personaEl.value.trim() : '';
+    if (!preLavadoParticularPersonaVal || preLavadoParticularPersonaVal === '__add__') {
+      showToast('Por favor, seleccioná de quién es el auto.', 'danger');
+      return;
+    }
+    interno = 'Lavado';
+  }
+
   const clasificacion = document.getElementById('pre-form-clasificacion').value;
   console.log("[submitPreOrderCheck] Final interno:", interno, "clasificacion:", clasificacion);
 
@@ -1625,7 +1648,10 @@ async function submitPreOrderCheck() {
   const isCarmona = currentUser === 'jcarmona@contenedoreshugo.com.ar' || currentUser === 'j.carmona@contenedoreshugo.com.ar';
 
   let existingOrder = null;
-  if (!isCarmona) {
+  // Lavado Particular nunca reutiliza una orden existente: el interno "Lavado" es el mismo
+  // para todos los autos particulares, asi que matchear por interno mezclaria el lavado de una
+  // persona con el de otra - cada uno tiene que crear su propia orden nueva siempre.
+  if (!isCarmona && !isParticularPreOrder) {
     // Only match existing order if it is fuera_de_servicio, belongs to the SAME sector group,
     // AND has the SAME clasificacion - a Correctivo/Preventivo/Auxilio for the same vehicle
     // are separate jobs and must always get their own order, never get merged into whichever
@@ -1732,6 +1758,13 @@ async function submitPreOrderCheck() {
     // el Rodado fijo real de esta categoria a mano.
     if (window._lavaderoNumberedRodado) {
       setSearchableSelectValue(document.getElementById('form-rodado'), window._lavaderoNumberedRodado);
+    }
+    if (isParticularPreOrder) {
+      // Activa el modo Lavado Particular en la pantalla completa (oculta Rodado/Interno reales
+      // ahi tambien) y aplica la persona ya elegida en "Identificar Unidad".
+      if (!window._lavadoParticularActive) toggleLavadoParticular();
+      const formPersonaSelect = document.getElementById('form-lavado-particular-persona');
+      if (formPersonaSelect) formPersonaSelect.value = preLavadoParticularPersonaVal;
     }
 
     if (taskGroups.length > 0) {
@@ -11835,17 +11868,11 @@ const LAVADERO_CATEGORIAS = {
   prensa_rolloff:  { imagen: 'lavadero/prensa_rolloff.jpg', rodado: 'Lavado Prensa Roll-off', numeradoPrefijo: 'Lavado Prensa Roll-Off', numeradoLabel: 'Número de Interno de la Prensa *' },
   tachos:          { imagen: 'lavadero/tachos.jpg', rodado: 'Lavado Tachos', numeradoPrefijo: 'Lavado Tachos', numeradoLabel: 'Número de Interno del Tacho *' },
   playa:           { imagen: 'lavadero/playa.jpg', rodado: 'Lavado Playa' },
-  otros:           { imagen: 'lavadero/otros.jpg', rodado: 'Lavado Otros' }
+  otros:           { imagen: 'lavadero/otros.jpg', rodado: 'Lavado Otros' },
+  particular:      { imagen: 'lavadero/particular.jpg', personaMode: true }
 };
 
 function selectLavaderoCategoria(categoria) {
-  if (categoria === 'particular') {
-    closeLavaderoCategoriaModal();
-    openNewOrderModal();
-    toggleLavadoParticular();
-    return;
-  }
-
   const config = LAVADERO_CATEGORIAS[categoria];
   if (!config) {
     showToast('Esta categoría todavía no está configurada - decime cómo querés que funcione.', 'warning');
@@ -11860,6 +11887,16 @@ function selectLavaderoCategoria(categoria) {
 
   if (config.rodado) {
     setSearchableSelectValue(document.getElementById('pre-form-interno'), config.rodado);
+  }
+
+  if (config.personaMode) {
+    // Lavado Particular (auto de un empleado): no tiene Rodado real, asi que se oculta igual
+    // que en las categorias numeradas, pero en vez de pedir un numero se pide de quien es el
+    // auto - mismo desplegable ya usado en la pantalla completa, ahora tambien aca.
+    const rodadoGroup = document.getElementById('pre-form-interno-group-select');
+    const personaGroup = document.getElementById('pre-lavado-particular-persona-group');
+    if (rodadoGroup) rodadoGroup.style.display = 'none';
+    if (personaGroup) personaGroup.style.display = 'block';
   }
 
   if (config.numeradoPrefijo) {
@@ -11907,13 +11944,15 @@ async function fetchPersonasLavadoAP() {
 }
 
 function renderPersonaLavadoSelect() {
-  const select = document.getElementById('form-lavado-particular-persona');
-  if (!select) return;
-  const currentValue = select.value;
-  const options = personasLavadoAP.map(p => `<option value="${escapeHtml(p.label)}">${escapeHtml(p.label)}</option>`).join('');
-  select.innerHTML = `<option value="">Seleccionar persona...</option>${options}<option value="__add__">+ Agregar persona</option>`;
-  const stillExists = Array.from(select.options).some(opt => opt.value === currentValue);
-  if (stillExists) select.value = currentValue;
+  ['form-lavado-particular-persona', 'pre-lavado-particular-persona'].forEach(id => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const currentValue = select.value;
+    const options = personasLavadoAP.map(p => `<option value="${escapeHtml(p.label)}">${escapeHtml(p.label)}</option>`).join('');
+    select.innerHTML = `<option value="">Seleccionar persona...</option>${options}<option value="__add__">+ Agregar persona</option>`;
+    const stillExists = Array.from(select.options).some(opt => opt.value === currentValue);
+    if (stillExists) select.value = currentValue;
+  });
 }
 
 function toggleLavadoParticular() {
@@ -11948,6 +11987,16 @@ function onLavadoParticularPersonaChange() {
   const select = document.getElementById('form-lavado-particular-persona');
   if (select && select.value === '__add__') {
     select.value = '';
+    window._crearPersonaLavadoTargetId = 'form-lavado-particular-persona';
+    openCrearPersonaLavadoModal();
+  }
+}
+
+function onPreLavadoParticularPersonaChange() {
+  const select = document.getElementById('pre-lavado-particular-persona');
+  if (select && select.value === '__add__') {
+    select.value = '';
+    window._crearPersonaLavadoTargetId = 'pre-lavado-particular-persona';
     openCrearPersonaLavadoModal();
   }
 }
@@ -11979,7 +12028,9 @@ async function submitCrearPersonaLavado() {
     const data = await res.json();
     personasLavadoAP.push(data.persona);
     renderPersonaLavadoSelect();
-    document.getElementById('form-lavado-particular-persona').value = data.persona.label;
+    const targetId = window._crearPersonaLavadoTargetId || 'form-lavado-particular-persona';
+    const targetSelect = document.getElementById(targetId);
+    if (targetSelect) targetSelect.value = data.persona.label;
     closeCrearPersonaLavadoModal();
     showToast(`"${data.persona.label}" agregado.`, 'success');
   } catch (e) {

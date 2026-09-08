@@ -1597,7 +1597,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.21.11</div>
+      <div class="sidebar-version">Versión 1.21.12</div>
     </div>
   </aside>
 
@@ -1681,6 +1681,13 @@
           <label id="pre-lavadero-numbered-label" for="pre-lavadero-numbered-input">Número de Interno de la Unidad *</label>
           <input type="text" id="pre-lavadero-numbered-input" placeholder="Ej: 55" inputmode="numeric" oninput="updateLavaderoNumberedPreview()" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box;">
           <div id="pre-lavadero-numbered-preview" style="margin-top: 8px; background: var(--primary-light); color: var(--primary-hover); border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 600;"></div>
+        </div>
+        <div class="form-group" id="pre-lavado-particular-persona-group" style="margin-top: 15px; display: none;">
+          <label for="pre-lavado-particular-persona">De quién es el auto *</label>
+          <select id="pre-lavado-particular-persona" onchange="onPreLavadoParticularPersonaChange()" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
+            <option value="">Seleccionar persona...</option>
+            <option value="__add__">+ Agregar persona</option>
+          </select>
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label for="pre-form-clasificacion">Clasificación *</label>
@@ -2777,6 +2784,6 @@
     }
   </style>
 
-  <script src="app.js?v=320"></script>
+  <script src="app.js?v=321"></script>
 </body>
 </html>
