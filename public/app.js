@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '322';
+const CURRENT_APP_VERSION = '323';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1004,6 +1004,13 @@ function openPreOrderModal() {
   const preOtrosItemSelect = document.getElementById('pre-lavadero-otros-item');
   if (preOtrosItemGroup) preOtrosItemGroup.style.display = 'none';
   if (preOtrosItemSelect) preOtrosItemSelect.value = '';
+  // Reset del modo "Sector" (Lavado de Playa).
+  const prePlayaSectorGroup = document.getElementById('pre-lavadero-playa-sector-group');
+  const prePlayaSectorSelect = document.getElementById('pre-lavadero-playa-sector');
+  const prePlayaSectorNewRow = document.getElementById('pre-lavadero-playa-sector-new-row');
+  if (prePlayaSectorGroup) prePlayaSectorGroup.style.display = 'none';
+  if (prePlayaSectorSelect) prePlayaSectorSelect.value = '';
+  if (prePlayaSectorNewRow) prePlayaSectorNewRow.style.display = 'none';
   if (isLavaderoUserForPreOrder) {
     window._preSelectedTipoLavado = null;
     renderTipoLavadoChips();
@@ -1628,6 +1635,22 @@ async function submitPreOrderCheck() {
       return;
     }
     interno = `Lavado Otros: ${itemVal}`;
+  }
+
+  // Lavado de Playa: se elige el sector (catalogo propio, mismo patron que Area/Sector de
+  // Edilicio). El interno queda "Lavado Playa: <sector>" - a diferencia de Particular/Otros,
+  // SI puede reutilizar una orden existente para el mismo sector (es un area fisica fija, no
+  // un objeto/persona distinto cada vez), la validacion generica de mas abajo ya lo cubre.
+  const prePlayaSectorGroupCheck = document.getElementById('pre-lavadero-playa-sector-group');
+  const isPlayaSectorPreOrder = !!(prePlayaSectorGroupCheck && prePlayaSectorGroupCheck.style.display !== 'none');
+  if (isPlayaSectorPreOrder) {
+    const sectorEl = document.getElementById('pre-lavadero-playa-sector');
+    const sectorVal = sectorEl ? sectorEl.value.trim() : '';
+    if (!sectorVal || sectorVal === '__new__') {
+      showToast('Por favor, seleccioná el sector.', 'danger');
+      return;
+    }
+    interno = `Lavado Playa: ${sectorVal}`;
   }
 
   const clasificacion = document.getElementById('pre-form-clasificacion').value;
@@ -2711,6 +2734,7 @@ async function fetchCatalogs() {
     fetchTiposLavado();
     fetchPersonasLavadoAP();
     fetchItemsLavadoOtros();
+    fetchSectoresPlaya();
 
     // Update catalog status UI now that cachedCatalogs is populated
     if (lastKnownSettings) {
@@ -11889,7 +11913,7 @@ const LAVADERO_CATEGORIAS = {
   prensa_volquete: { imagen: 'lavadero/prensa_volquete.jpg', rodado: 'Lavado Prensa Volquete', numeradoPrefijo: 'Lavado Prensa Volquete', numeradoLabel: 'Número de Interno de la Prensa *' },
   prensa_rolloff:  { imagen: 'lavadero/prensa_rolloff.jpg', rodado: 'Lavado Prensa Roll-off', numeradoPrefijo: 'Lavado Prensa Roll-Off', numeradoLabel: 'Número de Interno de la Prensa *' },
   tachos:          { imagen: 'lavadero/tachos.jpg', rodado: 'Lavado Tachos', numeradoPrefijo: 'Lavado Tachos', numeradoLabel: 'Número de Interno del Tacho *' },
-  playa:           { imagen: 'lavadero/playa.jpg', rodado: 'Lavado Playa' },
+  playa:           { imagen: 'lavadero/playa.jpg', rodado: 'Lavado Playa', sectorMode: true },
   otros:           { imagen: 'lavadero/otros.jpg', rodado: 'Lavado Otros', otrosItemMode: true },
   particular:      { imagen: 'lavadero/particular.jpg', personaMode: true }
 };
@@ -11909,11 +11933,11 @@ function selectLavaderoCategoria(categoria) {
 
   if (config.rodado) {
     setSearchableSelectValue(document.getElementById('pre-form-interno'), config.rodado);
-    if (config.numeradoPrefijo || config.otrosItemMode) {
+    if (config.numeradoPrefijo || config.otrosItemMode || config.sectorMode) {
       // El Rodado real (el "cajon" del catalogo de Taxes) queda fijo y oculto - se necesita de
       // nuevo mas adelante para reaplicarlo en la pantalla completa, porque ahi el Rodado se
-      // deriva del Interno via el catalogo, y el interno custom (numerado o "Lavado Otros:
-      // <item>") no existe como entrada real ahi.
+      // deriva del Interno via el catalogo, y el interno custom (numerado, "Lavado Otros:
+      // <item>" o "Lavado Playa: <sector>") no existe como entrada real ahi.
       window._lavaderoNumberedRodado = config.rodado;
     }
   }
@@ -11936,6 +11960,15 @@ function selectLavaderoCategoria(categoria) {
     const itemGroup = document.getElementById('pre-lavadero-otros-item-group');
     if (rodadoGroup) rodadoGroup.style.display = 'none';
     if (itemGroup) itemGroup.style.display = 'block';
+  }
+
+  if (config.sectorMode) {
+    // Lavado de Playa: mismo concepto que Area/Sector de Edilicio, pero catalogo propio ("Playa
+    // Norte", etc.). El Rodado sigue fijo ("Lavado Playa") por debajo, solo se oculta de la vista.
+    const rodadoGroup = document.getElementById('pre-form-interno-group-select');
+    const sectorGroup = document.getElementById('pre-lavadero-playa-sector-group');
+    if (rodadoGroup) rodadoGroup.style.display = 'none';
+    if (sectorGroup) sectorGroup.style.display = 'block';
   }
 
   if (config.numeradoPrefijo) {
@@ -12058,6 +12091,74 @@ async function submitCrearItemLavadoOtros() {
     showToast(`"${data.item.label}" agregado.`, 'success');
   } catch (e) {
     showToast(e.message, 'danger');
+  }
+}
+
+// --- Lavado de Playa (Lavadero) ---
+// Igual que el Área/Sector de Edilicio (desplegable + "Agregar sector nuevo"), pero con
+// catálogo propio - no comparte la lista de áreas con Edilicio.
+let cachedSectoresPlaya = [];
+
+async function fetchSectoresPlaya() {
+  try {
+    const res = await fetch('/api/sectores-playa');
+    if (!res.ok) return;
+    const data = await res.json();
+    cachedSectoresPlaya = Array.isArray(data.sectores) ? data.sectores : [];
+    populateSectoresPlayaSelect();
+  } catch (e) {
+    console.error('Error cargando sectores de Playa:', e);
+  }
+}
+
+function populateSectoresPlayaSelect(selectedValue) {
+  const select = document.getElementById('pre-lavadero-playa-sector');
+  if (!select) return;
+  const preserve = selectedValue !== undefined ? selectedValue : select.value;
+  select.innerHTML = '<option value="">Seleccionar sector...</option>' +
+    cachedSectoresPlaya.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('') +
+    '<option value="__new__">+ Agregar sector nuevo...</option>';
+  if (preserve && preserve !== '__new__') {
+    const exists = Array.from(select.options).some(opt => opt.value === preserve);
+    if (exists) select.value = preserve;
+  }
+}
+
+function onPreLavaderoPlayaSectorChange() {
+  const select = document.getElementById('pre-lavadero-playa-sector');
+  const newRow = document.getElementById('pre-lavadero-playa-sector-new-row');
+  if (!select || !newRow) return;
+  if (select.value === '__new__') {
+    newRow.style.display = 'flex';
+    const input = document.getElementById('pre-lavadero-playa-sector-new-input');
+    if (input) input.focus();
+  } else {
+    newRow.style.display = 'none';
+  }
+}
+
+async function savePreLavaderoPlayaSector() {
+  const input = document.getElementById('pre-lavadero-playa-sector-new-input');
+  const nombre = input ? input.value.trim() : '';
+  if (!nombre) {
+    return showToast('Escribí un nombre para el sector nuevo.', 'danger');
+  }
+  try {
+    const res = await fetch('/api/sectores-playa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre })
+    });
+    if (!res.ok) throw new Error('Error al guardar el sector');
+    const data = await res.json();
+    cachedSectoresPlaya = Array.isArray(data.sectores) ? data.sectores : cachedSectoresPlaya;
+    populateSectoresPlayaSelect(nombre);
+    const newRow = document.getElementById('pre-lavadero-playa-sector-new-row');
+    if (newRow) newRow.style.display = 'none';
+    if (input) input.value = '';
+    showToast('Sector agregado.', 'success');
+  } catch (error) {
+    showToast('No se pudo guardar el sector.', 'danger');
   }
 }
 

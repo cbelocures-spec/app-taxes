@@ -1478,6 +1478,26 @@ class LocalDB {
     return item;
   }
 
+  // Sectores para la categoria Playa (Lavadero) - catalogo propio, mismo patron que
+  // itemsLavadoOtros/areasEdilicio pero sin compartir la lista con Edilicio.
+  getSectoresPlaya() {
+    const db = this.read();
+    return db.sectoresPlaya || [];
+  }
+
+  addSectorPlaya(nombre) {
+    const clean = String(nombre || '').trim();
+    if (!clean) return this.getSectoresPlaya();
+    const db = this.read();
+    if (!Array.isArray(db.sectoresPlaya)) db.sectoresPlaya = [];
+    const exists = db.sectoresPlaya.some(s => s.trim().toLowerCase() === clean.toLowerCase());
+    if (!exists) {
+      db.sectoresPlaya.push(clean);
+      this.write(db);
+    }
+    return db.sectoresPlaya;
+  }
+
   // --- Audit Log for Auto-Deleted Verified Orders ---
   getDeletedOrdersLog() {
     const db = this.read();

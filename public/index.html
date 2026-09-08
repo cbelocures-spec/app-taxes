@@ -1597,7 +1597,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.21.13</div>
+      <div class="sidebar-version">Versión 1.21.14</div>
     </div>
   </aside>
 
@@ -1695,6 +1695,17 @@
             <option value="">Seleccionar...</option>
             <option value="__add__">+ Agregar</option>
           </select>
+        </div>
+        <div class="form-group" id="pre-lavadero-playa-sector-group" style="margin-top: 15px; display: none;">
+          <label for="pre-lavadero-playa-sector">Sector *</label>
+          <select id="pre-lavadero-playa-sector" onchange="onPreLavaderoPlayaSectorChange()" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
+            <option value="">Seleccionar sector...</option>
+            <option value="__new__">+ Agregar sector nuevo...</option>
+          </select>
+          <div id="pre-lavadero-playa-sector-new-row" style="display: none; margin-top: 8px; gap: 8px; align-items: center;">
+            <input type="text" id="pre-lavadero-playa-sector-new-input" placeholder="Nombre del sector (ej: Playa Norte)" style="flex: 1; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; height: 38px;">
+            <button type="button" class="btn btn-primary btn-sm" onclick="savePreLavaderoPlayaSector()">Guardar</button>
+          </div>
         </div>
         <div class="form-group" style="margin-top: 15px;">
           <label for="pre-form-clasificacion">Clasificación *</label>
@@ -2808,6 +2819,6 @@
     }
   </style>
 
-  <script src="app.js?v=322"></script>
+  <script src="app.js?v=323"></script>
 </body>
 </html>

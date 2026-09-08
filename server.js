@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '322';
+const APP_VERSION = '323';
 
 // Middleware
 app.use(cors());
@@ -3558,6 +3558,23 @@ app.post('/api/areas-edilicio', (req, res) => {
   try {
     const areas = db.addAreaEdilicio(req.body && req.body.nombre);
     res.json({ areas });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/sectores-playa', (req, res) => {
+  try {
+    res.json({ sectores: db.getSectoresPlaya() });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/sectores-playa', (req, res) => {
+  try {
+    const sectores = db.addSectorPlaya(req.body && req.body.nombre);
+    res.json({ sectores });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
