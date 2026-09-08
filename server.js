@@ -3618,11 +3618,15 @@ function applyOdometerOverrides(data) {
     const ultHs = parseFloat(String(patched.ultServiceHs || patched.ultimoServicioHs || patched.ultServiceRealizadoHs || 0).replace(/[^0-9\.]/g, '')) || 0;
     const ultKm = parseFloat(String(patched.ultServiceKm || patched.ultimoServicioKm || patched.ultServiceRealizadoKm || 0).replace(/[^0-9\.]/g, '')) || 0;
 
+    // No exigir ultHs/ultKm > 0: una unidad 0km (recien incorporada, sin service previo
+    // cargado) arranca legitimamente con esa base en 0, y antes esa condicion bloqueaba el
+    // calculo por completo - por mas horas/km que se cargaran despues, "pasaron" quedaba en 0
+    // y el Restante nunca bajaba del total de la frecuencia.
     let pasaron = 0;
     if (isHs) {
-      pasaron = (ultHs > 0 && currentHs >= ultHs) ? (currentHs - ultHs) : 0;
+      pasaron = (currentHs >= ultHs) ? (currentHs - ultHs) : 0;
     } else {
-      pasaron = (ultKm > 0 && currentKm >= ultKm) ? (currentKm - ultKm) : 0;
+      pasaron = (currentKm >= ultKm) ? (currentKm - ultKm) : 0;
     }
 
     if (freqNum > 0) {
