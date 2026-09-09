@@ -2724,6 +2724,38 @@ body {
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25) !important;
 }
 
+/* "Identificar Unidad" (pre-order-modal) en tablet/pantallas anchas - el layout pensado para
+   celular (tope de 500px) quedaba chico en el medio de la pantalla con mucho espacio vacío
+   alrededor. Escalado hacia arriba solo dentro de este modal, no afecta el resto de la app. */
+@media (min-width: 700px) {
+  #pre-order-modal .modal-content {
+    max-width: 640px;
+  }
+  #pre-order-modal .pre-order-card {
+    padding: 28px;
+  }
+  #pre-order-modal .pre-order-card .card-title-header h3 {
+    font-size: 20px;
+  }
+  #pre-order-modal .pre-order-card label {
+    font-size: 15px;
+  }
+  #pre-order-modal .pre-order-card input,
+  #pre-order-modal .pre-order-card select,
+  #pre-order-modal .pre-order-card .searchable-select-trigger {
+    font-size: 17px;
+    padding: 13px 15px;
+  }
+  #pre-order-modal .pre-order-card .btn-xs {
+    font-size: 14px;
+    padding: 8px 14px;
+  }
+  #pre-order-modal .pre-order-card .btn-primary {
+    font-size: 18px;
+    padding: 15px;
+  }
+}
+
 /* Popup modal style for diagnosis */
 .popup-modal-backdrop {
   position: fixed;
