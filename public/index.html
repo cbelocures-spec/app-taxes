@@ -1642,6 +1642,9 @@
         <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('playa')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/playa.jpg'); background-size: cover; background-position: center;">
           <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Playa</span>
         </button>
+        <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('tercerizado')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/empresa_tercerizada.jpg'); background-size: cover; background-position: center; grid-column: span 2;">
+          <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Empresa Tercerizada</span>
+        </button>
       </div>
     </div>
   </div>
@@ -1671,6 +1674,15 @@
         <div class="form-group" id="pre-form-interno-group-text" style="margin-top: 15px; display: none;">
           <label for="pre-form-interno-text">Número de Interno / Contenedor *</label>
           <input type="text" id="pre-form-interno-text" placeholder="Ej: 5655" list="internos-datalist" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box;">
+        </div>
+        <div class="form-group" id="pre-lavadero-empresa-group" style="margin-top: 15px; display: none;">
+          <label for="pre-lavadero-empresa">Empresa Tercerizada *</label>
+          <select id="pre-lavadero-empresa" onchange="onPreLavaderoEmpresaChange()" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px;">
+            <option value="">Seleccionar empresa...</option>
+            <option value="IRINEO GRAL.">Irineo Gral.</option>
+            <option value="VOLQUETE NICO">Volquete Nico</option>
+            <option value="SERVICIOS OTROS">Servicios Otros</option>
+          </select>
         </div>
         <div class="form-group" id="pre-lavadero-numbered-group" style="margin-top: 15px; display: none;">
           <label id="pre-lavadero-numbered-label" for="pre-lavadero-numbered-input">Número de Interno de la Unidad *</label>
@@ -2837,6 +2849,6 @@
     }
   </style>
 
-  <script src="app.js?v=333"></script>
+  <script src="app.js?v=334"></script>
 </body>
 </html>

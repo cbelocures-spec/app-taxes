@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '333';
+const CURRENT_APP_VERSION = '334';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1014,6 +1014,12 @@ function openPreOrderModal() {
   if (prePlayaSectorGroup) prePlayaSectorGroup.style.display = 'none';
   if (prePlayaSectorSelect) prePlayaSectorSelect.value = '';
   if (prePlayaSectorNewRow) prePlayaSectorNewRow.style.display = 'none';
+  // Reset del modo "Empresa Tercerizada" - selectLavaderoCategoria lo vuelve a mostrar junto
+  // con el campo numerado (pre-lavadero-numbered-group) si corresponde.
+  const preEmpresaGroup = document.getElementById('pre-lavadero-empresa-group');
+  const preEmpresaSelect = document.getElementById('pre-lavadero-empresa');
+  if (preEmpresaGroup) preEmpresaGroup.style.display = 'none';
+  if (preEmpresaSelect) preEmpresaSelect.value = '';
   if (isLavaderoUserForPreOrder) {
     window._preSelectedTipoLavado = null;
     renderTipoLavadoChips();
@@ -1593,6 +1599,15 @@ async function submitPreOrderCheck() {
     if (searchInput && searchInput.value.trim()) {
       interno = searchInput.value.trim();
     }
+  }
+
+  // Empresa Tercerizada: hasta que no se elige una empresa del desplegable propio,
+  // _lavaderoNumberedPrefix queda en null (ver onPreLavaderoEmpresaChange) - sin esto, el check
+  // de "numero de interno" de más abajo ni se dispara y se podría enviar sin empresa elegida.
+  const preEmpresaGroupCheck = document.getElementById('pre-lavadero-empresa-group');
+  if (preEmpresaGroupCheck && preEmpresaGroupCheck.style.display !== 'none' && !window._lavaderoNumberedRodado) {
+    showToast('Elegí la empresa tercerizada.', 'danger');
+    return;
   }
 
   // Categorias de Lavadero con numero propio (Volquetes/Cajas/Prensas/Tachos): el Interno de
@@ -11973,7 +11988,12 @@ const LAVADERO_CATEGORIAS = {
   tachos:          { imagen: 'lavadero/tachos.jpg', rodado: 'Lavado Tachos', numeradoPrefijo: 'Lavado Tachos', numeradoLabel: 'Número de Interno del Tacho *' },
   playa:           { imagen: 'lavadero/playa.jpg', rodado: 'Lavado Playa', sectorMode: true },
   otros:           { imagen: 'lavadero/otros.jpg', rodado: 'Lavado Otros', otrosItemMode: true },
-  particular:      { imagen: 'lavadero/particular.jpg', personaMode: true }
+  particular:      { imagen: 'lavadero/particular.jpg', personaMode: true },
+  // Empresa Tercerizada: a diferencia de volquetes/tachos/etc (rodado fijo por categoria), acá
+  // el Rodado real varía según qué empresa se elija en su propio desplegable (ver empresaMode
+  // más abajo y onPreLavaderoEmpresaChange) - son "cajones" reales del catálogo de Taxes ya
+  // existentes (VOLQUETE NICO, IRINEO GRAL., SERVICIOS OTROS), no uno fijo para la categoría.
+  tercerizado:     { imagen: 'lavadero/empresa_tercerizada.jpg', empresaMode: true, numeradoLabel: 'Número de Unidad *' }
 };
 
 function selectLavaderoCategoria(categoria) {
@@ -12044,6 +12064,38 @@ function selectLavaderoCategoria(categoria) {
     if (numberedLabel) numberedLabel.textContent = config.numeradoLabel;
     updateLavaderoNumberedPreview();
   }
+
+  if (config.empresaMode) {
+    // Empresa Tercerizada: el Rodado/prefijo del título no se fija acá (todavía no se eligió
+    // empresa) - se resuelve recién cuando cambia el desplegable, en onPreLavaderoEmpresaChange.
+    const rodadoGroup = document.getElementById('pre-form-interno-group-select');
+    const empresaGroup = document.getElementById('pre-lavadero-empresa-group');
+    const numberedGroup = document.getElementById('pre-lavadero-numbered-group');
+    const numberedLabel = document.getElementById('pre-lavadero-numbered-label');
+    if (rodadoGroup) rodadoGroup.style.display = 'none';
+    if (empresaGroup) empresaGroup.style.display = 'block';
+    if (numberedGroup) numberedGroup.style.display = 'block';
+    if (numberedLabel) numberedLabel.textContent = config.numeradoLabel;
+    window._lavaderoNumberedPrefix = null;
+    window._lavaderoNumberedRodado = null;
+    updateLavaderoNumberedPreview();
+  }
+}
+
+// Al elegir la empresa tercerizada, el Rodado real y el prefijo del título ("Lavado <empresa>")
+// se resuelven recién acá - antes de elegir, no hay ninguno de los dos.
+function onPreLavaderoEmpresaChange() {
+  const select = document.getElementById('pre-lavadero-empresa');
+  const numberedLabel = document.getElementById('pre-lavadero-numbered-label');
+  if (!select) return;
+  const opt = select.options[select.selectedIndex];
+  const empresaLabel = (opt && select.value) ? opt.textContent.trim() : '';
+  window._lavaderoNumberedRodado = select.value || null;
+  window._lavaderoNumberedPrefix = select.value ? `Lavado ${empresaLabel}` : null;
+  if (numberedLabel) {
+    numberedLabel.textContent = select.value ? `Número de Unidad de ${empresaLabel} *` : 'Número de Unidad *';
+  }
+  updateLavaderoNumberedPreview();
 }
 
 function updateLavaderoNumberedPreview() {
