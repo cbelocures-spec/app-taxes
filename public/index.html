@@ -1610,7 +1610,10 @@
        antes del formulario de siempre. -->
   <div class="popup-modal-backdrop" id="lavadero-categoria-modal">
     <div class="modal-content" style="max-width: 900px; width: 92vw; margin: auto; padding: 28px; border-radius: 20px; background: var(--card-bg); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: slideUp 0.3s ease-out;">
-      <h3 style="font-size: 26px; font-weight: 700; margin: 0 0 20px;">¿Qué se lava?</h3>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin: 0 0 20px;">
+        <h3 style="font-size: 26px; font-weight: 700; margin: 0;">¿Qué se lava?</h3>
+        <button type="button" class="btn btn-secondary" onclick="closeLavaderoCategoriaModal()" style="padding: 12px 24px; font-size: 16px; border-radius: 10px;">Cancelar</button>
+      </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px;">
         <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('camiones')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/camiones.jpg'); background-size: cover; background-position: center; grid-column: span 2;">
           <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Flota</span>
@@ -1639,9 +1642,6 @@
         <button type="button" class="lavadero-cat-btn" onclick="selectLavaderoCategoria('playa')" style="all: unset; cursor: pointer; border-radius: 16px; overflow: hidden; position: relative; height: 180px; display: flex; align-items: flex-end; background-image: url('lavadero/playa.jpg'); background-size: cover; background-position: center;">
           <span style="width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65)); box-sizing: border-box;">Lavado de Playa</span>
         </button>
-      </div>
-      <div style="display: flex; justify-content: flex-end; margin-top: 22px;">
-        <button type="button" class="btn btn-secondary" onclick="closeLavaderoCategoriaModal()" style="padding: 12px 24px; font-size: 16px; border-radius: 10px;">Cancelar</button>
       </div>
     </div>
   </div>
@@ -2821,6 +2821,6 @@
     }
   </style>
 
-  <script src="app.js?v=328"></script>
+  <script src="app.js?v=329"></script>
 </body>
 </html>
