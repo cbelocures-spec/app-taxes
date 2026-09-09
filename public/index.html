@@ -561,16 +561,11 @@
             </div>
           </div>
 
-          <div class="form-row">
+          <div class="form-row" style="display:none;">
             <div class="form-group col-12">
               <label for="bulk-clasificacion">Clasificación *</label>
               <select id="bulk-clasificacion" required>
-                <option value="" selected disabled>Seleccionar...</option>
-                <option value="Preventivo">Preventivo</option>
-                <option value="Auxilio">Auxilio</option>
-                <option value="Correctivo">Correctivo</option>
-                <option value="Herrería">Herrería</option>
-                <option value="Lavadero">Lavadero</option>
+                <option value="checklist" selected>checklist</option>
               </select>
             </div>
           </div>
@@ -1597,7 +1592,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.21.14</div>
+      <div class="sidebar-version">Versión 1.21.15</div>
     </div>
   </aside>
 
@@ -1715,7 +1710,10 @@
             <option value="Preventivo">Preventivo</option>
             <option value="Auxilio">Auxilio</option>
             <option value="Herrería">Herrería</option>
+            <option value="Elastiquero">Elastiquero</option>
+            <option value="Inversión">Inversión</option>
             <option value="Lavadero">Lavadero</option>
+            <option value="Edilicio">Edilicio</option>
           </select>
         </div>
         <div class="form-group" id="pre-tipo-lavado-group" style="margin-top: 15px; display: none;">
@@ -1817,12 +1815,10 @@
           <h3>2. Datos Generales de las Órdenes</h3>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
-          <div class="form-group">
+          <div class="form-group" style="display:none;">
             <label for="massive-form-clasificacion">Clasificación *</label>
             <select id="massive-form-clasificacion" required style="width: 100%; padding: 10px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px;">
-              <option value="Preventivo" selected>Preventivo</option>
-              <option value="Correctivo">Correctivo</option>
-              <option value="Auxilio">Auxilio</option>
+              <option value="checklist" selected>checklist</option>
             </select>
           </div>
           <div class="form-group">
@@ -2166,6 +2162,11 @@
                   <option value="Auxilio">Auxilio</option>
                   <option value="Correctivo">Correctivo</option>
                   <option value="Herrería">Herrería</option>
+                  <option value="Elastiquero">Elastiquero</option>
+                  <option value="Inversión">Inversión</option>
+                  <option value="Preventivo 5.000 Lts">Preventivo 5.000 Lts</option>
+                  <option value="Preventivo 10.000 Lts">Preventivo 10.000 Lts</option>
+                  <option value="Servicio Tercerizado">Servicio Tercerizado</option>
                   <option value="Edilicio">Edilicio</option>
                   <option value="Lavadero">Lavadero</option>
                 </select>
@@ -2819,6 +2820,6 @@
     }
   </style>
 
-  <script src="app.js?v=323"></script>
+  <script src="app.js?v=325"></script>
 </body>
 </html>

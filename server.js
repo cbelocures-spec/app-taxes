@@ -57,7 +57,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '323';
+const APP_VERSION = '325';
 
 // Middleware
 app.use(cors());
@@ -354,11 +354,10 @@ function getCentroCostoSector(centroCosto, centrosCostoList) {
   return null;
 }
 
-// Taxes has no real "Edilicio" clasificacion value (only Correctivo/Preventivo/Auxilio, plus
-// Herrería which genuinely exists there) - Edilicio work is identified by the order's `sector`
-// field and by each task's own centro de costo, never by writing "Edilicio" into clasificacion.
-// This resolves an order's sector checking BOTH clasificacion and sector, so it still recognizes
-// older orders that predate this fix and do have clasificacion === 'Edilicio' on file.
+// Edilicio work is identified primarily by the order's `sector` field and by each task's own
+// centro de costo; "Edilicio" is also now a real Taxes clasificacion value written on new
+// orders. This resolves an order's sector checking BOTH clasificacion and sector, so it works
+// for orders either way.
 function getOrderSector(clasificacion, sectorField) {
   if (isHerreria(clasificacion) || isHerreria(sectorField)) return 'Herrería';
   if (isEdilicio(sectorField) || isEdilicio(clasificacion)) return 'Edilicio';
@@ -405,10 +404,9 @@ function routeForeignTasksToSiblingOrder(sector, tasksForSector, ctx) {
   if (!tasksForSector || tasksForSector.length === 0) return null;
   console.log(`[routeForeignTasksToSiblingOrder][DEBUG] CALLED for sector=${sector} interno=${ctx.interno} area=${JSON.stringify(ctx.area)} taskCount=${tasksForSector.length} excludeOrderId=${ctx.excludeOrderId}`);
 
-  // Herrería y Lavadero existen como clasificacion real de Taxes, asi que ese sibling la lleva
-  // directo. Edilicio no (ver getOrderSector) - un sibling de Edilicio recibe "Correctivo" como
-  // un sibling de Taller, y se identifica por su campo `sector` en cambio.
-  const siblingClasificacion = (sector === 'Herrería' || sector === 'Lavadero') ? sector : 'Correctivo';
+  // Herrería, Lavadero y Edilicio existen como clasificacion real de Taxes, asi que ese
+  // sibling la lleva directo.
+  const siblingClasificacion = (sector === 'Herrería' || sector === 'Lavadero' || sector === 'Edilicio') ? sector : 'Correctivo';
   const cleanInterno = String(ctx.interno || '').trim().toLowerCase();
 
   const cleanArea = String(ctx.area || '').trim().toLowerCase();
@@ -987,9 +985,9 @@ app.post('/api/orders', (req, res) => {
     } else if (isLavadero(clasificacion)) {
       finalClasificacion = 'Lavadero';
     } else if (isEdilicio(clasificacion)) {
-      // Taxes has no "Edilicio" clasificacion value - that sector is identified by `sector`
-      // below and by each task's own centro de costo, not by this field (see getOrderSector).
-      finalClasificacion = 'Correctivo';
+      // Taxes ahora sí tiene "Edilicio" como clasificacion real (pedido explícito del
+      // usuario), igual que Herrería/Lavadero - se manda tal cual.
+      finalClasificacion = 'Edilicio';
     }
 
     const resolvedRodado = resolveRodadoForInterno(interno, rodado);
@@ -1507,9 +1505,8 @@ app.put('/api/orders/:id', (req, res) => {
     // Normalize accents/case only - a Herrería-sector user (e.g. Carmona) no longer gets
     // their clasificacion forced back to Herrería on every save; routing to the
     // Herrería view uses the order's `sector` field (set at creation), not this.
-    // Edilicio-only users still get theirs forced too, but to "Correctivo" - Taxes has no
-    // real "Edilicio" clasificacion value (see getOrderSector); that sector is identified by
-    // `sector` and by each task's own centro de costo, not by this field.
+    // Edilicio-only users get theirs forced to "Edilicio" too, now a real Taxes clasificacion
+    // value (see POST /api/orders).
     let finalClasificacion = clasificacion;
     const isEdilicioOnlyUser = sector === 'Edilicio' && !allowed.some(s => s === 'Taller');
 
@@ -1518,7 +1515,7 @@ app.put('/api/orders/:id', (req, res) => {
     } else if (isLavadero(clasificacion)) {
       finalClasificacion = 'Lavadero';
     } else if (isEdilicio(clasificacion) || isEdilicioOnlyUser) {
-      finalClasificacion = 'Correctivo';
+      finalClasificacion = 'Edilicio';
     }
 
     const createdBy = existing.createdBy || requester;

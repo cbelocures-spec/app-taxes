@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '323';
+const CURRENT_APP_VERSION = '325';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -953,23 +953,26 @@ function openPreOrderModal() {
   // Taller AND Edilicio are left blank on purpose - pedido explicito del usuario: auto-
   // seleccionar "Correctivo" hacia que gente que en realidad necesitaba cargar un Auxilio se
   // equivocara sin darse cuenta, porque el campo ya venia lleno. Ahora tiene que elegirlo a
-  // mano (submitPreOrderCheck ya bloquea continuar si queda vacio). Edilicio no tiene un valor
-  // propio de clasificacion en Taxes - ese sector se identifica por el Centro de Costo de la
-  // tarea, no por este campo.
+  // mano (submitPreOrderCheck ya bloquea continuar si queda vacio). Taller es el unico que
+  // sigue asi - Edilicio ahora tiene su propio valor real "Edilicio" en Taxes, igual que
+  // Lavadero/Herreria, asi que tambien se autocompleta y se oculta el campo.
   const clsEl = document.getElementById('pre-form-clasificacion');
   const currentUserForCls = localStorage.getItem('currentUserUsername');
   const userSectorForCls = getSectorByUsername(currentUserForCls);
   const isLavaderoUserForPreOrder = (userSectorForCls === 'Lavadero' || currentSelectedSector === 'Lavadero');
+  const isEdilicioUserForCls = (userSectorForCls === 'Edilicio' || currentSelectedSector === 'Edilicio');
   if (clsEl) {
     if (isLavaderoUserForPreOrder) {
       clsEl.value = 'Lavadero';
+    } else if (isEdilicioUserForCls) {
+      clsEl.value = 'Edilicio';
     } else if (userSectorForCls === 'Herrería' || currentSelectedSector === 'Herrería') {
       clsEl.value = 'Herrería';
     } else {
       clsEl.value = '';
     }
     const clsGroup = clsEl.closest('.form-group');
-    if (clsGroup) clsGroup.style.display = isLavaderoUserForPreOrder ? 'none' : '';
+    if (clsGroup) clsGroup.style.display = (isLavaderoUserForPreOrder || isEdilicioUserForCls) ? 'none' : '';
   }
 
   // Lavadero pide Tipo de lavado y Lavador ya en esta primera pantalla, en vez de recien en la
@@ -9246,8 +9249,10 @@ function getSectorByUsername(username) {
 }
 
 function updateClassificationSelectOptions() {
+  // bulk-clasificacion (Carga Masiva real) y massive-form-clasificacion (modal legacy sin
+  // usar) no entran acá a propósito: Carga Masiva ya no elige clasificación, siempre manda
+  // "checklist" (fijo en el HTML y en submitBulkOrders/submitMassiveOrders).
   const selects = [
-    { id: 'bulk-clasificacion', defaultText: 'Seleccionar...' },
     { id: 'pre-form-clasificacion', defaultText: 'Seleccionar Clasificación...' },
     { id: 'form-clasificacion', defaultText: 'Seleccionar...' }
   ];
@@ -9277,12 +9282,16 @@ function updateClassificationSelectOptions() {
         <option value="Lavadero" selected>Lavadero</option>
       `;
     } else {
-      // Taller / Admin / Edilicio - Taxes has no real "Edilicio" clasificacion value (only
-      // Correctivo/Preventivo/Auxilio, plus Herrería which genuinely exists there). Edilicio
-      // work is identified by the task's Centro de Costo, not by this field, so the Edilicio
-      // tab offers the exact same real options as Taller. "Herrería" itself is still offered
-      // here too (not just on the Herrería tab) - a Pañol/Admin/Taller account often needs to
-      // log a container/tacho job (free-text interno) without switching tabs first.
+      // Taller / Admin - Edilicio ya no pasa por acá (su campo queda oculto y fijo en
+      // "Edilicio", ver setupAllFieldsForSector). "Herrería" se sigue ofreciendo acá también
+      // (no solo en su propia solapa) - una cuenta Pañol/Admin/Taller a veces necesita cargar
+      // un trabajo de contenedor/tacho (interno libre) sin cambiar de solapa primero.
+      // Preventivo 5.000/10.000 Lts se agregan acá (no solo se fijan por JS en el flujo de
+      // Combustible) porque form-clasificacion es un <select> real: si el valor asignado no
+      // existe como <option>, el campo queda sin selección y se pierde al guardar la orden.
+      // "Edilicio" se incluye como <option> aunque su campo quede oculto en ese contexto
+      // (ver setupAllFieldsForSector/resetPreOrderForm): sin la <option>, asignarle
+      // clsEl.value = 'Edilicio' a un <select> no la encuentra y el campo queda vacío.
       html = `
         <option value="" selected disabled>${sel.defaultText}</option>
         <option value="Preventivo">Preventivo</option>
@@ -9290,6 +9299,11 @@ function updateClassificationSelectOptions() {
         <option value="Correctivo">Correctivo</option>
         <option value="Herrería">Herrería</option>
         <option value="Elastiquero">Elastiquero</option>
+        <option value="Inversión">Inversión</option>
+        <option value="Preventivo 5.000 Lts">Preventivo 5.000 Lts</option>
+        <option value="Preventivo 10.000 Lts">Preventivo 10.000 Lts</option>
+        <option value="Servicio Tercerizado">Servicio Tercerizado</option>
+        <option value="Edilicio">Edilicio</option>
       `;
       if (sel.id === 'pre-form-clasificacion') {
         html = `
@@ -9299,6 +9313,11 @@ function updateClassificationSelectOptions() {
           <option value="Auxilio">Auxilio</option>
           <option value="Herrería">Herrería</option>
           <option value="Elastiquero">Elastiquero</option>
+          <option value="Inversión">Inversión</option>
+          <option value="Preventivo 5.000 Lts">Preventivo 5.000 Lts</option>
+          <option value="Preventivo 10.000 Lts">Preventivo 10.000 Lts</option>
+          <option value="Servicio Tercerizado">Servicio Tercerizado</option>
+          <option value="Edilicio">Edilicio</option>
         `;
       }
     }
@@ -11170,7 +11189,7 @@ function openMassiveOrderModal() {
   document.getElementById('massive-interno-search').value = '';
   document.getElementById('massive-form-descripcion').value = '';
   document.getElementById('massive-form-horas').value = '0.00';
-  document.getElementById('massive-form-clasificacion').value = 'Preventivo';
+  document.getElementById('massive-form-clasificacion').value = 'checklist';
 
   // Set default date and time
   const now = new Date();
@@ -11307,7 +11326,8 @@ async function submitMassiveOrders() {
     return showToast("Por favor, selecciona al menos un interno.", "danger");
   }
 
-  const clasificacion = document.getElementById('massive-form-clasificacion').value;
+  // Toda orden masiva se identifica en Taxes como "checklist" - ya no se elige a mano.
+  const clasificacion = 'checklist';
   const responsableSelect = document.getElementById('massive-form-responsable');
   let responsable = responsableSelect.value;
   if (!responsable && responsableSelect.closest) {
@@ -12688,11 +12708,14 @@ function setupAllFieldsForSector() {
   const isEdilicio = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio' || preClasif === 'Edilicio' || formClasif === 'Edilicio');
   const isLavadero = (userSector === 'Lavadero' || currentSelectedSector === 'Lavadero' || preClasif === 'Lavadero' || formClasif === 'Lavadero');
 
-  // Lavadero siempre es Lavadero - no hace falta elegir Clasificación, se fija sola y se
-  // oculta el selector (a diferencia de Herrería/Edilicio, donde el usuario puede elegir
-  // otra clasificación real como Correctivo/Preventivo/Auxilio para ese mismo camion).
+  // Lavadero y Edilicio siempre son Lavadero/Edilicio - no hace falta elegir Clasificación,
+  // se fija sola y se oculta el selector (a diferencia de Herrería, donde el usuario puede
+  // elegir otra clasificación real como Correctivo/Preventivo/Auxilio para ese mismo camion).
   const formClasifGroup = document.getElementById('form-clasificacion') ? document.getElementById('form-clasificacion').closest('.form-group') : null;
-  if (formClasifGroup) formClasifGroup.style.display = isLavadero ? 'none' : '';
+  if (formClasifGroup) formClasifGroup.style.display = (isLavadero || isEdilicio) ? 'none' : '';
+  if (isEdilicio && document.getElementById('form-clasificacion')) {
+    document.getElementById('form-clasificacion').value = 'Edilicio';
+  }
   if (isLavadero && document.getElementById('form-clasificacion')) {
     document.getElementById('form-clasificacion').value = 'Lavadero';
   }
@@ -13442,7 +13465,7 @@ async function savePrevService() {
       fechaEntrega: '',
       horario: '',
       interno: String(prevCurrentServiceRow.interno),
-      clasificacion: 'Preventivo',
+      clasificacion: 'Servicio Tercerizado',
       incidente: incidente,
       tasks: [],
       estadoUnidad: 'fuera_de_servicio',
@@ -13629,10 +13652,10 @@ function openNewOrderModalWithFuelPreventivo(interno, tipo, rowIndex, litrosTota
     }
   }
   
-  // Set Clasificación to "Preventivo"
+  // Set Clasificación according to the fuel preventivo type
   const clasificacionEl = document.getElementById('form-clasificacion');
   if (clasificacionEl) {
-    clasificacionEl.value = 'Preventivo';
+    clasificacionEl.value = tipo === '5k' ? 'Preventivo 5.000 Lts' : 'Preventivo 10.000 Lts';
     if (clasificacionEl.rebuildSearchable) {
       clasificacionEl.rebuildSearchable();
     }
