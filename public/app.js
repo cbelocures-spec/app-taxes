@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '325';
+const CURRENT_APP_VERSION = '326';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9292,9 +9292,10 @@ function updateClassificationSelectOptions() {
       // "Edilicio" se incluye como <option> aunque su campo quede oculto en ese contexto
       // (ver setupAllFieldsForSector/resetPreOrderForm): sin la <option>, asignarle
       // clsEl.value = 'Edilicio' a un <select> no la encuentra y el campo queda vacío.
+      // "Preventivo" a secas ya no se ofrece acá - quedó reemplazado por las variantes
+      // específicas (5.000/10.000 Lts); dejarlo generaba ambigüedad con esas dos.
       html = `
         <option value="" selected disabled>${sel.defaultText}</option>
-        <option value="Preventivo">Preventivo</option>
         <option value="Auxilio">Auxilio</option>
         <option value="Correctivo">Correctivo</option>
         <option value="Herrería">Herrería</option>
@@ -9309,7 +9310,6 @@ function updateClassificationSelectOptions() {
         html = `
           <option value="">${sel.defaultText}</option>
           <option value="Correctivo">Correctivo</option>
-          <option value="Preventivo">Preventivo</option>
           <option value="Auxilio">Auxilio</option>
           <option value="Herrería">Herrería</option>
           <option value="Elastiquero">Elastiquero</option>
