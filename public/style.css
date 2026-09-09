@@ -2725,34 +2725,40 @@ body {
 }
 
 /* "Identificar Unidad" (pre-order-modal) en tablet/pantallas anchas - el layout pensado para
-   celular (tope de 500px) quedaba chico en el medio de la pantalla con mucho espacio vacío
-   alrededor. Escalado hacia arriba solo dentro de este modal, no afecta el resto de la app. */
+   celular (tope de 500px) quedaba chico en el medio de la pantalla. Pedido explícito del
+   usuario: que ocupe todo el ancho lateral disponible y con letras bien grandes. Escalado
+   solo dentro de este modal, no afecta el resto de la app ni el celular (bajo los 700px). */
 @media (min-width: 700px) {
+  /* !important en todo este bloque: el HTML trae max-width/padding/font-size puestos inline
+     en varios de estos elementos (ej. style="max-width:500px" en .modal-content, style=
+     "font-size:16px" en varios inputs), y un inline style le gana a cualquier regla externa
+     sin !important, sin importar la especificidad del selector. */
   #pre-order-modal .modal-content {
-    max-width: 640px;
+    max-width: 100% !important;
+    padding: 30px 48px !important;
   }
   #pre-order-modal .pre-order-card {
-    padding: 28px;
+    padding: 40px !important;
   }
   #pre-order-modal .pre-order-card .card-title-header h3 {
-    font-size: 20px;
+    font-size: 28px !important;
   }
   #pre-order-modal .pre-order-card label {
-    font-size: 15px;
+    font-size: 20px !important;
   }
   #pre-order-modal .pre-order-card input,
   #pre-order-modal .pre-order-card select,
   #pre-order-modal .pre-order-card .searchable-select-trigger {
-    font-size: 17px;
-    padding: 13px 15px;
+    font-size: 22px !important;
+    padding: 18px 20px !important;
   }
   #pre-order-modal .pre-order-card .btn-xs {
-    font-size: 14px;
-    padding: 8px 14px;
+    font-size: 18px !important;
+    padding: 12px 20px !important;
   }
   #pre-order-modal .pre-order-card .btn-primary {
-    font-size: 18px;
-    padding: 15px;
+    font-size: 24px !important;
+    padding: 20px !important;
   }
 }
 
