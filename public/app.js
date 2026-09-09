@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '326';
+const CURRENT_APP_VERSION = '327';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9268,9 +9268,10 @@ function updateClassificationSelectOptions() {
       html = `
         <option value="">${sel.defaultText}</option>
         <option value="Correctivo">Correctivo</option>
-        <option value="Preventivo">Preventivo</option>
         <option value="Auxilio">Auxilio</option>
         <option value="Herrería" selected>Herrería</option>
+        <option value="Inversión">Inversión</option>
+        <option value="checklist">checklist</option>
       `;
     } else if (sector === 'Lavadero') {
       // Igual que Herrería: Taxes tiene "Lavadero" como clasificacion real en su catalogo.
