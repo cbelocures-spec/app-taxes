@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '330';
+const CURRENT_APP_VERSION = '331';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -2920,12 +2920,12 @@ function updateEmployeeDropdownForCard(card) {
       return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
     };
 
-    // Always the full roster - sorted with the detected sector's own people first, never
-    // excluding anyone (see getEmployeesForSectorDropdown: staff sometimes help across
-    // sectors, and hiding them from this dropdown used to make the assignment impossible
-    // with no error shown at all).
+    // Solo el personal del sector detectado - pedido explícito del usuario: la lista mostraba
+    // la empresa entera (294 personas, choferes incluidos) en vez de solo los mecánicos/etc.
+    // Si alguien ya asignado a esta tarea no está en ese roster (ayudó cruzando de sector), el
+    // fallback de "custom option" más abajo lo sigue mostrando igual - no lo pierde de vista.
     const detectedSector = isHerreriaCC ? 'Herrería' : isMecanicaCC ? 'Taller' : isEdilicioCC ? 'Edilicio' : isLavaderoCC ? 'Lavadero' : null;
-    filteredEmployees = getEmployeesForSectorDropdown(detectedSector);
+    filteredEmployees = getOnlySectorEmployees(detectedSector);
 
     // Populate options
     let empOptions = `<option value="">Seleccionar Empleado...</option>`;
@@ -3376,12 +3376,11 @@ function addTaskField(taskData = null, forceNew = false) {
       const isEdilicioCC = ccLabelUpper.includes('EDILIC') || taskData.centroCosto === '8';
       const isLavaderoCC = ccLabelUpper.includes('LAVADER') || taskData.centroCosto === '13';
 
-      // Always the full roster, sorted with the detected sector's own people first - never
-      // excludes anyone (see getEmployeesForSectorDropdown: staff sometimes help across
-      // sectors, and hiding them from this dropdown used to make re-assigning an existing
-      // task impossible with no error shown at all).
+      // Solo el personal del sector detectado (ver el mismo cambio en updateEmployeeDropdownForCard
+      // más arriba) - si el empleado ya asignado a esta tarea no está en ese roster, el fallback
+      // de "custom option" más abajo lo sigue mostrando igual.
       const detectedSector = isMecanicaCC ? 'Taller' : isHerreriaCC ? 'Herrería' : isEdilicioCC ? 'Edilicio' : isLavaderoCC ? 'Lavadero' : null;
-      filteredEmployees = getEmployeesForSectorDropdown(detectedSector);
+      filteredEmployees = getOnlySectorEmployees(detectedSector);
       let empOptions = `<option value="">Seleccionar Empleado...</option>`;
       filteredEmployees.forEach(opt => {
         if (!opt) return;
@@ -7326,7 +7325,7 @@ function updateBulkEmployeeDropdownForCard(card, defaultValue = null) {
     };
 
     const detectedSector = isHerreriaCC ? 'Herrería' : isMecanicaCC ? 'Taller' : isEdilicioCC ? 'Edilicio' : isLavaderoCC ? 'Lavadero' : null;
-    filteredEmployees = getEmployeesForSectorDropdown(detectedSector);
+    filteredEmployees = getOnlySectorEmployees(detectedSector);
 
     // Populate options
     let empOptions = `<option value="">Seleccionar Empleado...</option>`;
