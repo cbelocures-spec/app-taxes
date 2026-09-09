@@ -1710,17 +1710,19 @@ function resolveAndMapEmployee(task) {
       { appName: 'Luciano',  taxesName: 'Carmona González, Juan Manuel' },
       { appName: 'Digno',    taxesName: 'García, Yamandú Liborio' }
     ],
-    Edilicio: []
+    Edilicio: [],
+    Lavadero: []
   };
 
-  const effectiveMappings = (savedMappings && (savedMappings.Taller || savedMappings.Herrería || savedMappings.Edilicio))
+  const effectiveMappings = (savedMappings && (savedMappings.Taller || savedMappings.Herrería || savedMappings.Edilicio || savedMappings.Lavadero))
     ? savedMappings
     : FALLBACK_MAPPINGS;
 
   const allMappings = [
     ...(effectiveMappings.Taller   || []),
     ...(effectiveMappings.Herrería || []),
-    ...(effectiveMappings.Edilicio || [])
+    ...(effectiveMappings.Edilicio || []),
+    ...(effectiveMappings.Lavadero || [])
   ];
 
   let finalDescription = (task.descripcion || '').trim();
