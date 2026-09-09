@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '338';
+const CURRENT_APP_VERSION = '339';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11993,7 +11993,7 @@ const LAVADERO_CATEGORIAS = {
   // el Rodado real varía según qué empresa se elija en su propio desplegable (ver empresaMode
   // más abajo y onPreLavaderoEmpresaChange) - son "cajones" reales del catálogo de Taxes ya
   // existentes (VOLQUETE NICO, IRINEO GRAL., SERVICIOS OTROS), no uno fijo para la categoría.
-  tercerizado:     { imagen: 'lavadero/empresa_tercerizada.jpg', empresaMode: true, numeradoLabel: 'Número de Unidad *' }
+  tercerizado:     { imagen: 'lavadero/empresa_tercerizada.jpg?v=2', empresaMode: true, numeradoLabel: 'Número de Unidad *' }
 };
 
 function selectLavaderoCategoria(categoria) {
