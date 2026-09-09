@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '327';
+const CURRENT_APP_VERSION = '328';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9270,7 +9270,8 @@ function updateClassificationSelectOptions() {
         <option value="Correctivo">Correctivo</option>
         <option value="Auxilio">Auxilio</option>
         <option value="Herrería" selected>Herrería</option>
-        <option value="Inversión">Inversión</option>
+        <option value="Fabricación">Fabricación</option>
+        <option value="Puesta a Punto">Puesta a Punto</option>
         <option value="checklist">checklist</option>
       `;
     } else if (sector === 'Lavadero') {
@@ -9301,7 +9302,7 @@ function updateClassificationSelectOptions() {
         <option value="Correctivo">Correctivo</option>
         <option value="Herrería">Herrería</option>
         <option value="Elastiquero">Elastiquero</option>
-        <option value="Inversión">Inversión</option>
+        <option value="Puesta a Punto">Puesta a Punto</option>
         <option value="Preventivo 5.000 Lts">Preventivo 5.000 Lts</option>
         <option value="Preventivo 10.000 Lts">Preventivo 10.000 Lts</option>
         <option value="Servicio Tercerizado">Servicio Tercerizado</option>
@@ -9314,7 +9315,7 @@ function updateClassificationSelectOptions() {
           <option value="Auxilio">Auxilio</option>
           <option value="Herrería">Herrería</option>
           <option value="Elastiquero">Elastiquero</option>
-          <option value="Inversión">Inversión</option>
+          <option value="Puesta a Punto">Puesta a Punto</option>
           <option value="Preventivo 5.000 Lts">Preventivo 5.000 Lts</option>
           <option value="Preventivo 10.000 Lts">Preventivo 10.000 Lts</option>
           <option value="Servicio Tercerizado">Servicio Tercerizado</option>
