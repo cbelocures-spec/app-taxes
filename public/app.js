@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '329';
+const CURRENT_APP_VERSION = '330';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11763,6 +11763,15 @@ async function fetchTiposLavado() {
 // submitPreOrderCheck arme la orden). Class distinta por contexto para que resaltar un chip en
 // una pantalla no afecte al otro.
 function renderTipoLavadoChips() {
+  // Cada categoría de "¿Qué se lava?" (Flota, Volquetes, Roll-Off, etc.) tiene su propio
+  // listado - solo se muestran los tipos con esa categoria, más los viejos sin categoria
+  // asignada todavía (creados antes de este cambio), que se siguen mostrando en todas para
+  // no perderlos de la vista hasta que alguien los recree con su categoria correcta.
+  const categoria = window._preSelectedLavaderoCategoria || null;
+  const tiposFiltrados = categoria
+    ? tiposLavado.filter(t => !t.categoria || t.categoria === categoria)
+    : tiposLavado;
+
   const targets = [
     { containerId: 'form-tipo-lavado-chips', cls: 'tipo-lavado-btn', handler: 'applyTipoLavado' },
     { containerId: 'pre-tipo-lavado-chips', cls: 'tipo-lavado-pre-btn', handler: 'applyTipoLavadoPre' }
@@ -11770,7 +11779,7 @@ function renderTipoLavadoChips() {
   targets.forEach(({ containerId, cls, handler }) => {
     const container = document.getElementById(containerId);
     if (!container) return;
-    const chips = tiposLavado.map(t => `
+    const chips = tiposFiltrados.map(t => `
       <button type="button" class="btn btn-secondary btn-xs ${cls}" data-key="${t.key}" onclick="${handler}('${t.key}')" style="border-radius:999px;">${escapeHtml(t.label)}</button>
     `).join('');
     container.innerHTML = chips + `
@@ -11872,6 +11881,10 @@ function quickSetPreLavador(value) {
 function openCrearTipoLavadoModal() {
   document.getElementById('ctl-nombre').value = '';
   document.getElementById('ctl-descripcion').value = '';
+  const categoriaEl = document.getElementById('ctl-categoria');
+  if (categoriaEl && window._preSelectedLavaderoCategoria) {
+    categoriaEl.value = window._preSelectedLavaderoCategoria;
+  }
   document.getElementById('crear-tipo-lavado-modal').classList.add('open');
 }
 
@@ -11882,6 +11895,7 @@ function closeCrearTipoLavadoModal() {
 async function submitCrearTipoLavado() {
   const label = document.getElementById('ctl-nombre').value.trim();
   const descripcion = document.getElementById('ctl-descripcion').value.trim();
+  const categoria = document.getElementById('ctl-categoria').value;
   if (!label) {
     return showToast('Ingresá un nombre para el tipo de lavado.', 'danger');
   }
@@ -11889,7 +11903,7 @@ async function submitCrearTipoLavado() {
     const res = await fetch('/api/tipos-lavado', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label, descripcion })
+      body: JSON.stringify({ label, descripcion, categoria })
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -11946,6 +11960,11 @@ function selectLavaderoCategoria(categoria) {
     showToast('Esta categoría todavía no está configurada - decime cómo querés que funcione.', 'warning');
     return;
   }
+
+  // Recordada para filtrar los chips de "Tipo de lavado" (renderTipoLavadoChips) y para
+  // preseleccionar la categoría al crear uno nuevo (openCrearTipoLavadoModal) - cada categoría
+  // de "¿Qué se lava?" tiene su propio listado, no uno compartido entre todas.
+  window._preSelectedLavaderoCategoria = categoria;
 
   closeLavaderoCategoriaModal();
   openPreOrderModal();

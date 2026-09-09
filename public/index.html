@@ -2006,6 +2006,22 @@
         <input type="text" id="ctl-nombre" placeholder="Ej: Premium" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 6px; box-sizing: border-box;">
       </div>
 
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label for="ctl-categoria" style="font-weight: 600; font-size: 12px; color: var(--text-main); text-transform: uppercase;">Categoría</label>
+        <select id="ctl-categoria" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 6px; box-sizing: border-box;">
+          <option value="camiones">Lavado de Flota</option>
+          <option value="volquetes">Lavado Volquetes</option>
+          <option value="caja_rolloff">Lavado de Caja Roll-Off</option>
+          <option value="prensa_volquete">Lavado de Prensas Volquete</option>
+          <option value="prensa_rolloff">Lavado de Prensas Roll-Off</option>
+          <option value="tachos">Lavado de Tachos</option>
+          <option value="particular">Lavado de Autos Particulares</option>
+          <option value="otros">Lavado de Otros</option>
+          <option value="playa">Lavado de Playa</option>
+        </select>
+        <p style="font-size: 11px; color: var(--text-muted); margin: 6px 0 0;">Solo va a aparecer como botón en esta categoría de "¿Qué se lava?".</p>
+      </div>
+
       <div class="form-group" style="margin-bottom: 20px;">
         <label for="ctl-descripcion" style="font-weight: 600; font-size: 12px; color: var(--text-main); text-transform: uppercase;">Descripción del lavado</label>
         <textarea id="ctl-descripcion" rows="3" placeholder="Ej: se lava cabina interior, exterior, encerado" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 6px; box-sizing: border-box;"></textarea>
@@ -2821,6 +2837,6 @@
     }
   </style>
 
-  <script src="app.js?v=329"></script>
+  <script src="app.js?v=330"></script>
 </body>
 </html>

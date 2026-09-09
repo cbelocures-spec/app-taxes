@@ -1368,12 +1368,17 @@ class LocalDB {
     return db.tiposLavado || [];
   }
 
-  addTipoLavado({ label, descripcion }) {
+  addTipoLavado({ label, descripcion, categoria }) {
     const db = this.read();
     if (!Array.isArray(db.tiposLavado)) db.tiposLavado = [];
     const cleanLabel = String(label || '').trim();
     if (!cleanLabel) throw new Error('El nombre del tipo de lavado no puede estar vacío.');
     const cleanDescripcion = String(descripcion || '').trim();
+    // Categoria del menu "¿Qué se lava?" (camiones/volquetes/caja_rolloff/etc, ver
+    // LAVADERO_CATEGORIAS en app.js) - cada categoria solo muestra sus propios tipos. Sin
+    // categoria (string vacio) el tipo se sigue mostrando en todas, para no perder los que ya
+    // existian antes de este campo.
+    const cleanCategoria = String(categoria || '').trim();
 
     const slugBase = cleanLabel
       .toLowerCase()
@@ -1388,7 +1393,7 @@ class LocalDB {
       key = `${slugBase}_${suffix}`;
     }
 
-    const item = { key, label: cleanLabel, descripcion: cleanDescripcion, createdAt: new Date().toISOString() };
+    const item = { key, label: cleanLabel, descripcion: cleanDescripcion, categoria: cleanCategoria, createdAt: new Date().toISOString() };
     db.tiposLavado.push(item);
     this.write(db);
     return item;
