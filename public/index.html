@@ -1998,7 +1998,7 @@
 
   <div class="popup-modal-backdrop" id="crear-tipo-lavado-modal">
     <div class="modal-content" style="max-width: 420px; margin: auto; padding: 24px; border-radius: 16px; background: var(--card-bg); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: slideUp 0.3s ease-out;">
-      <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 4px;">Crear tipo de lavado</h3>
+      <h3 id="ctl-modal-title" style="font-size: 18px; font-weight: 700; margin: 0 0 4px;">Crear tipo de lavado</h3>
       <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 18px;">Se agrega como botón permanente en Lavadero.</p>
 
       <div class="form-group" style="margin-bottom: 14px;">
@@ -2030,7 +2030,7 @@
 
       <div style="display: flex; gap: 8px; justify-content: flex-end;">
         <button type="button" class="btn btn-secondary" onclick="closeCrearTipoLavadoModal()" style="padding: 10px 18px; border-radius: 8px;">Cancelar</button>
-        <button type="button" class="btn btn-primary" onclick="submitCrearTipoLavado()" style="padding: 10px 18px; border-radius: 8px;">Crear tipo de lavado</button>
+        <button type="button" class="btn btn-primary" id="ctl-submit-btn" onclick="submitCrearTipoLavado()" style="padding: 10px 18px; border-radius: 8px;">Crear tipo de lavado</button>
       </div>
     </div>
   </div>
@@ -2837,6 +2837,6 @@
     }
   </style>
 
-  <script src="app.js?v=331"></script>
+  <script src="app.js?v=333"></script>
 </body>
 </html>

@@ -1399,6 +1399,20 @@ class LocalDB {
     return item;
   }
 
+  updateTipoLavado(key, { label, descripcion, categoria }) {
+    const db = this.read();
+    if (!Array.isArray(db.tiposLavado)) db.tiposLavado = [];
+    const item = db.tiposLavado.find(t => t.key === key);
+    if (!item) throw new Error('Tipo de lavado no encontrado.');
+    const cleanLabel = String(label || '').trim();
+    if (!cleanLabel) throw new Error('El nombre del tipo de lavado no puede estar vacío.');
+    item.label = cleanLabel;
+    item.descripcion = String(descripcion || '').trim();
+    item.categoria = String(categoria || '').trim();
+    this.write(db);
+    return item;
+  }
+
   // --- Personas de Lavado Particular (Lavadero) ---
   // Lista de nombres para el botón "Lavado Particular" de Nueva Orden - un lavado que no es de
   // un camión de flota sino de un auto de un empleado. El nombre elegido se sube a Taxes como

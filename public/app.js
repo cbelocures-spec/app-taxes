@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '331';
+const CURRENT_APP_VERSION = '333';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11765,7 +11765,10 @@ function renderTipoLavadoChips() {
   // Cada categoría de "¿Qué se lava?" (Flota, Volquetes, Roll-Off, etc.) tiene su propio
   // listado - solo se muestran los tipos con esa categoria, más los viejos sin categoria
   // asignada todavía (creados antes de este cambio), que se siguen mostrando en todas para
-  // no perderlos de la vista hasta que alguien los recree con su categoria correcta.
+  // no perderlos de la vista hasta que alguien los recree con su categoria correcta. Prensa
+  // Volquete y Prensa Roll-Off llegaron a compartir listado por un pedido anterior, pero se
+  // volvió a separar: el texto de un mismo tipo ("Lavado Completo") necesita ser distinto
+  // entre las dos (Volquete: "tapa de cubre cilindros", Roll-Off: "tapa de motor").
   const categoria = window._preSelectedLavaderoCategoria || null;
   const tiposFiltrados = categoria
     ? tiposLavado.filter(t => !t.categoria || t.categoria === categoria)
@@ -11779,7 +11782,12 @@ function renderTipoLavadoChips() {
     const container = document.getElementById(containerId);
     if (!container) return;
     const chips = tiposFiltrados.map(t => `
-      <button type="button" class="btn btn-secondary btn-xs ${cls}" data-key="${t.key}" onclick="${handler}('${t.key}')" style="border-radius:999px;">${escapeHtml(t.label)}</button>
+      <span style="display:inline-flex; align-items:stretch; border-radius:999px; overflow:hidden;">
+        <button type="button" class="btn btn-secondary btn-xs ${cls}" data-key="${t.key}" onclick="${handler}('${t.key}')" style="border-radius:999px 0 0 999px; border-right:none;">${escapeHtml(t.label)}</button>
+        <button type="button" class="btn btn-secondary btn-xs" onclick="openCrearTipoLavadoModal('${t.key}')" title="Editar tipo de lavado" style="border-radius:0 999px 999px 0; padding-left:4px; padding-right:6px;">
+          <span class="material-icons" style="font-size:13px;">edit</span>
+        </button>
+      </span>
     `).join('');
     container.innerHTML = chips + `
       <button type="button" class="btn btn-secondary btn-xs" onclick="openCrearTipoLavadoModal()" style="border-radius:999px; border-style:dashed;">
@@ -11877,18 +11885,27 @@ function quickSetPreLavador(value) {
   if (select) select.value = value;
 }
 
-function openCrearTipoLavadoModal() {
-  document.getElementById('ctl-nombre').value = '';
-  document.getElementById('ctl-descripcion').value = '';
+// Sin "key": modo creación. Con "key": modo edición - precarga el tipo existente y
+// submitCrearTipoLavado hace PATCH en vez de POST (ver window._editingTipoLavadoKey).
+function openCrearTipoLavadoModal(key) {
+  const tipo = key ? tiposLavado.find(t => t.key === key) : null;
+  window._editingTipoLavadoKey = tipo ? tipo.key : null;
+  document.getElementById('ctl-nombre').value = tipo ? tipo.label : '';
+  document.getElementById('ctl-descripcion').value = tipo ? tipo.descripcion : '';
   const categoriaEl = document.getElementById('ctl-categoria');
-  if (categoriaEl && window._preSelectedLavaderoCategoria) {
-    categoriaEl.value = window._preSelectedLavaderoCategoria;
+  if (categoriaEl) {
+    categoriaEl.value = tipo ? (tipo.categoria || '') : (window._preSelectedLavaderoCategoria || '');
   }
+  const titleEl = document.getElementById('ctl-modal-title');
+  if (titleEl) titleEl.textContent = tipo ? 'Editar tipo de lavado' : 'Crear tipo de lavado';
+  const submitBtn = document.getElementById('ctl-submit-btn');
+  if (submitBtn) submitBtn.textContent = tipo ? 'Guardar cambios' : 'Crear tipo de lavado';
   document.getElementById('crear-tipo-lavado-modal').classList.add('open');
 }
 
 function closeCrearTipoLavadoModal() {
   document.getElementById('crear-tipo-lavado-modal').classList.remove('open');
+  window._editingTipoLavadoKey = null;
 }
 
 async function submitCrearTipoLavado() {
@@ -11898,21 +11915,27 @@ async function submitCrearTipoLavado() {
   if (!label) {
     return showToast('Ingresá un nombre para el tipo de lavado.', 'danger');
   }
+  const editingKey = window._editingTipoLavadoKey;
   try {
-    const res = await fetch('/api/tipos-lavado', {
-      method: 'POST',
+    const res = await fetch(editingKey ? `/api/tipos-lavado/${encodeURIComponent(editingKey)}` : '/api/tipos-lavado', {
+      method: editingKey ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label, descripcion, categoria })
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Error al crear el tipo de lavado');
+      throw new Error(err.error || `Error al ${editingKey ? 'editar' : 'crear'} el tipo de lavado`);
     }
     const data = await res.json();
-    tiposLavado.push(data.tipo);
+    if (editingKey) {
+      const idx = tiposLavado.findIndex(t => t.key === editingKey);
+      if (idx >= 0) tiposLavado[idx] = data.tipo;
+    } else {
+      tiposLavado.push(data.tipo);
+    }
     renderTipoLavadoChips();
     closeCrearTipoLavadoModal();
-    showToast(`Tipo de lavado "${data.tipo.label}" creado.`, 'success');
+    showToast(`Tipo de lavado "${data.tipo.label}" ${editingKey ? 'actualizado' : 'creado'}.`, 'success');
   } catch (e) {
     showToast(e.message, 'danger');
   }
