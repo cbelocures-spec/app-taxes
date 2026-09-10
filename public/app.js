@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '339';
+const CURRENT_APP_VERSION = '340';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -153,6 +153,13 @@ let cachedInternoOptions = [];
 let cachedAreasEdilicio = [];
 let cachedNovelties = [];
 let activeOrders = [];
+// Órdenes archivadas recientes (últimas ~150) - GET /api/orders excluye las archivadas por
+// diseño (db.getWorkOrders() las filtra), así que una unidad cuya orden terminó y ya se movió
+// sola a Historial (operativa, sincronizada) desaparecía de activeOrders por completo. Sin
+// esto, adjustPtStateLists no tenía forma de saber que esa unidad volvió a estar operativa, y
+// su entrada en "En Reparación"/"Fuera de Servicio" del Parte Taller quedaba pegada ahí para
+// siempre aunque el trabajo ya estuviera hecho y la O.T. sincronizada.
+let recentArchivedOrdersForPt = [];
 let customPreventivos = []; // [{key, label, sector, necesitaHoja}] - Crear Preventivo en Carga Masiva
 let bulkSectorFilter = 'Todos';
 // Task ids with an optimistic dashboard change (pause/resume/finish) whose PUT save is still
@@ -13893,6 +13900,21 @@ function unitMatchesSearch(unit) {
   return intStr.includes(q) || rodStr.includes(q) || tipoStr.includes(q) || novStr.includes(q) || itemsStr.includes(q) || destStr.includes(q) || servStr.includes(q);
 }
 
+// Trae las últimas órdenes archivadas para que adjustPtStateLists pueda detectar una unidad
+// que volvió a estar operativa aunque su orden ya haya salido de activeOrders (ver el comentario
+// de recentArchivedOrdersForPt). No bloquea el render principal si falla - es un dato auxiliar,
+// no crítico, y el servidor ya cachea esta respuesta 5s así que pedirla seguido es barato.
+async function fetchRecentArchivedOrdersForPt() {
+  try {
+    const res = await fetch('/api/orders/archived?page=1&limit=150');
+    if (!res.ok) return;
+    const data = await res.json();
+    recentArchivedOrdersForPt = Array.isArray(data) ? data : (data.orders || []);
+  } catch (e) {
+    console.error('Error fetching recent archived orders for Parte Taller:', e);
+  }
+}
+
 async function fetchParteTallerEstado() {
   const tbody = document.getElementById('pt-fuera-tbody');
   const repTbody = document.getElementById('pt-reparacion-tbody');
@@ -13900,7 +13922,10 @@ async function fetchParteTallerEstado() {
   if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;"><span class="material-icons" style="animation:spin 1.5s linear infinite; vertical-align:middle;">sync</span> Cargando...</td></tr>';
 
   try {
-    const res = await fetch('/api/parte-taller/estado');
+    const [res] = await Promise.all([
+      fetch('/api/parte-taller/estado'),
+      fetchRecentArchivedOrdersForPt()
+    ]);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `HTTP ${res.status}`);
@@ -14204,7 +14229,10 @@ function adjustPtStateLists(state) {
   // alone. A truck can have several orders over time; only whichever is newest reflects its
   // real current status.
   const latestOrderByInterno = new Map();
-  activeOrders.forEach(o => {
+  // Incluye las archivadas recientes (ver recentArchivedOrdersForPt) - si no, una unidad cuya
+  // orden ya terminó y se archivó sola (operativa) no tenía ningún registro acá para probarlo,
+  // y su entrada vieja en "En Reparación"/"Fuera de Servicio" quedaba pegada para siempre.
+  [...activeOrders, ...recentArchivedOrdersForPt].forEach(o => {
     const taxInt = String(o.interno || '').trim().toUpperCase();
     if (!taxInt) return;
     const oTime = parseInt(o.id) || 0;
