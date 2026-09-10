@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '340';
+const CURRENT_APP_VERSION = '341';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -549,15 +549,22 @@ document.addEventListener('DOMContentLoaded', () => {
           // up to Fin. Insert a "Reanudó" stamped at the SAME instant as that Pausó (not "now" -
           // a resume can't be timestamped after the fact) so the pause collapses to zero-length
           // and the whole Inicio-to-Fin span counts, same as if it had never been paused.
-          if (!isRunning) {
-            const historyBeforeFin = JSON.parse(card.dataset.timerHistory || '[]');
-            const lastEvent = historyBeforeFin[historyBeforeFin.length - 1];
-            const wasPaused = lastEvent && String(lastEvent.type || '').trim().toLowerCase().startsWith('paus');
-            if (wasPaused) {
-              historyBeforeFin.push({ type: 'Reanudó', formatted: lastEvent.formatted, timestamp: lastEvent.timestamp });
-              card.dataset.timerHistory = JSON.stringify(historyBeforeFin);
-              renderTaskTimerHistory(card);
-            }
+          //
+          // This must key off the ACTUAL last history event, not the `isRunning` flag above -
+          // `isRunning` only reflects this device's local timer_start, which can still say
+          // "running" even after the task was auto-paused server-side (e.g. the same employee's
+          // conflicting-timer auto-resolution in resolveDatabaseConflicts, which pauses the older
+          // task from a poll without this open card ever hearing about it). That mismatch used to
+          // skip this bridge - the gap between that silent Pausó and Fin counted as zero, so a
+          // task that really ran 06:01→13:01 with a brief auto-pause 20 minutes in got saved with
+          // only ~20 minutes of work.
+          const historyBeforeFin = JSON.parse(card.dataset.timerHistory || '[]');
+          const lastEvent = historyBeforeFin[historyBeforeFin.length - 1];
+          const wasPaused = lastEvent && String(lastEvent.type || '').trim().toLowerCase().startsWith('paus');
+          if (wasPaused) {
+            historyBeforeFin.push({ type: 'Reanudó', formatted: lastEvent.formatted, timestamp: lastEvent.timestamp });
+            card.dataset.timerHistory = JSON.stringify(historyBeforeFin);
+            renderTaskTimerHistory(card);
           }
 
           addTaskTimerEvent(card, 'Fin');
