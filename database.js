@@ -480,6 +480,15 @@ class LocalDB {
         fs.copyFileSync(tmpPath, DB_PATH);
         try { fs.unlinkSync(tmpPath); } catch (_) {}
       }
+      // Sin esto, el próximo read() veía un mtime distinto al de la última vez que lo guardamos
+      // acá (obvio, lo acabamos de reescribir) y volvía a leer + parsear el archivo ENTERO desde
+      // disco para reconstruir el mismo objeto que ya tenía en memoria - con db.json en varios MB
+      // (workOrders con miles de órdenes archivadas), cada guardado terminaba constando el doble:
+      // stringify+write acá, más un read+parse redundante en el próximo read(). Multiplicado por
+      // cada acción del Taller (iniciar/pausar tarea, novedad de Parte Taller, etc.), eso es la
+      // lentitud pareja que se nota en toda la app.
+      this._memCache = data;
+      try { this._lastMtime = fs.statSync(DB_PATH).mtimeMs; } catch (_) {}
     } catch (e) {
       console.error("Error writing to db.json:", e.message);
       try {
