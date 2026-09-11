@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '341';
+const CURRENT_APP_VERSION = '342';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -14248,17 +14248,30 @@ function adjustPtStateLists(state) {
       latestOrderByInterno.set(taxInt, o);
     }
   });
-  const operativoInternos = new Set();
+  const operativoOrderByInterno = new Map();
   latestOrderByInterno.forEach((o, taxInt) => {
-    if (o.estadoUnidad === 'operativo') operativoInternos.add(taxInt);
+    if (o.estadoUnidad === 'operativo') operativoOrderByInterno.set(taxInt, o);
   });
-  function matchesOperativoOrder(internoPT) {
+  function getOperativoOrderFor(internoPT) {
     const ptIntUpper = String(internoPT || '').trim().toUpperCase();
-    if (operativoInternos.has(ptIntUpper)) return true;
-    if (ptIntUpper.includes('IRINEO') && operativoInternos.has('IRINEO GRAL.')) return true;
-    if ((ptIntUpper.includes('NICO') || ptIntUpper.startsWith('NICO')) && operativoInternos.has('VOLQUETE NICO')) return true;
-    return false;
+    if (operativoOrderByInterno.has(ptIntUpper)) return operativoOrderByInterno.get(ptIntUpper);
+    if (ptIntUpper.includes('IRINEO') && operativoOrderByInterno.has('IRINEO GRAL.')) return operativoOrderByInterno.get('IRINEO GRAL.');
+    if ((ptIntUpper.includes('NICO') || ptIntUpper.startsWith('NICO')) && operativoOrderByInterno.has('VOLQUETE NICO')) return operativoOrderByInterno.get('VOLQUETE NICO');
+    return null;
   }
+  // Parses the dd/mm/yyyy (es-AR) strings this sheet stores its dates as, back into a Date -
+  // needed below to tell a genuinely stale "operativo" order (job finished BEFORE this entry
+  // was created) apart from one that's simply older than today but hasn't caught up yet.
+  function parsePtEntryDate(str) {
+    if (!str) return null;
+    const parts = String(str).split('/');
+    if (parts.length !== 3) return null;
+    const d = parseInt(parts[0], 10), m = parseInt(parts[1], 10), y = parseInt(parts[2], 10);
+    if (!d || !m || !y) return null;
+    const dt = new Date(y, m - 1, d);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
   // A unit whose order already closed (no longer in activeOrders at all) can't be matched
   // against anything above - but if it has zero items left pending, it has nothing left to
   // show here regardless of why, so drop it too instead of leaving a permanent empty husk.
@@ -14276,7 +14289,22 @@ function adjustPtStateLists(state) {
   }
   ['fuera_de_servicio', 'reparacion'].forEach(listName => {
     if (Array.isArray(state[listName])) {
-      state[listName] = state[listName].filter(unit => !matchesOperativoOrder(unit.interno) && !hasNoOutstandingItems(unit));
+      state[listName] = state[listName].filter(unit => {
+        if (hasNoOutstandingItems(unit)) return false;
+        const operativoOrder = getOperativoOrderFor(unit.interno);
+        if (!operativoOrder) return true;
+        // Only let the order's "operativo" win over this entry if it was set on a LATER
+        // calendar day than when the entry itself landed here - otherwise moving a unit from
+        // Servicios Pendientes (where it's normally operativo) straight into Reparación/Fuera
+        // de Servicio made it disappear instantly: its only known order still said "operativo"
+        // from whenever its last job closed, with nothing to do with today's brand new move.
+        const entryDate = parsePtEntryDate(unit.dia_parado) || parsePtEntryDate(unit.fecha_ingreso);
+        const orderTime = parseInt(operativoOrder.id) || 0;
+        if (entryDate && orderTime) {
+          return startOfDay(new Date(orderTime)) <= startOfDay(entryDate);
+        }
+        return false;
+      });
     }
   });
 
