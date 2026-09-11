@@ -83,6 +83,14 @@ const candadoInternosActivos = new Set(); // Evita ejecuciones paralelas para el
 let isScraping = false;
 let scrapeCatalogsAbandoned = false;
 
+// Injected by server.js (the parent process) so the background poll loop below dispatches the
+// actual sync to the separate sync child process instead of running it right here - see
+// syncChildManager.js. Left null (falls back to calling syncWorkOrderWithTimeout directly, in
+// this same process) when this file is required from INSIDE the sync child itself
+// (syncChildEntry.js), which is exactly where that direct call needs to actually happen.
+let syncRunner = null;
+function setSyncRunner(fn) { syncRunner = fn; }
+
 // Global lock so only ONE Puppeteer browser runs at a time across the whole app.
 // Running two Chromium instances at once on a resource-limited server (like a
 // small Railway container) can cause one of them to crash/close mid-operation
@@ -4445,7 +4453,7 @@ async function startWorker() {
 
       if (pendingOrder) {
         console.log(`Found pending Work Order ID: ${pendingOrder.id}. Launching sync...`);
-        await syncWorkOrderWithTimeout(pendingOrder.id);
+        await (syncRunner || syncWorkOrderWithTimeout)(pendingOrder.id);
       } else {
         // No new orders to sync — look for orders that need an automatic retry:
         // either their tasks failed the control check (verifiedStatus: 'error'),
@@ -4473,7 +4481,7 @@ async function startWorker() {
 
         if (brokenOrder) {
           console.log(`[AutoFix] Found order needing retry (ID: ${brokenOrder.id}, syncStatus=${brokenOrder.syncStatus}, verifiedStatus=${brokenOrder.verifiedStatus}). Retrying full reconciliation...`);
-          await syncWorkOrderWithTimeout(brokenOrder.id);
+          await (syncRunner || syncWorkOrderWithTimeout)(brokenOrder.id);
         } else {
           // Nada pendiente por ahora — se revisa de nuevo en el próximo ciclo.
         }
@@ -5079,5 +5087,6 @@ module.exports = {
   isScraping,
   getIsScraping: () => isScraping,
   clearAbandoned: (id) => abandonedSyncOrderIds.delete(id),
-  autoLogin
+  autoLogin,
+  setSyncRunner
 };

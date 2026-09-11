@@ -7,13 +7,29 @@ const bcrypt = require('bcryptjs');
 const selfsigned = require('selfsigned');
 const db = require('./database');
 const syncWorker = require('./syncWorker');
+// Todo el trabajo con Puppeteer (sync real a Taxes + generación de PDF del Parte Taller) corre
+// en un proceso hijo aparte (syncChildEntry.js) para que un Chrome lento/colgado nunca bloquee
+// este proceso principal, que es el que atiende TODOS los pedidos HTTP de todos los usuarios.
+// Ver el plan "fizzy-percolating-wren" para el porqué completo.
+const syncChildManager = require('./syncChildManager');
 const excelControles = require('./excelControles');
 const worker = syncWorker;
+
+// El scraping de catálogos ahora corre en el proceso hijo (ver syncChildManager arriba), así
+// que el flag isScraping que vive DENTRO de syncWorker.js queda en la memoria del hijo, no de
+// este proceso - worker.getIsScraping() acá siempre daría false. Este flag local lo reemplaza:
+// lo prendemos/apagamos nosotros mismos alrededor de cada callSync a un scrape de catálogos.
+let catalogSyncInFlight = false;
+function callScrapeCatalogs(fnName, ...args) {
+  catalogSyncInFlight = true;
+  const p = syncChildManager.callSync(fnName, ...args);
+  p.finally(() => { catalogSyncInFlight = false; }).catch(() => {});
+  return p;
+}
 let localtunnel = null;
 try { localtunnel = require('localtunnel'); } catch(e) {}
 const { exec } = require('child_process');
 const fs = require('fs');
-const puppeteer = require('puppeteer');
 
 const lastConsoleErrors = [];
 const originalConsoleError = console.error;
@@ -528,7 +544,7 @@ app.post('/api/login', async (req, res) => {
       console.log(`[Login] Secondary user ${cleanUsername} logged in.`);
     }
 
-    worker.scrapeCatalogsWithTimeout(cleanUsername).then(result => {
+    callScrapeCatalogs('scrapeCatalogsWithTimeout', cleanUsername).then(result => {
       console.log(`[Login] Catalog sync for ${cleanUsername}:`, result.message);
     }).catch(e => {
       console.error(`[Login] Catalog sync error for ${cleanUsername}:`, e.message);
@@ -611,7 +627,7 @@ app.post('/api/sync-taxes', verificarPermisoSincronizacion, async (req, res) => 
   try {
     const username = req.headers['x-user-username'] || db.getSettings().username;
     if (username) {
-      worker.scrapeCatalogsWithTimeout(username).catch(console.error);
+      callScrapeCatalogs('scrapeCatalogsWithTimeout', username).catch(console.error);
     }
     res.json({ mensaje: "Sincronización con Taxes iniciada por el agente.", success: true });
   } catch (err) {
@@ -1853,7 +1869,7 @@ app.post('/api/orders/:id/sync-header', async (req, res) => {
 
     let result = { success: true, message: 'Encolado para sincronización Express O.T.' };
     try {
-      result = await syncWorker.syncExpressOtHeader(req.params.id);
+      result = await syncChildManager.callSync('syncExpressOtHeader', req.params.id);
     } catch (syncErr) {
       console.warn('[POST sync-header] Browser execution queued for local agent:', syncErr.message);
     }
@@ -1870,7 +1886,7 @@ app.post('/api/orders/:id/sync-header', async (req, res) => {
 app.post('/api/orders/create-header', async (req, res) => {
   const orderId = req.body.orderId || req.body.id;
   try {
-    const result = await syncWorker.syncWorkOrder(orderId);
+    const result = await syncChildManager.callSync('syncWorkOrder', orderId);
     if (result && result.success) {
       const order = db.getWorkOrderById(orderId);
       return res.status(200).json({ 
@@ -1892,7 +1908,7 @@ app.post('/api/orders/create-header', async (req, res) => {
 app.post('/api/orders/finalize-tasks', async (req, res) => {
   const orderId = req.body.orderId || req.body.id;
   try {
-    const result = await syncWorker.injectTasksToExistingOrder(orderId);
+    const result = await syncChildManager.callSync('injectTasksToExistingOrder', orderId);
     if (result.success) {
       return res.status(200).json({ status: "success", message: "Tareas sincronizadas e historial cerrado." });
     } else {
@@ -2005,7 +2021,7 @@ app.post('/api/orders/:id/tasks/:taskId/sync', async (req, res) => {
 
     let result = { success: true, message: `Sincronización de tarea #${taskIndex + 1} encolada.` };
     try {
-      result = await syncWorker.syncSingleTaskToTareasForm(req.params.id, taskIndex);
+      result = await syncChildManager.callSync('syncSingleTaskToTareasForm', req.params.id, taskIndex);
     } catch (syncErr) {
       console.warn('[POST task sync] Browser execution queued for local agent:', syncErr.message);
     }
@@ -2029,7 +2045,7 @@ app.post('/api/orders/:id/sync-tasks', async (req, res) => {
 
     let result = { success: true, message: 'Sincronización de tareas encolada.' };
     try {
-      result = await syncWorker.syncCompletedTasksForOrder(req.params.id);
+      result = await syncChildManager.callSync('syncCompletedTasksForOrder', req.params.id);
     } catch (syncErr) {
       console.warn('[POST sync-tasks] Browser execution queued for local agent:', syncErr.message);
     }
@@ -2106,9 +2122,7 @@ app.post('/api/orders/:id/force-resync', (req, res) => {
   try {
     const order = db.getWorkOrderById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
-    if (typeof worker.clearAbandoned === 'function') {
-      worker.clearAbandoned(req.params.id);
-    }
+    syncChildManager.callSync('clearAbandoned', req.params.id).catch(() => {});
     db.updateWorkOrder(req.params.id, {
       syncStatus: 'pending',
       syncError: null,
@@ -2119,9 +2133,7 @@ app.post('/api/orders/:id/force-resync', (req, res) => {
     });
     // Immediately spawn background sync execution for this order
     setTimeout(() => {
-      if (typeof worker.syncWorkOrderWithTimeout === 'function') {
-        worker.syncWorkOrderWithTimeout(req.params.id).catch(e => console.error('[ForceResync Worker] Error:', e.message));
-      }
+      syncChildManager.callSync('syncWorkOrderWithTimeout', req.params.id).catch(e => console.error('[ForceResync Worker] Error:', e.message));
     }, 100);
     res.json({ success: true });
   } catch (err) {
@@ -2137,9 +2149,7 @@ app.post('/api/orders/:id/clear-ot-number', (req, res) => {
     const order = db.getWorkOrderById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
     const previousOtNumber = order.taxesOrderNumber || null;
-    if (typeof worker.clearAbandoned === 'function') {
-      worker.clearAbandoned(req.params.id);
-    }
+    syncChildManager.callSync('clearAbandoned', req.params.id).catch(() => {});
     db.updateWorkOrder(req.params.id, {
       taxesOrderNumber: null,
       syncStatus: 'pending',
@@ -2150,9 +2160,7 @@ app.post('/api/orders/:id/clear-ot-number', (req, res) => {
       verifiedError: null
     });
     setTimeout(() => {
-      if (typeof worker.syncWorkOrderWithTimeout === 'function') {
-        worker.syncWorkOrderWithTimeout(req.params.id).catch(e => console.error('[ClearOtNumber Worker] Error:', e.message));
-      }
+      syncChildManager.callSync('syncWorkOrderWithTimeout', req.params.id).catch(e => console.error('[ClearOtNumber Worker] Error:', e.message));
     }, 100);
     console.log(`[Clear OT Number] Order ${req.params.id}: cleared taxesOrderNumber "${previousOtNumber}", will create a new O.T.`);
     res.json({ success: true, previousOtNumber });
@@ -2493,12 +2501,7 @@ app.post('/api/orders/retry/:id', async (req, res) => {
 
     // Trigger worker immediately in background on local server
     setImmediate(() => {
-      try {
-        const worker = require('./syncWorker');
-        worker.syncWorkOrderWithTimeout(order.id).catch(err => console.error('[RetrySync] Worker error:', err.message));
-      } catch (err) {
-        console.error('[RetrySync] Trigger error:', err.message);
-      }
+      syncChildManager.callSync('syncWorkOrderWithTimeout', order.id).catch(err => console.error('[RetrySync] Worker error:', err.message));
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -2669,7 +2672,7 @@ app.post('/api/orders/verify/:id', async (req, res) => {
     db.updateWorkOrder(orderId, { verifiedStatus: "checking" });
 
     // Call verifyWorkOrder in background
-    worker.verifyWorkOrderWithTimeout(orderId).then(result => {
+    syncChildManager.callSync('verifyWorkOrderWithTimeout', orderId).then(result => {
       console.log(`Background verification completed for order ${orderId}:`, result);
     }).catch(err => {
       console.error(`Background verification failed for order ${orderId}:`, err);
@@ -2705,7 +2708,7 @@ app.post('/api/orders/verify-all', async (req, res) => {
     }
 
     // Run verifyMultipleOrders in background (no await — respond immediately)
-    worker.verifyMultipleOrders(eligible).then(() => {
+    syncChildManager.callSync('verifyMultipleOrders', eligible).then(() => {
       console.log(`[VerifyAll] Background verification of ${eligible.length} order(s) complete.`);
     }).catch(err => {
       console.error(`[VerifyAll] Background error:`, err);
@@ -2771,7 +2774,7 @@ app.post('/api/tasks/verify-history', async (req, res) => {
       db.updateWorkOrder(id, { verifiedStatus: 'checking' });
     }
 
-    worker.verifyMultipleOrders(eligible).then(() => {
+    syncChildManager.callSync('verifyMultipleOrders', eligible).then(() => {
       console.log(`[TaskVerify] Background task verification of ${eligible.length} order(s) complete.`);
     }).catch(err => {
       console.error(`[TaskVerify] Background error:`, err);
@@ -2828,7 +2831,7 @@ app.get('/api/settings', (req, res) => {
     );
 
     let catalogStatus = settings.catalogSyncStatus || "idle";
-    if (catalogStatus === "syncing" && !worker.getIsScraping()) {
+    if (catalogStatus === "syncing" && !catalogSyncInFlight) {
       console.log("[Settings] Auto-correcting stuck catalogSyncStatus from 'syncing' to 'idle' because worker is not scraping.");
       catalogStatus = "idle";
       db.saveSettings({ catalogSyncStatus: "idle", catalogSyncError: null });
@@ -3606,7 +3609,7 @@ app.post('/api/catalogs/sync', async (req, res) => {
   try {
     const username = req.headers['x-user-username'] || null;
     // Run catalog scraping asynchronously so response is fast
-    worker.scrapeCatalogsWithTimeout(username).then(result => {
+    callScrapeCatalogs('scrapeCatalogsWithTimeout', username).then(result => {
       console.log("Async Catalog sync complete:", result);
     }).catch(e => {
       console.error("Async Catalog sync error:", e);
@@ -3621,7 +3624,7 @@ app.post('/api/catalogs/sync', async (req, res) => {
 // Get worker status
 app.get('/api/worker/status', (req, res) => {
   res.json({
-    isScraping: worker.getIsScraping()
+    isScraping: catalogSyncInFlight
   });
 });
 
@@ -4611,53 +4614,25 @@ app.post('/api/parte-taller/novedad', (req, res) => {
 });
 
 // Renders a self-contained HTML report (built client-side from the currently-displayed Parte
-// Taller state) into a PDF via a short-lived headless Chromium instance - kept separate from
-// syncWorker's browser, which stays busy doing real Taxes logins and shouldn't be touched here.
+// Taller state) into a PDF via a short-lived headless Chromium instance. The actual Puppeteer
+// work (pdfGenerator.js) runs in the same sync child process as syncWorker.js - see
+// syncChildManager.js - so this never blocks the main server even if a Taxes sync is running.
 app.post('/api/parte-taller/generar-pdf', async (req, res) => {
   const { html } = req.body || {};
   if (!html) {
     return res.status(400).json({ error: "Falta el HTML del reporte." });
   }
 
-  let browser = null;
   try {
-    let execPath = process.env.PUPPETEER_EXECUTABLE_PATH || null;
-    if (!execPath) {
-      if (process.platform === 'win32') {
-        const stdPath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-        const x86Path = 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe';
-        if (fs.existsSync(stdPath)) execPath = stdPath;
-        else if (fs.existsSync(x86Path)) execPath = x86Path;
-      } else {
-        const linuxPaths = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome'];
-        execPath = linuxPaths.find(p => fs.existsSync(p)) || null;
-      }
-    }
-
-    browser = await puppeteer.launch({
-      executablePath: execPath || undefined,
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
-    });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      landscape: true,
-      printBackground: true,
-      margin: { top: '15px', bottom: '15px', left: '15px', right: '15px' }
-    });
-
+    const pdfBuffer = await syncChildManager.callSync('generarPdfParteTaller', html);
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="Parte_Taller_${new Date().toISOString().split('T')[0]}.pdf"`
     });
-    res.send(pdfBuffer);
+    res.send(Buffer.from(pdfBuffer));
   } catch (error) {
     console.error("[POST /api/parte-taller/generar-pdf] Error:", error.message);
     res.status(500).json({ error: error.message });
-  } finally {
-    if (browser) await browser.close().catch(() => {});
   }
 });
 
@@ -5373,6 +5348,10 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   // whenever that Debian instance wasn't also bridging data back to Railway via the sync agent.
   if (process.env.DISABLE_BACKGROUND_WORKER !== 'true') {
     try {
+      // El loop de polling de startWorker (revisa cada 10s si hay una orden pendiente) sigue
+      // corriendo acá en el proceso principal - no usa Puppeteer para decidir. Solo la
+      // ejecución real de la sincronización se manda al proceso hijo.
+      worker.setSyncRunner((orderId) => syncChildManager.callSync('syncWorkOrderWithTimeout', orderId));
       worker.startWorker();
     } catch (wErr) {
       console.error('[Worker] Could not start Puppeteer worker:', wErr.message);
