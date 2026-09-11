@@ -5060,6 +5060,21 @@ async function syncCompletedTasksForOrder(orderId) {
   return { success: true, syncedAny };
 }
 
+// Screenshot on-demand de la página actualmente activa (la que setupPage() marcó en
+// global.paginaActivaParaStream) - usado por /api/dev/screenshot.jpg del proceso principal
+// para reconstruir la vista en vivo de Puppeteer ahora que el browser corre en el proceso
+// hijo aparte y ya no puede tocar ese `page` directo desde server.js.
+async function getCurrentScreenshot() {
+  try {
+    if (global.paginaActivaParaStream && !global.paginaActivaParaStream.isClosed()) {
+      return await global.paginaActivaParaStream.screenshot({ type: 'jpeg', quality: 65 });
+    }
+  } catch (e) {
+    // transient frame/navigation error - misma tolerancia que tenía el endpoint antes
+  }
+  return null;
+}
+
 // Alias functions matching the 2-phase API routes:
 async function createCleanHeader(orderId) {
   return await syncWorkOrder(orderId);
@@ -5088,5 +5103,6 @@ module.exports = {
   getIsScraping: () => isScraping,
   clearAbandoned: (id) => abandonedSyncOrderIds.delete(id),
   autoLogin,
-  setSyncRunner
+  setSyncRunner,
+  getCurrentScreenshot
 };

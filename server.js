@@ -1928,16 +1928,16 @@ app.get('/api/dev/screenshot.jpg', async (req, res) => {
   res.setHeader('Expires', '0');
 
   try {
-    if (global.paginaActivaParaStream && !global.paginaActivaParaStream.isClosed()) {
-      const buffer = await global.paginaActivaParaStream.screenshot({ 
-        type: 'jpeg', 
-        quality: 65 
-      });
+    // El browser vive en el proceso hijo aparte (ver syncChildManager.js) - le pedimos un
+    // screenshot de lo que esté haciendo ahora mismo en vez de tocar un `page` local que ya
+    // no existe acá.
+    const buffer = await syncChildManager.callSync('getCurrentScreenshot');
+    if (buffer) {
       res.setHeader('Content-Type', 'image/jpeg');
-      return res.send(buffer);
+      return res.send(Buffer.from(buffer));
     }
   } catch (err) {
-    // transient frame/navigation error
+    // transient frame/navigation error, o el proceso hijo ni arrancó todavía
   }
 
   // Standby SVG badge image when Puppeteer is idle
