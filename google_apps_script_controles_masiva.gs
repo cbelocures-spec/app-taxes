@@ -216,5 +216,84 @@ function actualizarControlesInsumos(fecha, responsable, registros, todosInternos
     }
     hojasActualizadas.push(nombreHoja);
   }
+  reconstruirResumen(ss);
   return hojasActualizadas;
+}
+
+// Arma la pestaña "Resumen": una fila por empleado, una columna por fecha, y en cada cruce
+// los tipos de control que hizo ese empleado ese dia (separados por coma si hizo mas de uno).
+// Se recalcula recorriendo TODAS las pestanas del archivo salvo "Resumen" - no hace falta
+// listarlas a mano, asi que un preventivo custom nuevo (con su propia pestana) entra solo la
+// proxima vez que se corra esta funcion, sin tocar este script.
+// Se llama sola al final de actualizarControlesInsumos (cada Carga Masiva la deja al dia); si
+// hace falta reconstruirla a mano (por ejemplo despues de cargar datos viejos a mano en alguna
+// pestana), elegi "reconstruirResumen" en el desplegable de funciones del editor y "Ejecutar".
+function reconstruirResumen(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var resumen = ss.getSheetByName('Resumen') || ss.insertSheet('Resumen');
+  var hojas = ss.getSheets().filter(function (sh) { return sh.getName() !== 'Resumen'; });
+
+  var registros = [];
+  hojas.forEach(function (sh) {
+    var lastCol = sh.getLastColumn();
+    if (lastCol < 2) return;
+    var empleados = sh.getRange(HEADER_ROW, 2, 1, lastCol - 1).getValues()[0];
+    var fechas = sh.getRange(DATE_ROW, 2, 1, lastCol - 1).getValues()[0];
+    for (var i = 0; i < empleados.length; i++) {
+      var empleado = String(empleados[i] || '').trim();
+      if (!empleado) continue;
+      var fecha = normalizarFechaResumen(fechas[i]);
+      if (!fecha) continue;
+      registros.push({ empleado: empleado, tipo: sh.getName(), fecha: fecha });
+    }
+  });
+
+  var empleadosUnicos = uniqueSorted(registros.map(function (r) { return r.empleado; }));
+  var fechasUnicas = uniqueSorted(registros.map(function (r) { return r.fecha; }));
+
+  var salida = [['Empleado / Fecha'].concat(fechasUnicas)];
+  empleadosUnicos.forEach(function (emp) {
+    var fila = [emp];
+    fechasUnicas.forEach(function (fecha) {
+      var tipos = registros
+        .filter(function (r) { return r.empleado === emp && r.fecha === fecha; })
+        .map(function (r) { return r.tipo; });
+      fila.push(tipos.join(', '));
+    });
+    salida.push(fila);
+  });
+
+  resumen.clearContents();
+  if (salida.length > 0 && salida[0].length > 0) {
+    var rango = resumen.getRange(1, 1, salida.length, salida[0].length);
+    rango.setValues(salida);
+    resumen.getRange(1, 1, 1, salida[0].length).setFontWeight('bold');
+    resumen.getRange(1, 1, salida.length, 1).setFontWeight('bold');
+  }
+}
+
+function uniqueSorted(valores) {
+  var vistos = {};
+  var unicos = [];
+  valores.forEach(function (v) {
+    if (v && !vistos[v]) { vistos[v] = true; unicos.push(v); }
+  });
+  unicos.sort();
+  return unicos;
+}
+
+// Admite fecha real (Date), texto ISO "2026-09-07" o texto DD-MM-AAAA "07-09-2026" (como quedo
+// tipeado a mano en alguna carga) - todo normalizado a texto "aaaa-mm-dd" para que ordene y
+// compare bien sin importar como haya quedado cargada la celda de origen.
+function normalizarFechaResumen(valor) {
+  if (valor instanceof Date) {
+    return Utilities.formatDate(valor, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  var str = String(valor || '').trim();
+  if (!str) return '';
+  var iso = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return iso[1] + '-' + ('0' + iso[2]).slice(-2) + '-' + ('0' + iso[3]).slice(-2);
+  var dmy = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
+  if (dmy) return dmy[3] + '-' + ('0' + dmy[2]).slice(-2) + '-' + ('0' + dmy[1]).slice(-2);
+  return str;
 }

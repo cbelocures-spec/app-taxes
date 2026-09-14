@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '342';
+const CURRENT_APP_VERSION = '343';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -1854,12 +1854,12 @@ async function submitPreOrderCheck() {
       addTaskField();
     }
 
-    // Lavadero ya eligió Tipo de lavado y Lavador(es) en "Filtro de Unidad y Tipo" - aplicarlos
-    // y arrancar el cronómetro de una, en vez de repetir el trabajo (o encima apretar
-    // "Iniciar") en la pantalla completa. Esa pantalla queda disponible solo por si hace falta
-    // modificar algo antes de enviar. A veces lavan entre varios: misma descripción para
-    // todos, pero una tarea (y un cronómetro) POR CADA lavador - la primera tarea es la que
-    // "addTaskField()" ya creó arriba, y se agrega una más por cada lavador extra.
+    // Lavadero ya eligió Tipo de lavado y Lavador(es) en "Filtro de Unidad y Tipo" - aplicarlos,
+    // arrancar el cronómetro de una y mandar la orden derecho, sin pasar por la pantalla completa
+    // (ahí "Continuar" es el único paso: nunca hace falta tocar nada más ni apretar "Enviar" a
+    // mano). A veces lavan entre varios: misma descripción para todos, pero una tarea (y un
+    // cronómetro) POR CADA lavador - la primera tarea es la que "addTaskField()" ya creó arriba,
+    // y se agrega una más por cada lavador extra.
     if (isLavaderoUserForPreOrder) {
       const tipo = tiposLavado.find(t => t.key === window._preSelectedTipoLavado);
       const tipoDescText = tipo ? `Lavado ${tipo.label}${tipo.descripcion ? `: ${tipo.descripcion}` : ''}` : '';
@@ -1879,6 +1879,8 @@ async function submitPreOrderCheck() {
         if (descField && tipoDescText) descField.value = tipoDescText;
         if (typeof toggleTaskTimer === 'function') await toggleTaskTimer(taskCard.id);
       }
+
+      await submitWorkOrder();
     }
   }
 }
