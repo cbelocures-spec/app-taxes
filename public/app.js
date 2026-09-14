@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '343';
+const CURRENT_APP_VERSION = '345';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -4724,14 +4724,26 @@ async function submitWorkOrder() {
 
     // Manual validations for touch optimization
     if (!window._lavadoParticularActive) {
-      if (!rodadoVal) return showToast("Por favor, selecciona un Rodado.", "danger");
+      // Los "cajones" de Lavadero sin camión real (Volquetes, Caja Roll-Off, Prensa Volquete,
+      // Tachos, Playa, Otros, Empresa Tercerizada) tampoco tienen una entrada real en el
+      // catálogo de Rodados - _lavaderoNumberedRodado cubre esa falta de rodadoVal (ver mas
+      // abajo, finalRodadoLabel).
+      if (!rodadoVal && !window._lavaderoNumberedRodado) return showToast("Por favor, selecciona un Rodado.", "danger");
       if (!internoVal) return showToast("Por favor, selecciona el Interno de Unidad.", "danger");
     }
     if (!clasificacionEl.value) return showToast("Por favor, selecciona una Clasificación.", "danger");
 
-    // El Rodado/Interno que realmente se mandan: "Lavado" fijo y sin interno para Lavado
-    // Particular (no hay camión real detrás), o los valores normales del formulario si no.
-    const finalRodadoLabel = window._lavadoParticularActive ? 'Lavado' : rodadoLabel;
+    // El Rodado que realmente se manda: "Lavado" fijo para Lavado Particular (no hay camión
+    // real detrás), o el nombre fijo de la categoría para el resto de los "cajones" de Lavadero
+    // sin camión real (_lavaderoNumberedRodado, puesto por selectLavaderoCategoria/
+    // onPreLavaderoEmpresaChange) - ninguno de los dos existe como opción real en el <select>
+    // de Rodado (que solo tiene la flota real), así que forzar su .value ahi (ver
+    // submitPreOrderCheck) no hace nada: la asignación queda pisada en blanco o en lo que haya
+    // quedado seleccionado antes, y eso es lo que terminaba subiendo a Taxes. El interno sí es
+    // real (se crea como opción nueva en openNewOrderModal), así que ese sigue del formulario.
+    const finalRodadoLabel = window._lavadoParticularActive
+      ? 'Lavado'
+      : (window._lavaderoNumberedRodado || rodadoLabel);
     const finalInternoVal = window._lavadoParticularActive ? '' : internoVal;
    
     // Collect tasks safely
@@ -9372,6 +9384,21 @@ function isHerreriaExclusiveEquipmentClient(rodado, interno) {
 }
 
 
+// A real Taller-specific centro de costo (Mec\u00e1nica, Electricidad, etc.) on one of the order's
+// tasks overrides the generic REP./FABRICACION/FINALIZACION/PRENSAS bucket assumption - that
+// bucket also covers real Taller repairs (ej. p\u00e9rdida hidr\u00e1ulica de una prensa volquete), not
+// only Herrer\u00eda fabricaci\u00f3n. Mirrors the same check in server.js's /api/orders filter.
+function hasKnownNonHerreriaTask(tasks) {
+  const centrosCostoList = (cachedCatalogs && cachedCatalogs.centrosCosto) || [];
+  return (tasks || []).some(t => {
+    const ccVal = String((t && t.centroCosto) || '').trim();
+    if (!ccVal) return false;
+    const ccOpt = centrosCostoList.find(c => c && String(c.value) === ccVal);
+    const label = (ccOpt && ccOpt.label ? ccOpt.label : ccVal).toLowerCase();
+    return !label.includes('herrer') && !label.includes('edil') && !label.includes('lavader');
+  });
+}
+
 function isHerreriaOrder(order) {
   if (!order) return false;
   const cls = String(order.clasificacion || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -9381,7 +9408,7 @@ function isHerreriaOrder(order) {
   // That used to pull whole Taller orders into Herreria just because one task's assignee
   // fuzzy-matched a Herreria name, hiding every other task in the order from Taller.
   if (cls.includes('herrer') || sec.includes('herrer')) return true;
-  if (isHerreriaExclusiveEquipmentClient(order.rodado, order.interno)) return true;
+  if (isHerreriaExclusiveEquipmentClient(order.rodado, order.interno) && !hasKnownNonHerreriaTask(order.tasks)) return true;
   return false;
 }
 

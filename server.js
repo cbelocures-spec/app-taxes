@@ -73,7 +73,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '343';
+const APP_VERSION = '345';
 
 // Middleware
 app.use(cors());
@@ -929,11 +929,20 @@ app.get('/api/orders', (req, res) => {
     // Filter orders based on user's authorized sectors
     const filtered = orders.filter(o => {
       const cls = o.clasificacion;
+      const tasksForHerreriaCheck = o.tasks || [];
       // An order for exclusive Herrería equipment (fabricación de cajas, prensa, etc.) belongs to
       // Herrería regardless of what its 'clasificacion' field says: some orders end up saved with
       // a generic clasificacion (e.g. "Correctivo") instead of "Herrería" for that equipment, and
-      // without this check they'd leak into Taller's view.
-      const isExclusiveHerreriaEquipment = isHerreriaExclusiveEquipment(o.rodado, o.interno);
+      // without this check they'd leak into Taller's view. BUT a real Taller-specific centro de
+      // costo (Mecánica, Electricidad, etc.) on one of its tasks overrides that assumption - the
+      // "PRENSAS" bucket also covers real Taller repairs (ej. pérdida hidráulica de una prensa
+      // volquete), not only Herrería fabricación, so it can't be forced to Herrería unconditionally
+      // just from the interno.
+      const hasKnownNonHerreriaTask = tasksForHerreriaCheck.some(t => {
+        const label = taskCentroCostoLabel(t);
+        return label && !label.includes('herrer') && !label.includes('edil') && !label.includes('lavader');
+      });
+      const isExclusiveHerreriaEquipment = isHerreriaExclusiveEquipment(o.rodado, o.interno) && !hasKnownNonHerreriaTask;
       // `sector` (set at creation from the creator's own sector) also counts: a
       // Herrería-sector user's order routes to Herrería even if its clasificacion
       // is Correctivo/Preventivo/Auxilio, since that field is no longer forced.
