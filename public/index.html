@@ -648,6 +648,19 @@
         <h2>Configuración</h2>
       </div>
 
+      <div class="settings-card" style="margin-bottom: 20px;">
+        <label style="font-weight: 600; color: var(--text-main); display: block; margin-bottom: 10px;">Modo de Vista</label>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" id="btn-modo-taller" class="btn btn-secondary" style="flex: 1; padding: 12px;" onclick="setUserViewMode('taller')">
+            <span class="material-icons" style="font-size: 18px; vertical-align: middle;">build</span> Taller (completo)
+          </button>
+          <button type="button" id="btn-modo-elastiquero" class="btn btn-secondary" style="flex: 1; padding: 12px;" onclick="setUserViewMode('elastiquero')">
+            <span class="material-icons" style="font-size: 18px; vertical-align: middle;">build_circle</span> Elastiquero
+          </button>
+        </div>
+        <small style="color: var(--text-muted); display: block; margin-top: 8px;">"Elastiquero" deja ver solo las pestañas de Elastiquero y Gomería - para cuando alguien del sector de elásticos usa esta cuenta.</small>
+      </div>
+
       <form id="settings-form" class="settings-card">
         <div class="form-group">
           <label for="set-portal-url">URL del Portal de Taxes</label>
@@ -1592,7 +1605,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.21.23</div>
+      <div class="sidebar-version">Versión 1.22.0</div>
     </div>
   </aside>
 
@@ -2849,6 +2862,6 @@
     }
   </style>
 
-  <script src="app.js?v=348"></script>
+  <script src="app.js?v=349"></script>
 </body>
 </html>

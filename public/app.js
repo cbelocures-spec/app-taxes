@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '348';
+const CURRENT_APP_VERSION = '349';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9610,6 +9610,17 @@ function getFilteredArchivedOrders() {
   });
 }
 
+const NAV_PERM_GATES = [
+  { id: 'nav-historial', flag: 'canViewHistory' },
+  { id: 'nav-bulk', flag: 'canViewMasivas' },
+  { id: 'nav-preventivos', flag: 'canViewPreventivos' },
+  { id: 'nav-partetaller', flag: 'canViewParteTaller' },
+  { id: 'nav-settings', flag: 'canViewSettings' },
+  { id: 'nav-orders', flag: 'canViewOrders' },
+  { id: 'nav-gomeria', flag: 'canViewGomeria' },
+  { id: 'nav-elastiquero', flag: 'canViewElastiquero' }
+];
+
 let currentUserPermissions = {
   canDelete: true,
   canSync: true,
@@ -9669,17 +9680,7 @@ async function loadUserPermissionsUI() {
     console.error('Error loading user permissions:', e);
   }
 
-  const navPermGates = [
-    { id: 'nav-historial', flag: 'canViewHistory' },
-    { id: 'nav-bulk', flag: 'canViewMasivas' },
-    { id: 'nav-preventivos', flag: 'canViewPreventivos' },
-    { id: 'nav-partetaller', flag: 'canViewParteTaller' },
-    { id: 'nav-settings', flag: 'canViewSettings' },
-    { id: 'nav-orders', flag: 'canViewOrders' },
-    { id: 'nav-gomeria', flag: 'canViewGomeria' },
-    { id: 'nav-elastiquero', flag: 'canViewElastiquero' }
-  ];
-  navPermGates.forEach(({ id, flag }) => {
+  NAV_PERM_GATES.forEach(({ id, flag }) => {
     const el = document.getElementById(id);
     if (el && currentUserPermissions[flag] === false) {
       el.style.display = 'none';
@@ -9759,6 +9760,56 @@ async function loadUserPermissionsUI() {
       userAuthSection.style.display = 'none';
     }
   }
+
+  applyUserViewMode();
+}
+
+// "Modo de Vista" (Ajustes): algunas cuentas (ej. pañol/Sergio) las usa gente de distintos
+// sectores según el turno - no hay un usuario propio para cada elastiquero. En vez de crear
+// cuentas nuevas, esto deja elegir "Elastiquero" para esconder todo salvo Elastiquero/Gomería
+// (y Ajustes, para poder volver a "Taller") sin tocar los permisos reales de la cuenta.
+// Guardado por username para que cada cuenta recuerde su propio modo.
+function getUserViewMode() {
+  const username = localStorage.getItem('currentUserUsername') || '';
+  return localStorage.getItem(`viewMode_${username}`) || 'taller';
+}
+
+function setUserViewMode(mode) {
+  const username = localStorage.getItem('currentUserUsername') || '';
+  localStorage.setItem(`viewMode_${username}`, mode);
+  applyUserViewMode();
+  if (mode === 'elastiquero') {
+    switchView('elastiquero');
+  } else {
+    switchView('home');
+  }
+}
+
+function applyUserViewMode() {
+  const mode = getUserViewMode();
+
+  const btnTaller = document.getElementById('btn-modo-taller');
+  const btnElastiquero = document.getElementById('btn-modo-elastiquero');
+  if (btnTaller) btnTaller.classList.toggle('btn-primary', mode === 'taller');
+  if (btnElastiquero) btnElastiquero.classList.toggle('btn-primary', mode === 'elastiquero');
+
+  // Recompute from scratch (real permisos de la cuenta) antes de aplicar el modo - si no,
+  // volver a "Taller" después de haber estado en "Elastiquero" dejaba todo oculto, porque acá
+  // nunca se había hecho display:flex de nuevo sobre lo que el modo Elastiquero escondió.
+  document.querySelectorAll('.nav-item').forEach(el => el.style.display = 'flex');
+  NAV_PERM_GATES.forEach(({ id, flag }) => {
+    const el = document.getElementById(id);
+    if (el && currentUserPermissions[flag] === false) el.style.display = 'none';
+  });
+
+  if (mode !== 'elastiquero') return;
+
+  // Solo dejar Elastiquero, Gomería y Ajustes (para poder volver a Modo Taller) - todo lo
+  // demás se oculta encima de lo que recién dejaron visible los permisos reales.
+  const keepVisible = new Set(['nav-elastiquero', 'nav-gomeria', 'nav-settings']);
+  document.querySelectorAll('.nav-item').forEach(el => {
+    if (!keepVisible.has(el.id)) el.style.display = 'none';
+  });
 }
 
 let currentBackupData = [];
