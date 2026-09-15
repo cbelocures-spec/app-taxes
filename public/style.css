@@ -3471,11 +3471,16 @@ body {
   font-size: 17px;
   padding: 16px 22px;
 }
-.eh-recibir-varios-btn {
-  width: 100%;
+.eh-recibir-shortcuts {
+  display: flex;
+  gap: 8px;
   margin-top: 10px;
-  font-size: 17px !important;
-  padding: 14px !important;
+}
+.eh-recibir-varios-btn {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px !important;
+  padding: 14px 8px !important;
 }
 
 .eh-module-grid {
