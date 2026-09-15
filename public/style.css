@@ -3491,6 +3491,9 @@ body {
 }
 @media (min-width: 620px) {
   .eh-module-grid { grid-template-columns: 1fr 1fr; }
+  /* Recorrido usa una foto panorámica - ocupa el ancho de las dos tarjetas de arriba en vez
+     de quedar sola en una sola columna, angosta. */
+  .eh-module-card.eh-recorrido { grid-column: 1 / -1; }
 }
 
 .eh-module-card {
