@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '358';
+const CURRENT_APP_VERSION = '361';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -887,16 +887,7 @@ function switchView(viewId) {
     }
 
     if (viewId === 'gomeria') {
-      // Reset every time the tab is opened, not just when empty - same reasoning as 'bulk':
-      // the tab stays mounted in the DOM between visits, so a leftover interno block from a
-      // previous batch would otherwise sit there ready to get resubmitted alongside a new one.
-      try {
-        const container = document.getElementById('gomeria-internos-container');
-        if (container) {
-          container.innerHTML = '';
-          addGomeriaInternoBlock();
-        }
-      } catch(e) {}
+      try { renderGomeriaView(); } catch(e) {}
     }
 
     if (viewId === 'elastiquero') {
@@ -913,6 +904,7 @@ function switchView(viewId) {
         }
       } catch(e) {}
       try { renderRecorridoHomeWidget(); } catch(e) {}
+      try { renderGomeriaHomeWidget(); } catch(e) {}
     }
 
     if (viewId === 'recorrido') {
@@ -2760,6 +2752,12 @@ async function fetchCatalogs() {
     populateSelect('form-interno', internoOptions, "Seleccionar Interno...");
     populateSelect('pre-form-interno', internoOptions, "Seleccionar Interno...");
     populateSelect('eh-recibir-interno', internoOptions, "Seleccionar Interno...");
+    populateSelect('gomeria-rodado-select', internoOptions, "Seleccionar Interno...");
+    populateSelect('gomeria-empleado-select', getGomeriaMecanicaEmployees(), "Seleccionar Empleado...");
+    const gomeriaRodadoSelectEl = document.getElementById('gomeria-rodado-select');
+    if (gomeriaRodadoSelectEl && typeof convertSelectToSearchable === 'function') convertSelectToSearchable(gomeriaRodadoSelectEl);
+    const gomeriaEmpleadoSelectEl = document.getElementById('gomeria-empleado-select');
+    if (gomeriaEmpleadoSelectEl && typeof convertSelectToSearchable === 'function') convertSelectToSearchable(gomeriaEmpleadoSelectEl);
 
     // Populate Parte Taller datalist for internal selection
     const ptDatalist = document.getElementById('pt-interno-list');
@@ -7700,117 +7698,259 @@ function cubiertaMedidaFieldValue(row, cls) {
   return el.value.trim();
 }
 
-function addGomeriaInternoBlock() {
-  const container = document.getElementById('gomeria-internos-container');
-  if (!container) return;
-  const internoOptionsHtml = (cachedInternoOptions || [])
-    .map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
-
-  const block = document.createElement('div');
-  block.className = 'form-section-card gomeria-interno-block';
-  block.innerHTML = `
-    <div class="card-title-header split">
-      <div class="flex-align">
-        <span class="material-icons">local_shipping</span>
-        <h3>Interno</h3>
-      </div>
-      <button type="button" class="btn btn-link btn-xs" onclick="removeGomeriaInternoBlock(this)" style="color:var(--danger);" title="Quitar este interno">
-        <span class="material-icons" style="font-size:18px;">delete</span>
-      </button>
-    </div>
-    <div class="gomeria-initial-fields">
-      <div class="form-group">
-        <label>Rodado *</label>
-        <select class="gomeria-interno-select" style="width:100%;">
-          <option value="">Seleccionar Interno...</option>
-          ${internoOptionsHtml}
-        </select>
-        <div style="display:flex; gap:8px; margin-top:8px;">
-          <button type="button" class="btn btn-secondary" style="flex:1;" onclick="setGomeriaRodadoShortcut(this, 'VARIOS')">
-            <span class="material-icons" style="font-size:16px;">cleaning_services</span> Ordenar / Limpieza
-          </button>
-          <button type="button" class="btn btn-secondary" style="flex:1;" onclick="setGomeriaRodadoShortcut(this, 'REPARACIONES INTERNAS')">
-            <span class="material-icons" style="font-size:16px;">build</span> Reparación Cubierta
-          </button>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Clasificación *</label>
-        <select class="gomeria-clasificacion-select" style="width:100%;">
-          <option value="Correctivo">Correctivo</option>
-          <option value="Auxilio">Auxilio</option>
-        </select>
-      </div>
-      <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px;">
-        <div class="form-group">
-          <label>Empleado *</label>
-          <select class="gomeria-empleado-select" style="width:100%;">
-            <option value="">Seleccionar Empleado...</option>
-            ${getGomeriaMecanicaEmployees().map(e => `<option value="${e.value}">${e.label}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Tiempo (horas)</label>
-          <input type="text" inputmode="decimal" class="gomeria-horas-input" placeholder="ej: 0.5" style="width:100%;">
-        </div>
-      </div>
-      <button type="button" class="btn btn-primary btn-block gomeria-continuar-btn" onclick="continuarGomeriaInterno(this)">
-        Continuar
-      </button>
-    </div>
-    <div class="gomeria-details-section" style="display:none;">
-      <div class="gomeria-tire-rows-container"></div>
-      <button type="button" class="btn btn-secondary btn-xs" onclick="addGomeriaTireRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
-        <span class="material-icons" style="font-size:14px;">add</span> Agregar Cubierta Cambiada
-      </button>
-    </div>
-  `;
-  container.appendChild(block);
-  const internoSelectEl = block.querySelector('.gomeria-interno-select');
-  if (internoSelectEl && typeof convertSelectToSearchable === 'function') {
-    convertSelectToSearchable(internoSelectEl);
-  }
-  const empleadoSelectEl = block.querySelector('.gomeria-empleado-select');
-  if (empleadoSelectEl && typeof convertSelectToSearchable === 'function') {
-    convertSelectToSearchable(empleadoSelectEl);
+// --- GOMERÍA (de a un interno por vez, con cronómetro propio) ---
+// Ya no es una carga en lote (varios internos + "Generar Órdenes" al final) - ahora es un solo
+// interno con su propio cronómetro, igual que Recorrido: Continuar arranca el reloj (reemplaza
+// la carga manual de horas), y recién al terminar se sabe cuánto tardó de verdad. El estado
+// vive en localStorage para sobrevivir a "Llenar Después" (volver a Inicio sin cortar el
+// cronómetro) y a un refresh/cierre de pestaña mientras el gomero sigue trabajando.
+function getGomeriaTimerState() {
+  try {
+    const raw = localStorage.getItem('gomeriaTimerState');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
   }
 }
 
-function removeGomeriaInternoBlock(btn) {
-  const block = btn.closest('.gomeria-interno-block');
-  if (block) block.remove();
+function setGomeriaTimerState(state) {
+  localStorage.setItem('gomeriaTimerState', JSON.stringify(state));
 }
 
-function setGomeriaRodadoShortcut(btn, value) {
-  const block = btn.closest('.gomeria-interno-block');
-  const select = block ? block.querySelector('.gomeria-interno-select') : null;
+function clearGomeriaTimerState() {
+  localStorage.removeItem('gomeriaTimerState');
+}
+
+function calcularSegundosGomeria(state) {
+  let total = 0;
+  (state.timerHistory || []).forEach(h => { total += Math.max(0, (h.end - h.start) / 1000); });
+  if (state.active && state.startTime) total += Math.max(0, (Date.now() - state.startTime) / 1000);
+  return total;
+}
+
+function setGomeriaRodadoShortcutSingle(value) {
+  const select = document.getElementById('gomeria-rodado-select');
   if (select) setSearchableSelectValue(select, value);
 }
 
-// Paso 1 (Rodado/Clasificación/Empleado/Horas) primero solo, y recién al confirmar acá se
-// revela el paso 2 (Eje/Posición, Cubierta, Se sacó, Se colocó) - evita mostrar todo el
-// formulario de una para algo que todavía no se sabe si es un cambio de cubierta.
-function continuarGomeriaInterno(btn) {
-  const block = btn.closest('.gomeria-interno-block');
-  if (!block) return;
-  const internoSelect = block.querySelector('.gomeria-interno-select');
-  if (!internoSelect || !internoSelect.value) {
+// Paso 1 (Rodado/Clasificación/Empleado) primero solo - al confirmar acá arranca el
+// cronómetro y recién ahí se puede cargar (ahora o después) Eje/Posición, Cubierta, Se sacó y
+// Se colocó.
+function continuarGomeria() {
+  const rodadoSelect = document.getElementById('gomeria-rodado-select');
+  const interno = rodadoSelect ? rodadoSelect.value.trim() : '';
+  if (!interno) {
     showToast('Elegí el Rodado antes de continuar.', 'danger');
     return;
   }
-  const empleadoSelect = block.querySelector('.gomeria-empleado-select');
+  const empleadoSelect = document.getElementById('gomeria-empleado-select');
   if (!empleadoSelect || !empleadoSelect.value) {
     showToast('Elegí el Empleado antes de continuar.', 'danger');
     return;
   }
-  btn.style.display = 'none';
-  const detailsSection = block.querySelector('.gomeria-details-section');
-  if (detailsSection) {
-    detailsSection.style.display = 'block';
-    if (!detailsSection.querySelector('.gomeria-tire-row')) {
-      addGomeriaTireRow(detailsSection.querySelector('.btn-secondary'));
-    }
+  const clasifSelect = document.getElementById('gomeria-clasificacion-select');
+
+  setGomeriaTimerState({
+    active: true,
+    startTime: Date.now(),
+    timerHistory: [],
+    interno,
+    clasificacion: clasifSelect ? clasifSelect.value : 'Correctivo',
+    empleado: empleadoSelect.value,
+    finished: false
+  });
+  renderGomeriaView();
+  renderGomeriaHomeWidget();
+}
+
+function toggleGomeriaPausa() {
+  const state = getGomeriaTimerState();
+  if (!state || state.finished) return;
+  state.timerHistory = state.timerHistory || [];
+  if (state.active) {
+    state.timerHistory.push({ start: state.startTime, end: Date.now() });
+    state.active = false;
+    state.startTime = null;
+  } else {
+    state.active = true;
+    state.startTime = Date.now();
   }
+  setGomeriaTimerState(state);
+  renderGomeriaView();
+  renderGomeriaHomeWidget();
+}
+
+// "Llenar Ahora": revela Eje/Cubierta sin cortar el cronómetro. Si nunca se aprieta ("Llenar
+// Después"), finalizarGomeriaTimer() la revela igual y a la fuerza al apretar Fin, porque para
+// generar la orden hace falta como mínimo un N° de fuego.
+function mostrarGomeriaDatosCubierta() {
+  const detailsEl = document.getElementById('gomeria-details-state');
+  if (!detailsEl) return;
+  detailsEl.style.display = 'block';
+  if (!detailsEl.querySelector('.gomeria-tire-row')) {
+    addGomeriaTireRow(detailsEl.querySelector('.btn-secondary'));
+  }
+}
+
+function finalizarGomeriaTimer() {
+  const state = getGomeriaTimerState();
+  if (!state) return;
+  if (state.active && state.startTime) {
+    state.timerHistory = state.timerHistory || [];
+    state.timerHistory.push({ start: state.startTime, end: Date.now() });
+  }
+  state.active = false;
+  state.startTime = null;
+  state.finished = true;
+  setGomeriaTimerState(state);
+  mostrarGomeriaDatosCubierta();
+  renderGomeriaView();
+  renderGomeriaHomeWidget();
+  switchView('gomeria');
+}
+
+let gomeriaTickInterval = null;
+
+function renderGomeriaTimerTick() {
+  const state = getGomeriaTimerState();
+  if (!state) return;
+  const seconds = calcularSegundosGomeria(state);
+  const display = document.getElementById('gomeria-timer-display');
+  if (display) display.textContent = formatSegundosHms(seconds);
+  const homeDisplay = document.getElementById('eh-gomeria-timer-display');
+  if (homeDisplay) homeDisplay.textContent = formatSegundosHms(seconds);
+}
+
+function ensureGomeriaTicking() {
+  if (gomeriaTickInterval) clearInterval(gomeriaTickInterval);
+  gomeriaTickInterval = setInterval(() => {
+    const state = getGomeriaTimerState();
+    if (state && state.active) renderGomeriaTimerTick();
+  }, 1000);
+}
+
+function renderGomeriaView() {
+  const initialEl = document.getElementById('gomeria-initial-state');
+  const runningEl = document.getElementById('gomeria-running-state');
+  const detailsEl = document.getElementById('gomeria-details-state');
+  if (!initialEl || !runningEl || !detailsEl) return;
+
+  const state = getGomeriaTimerState();
+  if (!state) {
+    initialEl.style.display = 'block';
+    runningEl.style.display = 'none';
+    detailsEl.style.display = 'none';
+    return;
+  }
+
+  initialEl.style.display = 'none';
+  runningEl.style.display = state.finished ? 'none' : 'block';
+  if (state.finished) detailsEl.style.display = 'block';
+
+  const pausaBtn = document.getElementById('gomeria-pausa-btn');
+  if (pausaBtn) {
+    pausaBtn.innerHTML = state.active
+      ? '<span class="material-icons">pause</span> Pausar'
+      : '<span class="material-icons">play_arrow</span> Reanudar';
+  }
+  renderGomeriaTimerTick();
+  ensureGomeriaTicking();
+}
+
+function resetGomeriaView() {
+  const rodadoSelect = document.getElementById('gomeria-rodado-select');
+  if (rodadoSelect) setSearchableSelectValue(rodadoSelect, '');
+  const empSelect = document.getElementById('gomeria-empleado-select');
+  if (empSelect) setSearchableSelectValue(empSelect, '');
+  const block = document.querySelector('.gomeria-interno-block');
+  const rowsContainer = block ? block.querySelector('.gomeria-tire-rows-container') : null;
+  if (rowsContainer) rowsContainer.innerHTML = '';
+  const detailsEl = document.getElementById('gomeria-details-state');
+  if (detailsEl) detailsEl.style.display = 'none';
+  renderGomeriaView();
+}
+
+async function submitGomeriaSingleOrder() {
+  const state = getGomeriaTimerState();
+  if (!state) return;
+  const block = document.querySelector('.gomeria-interno-block');
+  const descripcion = buildGomeriaDescription(block);
+  if (!descripcion) {
+    showToast('Cargá al menos un N° de fuego.', 'danger');
+    return;
+  }
+
+  const totalSeconds = calcularSegundosGomeria(state);
+  const horasEstimadas = parseFloat((totalSeconds / 3600).toFixed(2));
+  const rodadoOpt = cachedCatalogs.rodados
+    ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === state.interno)
+    : null;
+  const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${state.interno}`;
+
+  const orderPayload = {
+    rodado: rodadoLabel,
+    responsable: "AUTO",
+    interno: state.interno,
+    clasificacion: state.clasificacion,
+    fechaEntrega: new Date().toISOString().split('T')[0],
+    horario: new Date().toTimeString().slice(0, 5),
+    incidente: '',
+    estadoUnidad: 'operativo',
+    tasks: [{
+      centroCosto: "15",
+      empleado: state.empleado,
+      horasEstimadas,
+      descripcion,
+      status: "Finalizada"
+    }]
+  };
+
+  try {
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const res = await fetch('/api/orders/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-username': currentUsername },
+      body: JSON.stringify({ orders: [orderPayload] })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Error al generar la orden.');
+    }
+    showToast(`✅ Orden de Gomería generada (${horasEstimadas}hs).`, 'success');
+    clearGomeriaTimerState();
+    resetGomeriaView();
+    renderGomeriaHomeWidget();
+    fetchOrders();
+    switchView('elastiquero-home');
+  } catch (err) {
+    showToast(err.message, 'danger');
+    console.error('Error en submitGomeriaSingleOrder', err);
+  }
+}
+
+// Widget del cronómetro en Inicio Elastiquero - debajo de la tarjeta de Gomería, igual que el
+// de Recorrido, para verlo corriendo (con Pausar/Fin ahí mismo) sin entrar al módulo.
+function renderGomeriaHomeWidget() {
+  const widget = document.getElementById('eh-gomeria-widget');
+  if (!widget) return;
+  const state = getGomeriaTimerState();
+  if (!state || state.finished) {
+    widget.style.display = 'none';
+    widget.innerHTML = '';
+    return;
+  }
+  widget.style.display = 'flex';
+  widget.innerHTML = `
+    <span class="material-icons" style="font-size:18px;">timer</span>
+    <span id="eh-gomeria-timer-display">${formatSegundosHms(calcularSegundosGomeria(state))}</span>
+    <button type="button" class="btn btn-secondary btn-xs" onclick="toggleGomeriaPausa()">
+      <span class="material-icons" style="font-size:14px;">${state.active ? 'pause' : 'play_arrow'}</span> ${state.active ? 'Pausar' : 'Reanudar'}
+    </button>
+    <button type="button" class="btn btn-primary btn-xs" onclick="finalizarGomeriaTimer()">
+      <span class="material-icons" style="font-size:14px;">check</span> Fin
+    </button>
+  `;
+  ensureGomeriaTicking();
 }
 
 function addGomeriaTireRow(btn) {
@@ -8250,89 +8390,6 @@ function buildGomeriaDescription(block) {
     return `${prefix}${posSuffix}: se sacó N° Fuego ${sFuego || '-'} - Tipo ${sTipo || '-'} - Marca ${sMarca || '-'} - Medida ${sMedida || '-'} - Estado ${sEstado || '-'} = se colocó = N° Fuego ${eFuego || '-'} - Tipo ${eTipo || '-'} - Marca ${eMarca || '-'} - Medida ${eMedida || '-'} - Estado ${eEstado || '-'}`;
   }).filter(Boolean);
   return lines.join('\n');
-}
-
-async function submitGomeriaOrders() {
-  const blocks = Array.from(document.querySelectorAll('.gomeria-interno-block'));
-  if (blocks.length === 0) {
-    showToast('Agregá al menos un interno.', 'danger');
-    return;
-  }
-
-  const ordersPayload = [];
-  for (const block of blocks) {
-    const selectEl = block.querySelector('.gomeria-interno-select');
-    const interno = selectEl ? selectEl.value.trim() : '';
-    if (!interno) {
-      showToast('Todos los internos agregados deben estar seleccionados.', 'danger');
-      return;
-    }
-    const descripcion = buildGomeriaDescription(block);
-    if (!descripcion) {
-      showToast(`Cargá al menos un N° de fuego para el interno ${interno}.`, 'danger');
-      return;
-    }
-    const rodadoOpt = cachedCatalogs.rodados
-      ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === interno)
-      : null;
-    const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
-    const clasifSelect = block.querySelector('.gomeria-clasificacion-select');
-    const clasificacion = clasifSelect ? clasifSelect.value : 'Correctivo';
-    const empSelect = block.querySelector('.gomeria-empleado-select');
-    const empleado = empSelect ? empSelect.value : '';
-    if (!empleado) {
-      showToast(`Elegí quién hizo el cambio de cubiertas para el interno ${interno}.`, 'danger');
-      return;
-    }
-    const horasInput = block.querySelector('.gomeria-horas-input');
-    const horasEstimadas = (horasInput && horasInput.value.trim()) ? parseFloat(horasInput.value.replace(',', '.')) || 0 : 0;
-
-    ordersPayload.push({
-      rodado: rodadoLabel,
-      responsable: "AUTO",
-      interno: interno,
-      clasificacion: clasificacion,
-      fechaEntrega: new Date().toISOString().split('T')[0],
-      horario: new Date().toTimeString().slice(0, 5),
-      incidente: "Cambio de cubiertas",
-      estadoUnidad: "operativo",
-      tasks: [{
-        centroCosto: "15",
-        empleado: empleado,
-        horasEstimadas: horasEstimadas,
-        descripcion: descripcion,
-        // Gomería logs a tire change that's already done by the time it's entered here -
-        // unlike other order-creation flows, there's no reason to leave it Pendiente first.
-        // Marking it Finalizada up front is what lets the order sync as complete in Taxes.
-        status: "Finalizada"
-      }]
-    });
-  }
-
-  try {
-    const currentUsername = localStorage.getItem('currentUserUsername') || '';
-    const res = await fetch('/api/orders/bulk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-user-username': currentUsername },
-      body: JSON.stringify({ orders: ordersPayload })
-    });
-    if (!res.ok) {
-      let errMsg = 'Error al generar las órdenes.';
-      try { const errData = await res.json(); if (errData && errData.error) errMsg = errData.error; } catch (_) {}
-      throw new Error(errMsg);
-    }
-    showToast(`✅ ${ordersPayload.length} orden(es) de cambio de cubiertas generada(s)`, 'success');
-    const container = document.getElementById('gomeria-internos-container');
-    if (container) {
-      container.innerHTML = '';
-      addGomeriaInternoBlock();
-    }
-    fetchOrders();
-    switchView('orders');
-  } catch (err) {
-    showToast(err.message, 'danger');
-    console.error('Error creating gomeria orders', err);
-  }
 }
 
 // --- ELASTIQUERO (CAMBIO/REPARACIÓN DE ELÁSTICOS) ---

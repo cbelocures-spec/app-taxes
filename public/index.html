@@ -608,17 +608,70 @@
         <h2>Gomería — Cambio de Cubiertas</h2>
       </div>
 
-      <div id="gomeria-internos-container">
-        <!-- Dynamic interno blocks -->
+      <div class="gomeria-interno-block">
+        <div id="gomeria-initial-state" class="form-section-card">
+          <div class="form-group">
+            <label>Rodado *</label>
+            <select id="gomeria-rodado-select" style="width:100%;">
+              <option value="">Seleccionar Interno...</option>
+            </select>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <button type="button" class="btn btn-secondary" style="flex:1;" onclick="setGomeriaRodadoShortcutSingle('VARIOS')">
+                <span class="material-icons" style="font-size:16px;">cleaning_services</span> Ordenar / Limpieza
+              </button>
+              <button type="button" class="btn btn-secondary" style="flex:1;" onclick="setGomeriaRodadoShortcutSingle('REPARACIONES INTERNAS')">
+                <span class="material-icons" style="font-size:16px;">build</span> Reparación Cubierta
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Clasificación *</label>
+            <select id="gomeria-clasificacion-select" style="width:100%;">
+              <option value="Correctivo">Correctivo</option>
+              <option value="Auxilio">Auxilio</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Empleado *</label>
+            <select id="gomeria-empleado-select" style="width:100%;">
+              <option value="">Seleccionar Empleado...</option>
+            </select>
+          </div>
+          <button type="button" class="btn btn-primary btn-block" onclick="continuarGomeria()" style="margin-top:14px;">
+            Continuar
+          </button>
+        </div>
+
+        <div id="gomeria-running-state" class="form-section-card" style="display:none; text-align:center;">
+          <div id="gomeria-timer-display" class="recorrido-timer-display">00:00:00</div>
+          <div style="display:flex; gap:8px; margin-bottom:10px;">
+            <button type="button" class="btn btn-secondary" style="flex:1;" id="gomeria-pausa-btn" onclick="toggleGomeriaPausa()">
+              <span class="material-icons">pause</span> Pausar
+            </button>
+            <button type="button" class="btn btn-primary" style="flex:1; background-color:var(--success); border-color:var(--success);" onclick="finalizarGomeriaTimer()">
+              <span class="material-icons">check</span> Fin
+            </button>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="btn btn-secondary" style="flex:1;" onclick="mostrarGomeriaDatosCubierta()">
+              <span class="material-icons" style="font-size:18px;">edit_note</span> Llenar Ahora
+            </button>
+            <button type="button" class="btn btn-secondary" style="flex:1;" onclick="switchView('elastiquero-home')">
+              <span class="material-icons" style="font-size:18px;">home</span> Llenar Después
+            </button>
+          </div>
+        </div>
+
+        <div id="gomeria-details-state" style="display:none;">
+          <div class="gomeria-tire-rows-container"></div>
+          <button type="button" class="btn btn-secondary btn-xs" onclick="addGomeriaTireRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
+            <span class="material-icons" style="font-size:14px;">add</span> Agregar Cubierta Cambiada
+          </button>
+          <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitGomeriaSingleOrder()" style="margin-top:20px; margin-bottom: 30px;">
+            <span class="material-icons">send</span> Generar Orden
+          </button>
+        </div>
       </div>
-
-      <button type="button" class="btn btn-secondary btn-block" onclick="addGomeriaInternoBlock()" style="display:flex; align-items:center; justify-content:center; gap:6px; margin: 4px 0 20px;">
-        <span class="material-icons" style="font-size:18px;">add</span> Agregar Interno
-      </button>
-
-      <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitGomeriaOrders()" style="margin-bottom: 30px;">
-        <span class="material-icons">send</span> Generar Órdenes
-      </button>
     </section>
 
     <!-- VIEW: INICIO ELASTIQUERO (pantalla de selección para Modo Elastiquero en Ajustes) -->
@@ -676,6 +729,7 @@
             </div>
           </div>
         </button>
+        <div id="eh-gomeria-widget" class="eh-recorrido-widget" style="display:none;"></div>
 
         <button type="button" class="eh-module-card eh-recorrido" onclick="switchView('recorrido')">
           <img src="imagenes/recorrido.jpg" alt="Revisión del estado de las cubiertas de un camión">
@@ -1734,7 +1788,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.26.0</div>
+      <div class="sidebar-version">Versión 1.27.0</div>
     </div>
   </aside>
 
@@ -2991,6 +3045,6 @@
     }
   </style>
 
-  <script src="app.js?v=358"></script>
+  <script src="app.js?v=361"></script>
 </body>
 </html>
