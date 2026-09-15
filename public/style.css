@@ -3530,6 +3530,9 @@ body {
 .eh-module-card.eh-elastiquero .eh-chip { background: #92400e; }
 .eh-module-card.eh-gomeria .eh-chip { background: #1f2937; }
 .eh-module-card.eh-recorrido .eh-chip { background: #0369a1; }
+/* Foto panorámica (1973x544, ~3.6:1) - con el aspect-ratio 4:3 genérico se veía recortadísima
+   (solo la goma en primer plano). Con su propia proporción entra el camión completo. */
+.eh-module-card.eh-recorrido { aspect-ratio: 3.6 / 1; }
 
 .eh-module-card .eh-label {
   position: absolute; left: 14px; right: 14px; bottom: 12px;
