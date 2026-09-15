@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '352';
+const CURRENT_APP_VERSION = '353';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -8405,9 +8405,12 @@ function renderElastiqueroPendingBlocks() {
 // todavía - el camión ya queda Fuera de Servicio y Pañol lo ve para preparar insumos. Las
 // tareas (ejes/cubiertas/empleados/horas) se cargan después desde la pestaña Elastiquero,
 // donde este mismo interno ya va a aparecer pre-armado (ver renderElastiqueroPendingBlocks).
-async function recibirCamionElastiquero() {
+async function recibirCamionElastiquero(internoOverride) {
+  // "Ordenar / Limpieza" (botón rápido) pasa 'VARIOS' directo, sin pasar por el desplegable -
+  // ese interno especial ya existe en el catálogo de Taxes (label "8 17 Interno VARIOS") para
+  // laburos de orden/limpieza del taller que no son de un camión puntual.
   const selectEl = document.getElementById('eh-recibir-interno');
-  const interno = selectEl ? selectEl.value.trim() : '';
+  const interno = internoOverride || (selectEl ? selectEl.value.trim() : '');
   if (!interno) {
     showToast('Elegí un interno.', 'danger');
     return;
@@ -8447,7 +8450,7 @@ async function recibirCamionElastiquero() {
       throw new Error(errData.error || 'Error al recibir el camión.');
     }
     showToast(`✅ Interno ${interno} recibido - Fuera de Servicio.`, 'success');
-    setSearchableSelectValue(selectEl, '');
+    if (!internoOverride && selectEl) setSearchableSelectValue(selectEl, '');
     await fetchOrders();
   } catch (err) {
     showToast(err.message, 'danger');
