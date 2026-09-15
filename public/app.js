@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '356';
+const CURRENT_APP_VERSION = '357';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -837,6 +837,14 @@ function switchView(viewId) {
         updateHistoryBulkDeleteActionBar();
         document.querySelectorAll('.history-order-select-checkbox').forEach(chk => chk.checked = false);
       } catch (e) {}
+    }
+
+    // El "+" flotante abre el modal genérico de Nueva Orden de Trabajo (Taller) - en Elastiquero
+    // no aplica, ahí se cargan órdenes con "Recibir Camión"/"Agregar Interno" y "Generar
+    // Órdenes" propios, así que se oculta en sus dos pantallas y se restaura en cualquier otra.
+    const createOrderFab = document.getElementById('create-order-fab');
+    if (createOrderFab) {
+      createOrderFab.style.display = (viewId === 'elastiquero' || viewId === 'elastiquero-home') ? 'none' : '';
     }
 
     if (viewId === 'orders') {
