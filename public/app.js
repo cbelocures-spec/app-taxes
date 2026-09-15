@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '347';
+const CURRENT_APP_VERSION = '348';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -8321,9 +8321,13 @@ function removeElastiqueroInternoBlock(btn) {
   updateElastiqueroHorasResumen();
 }
 
-// Same match used at submit time: a real Taller order (not Herrería/Edilicio), still Fuera de
+// Same match used at submit time: an open Elastiquero-classified order, still Fuera de
 // Servicio, for this exact interno - kept as one function so the live preview and the actual
 // submit never disagree about which order (if any) is going to receive the new tasks.
+// Used to match ANY open Taller order regardless of its own clasificación (Auxilio,
+// Correctivo, etc.), which meant Elastiquero's work landed mixed into whatever unrelated
+// order happened to already have the truck Fuera de Servicio - pedido explicito del usuario
+// para que cada clasificación tenga su propia orden (2026-09-15).
 function findOpenTallerOrderForInterno(interno) {
   const cleanInterno = String(interno || '').trim();
   if (!cleanInterno) return null;
@@ -8331,7 +8335,7 @@ function findOpenTallerOrderForInterno(interno) {
     String(o.interno || '').trim() === cleanInterno &&
     o.estadoUnidad === 'fuera_de_servicio' &&
     (!o.estado || o.estado.toLowerCase() !== 'cerrada') &&
-    !isHerreriaOrder(o) && !isEdilicioOrder(o)
+    o.clasificacion === 'Elastiquero'
   ) || null;
 }
 
