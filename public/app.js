@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '351';
+const CURRENT_APP_VERSION = '352';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -2746,6 +2746,7 @@ async function fetchCatalogs() {
     cachedInternoOptions = internoOptions;
     populateSelect('form-interno', internoOptions, "Seleccionar Interno...");
     populateSelect('pre-form-interno', internoOptions, "Seleccionar Interno...");
+    populateSelect('eh-recibir-interno', internoOptions, "Seleccionar Interno...");
 
     // Populate Parte Taller datalist for internal selection
     const ptDatalist = document.getElementById('pt-interno-list');
@@ -2757,6 +2758,7 @@ async function fetchCatalogs() {
     convertSelectToSearchable(document.getElementById('form-rodado'));
     convertSelectToSearchable(document.getElementById('form-interno'));
     convertSelectToSearchable(document.getElementById('pre-form-interno'));
+    convertSelectToSearchable(document.getElementById('eh-recibir-interno'));
 
     // Initialize Carga Masiva tasks
     const bulkContainer = document.getElementById('bulk-tasks-container');

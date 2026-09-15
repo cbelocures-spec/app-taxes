@@ -3454,6 +3454,25 @@ body {
   flex: none;
   white-space: nowrap;
 }
+/* Más grande a propósito: lo usa gente mayor en el taller - hay que poder leerlo y tocarlo
+   sin entrecerrar los ojos. */
+.eh-recibir-row .searchable-select-trigger,
+.eh-recibir-row select {
+  font-size: 19px !important;
+  padding: 16px 14px !important;
+}
+.eh-recibir-row .searchable-select-search-input {
+  font-size: 19px !important;
+  padding: 12px !important;
+}
+.eh-recibir-row .searchable-select-option {
+  font-size: 18px !important;
+  padding: 14px 12px !important;
+}
+.eh-recibir-row button.btn-primary {
+  font-size: 17px;
+  padding: 0 22px;
+}
 
 .eh-module-grid {
   display: grid;
