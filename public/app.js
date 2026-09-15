@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '355';
+const CURRENT_APP_VERSION = '356';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7652,6 +7652,41 @@ function getGomeriaMecanicaEmployees() {
   return matched;
 }
 
+// Compartido entre Gomería, Elastiquero (cubiertas cambiadas) y Reparación Cubierta - antes
+// "Tipo" y "Medida" eran texto libre y cada uno terminaba escribiendo distinto (ej: "lineal",
+// "Lineal", "LINEAL") - ahora son desplegables con las opciones reales que se usan en el taller,
+// y "Medida" deja agregar una medida no listada sin perder la validación de las dos comunes.
+const CUBIERTA_TIPO_OPTIONS = ['Lineal', 'Taco', 'Mixta'];
+const CUBIERTA_MEDIDA_PRESETS = ['275/80', '295/80'];
+
+function cubiertaTipoSelectHtml(cls) {
+  const opts = CUBIERTA_TIPO_OPTIONS.map(t => `<option value="${t}">${t}</option>`).join('');
+  return `<select class="${cls}" style="width:100%; margin-bottom:6px;"><option value="">Tipo...</option>${opts}</select>`;
+}
+
+function cubiertaMedidaSelectHtml(cls, otroCls) {
+  const opts = CUBIERTA_MEDIDA_PRESETS.map(m => `<option value="${m}">${m}</option>`).join('');
+  return `<select class="${cls}" style="width:100%; margin-bottom:6px;" onchange="toggleCubiertaMedidaOtro(this)"><option value="">Medida...</option>${opts}<option value="__otro__">+ Agregar otra medida</option></select>
+      <input type="text" class="${otroCls}" placeholder="Escribir medida" style="width:100%; margin-bottom:6px; display:none;">`;
+}
+
+function toggleCubiertaMedidaOtro(selectEl) {
+  const otroInput = selectEl.nextElementSibling;
+  if (otroInput) otroInput.style.display = (selectEl.value === '__otro__') ? 'block' : 'none';
+}
+
+// Igual que "field(row, cls)" pero para un select de Medida: si eligieron "+ Agregar otra
+// medida" lee el texto libre de al lado en vez del valor "__otro__" literal.
+function cubiertaMedidaFieldValue(row, cls) {
+  const el = row.querySelector(`.${cls}`);
+  if (!el) return '';
+  if (el.value === '__otro__') {
+    const otroInput = el.nextElementSibling;
+    return otroInput ? otroInput.value.trim() : '';
+  }
+  return el.value.trim();
+}
+
 function addGomeriaInternoBlock() {
   const container = document.getElementById('gomeria-internos-container');
   if (!container) return;
@@ -7763,17 +7798,17 @@ function addGomeriaTireRow(btn) {
       <div>
         <label style="font-size:11px; font-weight:700; color:var(--danger); text-transform:uppercase; display:block; margin-bottom:6px;">Se sacó</label>
         <input type="text" class="gomeria-salida-fuego" placeholder="N° Fuego" style="width:100%; margin-bottom:6px;">
-        <input type="text" class="gomeria-salida-tipo" placeholder="Tipo (ej: Lineal)" style="width:100%; margin-bottom:6px;">
+        ${cubiertaTipoSelectHtml('gomeria-salida-tipo')}
         <input type="text" class="gomeria-salida-marca" placeholder="Marca" style="width:100%; margin-bottom:6px;">
-        <input type="text" class="gomeria-salida-medida" placeholder="Medida (ej: 275)" style="width:100%; margin-bottom:6px;">
+        ${cubiertaMedidaSelectHtml('gomeria-salida-medida', 'gomeria-salida-medida-otro')}
         <input type="text" class="gomeria-salida-estado" placeholder="Estado (pinchada, liza...)" style="width:100%;">
       </div>
       <div>
         <label style="font-size:11px; font-weight:700; color:var(--success); text-transform:uppercase; display:block; margin-bottom:6px;">Se colocó</label>
         <input type="text" class="gomeria-entrada-fuego" placeholder="N° Fuego" style="width:100%; margin-bottom:6px;">
-        <input type="text" class="gomeria-entrada-tipo" placeholder="Tipo (ej: Lineal)" style="width:100%; margin-bottom:6px;">
+        ${cubiertaTipoSelectHtml('gomeria-entrada-tipo')}
         <input type="text" class="gomeria-entrada-marca" placeholder="Marca" style="width:100%; margin-bottom:6px;">
-        <input type="text" class="gomeria-entrada-medida" placeholder="Medida (ej: 275)" style="width:100%; margin-bottom:6px;">
+        ${cubiertaMedidaSelectHtml('gomeria-entrada-medida', 'gomeria-entrada-medida-otro')}
         <input type="text" class="gomeria-entrada-estado" placeholder="Estado (recapada nueva...)" style="width:100%;">
       </div>
     </div>
@@ -7844,12 +7879,12 @@ function buildGomeriaDescription(block) {
     const sFuego = field(row, 'gomeria-salida-fuego');
     const sTipo = field(row, 'gomeria-salida-tipo');
     const sMarca = field(row, 'gomeria-salida-marca');
-    const sMedida = field(row, 'gomeria-salida-medida');
+    const sMedida = cubiertaMedidaFieldValue(row, 'gomeria-salida-medida');
     const sEstado = field(row, 'gomeria-salida-estado');
     const eFuego = field(row, 'gomeria-entrada-fuego');
     const eTipo = field(row, 'gomeria-entrada-tipo');
     const eMarca = field(row, 'gomeria-entrada-marca');
-    const eMedida = field(row, 'gomeria-entrada-medida');
+    const eMedida = cubiertaMedidaFieldValue(row, 'gomeria-entrada-medida');
     const eEstado = field(row, 'gomeria-entrada-estado');
     if (!sFuego && !eFuego) return null;
     const prefix = rows.length > 1 ? `Cambio cubierta ${idx + 1}` : 'Cambio cubierta';
@@ -8056,17 +8091,17 @@ function addElastiqueroCubiertaRow(btn) {
       <div>
         <label style="font-size:11px; font-weight:700; color:var(--danger); text-transform:uppercase; display:block; margin-bottom:6px;">Se sacó</label>
         <input type="text" class="elastiquero-cubierta-salida-fuego" placeholder="N° Fuego" style="width:100%; margin-bottom:6px;">
-        <input type="text" class="elastiquero-cubierta-salida-tipo" placeholder="Tipo (ej: Lineal)" style="width:100%; margin-bottom:6px;">
+        ${cubiertaTipoSelectHtml('elastiquero-cubierta-salida-tipo')}
         <input type="text" class="elastiquero-cubierta-salida-marca" placeholder="Marca" style="width:100%; margin-bottom:6px;">
-        <input type="text" class="elastiquero-cubierta-salida-medida" placeholder="Medida (ej: 275)" style="width:100%; margin-bottom:6px;">
+        ${cubiertaMedidaSelectHtml('elastiquero-cubierta-salida-medida', 'elastiquero-cubierta-salida-medida-otro')}
         <input type="text" class="elastiquero-cubierta-salida-estado" placeholder="Estado (pinchada, liza...)" style="width:100%;">
       </div>
       <div>
         <label style="font-size:11px; font-weight:700; color:var(--success); text-transform:uppercase; display:block; margin-bottom:6px;">Se colocó</label>
         <input type="text" class="elastiquero-cubierta-entrada-fuego" placeholder="N° Fuego" style="width:100%; margin-bottom:6px;">
-        <input type="text" class="elastiquero-cubierta-entrada-tipo" placeholder="Tipo (ej: Lineal)" style="width:100%; margin-bottom:6px;">
+        ${cubiertaTipoSelectHtml('elastiquero-cubierta-entrada-tipo')}
         <input type="text" class="elastiquero-cubierta-entrada-marca" placeholder="Marca" style="width:100%; margin-bottom:6px;">
-        <input type="text" class="elastiquero-cubierta-entrada-medida" placeholder="Medida (ej: 275)" style="width:100%; margin-bottom:6px;">
+        ${cubiertaMedidaSelectHtml('elastiquero-cubierta-entrada-medida', 'elastiquero-cubierta-entrada-medida-otro')}
         <input type="text" class="elastiquero-cubierta-entrada-estado" placeholder="Estado (recapada nueva...)" style="width:100%;">
       </div>
     </div>
@@ -8116,12 +8151,12 @@ function buildElastiqueroCubiertaDescription(block) {
     const sFuego = field(row, 'elastiquero-cubierta-salida-fuego');
     const sTipo = field(row, 'elastiquero-cubierta-salida-tipo');
     const sMarca = field(row, 'elastiquero-cubierta-salida-marca');
-    const sMedida = field(row, 'elastiquero-cubierta-salida-medida');
+    const sMedida = cubiertaMedidaFieldValue(row, 'elastiquero-cubierta-salida-medida');
     const sEstado = field(row, 'elastiquero-cubierta-salida-estado');
     const eFuego = field(row, 'elastiquero-cubierta-entrada-fuego');
     const eTipo = field(row, 'elastiquero-cubierta-entrada-tipo');
     const eMarca = field(row, 'elastiquero-cubierta-entrada-marca');
-    const eMedida = field(row, 'elastiquero-cubierta-entrada-medida');
+    const eMedida = cubiertaMedidaFieldValue(row, 'elastiquero-cubierta-entrada-medida');
     const eEstado = field(row, 'elastiquero-cubierta-entrada-estado');
     const descripcion = field(row, 'elastiquero-cubierta-descripcion');
     if (!sFuego && !eFuego && !descripcion) return null;
@@ -8189,9 +8224,9 @@ function addElastiqueroReparacionRow(btn) {
     </div>
     <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Cubierta reparada</label>
     <input type="text" class="elastiquero-reparacion-fuego" placeholder="N° Fuego" style="width:100%; margin-bottom:6px;">
-    <input type="text" class="elastiquero-reparacion-tipo" placeholder="Tipo (ej: Lineal)" style="width:100%; margin-bottom:6px;">
+    ${cubiertaTipoSelectHtml('elastiquero-reparacion-tipo')}
     <input type="text" class="elastiquero-reparacion-marca" placeholder="Marca" style="width:100%; margin-bottom:6px;">
-    <input type="text" class="elastiquero-reparacion-medida" placeholder="Medida (ej: 275)" style="width:100%; margin-bottom:6px;">
+    ${cubiertaMedidaSelectHtml('elastiquero-reparacion-medida', 'elastiquero-reparacion-medida-otro')}
     <input type="text" class="elastiquero-reparacion-estado" placeholder="Estado (pinchada, liza...)" style="width:100%;">
   `;
   rowsContainer.appendChild(row);
@@ -8212,7 +8247,7 @@ function buildElastiqueroReparacionDescription(block) {
     const fuego = field(row, 'elastiquero-reparacion-fuego');
     const tipo = field(row, 'elastiquero-reparacion-tipo');
     const marca = field(row, 'elastiquero-reparacion-marca');
-    const medida = field(row, 'elastiquero-reparacion-medida');
+    const medida = cubiertaMedidaFieldValue(row, 'elastiquero-reparacion-medida');
     const estado = field(row, 'elastiquero-reparacion-estado');
     const descripcion = field(row, 'elastiquero-reparacion-descripcion');
     if (!fuego && !descripcion) return null;
