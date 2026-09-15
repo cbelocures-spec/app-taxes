@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '354';
+const CURRENT_APP_VERSION = '355';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -8168,6 +8168,84 @@ function buildElastiqueroOtrosDescription(block) {
   return lines.join('\n');
 }
 
+// "Reparación Cubierta": una cubierta suelta que se repara en el taller, no montada en ningún
+// camión - por eso no tiene "Eje/Posición" ni el par Se sacó/Se colocó (no se cambia una
+// cubierta por otra, se arregla la misma). Solo Descripción + los datos de esa cubierta.
+function addElastiqueroReparacionRow(btn) {
+  const block = btn.closest('.elastiquero-interno-block');
+  const rowsContainer = block ? block.querySelector('.elastiquero-reparacion-rows-container') : null;
+  if (!rowsContainer) return;
+
+  const row = document.createElement('div');
+  row.className = 'elastiquero-reparacion-row';
+  row.style.cssText = 'border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-top:10px; position:relative;';
+  row.innerHTML = `
+    <button type="button" onclick="removeElastiqueroReparacionRow(this)" style="position:absolute; top:6px; right:6px; border:none; background:none; color:var(--danger); cursor:pointer; padding:2px;" title="Quitar">
+      <span class="material-icons" style="font-size:16px;">close</span>
+    </button>
+    <div class="form-group" style="margin-bottom:10px;">
+      <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Descripción</label>
+      <textarea class="elastiquero-reparacion-descripcion" rows="2" placeholder="Ej: se parchó pinchadura, se reforzó talón" style="width:100%;"></textarea>
+    </div>
+    <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Cubierta reparada</label>
+    <input type="text" class="elastiquero-reparacion-fuego" placeholder="N° Fuego" style="width:100%; margin-bottom:6px;">
+    <input type="text" class="elastiquero-reparacion-tipo" placeholder="Tipo (ej: Lineal)" style="width:100%; margin-bottom:6px;">
+    <input type="text" class="elastiquero-reparacion-marca" placeholder="Marca" style="width:100%; margin-bottom:6px;">
+    <input type="text" class="elastiquero-reparacion-medida" placeholder="Medida (ej: 275)" style="width:100%; margin-bottom:6px;">
+    <input type="text" class="elastiquero-reparacion-estado" placeholder="Estado (pinchada, liza...)" style="width:100%;">
+  `;
+  rowsContainer.appendChild(row);
+}
+
+function removeElastiqueroReparacionRow(btn) {
+  const row = btn.closest('.elastiquero-reparacion-row');
+  if (row) row.remove();
+}
+
+function buildElastiqueroReparacionDescription(block) {
+  const rows = Array.from(block.querySelectorAll('.elastiquero-reparacion-row'));
+  const field = (row, cls) => {
+    const el = row.querySelector(`.${cls}`);
+    return el ? el.value.trim() : '';
+  };
+  const lines = rows.map((row, idx) => {
+    const fuego = field(row, 'elastiquero-reparacion-fuego');
+    const tipo = field(row, 'elastiquero-reparacion-tipo');
+    const marca = field(row, 'elastiquero-reparacion-marca');
+    const medida = field(row, 'elastiquero-reparacion-medida');
+    const estado = field(row, 'elastiquero-reparacion-estado');
+    const descripcion = field(row, 'elastiquero-reparacion-descripcion');
+    if (!fuego && !descripcion) return null;
+    const prefix = rows.length > 1 ? `Cubierta reparada ${idx + 1}` : 'Cubierta reparada';
+    const descSuffix = descripcion ? ` - ${descripcion}` : '';
+    return `${prefix}: N° Fuego ${fuego || '-'} - Tipo ${tipo || '-'} - Marca ${marca || '-'} - Medida ${medida || '-'} - Estado ${estado || '-'}${descSuffix}`;
+  }).filter(Boolean);
+  return lines.join('\n');
+}
+
+// Botón "Reparación Cubierta" (peer de "Agregar Interno"): arma un bloque ya fijado al interno
+// especial "REPARACIONES INTERNAS" del catálogo de Taxes (label "9 15 Interno REPARACIONES
+// INTERNAS") y muestra la sección "Cubierta reparada" en vez de Ejes/Cubiertas cambiadas.
+function addElastiqueroReparacionInternaBlock() {
+  addElastiqueroInternoBlock();
+  const container = document.getElementById('elastiquero-internos-container');
+  const block = container ? container.querySelector('.elastiquero-interno-block:last-child') : null;
+  if (!block) return;
+
+  const internoSelect = block.querySelector('.elastiquero-interno-select');
+  if (internoSelect) setSearchableSelectValue(internoSelect, 'REPARACIONES INTERNAS');
+
+  const ejeSection = block.querySelector('.elastiquero-eje-section');
+  if (ejeSection) ejeSection.style.display = 'none';
+  const cubiertaSection = block.querySelector('.elastiquero-cubierta-section');
+  if (cubiertaSection) cubiertaSection.style.display = 'none';
+  const reparacionSection = block.querySelector('.elastiquero-reparacion-section');
+  if (reparacionSection) reparacionSection.style.display = 'block';
+
+  const addReparacionBtn = reparacionSection ? reparacionSection.querySelector('.btn-secondary') : null;
+  if (addReparacionBtn) addElastiqueroReparacionRow(addReparacionBtn);
+}
+
 function addElastiqueroEmpleadoRow(btn) {
   const block = btn.closest('.elastiquero-interno-block');
   const rowsContainer = block ? block.querySelector('.elastiquero-empleado-rows-container') : null;
@@ -8323,17 +8401,29 @@ function addElastiqueroInternoBlock() {
     </div>
     <div class="elastiquero-ot-info" style="display:none; margin-top:8px; padding:8px 10px; border-radius:6px; font-size:12px; font-weight:600;"></div>
 
-    <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:14px 0 0;">Ejes trabajados (elástico)</label>
-    <div class="elastiquero-eje-rows-container"></div>
-    <button type="button" class="btn btn-secondary btn-xs" onclick="addElastiqueroEjeRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
-      <span class="material-icons" style="font-size:14px;">add</span> Agregar eje
-    </button>
+    <div class="elastiquero-eje-section">
+      <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:14px 0 0;">Ejes trabajados (elástico)</label>
+      <div class="elastiquero-eje-rows-container"></div>
+      <button type="button" class="btn btn-secondary btn-xs" onclick="addElastiqueroEjeRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
+        <span class="material-icons" style="font-size:14px;">add</span> Agregar eje
+      </button>
+    </div>
 
-    <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:16px 0 0; border-top:1px solid var(--border-color); padding-top:12px;">Cubiertas cambiadas (gomería)</label>
-    <div class="elastiquero-cubierta-rows-container"></div>
-    <button type="button" class="btn btn-secondary btn-xs" onclick="addElastiqueroCubiertaRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
-      <span class="material-icons" style="font-size:14px;">add</span> Agregar cubierta cambiada
-    </button>
+    <div class="elastiquero-cubierta-section">
+      <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:16px 0 0; border-top:1px solid var(--border-color); padding-top:12px;">Cubiertas cambiadas (gomería)</label>
+      <div class="elastiquero-cubierta-rows-container"></div>
+      <button type="button" class="btn btn-secondary btn-xs" onclick="addElastiqueroCubiertaRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
+        <span class="material-icons" style="font-size:14px;">add</span> Agregar cubierta cambiada
+      </button>
+    </div>
+
+    <div class="elastiquero-reparacion-section" style="display:none;">
+      <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:16px 0 0; border-top:1px solid var(--border-color); padding-top:12px;">Cubierta reparada</label>
+      <div class="elastiquero-reparacion-rows-container"></div>
+      <button type="button" class="btn btn-secondary btn-xs" onclick="addElastiqueroReparacionRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
+        <span class="material-icons" style="font-size:14px;">add</span> Agregar cubierta reparada
+      </button>
+    </div>
 
     <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:16px 0 0; border-top:1px solid var(--border-color); padding-top:12px;">Otros</label>
     <div class="elastiquero-otro-rows-container"></div>
@@ -8575,9 +8665,10 @@ async function submitElastiqueroOrders() {
     const ejeDescripcion = buildElastiqueroDescription(block);
     const cubiertaDescripcion = buildElastiqueroCubiertaDescription(block);
     const otrosDescripcion = buildElastiqueroOtrosDescription(block);
-    const descripcion = [ejeDescripcion, cubiertaDescripcion, otrosDescripcion].filter(Boolean).join('\n');
+    const reparacionDescripcion = buildElastiqueroReparacionDescription(block);
+    const descripcion = [ejeDescripcion, cubiertaDescripcion, reparacionDescripcion, otrosDescripcion].filter(Boolean).join('\n');
     if (!descripcion) {
-      showToast(`Cargá al menos un eje trabajado, una cubierta cambiada u otro trabajo para el interno ${interno}.`, 'danger');
+      showToast(`Cargá al menos un eje trabajado, una cubierta cambiada, una cubierta reparada u otro trabajo para el interno ${interno}.`, 'danger');
       return;
     }
 
@@ -8624,6 +8715,7 @@ async function submitElastiqueroOrders() {
       const incidenteParts = [];
       if (ejeDescripcion) incidenteParts.push('Cambio/Reparación de elástico');
       if (cubiertaDescripcion) incidenteParts.push('Cambio de cubiertas');
+      if (reparacionDescripcion) incidenteParts.push('Reparación de cubierta');
       if (otrosDescripcion) incidenteParts.push('Otros');
       newOrdersToCreate.push({
         rodado: rodadoLabel,
