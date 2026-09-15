@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '345';
+const CURRENT_APP_VERSION = '346';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -8142,7 +8142,7 @@ function addElastiqueroEmpleadoRow(btn) {
       </select>
     </div>
     <div class="form-group" style="margin-bottom:0;">
-      <input type="number" step="0.1" min="0" class="elastiquero-horas-input" placeholder="Horas">
+      <input type="text" inputmode="decimal" class="elastiquero-horas-input" placeholder="Horas (ej: 0.5)">
     </div>
     <button type="button" onclick="removeElastiqueroEmpleadoRow(this)" style="border:none; background:none; color:var(--danger); cursor:pointer; padding:6px;" title="Quitar este empleado">
       <span class="material-icons" style="font-size:18px;">close</span>
