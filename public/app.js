@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '346';
+const CURRENT_APP_VERSION = '347';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -8208,16 +8208,20 @@ function updateElastiqueroHorasResumen() {
   const resumenEl = document.getElementById('elastiquero-horas-resumen');
   if (!resumenEl) return;
 
-  const totales = new Map(); // empleado (value del select) -> { label, horas }
+  // Las horas se cargan en notación hs.mm (ej: "0.30" = 0h30m, "1.30" = 1h30m), igual que en
+  // el resto de la app (ver hmmToMinutes/minutesToHmm) - NO son horas decimales. Sumar los
+  // valores crudos como decimales hacía que dos cargas de "0.30" dieran "0.6" en vez de "1"
+  // (una hora), así que acá se suman en minutos reales y se vuelve a expresar en horas.
+  const totales = new Map(); // empleado (value del select) -> { label, minutos }
   document.querySelectorAll('#elastiquero-internos-container .elastiquero-empleado-row').forEach(row => {
     const select = row.querySelector('.elastiquero-empleado-select');
     const empleado = select ? select.value : '';
     if (!empleado) return;
     const horasInput = row.querySelector('.elastiquero-horas-input');
-    const horas = (horasInput && horasInput.value.trim()) ? parseFloat(horasInput.value.replace(',', '.')) || 0 : 0;
+    const hmmVal = (horasInput && horasInput.value.trim()) ? parseFloat(horasInput.value.replace(',', '.')) || 0 : 0;
     const label = (select.selectedOptions && select.selectedOptions[0]) ? select.selectedOptions[0].text : empleado;
-    const entry = totales.get(empleado) || { label, horas: 0 };
-    entry.horas += horas;
+    const entry = totales.get(empleado) || { label, minutos: 0 };
+    entry.minutos += hmmToMinutes(hmmVal);
     totales.set(empleado, entry);
   });
 
@@ -8227,7 +8231,8 @@ function updateElastiqueroHorasResumen() {
   }
 
   const minimo = (new Date().getDay() === 6) ? 4 : 7; // sabado: 4hs, resto de la semana: 7hs
-  resumenEl.innerHTML = Array.from(totales.values()).map(({ label, horas }) => {
+  resumenEl.innerHTML = Array.from(totales.values()).map(({ label, minutos }) => {
+    const horas = minutos / 60;
     const completo = horas >= minimo;
     const bg = completo ? '#dff5e6' : '#fde3e3';
     const fg = completo ? '#1e7d43' : '#b3271e';
