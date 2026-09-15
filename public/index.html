@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=50">
+  <link rel="stylesheet" href="style.css?v=51">
   <script>
     (function() {
       try {
@@ -676,9 +676,70 @@
             </div>
           </div>
         </button>
+
+        <button type="button" class="eh-module-card eh-recorrido" onclick="switchView('recorrido')">
+          <img src="imagenes/recorrido.jpg" alt="Revisión del estado de las cubiertas de un camión">
+          <div class="eh-scrim"></div>
+          <span class="eh-chip">Revisión de cubiertas</span>
+          <div class="eh-label">
+            <span class="material-icons">directions_walk</span>
+            <div class="eh-label-text">
+              <strong>Recorrido</strong>
+              <small>Revisar el estado de las cubiertas</small>
+            </div>
+          </div>
+        </button>
+        <div id="eh-recorrido-widget" class="eh-recorrido-widget" style="display:none;"></div>
       </div>
 
       <p class="eh-footnote">Podés volver a este modo desde Ajustes cuando quieras.</p>
+    </section>
+
+    <!-- VIEW: RECORRIDO (revisión del estado de las cubiertas) -->
+    <section id="view-recorrido" class="app-view">
+      <div class="view-header">
+        <h2>Recorrido</h2>
+      </div>
+
+      <div id="recorrido-idle-state" class="form-section-card" style="text-align:center;">
+        <p style="color:var(--text-muted); margin-top:0;">Arrancá el cronómetro al salir a revisar el estado de las cubiertas de los camiones.</p>
+        <button type="button" class="btn btn-primary btn-block btn-lg" onclick="iniciarRecorrido()">
+          <span class="material-icons">play_arrow</span> Iniciar Recorrido
+        </button>
+      </div>
+
+      <div id="recorrido-running-state" class="form-section-card" style="display:none; text-align:center;">
+        <div id="recorrido-timer-display" class="recorrido-timer-display">00:00:00</div>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn btn-secondary" style="flex:1;" id="recorrido-pausa-btn" onclick="toggleRecorridoPausa()">
+            <span class="material-icons">pause</span> Pausar
+          </button>
+          <button type="button" class="btn btn-primary" style="flex:1; background-color:var(--success); border-color:var(--success);" onclick="finalizarRecorridoTimer()">
+            <span class="material-icons">check</span> Fin
+          </button>
+        </div>
+      </div>
+
+      <div id="recorrido-review-state" style="display:none;">
+        <div class="form-section-card">
+          <p style="margin-top:0; color:var(--text-muted);">Tiempo total del recorrido: <strong id="recorrido-total-tiempo">00:00:00</strong></p>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Empleado (quién hizo el recorrido) *</label>
+            <select id="recorrido-empleado-select" style="width:100%;">
+              <option value="">Seleccionar Empleado...</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="recorrido-internos-container"></div>
+        <button type="button" class="btn btn-secondary btn-block" onclick="addRecorridoInternoRow()" style="display:flex; align-items:center; justify-content:center; gap:6px; margin: 4px 0 20px;">
+          <span class="material-icons" style="font-size:18px;">add</span> Agregar Interno Revisado
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitRecorridoOrders()" style="margin-bottom: 30px;">
+          <span class="material-icons">send</span> Generar Órdenes
+        </button>
+      </div>
     </section>
 
     <!-- VIEW: ELASTIQUERO (CAMBIO/REPARACIÓN DE ELÁSTICOS) -->
@@ -1625,6 +1686,10 @@
         <span class="material-icons">linear_scale</span>
         <span>Elastiquero</span>
       </button>
+      <button class="nav-item" onclick="switchView('recorrido')" id="nav-recorrido">
+        <span class="material-icons">directions_walk</span>
+        <span>Recorrido</span>
+      </button>
       <button class="nav-item" onclick="switchView('partetaller')" id="nav-partetaller">
         <span class="material-icons">engineering</span>
         <span>Parte Taller</span>
@@ -1669,7 +1734,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.25.1</div>
+      <div class="sidebar-version">Versión 1.26.0</div>
     </div>
   </aside>
 
@@ -2926,6 +2991,6 @@
     }
   </style>
 
-  <script src="app.js?v=357"></script>
+  <script src="app.js?v=358"></script>
 </body>
 </html>

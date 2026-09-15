@@ -3526,6 +3526,7 @@ body {
 }
 .eh-module-card.eh-elastiquero .eh-chip { background: #92400e; }
 .eh-module-card.eh-gomeria .eh-chip { background: #1f2937; }
+.eh-module-card.eh-recorrido .eh-chip { background: #0369a1; }
 
 .eh-module-card .eh-label {
   position: absolute; left: 14px; right: 14px; bottom: 12px;
@@ -3540,5 +3541,29 @@ body {
 .eh-footnote {
   text-align: center; font-size: 11px; color: var(--text-muted);
   padding-top: 14px;
+}
+
+.eh-recorrido-widget {
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--primary-light);
+  border: 1px solid var(--primary);
+  font-size: 15px;
+}
+.eh-recorrido-widget #eh-recorrido-timer-display {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary);
+  margin-right: auto;
+}
+
+.recorrido-timer-display {
+  font-size: 40px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin: 8px 0 20px;
 }
 

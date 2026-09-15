@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '357';
+const CURRENT_APP_VERSION = '358';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -844,7 +844,7 @@ function switchView(viewId) {
     // Órdenes" propios, así que se oculta en sus dos pantallas y se restaura en cualquier otra.
     const createOrderFab = document.getElementById('create-order-fab');
     if (createOrderFab) {
-      createOrderFab.style.display = (viewId === 'elastiquero' || viewId === 'elastiquero-home') ? 'none' : '';
+      createOrderFab.style.display = (viewId === 'elastiquero' || viewId === 'elastiquero-home' || viewId === 'recorrido') ? 'none' : '';
     }
 
     if (viewId === 'orders') {
@@ -912,6 +912,11 @@ function switchView(viewId) {
           if (recibirSelect.rebuildSearchable) recibirSelect.rebuildSearchable();
         }
       } catch(e) {}
+      try { renderRecorridoHomeWidget(); } catch(e) {}
+    }
+
+    if (viewId === 'recorrido') {
+      try { renderRecorridoView(); } catch(e) {}
     }
 
     if (viewId === 'partetaller') {
@@ -7713,13 +7718,21 @@ function addGomeriaInternoBlock() {
         <span class="material-icons" style="font-size:18px;">delete</span>
       </button>
     </div>
-    <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px;">
+    <div class="gomeria-initial-fields">
       <div class="form-group">
-        <label>Interno *</label>
+        <label>Rodado *</label>
         <select class="gomeria-interno-select" style="width:100%;">
           <option value="">Seleccionar Interno...</option>
           ${internoOptionsHtml}
         </select>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button type="button" class="btn btn-secondary" style="flex:1;" onclick="setGomeriaRodadoShortcut(this, 'VARIOS')">
+            <span class="material-icons" style="font-size:16px;">cleaning_services</span> Ordenar / Limpieza
+          </button>
+          <button type="button" class="btn btn-secondary" style="flex:1;" onclick="setGomeriaRodadoShortcut(this, 'REPARACIONES INTERNAS')">
+            <span class="material-icons" style="font-size:16px;">build</span> Reparación Cubierta
+          </button>
+        </div>
       </div>
       <div class="form-group">
         <label>Clasificación *</label>
@@ -7728,27 +7741,31 @@ function addGomeriaInternoBlock() {
           <option value="Auxilio">Auxilio</option>
         </select>
       </div>
-    </div>
-    <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px;">
-      <div class="form-group">
-        <label>Empleado *</label>
-        <select class="gomeria-empleado-select" style="width:100%;">
-          <option value="">Seleccionar Empleado...</option>
-          ${getGomeriaMecanicaEmployees().map(e => `<option value="${e.value}">${e.label}</option>`).join('')}
-        </select>
+      <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label>Empleado *</label>
+          <select class="gomeria-empleado-select" style="width:100%;">
+            <option value="">Seleccionar Empleado...</option>
+            ${getGomeriaMecanicaEmployees().map(e => `<option value="${e.value}">${e.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tiempo (horas)</label>
+          <input type="text" inputmode="decimal" class="gomeria-horas-input" placeholder="ej: 0.5" style="width:100%;">
+        </div>
       </div>
-      <div class="form-group">
-        <label>Tiempo (horas)</label>
-        <input type="number" step="0.1" min="0" class="gomeria-horas-input" placeholder="ej: 0.5" style="width:100%;">
-      </div>
+      <button type="button" class="btn btn-primary btn-block gomeria-continuar-btn" onclick="continuarGomeriaInterno(this)">
+        Continuar
+      </button>
     </div>
-    <div class="gomeria-tire-rows-container"></div>
-    <button type="button" class="btn btn-secondary btn-xs" onclick="addGomeriaTireRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
-      <span class="material-icons" style="font-size:14px;">add</span> Agregar Cubierta Cambiada
-    </button>
+    <div class="gomeria-details-section" style="display:none;">
+      <div class="gomeria-tire-rows-container"></div>
+      <button type="button" class="btn btn-secondary btn-xs" onclick="addGomeriaTireRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
+        <span class="material-icons" style="font-size:14px;">add</span> Agregar Cubierta Cambiada
+      </button>
+    </div>
   `;
   container.appendChild(block);
-  addGomeriaTireRow(block.querySelector('.btn-secondary'));
   const internoSelectEl = block.querySelector('.gomeria-interno-select');
   if (internoSelectEl && typeof convertSelectToSearchable === 'function') {
     convertSelectToSearchable(internoSelectEl);
@@ -7762,6 +7779,38 @@ function addGomeriaInternoBlock() {
 function removeGomeriaInternoBlock(btn) {
   const block = btn.closest('.gomeria-interno-block');
   if (block) block.remove();
+}
+
+function setGomeriaRodadoShortcut(btn, value) {
+  const block = btn.closest('.gomeria-interno-block');
+  const select = block ? block.querySelector('.gomeria-interno-select') : null;
+  if (select) setSearchableSelectValue(select, value);
+}
+
+// Paso 1 (Rodado/Clasificación/Empleado/Horas) primero solo, y recién al confirmar acá se
+// revela el paso 2 (Eje/Posición, Cubierta, Se sacó, Se colocó) - evita mostrar todo el
+// formulario de una para algo que todavía no se sabe si es un cambio de cubierta.
+function continuarGomeriaInterno(btn) {
+  const block = btn.closest('.gomeria-interno-block');
+  if (!block) return;
+  const internoSelect = block.querySelector('.gomeria-interno-select');
+  if (!internoSelect || !internoSelect.value) {
+    showToast('Elegí el Rodado antes de continuar.', 'danger');
+    return;
+  }
+  const empleadoSelect = block.querySelector('.gomeria-empleado-select');
+  if (!empleadoSelect || !empleadoSelect.value) {
+    showToast('Elegí el Empleado antes de continuar.', 'danger');
+    return;
+  }
+  btn.style.display = 'none';
+  const detailsSection = block.querySelector('.gomeria-details-section');
+  if (detailsSection) {
+    detailsSection.style.display = 'block';
+    if (!detailsSection.querySelector('.gomeria-tire-row')) {
+      addGomeriaTireRow(detailsSection.querySelector('.btn-secondary'));
+    }
+  }
 }
 
 function addGomeriaTireRow(btn) {
@@ -7833,6 +7882,307 @@ function removeGomeriaTireRow(btn) {
     return;
   }
   row.remove();
+}
+
+// --- RECORRIDO (revisión del estado de las cubiertas por el gomero) ---
+// El cronómetro no está atado a ninguna orden mientras corre - recién al apretar Fin se sabe
+// cuántos internos se revisaron, y ahí se reparte el tiempo total en partes iguales entre
+// todos. Se guarda en localStorage para sobrevivir a un refresh/cierre de pestaña mientras el
+// gomero está afuera recorriendo. Ningún camión queda Fuera de Servicio por esto - es solo una
+// revisión visual, no un trabajo que saque la unidad de servicio.
+function getRecorridoState() {
+  try {
+    const raw = localStorage.getItem('recorridoState');
+    return raw ? JSON.parse(raw) : { active: false, startTime: null, timerHistory: [], finished: false };
+  } catch (e) {
+    return { active: false, startTime: null, timerHistory: [], finished: false };
+  }
+}
+
+function setRecorridoState(state) {
+  localStorage.setItem('recorridoState', JSON.stringify(state));
+}
+
+function clearRecorridoState() {
+  localStorage.removeItem('recorridoState');
+}
+
+function calcularSegundosRecorrido(state) {
+  let total = 0;
+  (state.timerHistory || []).forEach(h => { total += Math.max(0, (h.end - h.start) / 1000); });
+  if (state.active && state.startTime) total += Math.max(0, (Date.now() - state.startTime) / 1000);
+  return total;
+}
+
+function formatSegundosHms(totalSeconds) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const hh = Math.floor(s / 3600);
+  const mm = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+}
+
+let recorridoTickInterval = null;
+
+function iniciarRecorrido() {
+  const state = getRecorridoState();
+  if (state.active || state.finished) return;
+  state.active = true;
+  state.startTime = Date.now();
+  state.timerHistory = state.timerHistory || [];
+  setRecorridoState(state);
+  renderRecorridoView();
+  renderRecorridoHomeWidget();
+}
+
+function toggleRecorridoPausa() {
+  const state = getRecorridoState();
+  if (state.active) {
+    state.timerHistory = state.timerHistory || [];
+    state.timerHistory.push({ start: state.startTime, end: Date.now() });
+    state.active = false;
+    state.startTime = null;
+  } else {
+    state.active = true;
+    state.startTime = Date.now();
+  }
+  setRecorridoState(state);
+  renderRecorridoView();
+  renderRecorridoHomeWidget();
+}
+
+function finalizarRecorridoTimer() {
+  const state = getRecorridoState();
+  if (state.active && state.startTime) {
+    state.timerHistory = state.timerHistory || [];
+    state.timerHistory.push({ start: state.startTime, end: Date.now() });
+  }
+  state.active = false;
+  state.startTime = null;
+  state.finished = true;
+  setRecorridoState(state);
+  renderRecorridoView();
+  renderRecorridoHomeWidget();
+}
+
+function renderRecorridoTimerTick() {
+  const state = getRecorridoState();
+  const seconds = calcularSegundosRecorrido(state);
+  const display = document.getElementById('recorrido-timer-display');
+  if (display) display.textContent = formatSegundosHms(seconds);
+  const homeDisplay = document.getElementById('eh-recorrido-timer-display');
+  if (homeDisplay) homeDisplay.textContent = formatSegundosHms(seconds);
+}
+
+function ensureRecorridoTicking() {
+  if (recorridoTickInterval) clearInterval(recorridoTickInterval);
+  recorridoTickInterval = setInterval(() => {
+    const state = getRecorridoState();
+    if (state.active) renderRecorridoTimerTick();
+  }, 1000);
+}
+
+function renderRecorridoView() {
+  const idleEl = document.getElementById('recorrido-idle-state');
+  const runningEl = document.getElementById('recorrido-running-state');
+  const reviewEl = document.getElementById('recorrido-review-state');
+  if (!idleEl || !runningEl || !reviewEl) return;
+
+  const state = getRecorridoState();
+
+  if (state.finished) {
+    idleEl.style.display = 'none';
+    runningEl.style.display = 'none';
+    reviewEl.style.display = 'block';
+
+    const totalSeconds = calcularSegundosRecorrido(state);
+    const totalEl = document.getElementById('recorrido-total-tiempo');
+    if (totalEl) totalEl.textContent = formatSegundosHms(totalSeconds);
+
+    const empleadoSelect = document.getElementById('recorrido-empleado-select');
+    if (empleadoSelect && empleadoSelect.options.length <= 1) {
+      getGomeriaMecanicaEmployees().forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e.value; opt.textContent = e.label;
+        empleadoSelect.appendChild(opt);
+      });
+      if (typeof convertSelectToSearchable === 'function') convertSelectToSearchable(empleadoSelect);
+    }
+
+    const container = document.getElementById('recorrido-internos-container');
+    if (container && container.children.length === 0) {
+      addRecorridoInternoRow();
+    }
+  } else if (state.active || (state.timerHistory && state.timerHistory.length > 0)) {
+    idleEl.style.display = 'none';
+    runningEl.style.display = 'block';
+    reviewEl.style.display = 'none';
+    const pausaBtn = document.getElementById('recorrido-pausa-btn');
+    if (pausaBtn) {
+      pausaBtn.innerHTML = state.active
+        ? '<span class="material-icons">pause</span> Pausar'
+        : '<span class="material-icons">play_arrow</span> Reanudar';
+    }
+    renderRecorridoTimerTick();
+    ensureRecorridoTicking();
+  } else {
+    idleEl.style.display = 'block';
+    runningEl.style.display = 'none';
+    reviewEl.style.display = 'none';
+  }
+}
+
+function addRecorridoInternoRow() {
+  const container = document.getElementById('recorrido-internos-container');
+  if (!container) return;
+  const internoOptionsHtml = (cachedInternoOptions || [])
+    .map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+
+  const row = document.createElement('div');
+  row.className = 'form-section-card recorrido-interno-row';
+  row.innerHTML = `
+    <div class="card-title-header split">
+      <div class="flex-align">
+        <span class="material-icons">local_shipping</span>
+        <h3>Interno</h3>
+      </div>
+      <button type="button" class="btn btn-link btn-xs" onclick="removeRecorridoInternoRow(this)" style="color:var(--danger);" title="Quitar">
+        <span class="material-icons" style="font-size:18px;">delete</span>
+      </button>
+    </div>
+    <div class="form-group">
+      <label>Interno *</label>
+      <select class="recorrido-interno-select" style="width:100%;">
+        <option value="">Seleccionar Interno...</option>
+        ${internoOptionsHtml}
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label>Novedad (opcional)</label>
+      <textarea class="recorrido-novedad" rows="2" placeholder="Ej: cubierta trasera derecha desgastada, evaluar cambio"></textarea>
+    </div>
+  `;
+  container.appendChild(row);
+  const select = row.querySelector('.recorrido-interno-select');
+  if (select && typeof convertSelectToSearchable === 'function') convertSelectToSearchable(select);
+}
+
+function removeRecorridoInternoRow(btn) {
+  const row = btn.closest('.recorrido-interno-row');
+  const container = document.getElementById('recorrido-internos-container');
+  if (row && container && container.querySelectorAll('.recorrido-interno-row').length > 1) {
+    row.remove();
+  } else {
+    showToast('Tiene que quedar al menos un interno revisado.', 'warning');
+  }
+}
+
+async function submitRecorridoOrders() {
+  const state = getRecorridoState();
+  const totalSeconds = calcularSegundosRecorrido(state);
+  const empleadoSelect = document.getElementById('recorrido-empleado-select');
+  const empleado = empleadoSelect ? empleadoSelect.value : '';
+  if (!empleado) {
+    showToast('Elegí quién hizo el recorrido.', 'danger');
+    return;
+  }
+
+  const rows = Array.from(document.querySelectorAll('.recorrido-interno-row'));
+  const entries = [];
+  for (const row of rows) {
+    const select = row.querySelector('.recorrido-interno-select');
+    const interno = select ? select.value.trim() : '';
+    if (!interno) {
+      showToast('Todos los internos revisados deben estar seleccionados.', 'danger');
+      return;
+    }
+    const novedadEl = row.querySelector('.recorrido-novedad');
+    const novedad = novedadEl ? novedadEl.value.trim() : '';
+    entries.push({ interno, novedad });
+  }
+  if (entries.length === 0) {
+    showToast('Agregá al menos un interno revisado.', 'danger');
+    return;
+  }
+
+  const totalHoras = totalSeconds / 3600;
+  const horasPorInterno = totalHoras / entries.length;
+
+  const orders = entries.map(({ interno, novedad }) => {
+    const rodadoOpt = cachedCatalogs.rodados
+      ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === interno)
+      : null;
+    const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+    const descripcion = novedad
+      ? `Recorrido de estado de cubiertas - Novedad: ${novedad}`
+      : 'Recorrido de estado de cubiertas';
+    return {
+      rodado: rodadoLabel,
+      responsable: "AUTO",
+      interno: interno,
+      clasificacion: 'Correctivo',
+      fechaEntrega: new Date().toISOString().split('T')[0],
+      horario: new Date().toTimeString().slice(0, 5),
+      incidente: novedad ? 'Novedad de cubierta en recorrido' : '',
+      estadoUnidad: 'operativo',
+      tasks: [{
+        centroCosto: "15",
+        empleado: empleado,
+        horasEstimadas: parseFloat(horasPorInterno.toFixed(2)),
+        descripcion: descripcion,
+        status: "Finalizada"
+      }]
+    };
+  });
+
+  try {
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const res = await fetch('/api/orders/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-username': currentUsername },
+      body: JSON.stringify({ orders })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Error al generar las órdenes del recorrido.');
+    }
+    showToast(`✅ Recorrido cargado: ${entries.length} interno(s), ${horasPorInterno.toFixed(2)}hs c/u.`, 'success');
+    clearRecorridoState();
+    const container = document.getElementById('recorrido-internos-container');
+    if (container) container.innerHTML = '';
+    renderRecorridoHomeWidget();
+    renderRecorridoView();
+    fetchOrders();
+    switchView('elastiquero-home');
+  } catch (err) {
+    showToast(err.message, 'danger');
+    console.error('Error en submitRecorridoOrders', err);
+  }
+}
+
+// Widget del cronómetro en Inicio Elastiquero - debajo de la tarjeta de Recorrido, para verlo
+// corriendo (con Pausar/Fin ahí mismo) sin tener que entrar al módulo.
+function renderRecorridoHomeWidget() {
+  const widget = document.getElementById('eh-recorrido-widget');
+  if (!widget) return;
+  const state = getRecorridoState();
+  if (state.finished || (!state.active && (!state.timerHistory || state.timerHistory.length === 0))) {
+    widget.style.display = 'none';
+    widget.innerHTML = '';
+    return;
+  }
+  widget.style.display = 'flex';
+  widget.innerHTML = `
+    <span class="material-icons" style="font-size:18px;">timer</span>
+    <span id="eh-recorrido-timer-display">${formatSegundosHms(calcularSegundosRecorrido(state))}</span>
+    <button type="button" class="btn btn-secondary btn-xs" onclick="toggleRecorridoPausa()">
+      <span class="material-icons" style="font-size:14px;">${state.active ? 'pause' : 'play_arrow'}</span> ${state.active ? 'Pausar' : 'Reanudar'}
+    </button>
+    <button type="button" class="btn btn-primary btn-xs" onclick="finalizarRecorridoTimer(); switchView('recorrido');">
+      <span class="material-icons" style="font-size:14px;">check</span> Fin
+    </button>
+  `;
+  ensureRecorridoTicking();
 }
 
 // Native <option> elements can't reliably be colored (especially on mobile, where the OS
@@ -10085,7 +10435,7 @@ function applyUserViewMode() {
 
   // Solo dejar Elastiquero, Gomería y Ajustes (para poder volver a Modo Taller) - todo lo
   // demás se oculta encima de lo que recién dejaron visible los permisos reales.
-  const keepVisible = new Set(['nav-elastiquero', 'nav-gomeria', 'nav-settings']);
+  const keepVisible = new Set(['nav-elastiquero', 'nav-gomeria', 'nav-recorrido', 'nav-settings']);
   document.querySelectorAll('.nav-item').forEach(el => {
     if (!keepVisible.has(el.id)) el.style.display = 'none';
   });
