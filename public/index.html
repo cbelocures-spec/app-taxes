@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=43">
+  <link rel="stylesheet" href="style.css?v=44">
   <script>
     (function() {
       try {
@@ -619,6 +619,45 @@
       <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitGomeriaOrders()" style="margin-bottom: 30px;">
         <span class="material-icons">send</span> Generar Órdenes
       </button>
+    </section>
+
+    <!-- VIEW: INICIO ELASTIQUERO (pantalla de selección para Modo Elastiquero en Ajustes) -->
+    <section id="view-elastiquero-home" class="app-view">
+      <div class="eh-intro">
+        <p class="eh-eyebrow">Modo Elastiquero</p>
+        <h2>¿Qué vas a cargar?</h2>
+        <p class="eh-subtitle">Elegí el módulo para empezar.</p>
+      </div>
+
+      <div class="eh-module-grid">
+        <button type="button" class="eh-module-card eh-elastiquero" onclick="switchView('elastiquero')">
+          <img src="imagenes/elastiquero.jpg" alt="Elásticos de camión en el estante del taller">
+          <div class="eh-scrim"></div>
+          <span class="eh-chip">Ejes y elásticos</span>
+          <div class="eh-label">
+            <span class="material-icons">construction</span>
+            <div class="eh-label-text">
+              <strong>Elastiquero</strong>
+              <small>Cambio y reparación de elásticos</small>
+            </div>
+          </div>
+        </button>
+
+        <button type="button" class="eh-module-card eh-gomeria" onclick="switchView('gomeria')">
+          <img src="imagenes/gomeria.jpg" alt="Cubiertas y llantas apiladas en el depósito">
+          <div class="eh-scrim"></div>
+          <span class="eh-chip">Cubiertas y llantas</span>
+          <div class="eh-label">
+            <span class="material-icons">trip_origin</span>
+            <div class="eh-label-text">
+              <strong>Gomería</strong>
+              <small>Cambio de cubiertas</small>
+            </div>
+          </div>
+        </button>
+      </div>
+
+      <p class="eh-footnote">Podés volver a este modo desde Ajustes cuando quieras.</p>
     </section>
 
     <!-- VIEW: ELASTIQUERO (CAMBIO/REPARACIÓN DE ELÁSTICOS) -->
@@ -1605,7 +1644,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.22.0</div>
+      <div class="sidebar-version">Versión 1.22.1</div>
     </div>
   </aside>
 
@@ -2862,6 +2901,6 @@
     }
   </style>
 
-  <script src="app.js?v=349"></script>
+  <script src="app.js?v=350"></script>
 </body>
 </html>

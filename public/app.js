@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '349';
+const CURRENT_APP_VERSION = '350';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9779,7 +9779,7 @@ function setUserViewMode(mode) {
   localStorage.setItem(`viewMode_${username}`, mode);
   applyUserViewMode();
   if (mode === 'elastiquero') {
-    switchView('elastiquero');
+    switchView('elastiquero-home');
   } else {
     switchView('home');
   }
@@ -9810,6 +9810,13 @@ function applyUserViewMode() {
   document.querySelectorAll('.nav-item').forEach(el => {
     if (!keepVisible.has(el.id)) el.style.display = 'none';
   });
+
+  // Si al cargar/refrescar la página cayó en el Inicio genérico (su botón de nav ya está
+  // oculto en este modo), mandarlo directo a la pantalla de selección de Elastiquero/Gomería.
+  const activeView = document.querySelector('.app-view.active');
+  if (activeView && activeView.id === 'view-home') {
+    switchView('elastiquero-home');
+  }
 }
 
 let currentBackupData = [];

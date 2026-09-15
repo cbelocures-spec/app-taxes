@@ -3420,3 +3420,71 @@ body {
   filter: brightness(0.95);
 }
 
+/* ── VIEW: INICIO ELASTIQUERO (Modo Elastiquero, ver Ajustes) ─────────────────────────── */
+.eh-intro { padding: 4px 2px 4px; }
+.eh-eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--primary); margin: 0 0 4px;
+}
+.eh-intro h2 { margin: 0; }
+.eh-subtitle { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); }
+
+.eh-module-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+@media (min-width: 620px) {
+  .eh-module-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.eh-module-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  border: none;
+  padding: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .15s ease;
+}
+.eh-module-card:active { transform: scale(.97); }
+.eh-module-card img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+.eh-module-card .eh-scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,.72) 100%);
+}
+.eh-module-card .eh-chip {
+  position: absolute; top: 12px; left: 12px;
+  font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: #fff;
+  padding: 4px 9px;
+  border-radius: 999px;
+}
+.eh-module-card.eh-elastiquero .eh-chip { background: #92400e; }
+.eh-module-card.eh-gomeria .eh-chip { background: #1f2937; }
+
+.eh-module-card .eh-label {
+  position: absolute; left: 14px; right: 14px; bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+  color: #fff;
+}
+.eh-module-card .eh-label .material-icons { font-size: 22px; }
+.eh-label-text { display: flex; flex-direction: column; line-height: 1.15; text-align: left; }
+.eh-label-text strong { font-size: 18px; font-weight: 800; letter-spacing: .01em; }
+.eh-label-text small { font-size: 11.5px; font-weight: 500; opacity: .85; }
+
+.eh-footnote {
+  text-align: center; font-size: 11px; color: var(--text-muted);
+  padding-top: 14px;
+}
+
