@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=44">
+  <link rel="stylesheet" href="style.css?v=45">
   <script>
     (function() {
       try {
@@ -627,6 +627,19 @@
         <p class="eh-eyebrow">Modo Elastiquero</p>
         <h2>¿Qué vas a cargar?</h2>
         <p class="eh-subtitle">Elegí el módulo para empezar.</p>
+      </div>
+
+      <div class="eh-recibir-card">
+        <label for="eh-recibir-interno">Recibir Camión</label>
+        <p class="eh-recibir-hint">Apenas entra el camión, sin cargar tareas todavía - así ya queda Fuera de Servicio y Pañol puede preparar insumos.</p>
+        <div class="eh-recibir-row">
+          <select id="eh-recibir-interno" style="width:100%;">
+            <option value="">Seleccionar Interno...</option>
+          </select>
+          <button type="button" class="btn btn-primary" onclick="recibirCamionElastiquero()">
+            <span class="material-icons" style="font-size:18px;">local_shipping</span> Recibir
+          </button>
+        </div>
       </div>
 
       <div class="eh-module-grid">
@@ -1644,7 +1657,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.22.1</div>
+      <div class="sidebar-version">Versión 1.23.0</div>
     </div>
   </aside>
 
@@ -2901,6 +2914,6 @@
     }
   </style>
 
-  <script src="app.js?v=350"></script>
+  <script src="app.js?v=351"></script>
 </body>
 </html>

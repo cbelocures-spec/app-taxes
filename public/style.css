@@ -3429,6 +3429,32 @@ body {
 .eh-intro h2 { margin: 0; }
 .eh-subtitle { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); }
 
+.eh-recibir-card {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+}
+.eh-recibir-card > label {
+  font-size: 13px; font-weight: 700; color: var(--text-main); display: block;
+}
+.eh-recibir-hint {
+  margin: 4px 0 10px; font-size: 12px; color: var(--text-muted);
+}
+.eh-recibir-row {
+  display: flex; gap: 8px; align-items: center;
+}
+.eh-recibir-row > .searchable-select-container,
+.eh-recibir-row > select {
+  flex: 1;
+  min-width: 0;
+}
+.eh-recibir-row > button {
+  flex: none;
+  white-space: nowrap;
+}
+
 .eh-module-grid {
   display: grid;
   grid-template-columns: 1fr;

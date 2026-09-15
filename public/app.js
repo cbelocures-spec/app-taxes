@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '350';
+const CURRENT_APP_VERSION = '351';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -892,11 +892,16 @@ function switchView(viewId) {
     }
 
     if (viewId === 'elastiquero') {
+      try { renderElastiqueroPendingBlocks(); } catch(e) {}
+    }
+
+    if (viewId === 'elastiquero-home') {
       try {
-        const container = document.getElementById('elastiquero-internos-container');
-        if (container) {
-          container.innerHTML = '';
-          addElastiqueroInternoBlock();
+        const recibirSelect = document.getElementById('eh-recibir-interno');
+        if (recibirSelect && cachedInternoOptions && cachedInternoOptions.length > 0) {
+          populateSelect('eh-recibir-interno', cachedInternoOptions, 'Seleccionar Interno...');
+          if (typeof convertSelectToSearchable === 'function') convertSelectToSearchable(recibirSelect);
+          if (recibirSelect.rebuildSearchable) recibirSelect.rebuildSearchable();
         }
       } catch(e) {}
     }
@@ -8126,6 +8131,41 @@ function buildElastiqueroCubiertaDescription(block) {
   return lines.join('\n');
 }
 
+// "Otros" - trabajos de elastiquero que no encajan en la lista de posiciones de eje (ej.
+// enganchar algo, arreglar un soporte) - texto libre, sin elegir ninguna posición.
+function addElastiqueroOtroRow(btn) {
+  const block = btn.closest('.elastiquero-interno-block');
+  const rowsContainer = block ? block.querySelector('.elastiquero-otro-rows-container') : null;
+  if (!rowsContainer) return;
+
+  const row = document.createElement('div');
+  row.className = 'elastiquero-otro-row';
+  row.style.cssText = 'border:1px solid var(--border-color); border-radius:8px; padding:10px; margin-top:10px; position:relative;';
+  row.innerHTML = `
+    <button type="button" onclick="removeElastiqueroOtroRow(this)" style="position:absolute; top:6px; right:6px; border:none; background:none; color:var(--danger); cursor:pointer; padding:2px;" title="Quitar">
+      <span class="material-icons" style="font-size:16px;">close</span>
+    </button>
+    <textarea class="elastiquero-otro-descripcion" rows="2" placeholder="Describí el trabajo..." style="width:100%;"></textarea>
+  `;
+  rowsContainer.appendChild(row);
+}
+
+function removeElastiqueroOtroRow(btn) {
+  const row = btn.closest('.elastiquero-otro-row');
+  if (row) row.remove();
+}
+
+function buildElastiqueroOtrosDescription(block) {
+  const rows = Array.from(block.querySelectorAll('.elastiquero-otro-row'));
+  const lines = rows
+    .map(row => {
+      const descEl = row.querySelector('.elastiquero-otro-descripcion');
+      return descEl ? descEl.value.trim() : '';
+    })
+    .filter(Boolean);
+  return lines.join('\n');
+}
+
 function addElastiqueroEmpleadoRow(btn) {
   const block = btn.closest('.elastiquero-interno-block');
   const rowsContainer = block ? block.querySelector('.elastiquero-empleado-rows-container') : null;
@@ -8293,6 +8333,12 @@ function addElastiqueroInternoBlock() {
       <span class="material-icons" style="font-size:14px;">add</span> Agregar cubierta cambiada
     </button>
 
+    <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:16px 0 0; border-top:1px solid var(--border-color); padding-top:12px;">Otros</label>
+    <div class="elastiquero-otro-rows-container"></div>
+    <button type="button" class="btn btn-secondary btn-xs" onclick="addElastiqueroOtroRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
+      <span class="material-icons" style="font-size:14px;">add</span> Otros
+    </button>
+
     <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin:16px 0 0; border-top:1px solid var(--border-color); padding-top:12px;">Empleados y horas</label>
     <div style="display:flex; gap:6px; margin:6px 0 0; flex-wrap:wrap;">
       <button type="button" class="btn btn-secondary btn-xs" onclick="quickAddElastiqueroEmpleado(this, '528')" style="border-radius:999px;">+ Javier</button>
@@ -8319,6 +8365,92 @@ function removeElastiqueroInternoBlock(btn) {
   const block = btn.closest('.elastiquero-interno-block');
   if (block) block.remove();
   updateElastiqueroHorasResumen();
+}
+
+// Al abrir la pestaña Elastiquero, en vez de arrancar vacío (obligando a agregar y buscar cada
+// interno a mano), se pre-cargan un bloque por cada camión ya "Recibido" (orden Elastiquero
+// abierta sin tareas todavía) con su interno ya seleccionado - solo falta completar ejes/
+// cubiertas/empleados. Si no hay ninguno pendiente, se deja un bloque en blanco como antes.
+function renderElastiqueroPendingBlocks() {
+  const container = document.getElementById('elastiquero-internos-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const pendientes = (activeOrders || []).filter(o =>
+    o.clasificacion === 'Elastiquero' &&
+    o.estadoUnidad === 'fuera_de_servicio' &&
+    (!o.estado || o.estado.toLowerCase() !== 'cerrada') &&
+    (!o.tasks || o.tasks.length === 0)
+  );
+
+  if (pendientes.length === 0) {
+    addElastiqueroInternoBlock();
+    return;
+  }
+
+  pendientes.forEach(order => {
+    addElastiqueroInternoBlock();
+    const block = container.querySelector('.elastiquero-interno-block:last-child');
+    const internoSelect = block ? block.querySelector('.elastiquero-interno-select') : null;
+    if (internoSelect) {
+      setSearchableSelectValue(internoSelect, String(order.interno || '').trim());
+    }
+  });
+  updateElastiqueroHorasResumen();
+}
+
+// "Recibir Camión" (Inicio Elastiquero): crea la orden apenas entra el camión, sin tareas
+// todavía - el camión ya queda Fuera de Servicio y Pañol lo ve para preparar insumos. Las
+// tareas (ejes/cubiertas/empleados/horas) se cargan después desde la pestaña Elastiquero,
+// donde este mismo interno ya va a aparecer pre-armado (ver renderElastiqueroPendingBlocks).
+async function recibirCamionElastiquero() {
+  const selectEl = document.getElementById('eh-recibir-interno');
+  const interno = selectEl ? selectEl.value.trim() : '';
+  if (!interno) {
+    showToast('Elegí un interno.', 'danger');
+    return;
+  }
+
+  if (findOpenTallerOrderForInterno(interno)) {
+    showToast('Ese interno ya tiene una orden de Elastiquero abierta.', 'warning');
+    return;
+  }
+
+  const rodadoOpt = cachedCatalogs.rodados
+    ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === interno)
+    : null;
+  const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+
+  try {
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const res = await fetch('/api/orders/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-username': currentUsername },
+      body: JSON.stringify({
+        orders: [{
+          rodado: rodadoLabel,
+          responsable: "AUTO",
+          interno: interno,
+          clasificacion: 'Elastiquero',
+          fechaEntrega: new Date().toISOString().split('T')[0],
+          horario: new Date().toTimeString().slice(0, 5),
+          incidente: '',
+          estadoUnidad: 'fuera_de_servicio',
+          tasks: []
+        }]
+      })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Error al recibir el camión.');
+    }
+    showToast(`✅ Interno ${interno} recibido - Fuera de Servicio.`, 'success');
+    setSearchableSelectValue(selectEl, '');
+    await fetchOrders();
+  } catch (err) {
+    showToast(err.message, 'danger');
+    console.error('Error en recibirCamionElastiquero', err);
+  }
 }
 
 // Same match used at submit time: an open Elastiquero-classified order, still Fuera de
@@ -8437,9 +8569,10 @@ async function submitElastiqueroOrders() {
     }
     const ejeDescripcion = buildElastiqueroDescription(block);
     const cubiertaDescripcion = buildElastiqueroCubiertaDescription(block);
-    const descripcion = [ejeDescripcion, cubiertaDescripcion].filter(Boolean).join('\n');
+    const otrosDescripcion = buildElastiqueroOtrosDescription(block);
+    const descripcion = [ejeDescripcion, cubiertaDescripcion, otrosDescripcion].filter(Boolean).join('\n');
     if (!descripcion) {
-      showToast(`Cargá al menos un eje trabajado o una cubierta cambiada para el interno ${interno}.`, 'danger');
+      showToast(`Cargá al menos un eje trabajado, una cubierta cambiada u otro trabajo para el interno ${interno}.`, 'danger');
       return;
     }
 
@@ -8467,7 +8600,11 @@ async function submitElastiqueroOrders() {
     const recentClosedOrder = existingOrder ? null : findRecentClosedTallerOrderForInterno(interno);
 
     if (existingOrder) {
-      additionsToExistingOrders.push({ orderId: existingOrder.id, interno, tasks, needsUnarchive: false, clearElastiqueroFlag: false });
+      // Esta orden viene de "Recibir Camión" (Fuera de Servicio, sin tareas) o de un uso
+      // anterior - como las tareas de Elastiquero se cargan ya Finalizadas (no tienen su propio
+      // cronómetro de inicio/pausa/fin), completar el formulario acá significa que el trabajo
+      // terminó: el camión vuelve a Operativo.
+      additionsToExistingOrders.push({ orderId: existingOrder.id, interno, tasks, needsUnarchive: false, clearElastiqueroFlag: false, setOperativo: true });
     } else if (recentClosedOrder) {
       // Clear the flag once its tasks land - otherwise this same order would keep matching for
       // an unrelated future job on this interno.
@@ -8482,6 +8619,7 @@ async function submitElastiqueroOrders() {
       const incidenteParts = [];
       if (ejeDescripcion) incidenteParts.push('Cambio/Reparación de elástico');
       if (cubiertaDescripcion) incidenteParts.push('Cambio de cubiertas');
+      if (otrosDescripcion) incidenteParts.push('Otros');
       newOrdersToCreate.push({
         rodado: rodadoLabel,
         responsable: "AUTO",
@@ -8514,6 +8652,7 @@ async function submitElastiqueroOrders() {
       }
       const putBody = { tasks: addition.tasks };
       if (addition.clearElastiqueroFlag) putBody.pendingElastiquero = false;
+      if (addition.setOperativo) putBody.estadoUnidad = 'operativo';
       const res = await fetch(`/api/orders/${addition.orderId}`, {
         method: 'PUT',
         headers: commonHeaders,
