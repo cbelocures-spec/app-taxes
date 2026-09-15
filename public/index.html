@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=47">
+  <link rel="stylesheet" href="style.css?v=48">
   <script>
     (function() {
       try {
@@ -640,7 +640,7 @@
             <span class="material-icons" style="font-size:18px;">local_shipping</span> Recibir
           </button>
         </div>
-        <button type="button" class="btn btn-secondary eh-recibir-varios-btn" onclick="recibirCamionElastiquero('VARIOS')">
+        <button type="button" class="btn btn-secondary eh-recibir-varios-btn" onclick="setSearchableSelectValue(document.getElementById('eh-recibir-interno'), 'VARIOS')">
           <span class="material-icons" style="font-size:18px;">cleaning_services</span> Ordenar / Limpieza
         </button>
       </div>
@@ -1660,7 +1660,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.23.2</div>
+      <div class="sidebar-version">Versión 1.23.3</div>
     </div>
   </aside>
 
@@ -2917,6 +2917,6 @@
     }
   </style>
 
-  <script src="app.js?v=353"></script>
+  <script src="app.js?v=354"></script>
 </body>
 </html>

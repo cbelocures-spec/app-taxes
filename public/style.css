@@ -3443,16 +3443,14 @@ body {
   margin: 4px 0 10px; font-size: 12px; color: var(--text-muted);
 }
 .eh-recibir-row {
-  display: flex; gap: 8px; align-items: center;
+  display: flex; flex-direction: column; gap: 8px;
 }
 .eh-recibir-row > .searchable-select-container,
 .eh-recibir-row > select {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
 }
 .eh-recibir-row > button {
-  flex: none;
-  white-space: nowrap;
+  width: 100%;
 }
 /* Más grande a propósito: lo usa gente mayor en el taller - hay que poder leerlo y tocarlo
    sin entrecerrar los ojos. */
