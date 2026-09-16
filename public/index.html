@@ -644,6 +644,7 @@
 
         <div id="gomeria-running-state" class="form-section-card" style="display:none; text-align:center;">
           <div id="gomeria-timer-display" class="recorrido-timer-display">00:00:00</div>
+          <div id="gomeria-ot-status" style="display:none; font-size:13px; color:var(--text-muted); margin-bottom:10px;"></div>
           <div style="display:flex; gap:8px; margin-bottom:10px;">
             <button type="button" class="btn btn-secondary" style="flex:1;" id="gomeria-pausa-btn" onclick="toggleGomeriaPausa()">
               <span class="material-icons">pause</span> Pausar
@@ -668,7 +669,15 @@
             <span class="material-icons" style="font-size:14px;">add</span> Agregar Cubierta Cambiada
           </button>
           <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitGomeriaSingleOrder()" style="margin-top:20px; margin-bottom: 30px;">
-            <span class="material-icons">send</span> Generar Orden
+            <span class="material-icons">send</span> Subir Tareas
+          </button>
+        </div>
+
+        <div id="gomeria-sync-state" class="form-section-card" style="display:none; text-align:center;">
+          <span class="material-icons" style="font-size:36px; color:var(--primary);">sync</span>
+          <p id="gomeria-sync-status-text" style="font-weight:600; margin:10px 0; font-size:15px;">Enviando orden...</p>
+          <button type="button" class="btn btn-primary btn-block" onclick="resetGomeriaAfterSync()" style="margin-top:6px;">
+            <span class="material-icons" style="font-size:18px;">add</span> Cargar Otra Cubierta
           </button>
         </div>
       </div>
@@ -817,7 +826,7 @@
       <div id="elastiquero-horas-resumen" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:14px;"></div>
 
       <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitElastiqueroOrders()" style="margin-bottom: 30px;">
-        <span class="material-icons">send</span> Generar Órdenes
+        <span class="material-icons">send</span> Subir Tareas
       </button>
     </section>
 
@@ -937,6 +946,7 @@
       </div>
 
       <div id="user-authorizations-section" style="display: none;">
+        <form id="user-authorizations-form" onsubmit="event.preventDefault(); return false;" autocomplete="off">
         <div class="section-title">
           <h3>Gestión y Autorización de Usuarios (Solo Pañol / Admin)</h3>
         </div>
@@ -986,6 +996,7 @@
             <div class="empty-dashboard-state">Cargando autorizaciones...</div>
           </div>
         </div>
+        </form>
       </div>
 
       <!-- ── MAPEO DE EMPLEADOS (Solo Pañol / Admin) ── -->
@@ -1788,7 +1799,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.2</div>
+      <div class="sidebar-version">Versión 1.27.6</div>
     </div>
   </aside>
 
@@ -1978,6 +1989,7 @@
       <div style="width: 40px;"></div>
     </div>
     <div class="modal-content" style="max-width: 900px; margin: 0 auto; padding: 20px;">
+      <form id="massive-order-form" onsubmit="event.preventDefault(); return false;" autocomplete="off">
       <div class="form-section-card" style="margin-bottom: 20px;">
         <div class="card-title-header">
           <span class="material-icons" style="color: var(--primary);">assignment_turned_in</span>
@@ -2080,13 +2092,14 @@
       </div>
 
       <div style="display: flex; gap: 12px; justify-content: flex-end;">
-        <button class="btn btn-secondary" onclick="closeMassiveOrderModal()" style="padding: 12px 24px; font-size: 16px; border-radius: 8px;">
+        <button type="button" class="btn btn-secondary" onclick="closeMassiveOrderModal()" style="padding: 12px 24px; font-size: 16px; border-radius: 8px;">
           Cancelar
         </button>
-        <button class="btn btn-primary" onclick="submitMassiveOrders()" style="padding: 12px 24px; font-size: 16px; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+        <button type="button" class="btn btn-primary" onclick="submitMassiveOrders()" style="padding: 12px 24px; font-size: 16px; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
           <span class="material-icons">playlist_add</span> Generar Órdenes
         </button>
       </div>
+      </form>
     </div>
   </div>
 
@@ -3045,6 +3058,6 @@
     }
   </style>
 
-  <script src="app.js?v=361"></script>
+  <script src="app.js?v=365"></script>
 </body>
 </html>

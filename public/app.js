@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '361';
+const CURRENT_APP_VERSION = '365';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -813,6 +813,16 @@ function switchView(viewId) {
     });
     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
 
+    // Leaving Ajustes: wipe the Taxes login / API key inputs so the real credentials don't
+    // keep sitting in the DOM (see populateSettingsCredentialFields) while the user works
+    // elsewhere in the app.
+    if (viewId !== 'settings') {
+      ['set-username', 'set-password', 'set-gemini-api-key', 'set-claude-api-key'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+    }
+
     // Activate selected view
     const viewEl = document.getElementById(`view-${viewId}`);
     if (viewEl) {
@@ -852,6 +862,7 @@ function switchView(viewId) {
     }
 
     if (viewId === 'settings') {
+      populateSettingsCredentialFields();
       try { renderEmployeeHoursSummary(); } catch(e) {}
       const empMappingsSection = document.getElementById('employee-mappings-section');
       if (empMappingsSection) {
@@ -2388,6 +2399,24 @@ function closeErrorModal() {
 }
 
 // 3. FETCH CONFIGURATION & SETTINGS
+let lastSettingsData = null;
+
+// Only fills the Taxes login / API key inputs while Ajustes is the visible screen - see the
+// note in fetchSettings() for why these stay out of the DOM the rest of the time.
+function populateSettingsCredentialFields() {
+  const settingsView = document.getElementById('view-settings');
+  if (!settingsView || !settingsView.classList.contains('active')) return;
+  const data = lastSettingsData || {};
+  const usernameInput = document.getElementById('set-username');
+  if (usernameInput) usernameInput.value = data.username || "";
+  const passwordInput = document.getElementById('set-password');
+  if (passwordInput) passwordInput.value = data.password || "";
+  const geminiApiKeyInput = document.getElementById('set-gemini-api-key');
+  if (geminiApiKeyInput) geminiApiKeyInput.value = data.geminiApiKey || "";
+  const claudeApiKeyInput = document.getElementById('set-claude-api-key');
+  if (claudeApiKeyInput) claudeApiKeyInput.value = data.claudeApiKey || "";
+}
+
 async function fetchSettings() {
   try {
     // Pass current user so server returns THIS user's credentials, not global ones
@@ -2398,8 +2427,13 @@ async function fetchSettings() {
     const data = await res.json();
     
     document.getElementById('set-portal-url').value = data.portalUrl || "https://taxes.com.ar";
-    document.getElementById('set-username').value = data.username || "";
-    document.getElementById('set-password').value = data.password || "";
+    // Credential-like fields (Taxes login + API keys) are cached here but only written into
+    // their <input type="password"> elements while the user is actually on the Ajustes screen
+    // (see switchView) - keeping them out of the DOM otherwise avoids Chrome/Android seeing a
+    // live username+password pair on every page load and offering to "save password" on totally
+    // unrelated forms (e.g. setting a horario) elsewhere in the app.
+    lastSettingsData = data;
+    populateSettingsCredentialFields();
     const insumosUrlInput = document.getElementById('set-google-insumos-url');
     if (insumosUrlInput) insumosUrlInput.value = data.googleScriptUrl || "";
     const activeTasksInput = document.getElementById('set-google-active-tasks-url');
@@ -2417,11 +2451,6 @@ async function fetchSettings() {
     window._controlesMasivaSheetUrl = data.controlesMasivaSheetUrl || "";
     const aguaScriptInput = document.getElementById('set-agua-script-url');
     if (aguaScriptInput) aguaScriptInput.value = data.aguaScriptUrl || "";
-    const geminiApiKeyInput = document.getElementById('set-gemini-api-key');
-    if (geminiApiKeyInput) geminiApiKeyInput.value = data.geminiApiKey || "";
-    const claudeApiKeyInput = document.getElementById('set-claude-api-key');
-    if (claudeApiKeyInput) claudeApiKeyInput.value = data.claudeApiKey || "";
-    
     isCurrentUserSupervisor = !!data.isSupervisor;
     const hoursSection = document.getElementById('supervisor-hours-section');
     if (hoursSection) {
@@ -4037,6 +4066,8 @@ async function fetchOrders() {
     await resolveDatabaseConflicts();
     renderOrders();
     updateStats();
+    if (typeof renderGomeriaSyncStatus === 'function') renderGomeriaSyncStatus();
+    if (typeof renderGomeriaOtStatus === 'function') renderGomeriaOtStatus();
   } catch (error) {
     console.error("Error polling orders:", error);
   }
@@ -7733,10 +7764,11 @@ function setGomeriaRodadoShortcutSingle(value) {
   if (select) setSearchableSelectValue(select, value);
 }
 
-// Paso 1 (Rodado/Clasificación/Empleado) primero solo - al confirmar acá arranca el
-// cronómetro y recién ahí se puede cargar (ahora o después) Eje/Posición, Cubierta, Se sacó y
-// Se colocó.
-function continuarGomeria() {
+// Paso 1 (Rodado/Clasificación/Empleado) primero solo - al confirmar acá se crea de una el
+// encabezado (O.T. vacía, Fuera de Servicio) en Taxes -igual que "Recibir Camión" en
+// Elastiquero- y arranca el cronómetro. Recién al terminar (Fin + Generar Orden) se le agrega
+// la tarea a ESA MISMA orden y la unidad vuelve a Operativo - nunca se crea una orden nueva ahí.
+async function continuarGomeria() {
   const rodadoSelect = document.getElementById('gomeria-rodado-select');
   const interno = rodadoSelect ? rodadoSelect.value.trim() : '';
   if (!interno) {
@@ -7749,18 +7781,62 @@ function continuarGomeria() {
     return;
   }
   const clasifSelect = document.getElementById('gomeria-clasificacion-select');
+  const clasificacion = clasifSelect ? clasifSelect.value : 'Correctivo';
+  const empleado = empleadoSelect.value;
 
-  setGomeriaTimerState({
-    active: true,
-    startTime: Date.now(),
-    timerHistory: [],
-    interno,
-    clasificacion: clasifSelect ? clasifSelect.value : 'Correctivo',
-    empleado: empleadoSelect.value,
-    finished: false
-  });
-  renderGomeriaView();
-  renderGomeriaHomeWidget();
+  const continuarBtn = document.querySelector('#gomeria-initial-state .btn-primary');
+  if (continuarBtn) continuarBtn.disabled = true;
+
+  const rodadoOpt = cachedCatalogs.rodados
+    ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === interno)
+    : null;
+  const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
+
+  try {
+    const currentUsername = localStorage.getItem('currentUserUsername') || '';
+    const res = await fetch('/api/orders/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-username': currentUsername },
+      body: JSON.stringify({
+        orders: [{
+          rodado: rodadoLabel,
+          responsable: "AUTO",
+          interno,
+          clasificacion,
+          fechaEntrega: new Date().toISOString().split('T')[0],
+          horario: new Date().toTimeString().slice(0, 5),
+          incidente: '',
+          estadoUnidad: 'fuera_de_servicio',
+          tasks: []
+        }]
+      })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Error al crear el encabezado en Taxes.');
+    }
+    const resData = await res.json().catch(() => ({}));
+    const newOrder = resData.orders && resData.orders[0];
+
+    setGomeriaTimerState({
+      active: true,
+      startTime: Date.now(),
+      timerHistory: [],
+      interno,
+      clasificacion,
+      empleado,
+      finished: false,
+      orderId: newOrder ? newOrder.id : null
+    });
+    renderGomeriaView();
+    renderGomeriaHomeWidget();
+    fetchOrders();
+  } catch (err) {
+    showToast(err.message, 'danger');
+    console.error('Error en continuarGomeria', err);
+  } finally {
+    if (continuarBtn) continuarBtn.disabled = false;
+  }
 }
 
 function toggleGomeriaPausa() {
@@ -7833,19 +7909,33 @@ function renderGomeriaView() {
   const initialEl = document.getElementById('gomeria-initial-state');
   const runningEl = document.getElementById('gomeria-running-state');
   const detailsEl = document.getElementById('gomeria-details-state');
-  if (!initialEl || !runningEl || !detailsEl) return;
+  const syncEl = document.getElementById('gomeria-sync-state');
+  if (!initialEl || !runningEl || !detailsEl || !syncEl) return;
 
   const state = getGomeriaTimerState();
   if (!state) {
     initialEl.style.display = 'block';
     runningEl.style.display = 'none';
     detailsEl.style.display = 'none';
+    syncEl.style.display = 'none';
     return;
   }
 
   initialEl.style.display = 'none';
   runningEl.style.display = state.finished ? 'none' : 'block';
-  if (state.finished) detailsEl.style.display = 'block';
+  // state.orderId is the Taxes header, created back at Continuar - it already exists by the
+  // time Fin is pressed. Only once the task itself was submitted (state.tasksSubmitted, set by
+  // submitGomeriaSingleOrder) does the tire-details form give way to the sync status card.
+  if (state.finished && state.tasksSubmitted) {
+    detailsEl.style.display = 'none';
+    syncEl.style.display = 'block';
+    renderGomeriaSyncStatus();
+  } else if (state.finished) {
+    detailsEl.style.display = 'block';
+    syncEl.style.display = 'none';
+  } else {
+    syncEl.style.display = 'none';
+  }
 
   const pausaBtn = document.getElementById('gomeria-pausa-btn');
   if (pausaBtn) {
@@ -7853,8 +7943,60 @@ function renderGomeriaView() {
       ? '<span class="material-icons">pause</span> Pausar'
       : '<span class="material-icons">play_arrow</span> Reanudar';
   }
+  renderGomeriaOtStatus();
   renderGomeriaTimerTick();
   ensureGomeriaTicking();
+}
+
+// Encabezado creado en Taxes apenas se apretó Continuar (ver continuarGomeria) - mientras el
+// cronómetro corre, esta línea debajo de Pausar/Fin muestra si esa O.T. ya está creada en Taxes
+// o todavía se está sincronizando. Se llama en cada poll de fetchOrders() además de en cada
+// render de la vista.
+function renderGomeriaOtStatus() {
+  const el = document.getElementById('gomeria-ot-status');
+  if (!el) return;
+  const state = getGomeriaTimerState();
+  if (!state || state.finished || !state.orderId) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'block';
+  const order = (activeOrders || []).find(o => o.id === state.orderId);
+  if (order && order.taxesOrderNumber) {
+    el.innerHTML = `<span class="material-icons" style="font-size:14px; vertical-align:-2px; color:var(--success);">check_circle</span> OT Taxes: #${escapeHtml(String(order.taxesOrderNumber))}`;
+  } else if (order && order.syncStatus === 'error') {
+    el.innerHTML = `<span class="material-icons" style="font-size:14px; vertical-align:-2px; color:var(--danger);">error</span> Error creando el encabezado en Taxes`;
+  } else {
+    el.innerHTML = `<span class="material-icons" style="font-size:14px; vertical-align:-2px;">sync</span> Creando encabezado en Taxes...`;
+  }
+}
+
+// Refleja el estado de sincronización con Taxes de la última orden de Gomería enviada -
+// se llama en cada poll de fetchOrders() mientras esa orden siga con la tarjeta de sync visible.
+function renderGomeriaSyncStatus() {
+  const state = getGomeriaTimerState();
+  const syncEl = document.getElementById('gomeria-sync-state');
+  const textEl = document.getElementById('gomeria-sync-status-text');
+  if (!syncEl || !textEl || !state || !state.orderId) return;
+  if (syncEl.style.display === 'none') return;
+
+  const order = (activeOrders || []).find(o => o.id === state.orderId);
+  if (order) {
+    if (order.taxesOrderNumber) {
+      textEl.innerHTML = `✅ Orden creada en Taxes — <strong>OT #${escapeHtml(String(order.taxesOrderNumber))}</strong>`;
+      state.lastKnownOt = order.taxesOrderNumber;
+      setGomeriaTimerState(state);
+    } else if (order.syncStatus === 'error') {
+      textEl.innerHTML = `⚠️ Error al sincronizar con Taxes: ${escapeHtml(order.syncError || 'reintentando...')}`;
+    } else {
+      textEl.textContent = 'Enviando a Taxes... (podés cargar otra cubierta mientras tanto)';
+    }
+  } else {
+    // Ya no está en activas: el auto-archive la mandó a Historial porque terminó de sincronizar.
+    textEl.innerHTML = state.lastKnownOt
+      ? `✅ Completada y archivada en Historial — OT #${escapeHtml(String(state.lastKnownOt))}`
+      : '✅ Completada y archivada en Historial.';
+  }
 }
 
 function resetGomeriaView() {
@@ -7867,12 +8009,26 @@ function resetGomeriaView() {
   if (rowsContainer) rowsContainer.innerHTML = '';
   const detailsEl = document.getElementById('gomeria-details-state');
   if (detailsEl) detailsEl.style.display = 'none';
+  const syncEl = document.getElementById('gomeria-sync-state');
+  if (syncEl) syncEl.style.display = 'none';
   renderGomeriaView();
+}
+
+// Botón "Cargar Otra Cubierta" en la tarjeta de sync: recién ahí se descarta el estado de la
+// orden ya enviada, para no perder el número de OT mientras el gomero todavía lo está mirando.
+function resetGomeriaAfterSync() {
+  clearGomeriaTimerState();
+  resetGomeriaView();
+  renderGomeriaHomeWidget();
 }
 
 async function submitGomeriaSingleOrder() {
   const state = getGomeriaTimerState();
   if (!state) return;
+  if (!state.orderId) {
+    showToast('No se encontró el encabezado creado en Taxes para esta orden - volvé a "Cargar Otra Cubierta" y empezá de nuevo desde Continuar.', 'danger');
+    return;
+  }
   const block = document.querySelector('.gomeria-interno-block');
   const descripcion = buildGomeriaDescription(block);
   if (!descripcion) {
@@ -7882,46 +8038,38 @@ async function submitGomeriaSingleOrder() {
 
   const totalSeconds = calcularSegundosGomeria(state);
   const horasEstimadas = parseFloat((totalSeconds / 3600).toFixed(2));
-  const rodadoOpt = cachedCatalogs.rodados
-    ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === state.interno)
-    : null;
-  const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${state.interno}`;
 
-  const orderPayload = {
-    rodado: rodadoLabel,
-    responsable: "AUTO",
-    interno: state.interno,
-    clasificacion: state.clasificacion,
-    fechaEntrega: new Date().toISOString().split('T')[0],
-    horario: new Date().toTimeString().slice(0, 5),
-    incidente: '',
-    estadoUnidad: 'operativo',
-    tasks: [{
-      centroCosto: "15",
-      empleado: state.empleado,
-      horasEstimadas,
-      descripcion,
-      status: "Finalizada"
-    }]
+  const taskPayload = {
+    centroCosto: "15",
+    empleado: state.empleado,
+    horasEstimadas,
+    descripcion,
+    status: "Finalizada"
   };
 
   try {
     const currentUsername = localStorage.getItem('currentUserUsername') || '';
-    const res = await fetch('/api/orders/bulk', {
-      method: 'POST',
+    // PUT a la MISMA orden creada en continuarGomeria (encabezado ya con su N° de OT en
+    // Taxes) - nunca una orden nueva. Esto le agrega la tarea y recién acá pasa a Operativo,
+    // que es lo que dispara al Sync Worker a cargar la tarea bajo ese mismo número de OT.
+    const res = await fetch(`/api/orders/${state.orderId}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'x-user-username': currentUsername },
-      body: JSON.stringify({ orders: [orderPayload] })
+      body: JSON.stringify({ tasks: [taskPayload], estadoUnidad: 'operativo' })
     });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || 'Error al generar la orden.');
     }
     showToast(`✅ Orden de Gomería generada (${horasEstimadas}hs).`, 'success');
-    clearGomeriaTimerState();
-    resetGomeriaView();
+    // No se limpia el estado todavía: se deja la tarjeta de "Cargar Otra Cubierta" con el
+    // estado de sincronización (y el N° de OT en cuanto Taxes lo asigna) hasta que el gomero
+    // mismo la descarte - así no se pierde de vista si quedó bien creada.
+    state.tasksSubmitted = true;
+    setGomeriaTimerState(state);
+    renderGomeriaView();
     renderGomeriaHomeWidget();
     fetchOrders();
-    switchView('elastiquero-home');
   } catch (err) {
     showToast(err.message, 'danger');
     console.error('Error en submitGomeriaSingleOrder', err);
