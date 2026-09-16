@@ -3102,27 +3102,6 @@ async function syncWorkOrder(orderId) {
         appTask.needsHoursUpdate = false;
       }
 
-      // Merge only the sync bookkeeping flags (synced/taxesRealizadaSynced) onto the CURRENT
-      // task data instead of blindly overwriting with `order.tasks` (a snapshot taken minutes
-      // ago, before the browser automation ran). This sync can take a long time; if the user
-      // edited the order in the app meanwhile (e.g. adding diagnóstico/insumos or fixing hours),
-      // a blind overwrite here would silently erase that edit by reverting to the stale snapshot.
-      {
-        const freshOrder = db.getWorkOrderById(orderId);
-        console.log(`[syncWorkOrder][DEBUG] SYNC-BACK MERGE orderId=${orderId} order.tasks(pre-Puppeteer)=${order.tasks.length} freshOrder.tasks(DB now)=${freshOrder ? (freshOrder.tasks||[]).length : 'N/A'}`);
-        if (freshOrder && Array.isArray(freshOrder.tasks)) {
-          const syncedById = new Map(order.tasks.map(t => [t.id, t]));
-          const mergedTasks = freshOrder.tasks.map(freshTask => {
-            const synced = syncedById.get(freshTask.id);
-            if (!synced) return freshTask;
-            return { ...freshTask, synced: synced.synced, taxesRealizadaSynced: synced.taxesRealizadaSynced };
-          });
-          db.updateWorkOrder(orderId, { tasks: mergedTasks });
-        } else {
-          db.updateWorkOrder(orderId, { tasks: order.tasks });
-        }
-      }
-
       // Fix date inputs before saving:
       // Force all date inputs to have valid formats.
       // - inputs with type="date" strictly require "yyyy-MM-dd"
@@ -3259,6 +3238,34 @@ async function syncWorkOrder(orderId) {
         abandonedSyncOrderIds.delete(orderId);
         if (browser) try { await browser.close(); } catch (_) {}
         return { success: false, message: 'Abandoned due to timeout' };
+      }
+
+      // Only now - with GUARDAR clicked and the form confirmed closed (no validation errors,
+      // no crash/restart in between) - persist the per-task synced/taxesRealizadaSynced flags
+      // set during the reconcile loop above. Writing these any earlier (right after toggling
+      // each card's Realizada checkbox, before Guardar was even found) meant a crash or a
+      // restart between the toggle and the save left the app believing a task was saved in
+      // Taxes when the click never actually went through - the next sync would see the
+      // checkbox still unchecked live in Taxes, re-toggle it, and get stuck at the same step
+      // again. Merge only these bookkeeping flags onto the CURRENT task data instead of
+      // blindly overwriting with `order.tasks` (a snapshot taken minutes ago, before the
+      // browser automation ran) - this sync can take a long time, and a blind overwrite here
+      // would silently erase an edit the user made in the app meanwhile (e.g. diagnóstico,
+      // insumos, or a fixed hours value).
+      {
+        const freshOrder = db.getWorkOrderById(orderId);
+        console.log(`[syncWorkOrder][DEBUG] SYNC-BACK MERGE orderId=${orderId} order.tasks(pre-Puppeteer)=${order.tasks.length} freshOrder.tasks(DB now)=${freshOrder ? (freshOrder.tasks||[]).length : 'N/A'}`);
+        if (freshOrder && Array.isArray(freshOrder.tasks)) {
+          const syncedById = new Map(order.tasks.map(t => [t.id, t]));
+          const mergedTasks = freshOrder.tasks.map(freshTask => {
+            const synced = syncedById.get(freshTask.id);
+            if (!synced) return freshTask;
+            return { ...freshTask, synced: synced.synced, taxesRealizadaSynced: synced.taxesRealizadaSynced };
+          });
+          db.updateWorkOrder(orderId, { tasks: mergedTasks });
+        } else {
+          db.updateWorkOrder(orderId, { tasks: order.tasks });
+        }
       }
 
       db.updateWorkOrder(orderId, {
