@@ -668,8 +668,11 @@
           <button type="button" class="btn btn-secondary btn-xs" onclick="addGomeriaTireRow(this)" style="margin-top:10px; display:flex; align-items:center; gap:4px;">
             <span class="material-icons" style="font-size:14px;">add</span> Agregar Cubierta Cambiada
           </button>
-          <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitGomeriaSingleOrder()" style="margin-top:20px; margin-bottom: 30px;">
+          <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitGomeriaSingleOrder()" style="margin-top:20px;">
             <span class="material-icons">send</span> Subir Tareas
+          </button>
+          <button type="button" class="btn btn-secondary btn-block" onclick="cancelarGomeriaEnCurso()" style="margin-top:8px; margin-bottom: 30px;">
+            Cancelar y empezar de nuevo
           </button>
         </div>
 
@@ -1799,7 +1802,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.7</div>
+      <div class="sidebar-version">Versión 1.27.8</div>
     </div>
   </aside>
 
@@ -3058,6 +3061,6 @@
     }
   </style>
 
-  <script src="app.js?v=366"></script>
+  <script src="app.js?v=367"></script>
 </body>
 </html>

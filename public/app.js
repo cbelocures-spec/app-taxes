@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '366';
+const CURRENT_APP_VERSION = '367';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -8023,6 +8023,17 @@ function resetGomeriaView() {
 // Botón "Cargar Otra Cubierta" en la tarjeta de sync: recién ahí se descarta el estado de la
 // orden ya enviada, para no perder el número de OT mientras el gomero todavía lo está mirando.
 function resetGomeriaAfterSync() {
+  clearGomeriaTimerState();
+  resetGomeriaView();
+  renderGomeriaHomeWidget();
+}
+
+// Salida de emergencia desde la pantalla de cubierta: sin esto, un estado guardado de una
+// versión vieja (sin state.orderId, de antes de que Continuar creara el encabezado en Taxes)
+// dejaba a alguien encerrado acá sin ningún botón para volver - "Subir Tareas" solo tira el
+// error de "no se encontró el encabezado" y no hay forma de salir.
+function cancelarGomeriaEnCurso() {
+  if (!confirm('¿Cancelar esta carga de Gomería? Se pierde el tiempo del cronómetro y lo cargado en este formulario.')) return;
   clearGomeriaTimerState();
   resetGomeriaView();
   renderGomeriaHomeWidget();
