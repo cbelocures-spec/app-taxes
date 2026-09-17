@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '370';
+const CURRENT_APP_VERSION = '371';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -11364,15 +11364,9 @@ async function saveAllUserAuthorizations() {
 
 function checkUserSession() {
   let username = localStorage.getItem('currentUserUsername');
-  // On a genuinely fresh device (never logged in) with no explicit logout on record, fall
-  // back to the shared "Pañol" account so the shop tablet doesn't need every worker to type
-  // credentials. But right after the user explicitly logs out, this same fallback used to
-  // silently re-create that session and hide the login screen before it ever appeared - the
-  // logout button looked like it "logged back in by itself". Skip it exactly once in that case.
-  const skipAutoProvision = localStorage.getItem('userExplicitlyLoggedOut') === '1';
-  if (!username && skipAutoProvision) {
-    localStorage.removeItem('userExplicitlyLoggedOut');
-  } else if (!username || username === 'Operador Móvil' || username === 'Operador Movil') {
+  // Migrate old sessions that stored the legacy display name instead of the real username.
+  // This only touches a device that already had a saved session - it never creates one.
+  if (username === 'Operador Móvil' || username === 'Operador Movil') {
     username = 'paniol@contenedoreshugo.com.ar';
     localStorage.setItem('currentUserUsername', username);
     localStorage.setItem('currentUserPassword', '123');
