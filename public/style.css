@@ -3549,6 +3549,28 @@ body {
   padding-top: 14px;
 }
 
+.eh-fs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+.eh-fs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+}
+.eh-fs-row-label { display: flex; flex-direction: column; line-height: 1.2; }
+.eh-fs-row-label strong { font-size: 15px; }
+.eh-fs-row-label small { font-size: 12px; color: var(--text-muted); }
+.eh-fs-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.eh-fs-row-actions .btn { padding: 8px 12px; font-size: 13px; width: auto; }
+
 .eh-recorrido-widget {
   grid-column: 1 / -1;
   align-items: center;

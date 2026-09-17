@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '373';
+const CURRENT_APP_VERSION = '374';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -903,6 +903,7 @@ function switchView(viewId) {
 
     if (viewId === 'elastiquero') {
       try { renderElastiqueroPendingBlocks(); } catch(e) {}
+      try { renderElastiqueroFueraDeServicioList(); } catch(e) {}
       try {
         const recibirSelect = document.getElementById('eh-recibir-interno');
         if (recibirSelect && cachedInternoOptions && cachedInternoOptions.length > 0) {
@@ -4077,6 +4078,7 @@ async function fetchOrders() {
     updateStats();
     if (typeof renderGomeriaSyncStatus === 'function') renderGomeriaSyncStatus();
     if (typeof renderGomeriaOtStatus === 'function') renderGomeriaOtStatus();
+    if (typeof renderElastiqueroFueraDeServicioList === 'function') renderElastiqueroFueraDeServicioList();
   } catch (error) {
     console.error("Error polling orders:", error);
   }
@@ -9198,11 +9200,13 @@ function renderElastiqueroPendingBlocks() {
   if (!container) return;
   container.innerHTML = '';
 
+  // Ya no exige "sin tareas" - un camión Fuera de Servicio sigue apareciendo acá aunque ya
+  // se le hayan cargado tareas antes (p.ej. el elastiquero no lo terminó y sigue mañana), y
+  // solo deja de aparecer cuando alguien lo marca Operativo (ver setElastiqueroOrderEstadoUnidad).
   const pendientes = (activeOrders || []).filter(o =>
     o.clasificacion === 'Elastiquero' &&
     o.estadoUnidad === 'fuera_de_servicio' &&
-    (!o.estado || o.estado.toLowerCase() !== 'cerrada') &&
-    (!o.tasks || o.tasks.length === 0)
+    (!o.estado || o.estado.toLowerCase() !== 'cerrada')
   );
 
   if (pendientes.length === 0) {
@@ -9230,6 +9234,95 @@ function abrirFormularioElastiquero() {
   const formBody = document.getElementById('elastiquero-form-body');
   if (intakeGate) intakeGate.style.display = 'none';
   if (formBody) formBody.style.display = '';
+}
+
+// Lista de camiones de Elastiquero actualmente Fuera de Servicio, entre "Ordenar/Limpieza" y
+// la foto - cada uno con sus propios botones Operativo/F. Servicio, independiente de lo que
+// esté abierto en el formulario de Cargar Tareas (ver setElastiqueroOrderEstadoUnidad).
+function renderElastiqueroFueraDeServicioList() {
+  const container = document.getElementById('elastiquero-fuera-servicio-list');
+  if (!container) return;
+
+  const pendientes = (activeOrders || []).filter(o =>
+    o.clasificacion === 'Elastiquero' &&
+    o.estadoUnidad === 'fuera_de_servicio' &&
+    (!o.estado || o.estado.toLowerCase() !== 'cerrada')
+  );
+
+  if (pendientes.length === 0) {
+    container.innerHTML = '';
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = '';
+  container.innerHTML = pendientes.map(o => `
+    <div class="eh-fs-row">
+      <div class="eh-fs-row-label">
+        <strong>Interno ${o.interno}</strong>
+        <small>${o.taxesOrderNumber ? 'OT #' + o.taxesOrderNumber : 'Sin sincronizar aún'}</small>
+      </div>
+      <div class="eh-fs-row-actions">
+        <button type="button" class="btn btn-secondary" onclick="setElastiqueroOrderEstadoUnidad('${o.id}','operativo')">Operativo</button>
+        <button type="button" class="btn btn-primary" onclick="setElastiqueroOrderEstadoUnidad('${o.id}','fuera_de_servicio')">F. Servicio</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Botones Operativo/F. Servicio de la lista de arriba. A diferencia de toggleOrderEstadoUnidad
+// (el switch que ya existe en Órdenes), acá NO se dispara el envío de tareas a Taxes al pasar a
+// Operativo - eso lo sigue haciendo únicamente "Subir Tareas", cuando el usuario lo apriete.
+// Este botón solo decide si el camión sigue figurando como pendiente acá y en Parte Taller.
+async function setElastiqueroOrderEstadoUnidad(orderId, nuevoEstado) {
+  const order = activeOrders.find(o => o.id === orderId);
+  if (!order) return;
+
+  if (nuevoEstado === 'operativo') {
+    const tasks = order.tasks || [];
+    const hasActiveOrPausedTimer = tasks.some(t => t.status !== 'Finalizada' && (t.timerStarted || t.timerStart || t.status === 'En Proceso'));
+    if (hasActiveOrPausedTimer) {
+      showToast("No se puede marcar como Operativo mientras haya tareas activas o en proceso", "warning");
+      return;
+    }
+  }
+
+  const estadoPrevio = order.estadoUnidad;
+  order.estadoUnidad = nuevoEstado;
+  renderElastiqueroFueraDeServicioList();
+
+  try {
+    const res = await fetch(`/api/orders/${orderId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estadoUnidad: nuevoEstado })
+    });
+    if (!res.ok) throw new Error('Failed to update status');
+    showToast(`Interno ${order.interno} marcado como ${nuevoEstado === 'operativo' ? 'Operativo' : 'Fuera de Servicio'}`, 'success');
+
+    try {
+      await fetch('/api/parte-taller/novedad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accion: 'actualizar_estado_flota',
+          interno: order.interno,
+          estado: nuevoEstado,
+          motivo: order.incidente || (nuevoEstado === 'fuera_de_servicio' ? 'Fuera de servicio' : 'Operativo'),
+          responsable: localStorage.getItem('currentUserUsername') || '',
+          sector: 'taller'
+        })
+      });
+      if (typeof fetchParteTallerEstado === 'function') fetchParteTallerEstado();
+    } catch (ptErr) {
+      console.error('[setElastiqueroOrderEstadoUnidad] Error sincronizando Parte Taller:', ptErr);
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Error al actualizar el estado del camión', 'danger');
+    order.estadoUnidad = estadoPrevio;
+    renderElastiqueroFueraDeServicioList();
+  }
 }
 
 // "Recibir Camión" (Inicio Elastiquero): crea la orden apenas entra el camión, sin tareas
@@ -9437,11 +9530,11 @@ async function submitElastiqueroOrders() {
     const recentClosedOrder = existingOrder ? null : findRecentClosedTallerOrderForInterno(interno);
 
     if (existingOrder) {
-      // Esta orden viene de "Recibir Camión" (Fuera de Servicio, sin tareas) o de un uso
-      // anterior - como las tareas de Elastiquero se cargan ya Finalizadas (no tienen su propio
-      // cronómetro de inicio/pausa/fin), completar el formulario acá significa que el trabajo
-      // terminó: el camión vuelve a Operativo.
-      additionsToExistingOrders.push({ orderId: existingOrder.id, interno, tasks, needsUnarchive: false, clearElastiqueroFlag: false, setOperativo: true });
+      // Esta orden viene de "Recibir Camión" (Fuera de Servicio) o de un uso anterior. Ya NO
+      // se fuerza a Operativo acá - el elastiquero puede no haber terminado el camión (sigue
+      // mañana), así que el estado (Operativo/F. Servicio) lo decide el usuario a mano con los
+      // botones de la lista de pendientes (ver setElastiqueroOrderEstadoUnidad), no "Subir Tareas".
+      additionsToExistingOrders.push({ orderId: existingOrder.id, interno, tasks, needsUnarchive: false, clearElastiqueroFlag: false, setOperativo: false });
     } else if (recentClosedOrder) {
       // Clear the flag once its tasks land - otherwise this same order would keep matching for
       // an unrelated future job on this interno.
@@ -10779,11 +10872,18 @@ function applyUserViewMode() {
     if (el && currentUserPermissions[flag] === false) el.style.display = 'none';
   });
 
-  if (mode !== 'elastiquero') return;
+  // "Inicio" de Modo Elastiquero (los 3 módulos) solo aplica en ese modo - en Modo Taller
+  // el Inicio de siempre (nav-home) ya cubre eso.
+  const navElastiqueroHome = document.getElementById('nav-elastiquero-home');
+  if (mode !== 'elastiquero') {
+    if (navElastiqueroHome) navElastiqueroHome.style.display = 'none';
+    return;
+  }
 
-  // Solo dejar Elastiquero, Gomería y Ajustes (para poder volver a Modo Taller) - todo lo
-  // demás se oculta encima de lo que recién dejaron visible los permisos reales.
-  const keepVisible = new Set(['nav-elastiquero', 'nav-gomeria', 'nav-recorrido', 'nav-settings']);
+  // Solo dejar Inicio (propio), Elastiquero, Gomería y Ajustes (para poder volver a Modo
+  // Taller) - todo lo demás se oculta encima de lo que recién dejaron visible los permisos
+  // reales.
+  const keepVisible = new Set(['nav-elastiquero-home', 'nav-elastiquero', 'nav-gomeria', 'nav-recorrido', 'nav-settings']);
   document.querySelectorAll('.nav-item').forEach(el => {
     if (!keepVisible.has(el.id)) el.style.display = 'none';
   });
