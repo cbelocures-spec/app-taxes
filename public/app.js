@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '372';
+const CURRENT_APP_VERSION = '373';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -911,11 +911,11 @@ function switchView(viewId) {
           if (recibirSelect.rebuildSearchable) recibirSelect.rebuildSearchable();
         }
       } catch(e) {}
-      // Siempre entra mostrando la foto primero - recién al tocarla se ve el formulario
-      // de carga de tareas (ver abrirFormularioElastiquero).
-      const photoGate = document.getElementById('eh-elastiquero-photo-gate');
+      // Siempre entra mostrando el intake (intro + Recibir Camión + foto) primero - recién
+      // al tocar la foto se ve el formulario de carga de tareas (ver abrirFormularioElastiquero).
+      const intakeGate = document.getElementById('elastiquero-intake-gate');
       const formBody = document.getElementById('elastiquero-form-body');
-      if (photoGate) photoGate.style.display = '';
+      if (intakeGate) intakeGate.style.display = '';
       if (formBody) formBody.style.display = 'none';
     }
 
@@ -9221,12 +9221,14 @@ function renderElastiqueroPendingBlocks() {
   updateElastiqueroHorasResumen();
 }
 
-// Tocar la foto en la pantalla de Elastiquero destapa el formulario de carga de tareas,
-// que hasta ahí queda oculto (ver el reset en switchView al entrar a 'elastiquero').
+// Tocar la foto en la pantalla de Elastiquero destapa el formulario de carga de tareas y
+// esconde todo el bloque de arriba (intro + Recibir Camión + foto) - una vez cargando
+// tareas, ese cartel de intake ya no pinta nada ahí (ver el reset en switchView al entrar
+// a 'elastiquero', que lo vuelve a mostrar).
 function abrirFormularioElastiquero() {
-  const photoGate = document.getElementById('eh-elastiquero-photo-gate');
+  const intakeGate = document.getElementById('elastiquero-intake-gate');
   const formBody = document.getElementById('elastiquero-form-body');
-  if (photoGate) photoGate.style.display = 'none';
+  if (intakeGate) intakeGate.style.display = 'none';
   if (formBody) formBody.style.display = '';
 }
 

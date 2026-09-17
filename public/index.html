@@ -785,45 +785,47 @@
 
     <!-- VIEW: ELASTIQUERO (CAMBIO/REPARACIÓN DE ELÁSTICOS) -->
     <section id="view-elastiquero" class="app-view">
-      <div class="eh-intro">
-        <p class="eh-eyebrow">Modo Elastiquero</p>
-        <h2>¿Qué vas a cargar?</h2>
-        <p class="eh-subtitle">Elegí el módulo para empezar.</p>
-      </div>
-
-      <div class="eh-recibir-card">
-        <label for="eh-recibir-interno">Recibir Camión</label>
-        <p class="eh-recibir-hint">Apenas entra el camión, sin cargar tareas todavía - así ya queda Fuera de Servicio y Pañol puede preparar insumos.</p>
-        <div class="eh-recibir-row">
-          <select id="eh-recibir-interno" style="width:100%;">
-            <option value="">Seleccionar Interno...</option>
-          </select>
-          <button type="button" class="btn btn-primary" onclick="recibirCamionElastiquero()">
-            <span class="material-icons" style="font-size:18px;">local_shipping</span> Recibir
-          </button>
+      <div id="elastiquero-intake-gate">
+        <div class="eh-intro">
+          <p class="eh-eyebrow">Modo Elastiquero</p>
+          <h2>¿Qué vas a cargar?</h2>
+          <p class="eh-subtitle">Elegí el módulo para empezar.</p>
         </div>
-        <div class="eh-recibir-shortcuts">
-          <button type="button" class="btn btn-secondary eh-recibir-varios-btn" onclick="setSearchableSelectValue(document.getElementById('eh-recibir-interno'), 'VARIOS')">
-            <span class="material-icons" style="font-size:18px;">cleaning_services</span> Ordenar / Limpieza
-          </button>
-          <button type="button" class="btn btn-secondary eh-recibir-varios-btn" onclick="setSearchableSelectValue(document.getElementById('eh-recibir-interno'), 'REPARACIONES INTERNAS')">
-            <span class="material-icons" style="font-size:18px;">build</span> Reparación Cubierta
-          </button>
-        </div>
-      </div>
 
-      <button type="button" class="eh-module-card eh-elastiquero" id="eh-elastiquero-photo-gate" onclick="abrirFormularioElastiquero()" style="margin-bottom:16px;">
-        <img src="imagenes/elastiquero_cargar_tareas.jpg" alt="Elastiquero reparando ballesta de camión">
-        <div class="eh-scrim"></div>
-        <span class="eh-chip">Ejes y elásticos</span>
-        <div class="eh-label">
-          <span class="material-icons">construction</span>
-          <div class="eh-label-text">
-            <strong>Cargar Tareas</strong>
-            <small>Tocá para cargar lo que se hizo</small>
+        <div class="eh-recibir-card">
+          <label for="eh-recibir-interno">Recibir Camión</label>
+          <p class="eh-recibir-hint">Apenas entra el camión, sin cargar tareas todavía - así ya queda Fuera de Servicio y Pañol puede preparar insumos.</p>
+          <div class="eh-recibir-row">
+            <select id="eh-recibir-interno" style="width:100%;">
+              <option value="">Seleccionar Interno...</option>
+            </select>
+            <button type="button" class="btn btn-primary" onclick="recibirCamionElastiquero()">
+              <span class="material-icons" style="font-size:18px;">local_shipping</span> Recibir
+            </button>
+          </div>
+          <div class="eh-recibir-shortcuts">
+            <button type="button" class="btn btn-secondary eh-recibir-varios-btn" onclick="setSearchableSelectValue(document.getElementById('eh-recibir-interno'), 'VARIOS')">
+              <span class="material-icons" style="font-size:18px;">cleaning_services</span> Ordenar / Limpieza
+            </button>
+            <button type="button" class="btn btn-secondary eh-recibir-varios-btn" onclick="setSearchableSelectValue(document.getElementById('eh-recibir-interno'), 'REPARACIONES INTERNAS')">
+              <span class="material-icons" style="font-size:18px;">build</span> Reparación Cubierta
+            </button>
           </div>
         </div>
-      </button>
+
+        <button type="button" class="eh-module-card eh-elastiquero" id="eh-elastiquero-photo-gate" onclick="abrirFormularioElastiquero()" style="margin-bottom:16px;">
+          <img src="imagenes/elastiquero_cargar_tareas.jpg" alt="Elastiquero reparando ballesta de camión">
+          <div class="eh-scrim"></div>
+          <span class="eh-chip">Ejes y elásticos</span>
+          <div class="eh-label">
+            <span class="material-icons">construction</span>
+            <div class="eh-label-text">
+              <strong>Cargar Tareas</strong>
+              <small>Tocá para cargar lo que se hizo</small>
+            </div>
+          </div>
+        </button>
+      </div>
 
       <div id="elastiquero-form-body" style="display:none;">
         <div class="view-header">
@@ -1819,7 +1821,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.13</div>
+      <div class="sidebar-version">Versión 1.27.14</div>
     </div>
   </aside>
 
@@ -3078,6 +3080,6 @@
     }
   </style>
 
-  <script src="app.js?v=372"></script>
+  <script src="app.js?v=373"></script>
 </body>
 </html>
