@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '390';
+const CURRENT_APP_VERSION = '391';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -17292,6 +17292,13 @@ function buildInformeTurnosHoras(turnos) {
       const intervalos = extraerIntervalosDeTimerHistory(task.timerHistory);
       intervalos.forEach(({ start, end }) => {
         if (!(end > start)) return;
+        // Filtro de cordura: si el intervalo ni siquiera ARRANCÓ hoy (un timerHistory
+        // acumulado durante meses puede tener basura vieja), no entra al informe de hoy bajo
+        // ningún concepto - ni con horario automático ni con uno forzado/personalizado. Sin
+        // este filtro, un "entrada" corrupta de hace meses hacía que "override.start - start"
+        // (la cuenta de "llegó antes de su turno") se disparara a miles de horas, porque el
+        // tope de 12hs de arriba solo acota la DURACIÓN del intervalo, no en qué día cae.
+        if (start < turnos['Mañana'].start || start >= turnos['Noche'].end) return;
 
         const override = resolverVentanaEmpleadoHoy(emp, turnos);
         let turno, trabajadasMs, extraMs, ventanaMs;
