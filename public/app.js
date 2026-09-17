@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '378';
+const CURRENT_APP_VERSION = '380';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -8952,6 +8952,34 @@ function buildElastiqueroReparacionDescription(block) {
   return lines.join('\n');
 }
 
+// Ajusta qué secciones se ven en un bloque según el interno elegido - "REPARACIONES INTERNAS"
+// es una cubierta suelta reparada (solo esa sección) y "VARIOS" es Ordenar/Limpieza (nada de
+// ejes/cubiertas/reparación, solo Otros + Empleados). Cualquier otro interno usa las secciones
+// normales de Ejes trabajados/Cubiertas cambiadas. Se llama tanto al pre-cargar un bloque
+// (renderElastiqueroPendingBlocks) como al cambiar el interno a mano, para que ambos caminos
+// terminen mostrando los mismos campos.
+function ajustarSeccionesElastiqueroPorInterno(block, interno) {
+  if (!block) return;
+  const ejeSection = block.querySelector('.elastiquero-eje-section');
+  const cubiertaSection = block.querySelector('.elastiquero-cubierta-section');
+  const reparacionSection = block.querySelector('.elastiquero-reparacion-section');
+  const cleanInterno = String(interno || '').trim().toUpperCase();
+
+  if (cleanInterno === 'REPARACIONES INTERNAS') {
+    if (ejeSection) ejeSection.style.display = 'none';
+    if (cubiertaSection) cubiertaSection.style.display = 'none';
+    if (reparacionSection) reparacionSection.style.display = 'block';
+  } else if (cleanInterno === 'VARIOS') {
+    if (ejeSection) ejeSection.style.display = 'none';
+    if (cubiertaSection) cubiertaSection.style.display = 'none';
+    if (reparacionSection) reparacionSection.style.display = 'none';
+  } else {
+    if (ejeSection) ejeSection.style.display = '';
+    if (cubiertaSection) cubiertaSection.style.display = '';
+    if (reparacionSection) reparacionSection.style.display = 'none';
+  }
+}
+
 // Botón "Reparación Cubierta" (peer de "Agregar Interno"): arma un bloque ya fijado al interno
 // especial "REPARACIONES INTERNAS" del catálogo de Taxes (label "9 15 Interno REPARACIONES
 // INTERNAS") y muestra la sección "Cubierta reparada" en vez de Ejes/Cubiertas cambiadas.
@@ -8964,15 +8992,25 @@ function addElastiqueroReparacionInternaBlock() {
   const internoSelect = block.querySelector('.elastiquero-interno-select');
   if (internoSelect) setSearchableSelectValue(internoSelect, 'REPARACIONES INTERNAS');
 
-  const ejeSection = block.querySelector('.elastiquero-eje-section');
-  if (ejeSection) ejeSection.style.display = 'none';
-  const cubiertaSection = block.querySelector('.elastiquero-cubierta-section');
-  if (cubiertaSection) cubiertaSection.style.display = 'none';
-  const reparacionSection = block.querySelector('.elastiquero-reparacion-section');
-  if (reparacionSection) reparacionSection.style.display = 'block';
+  ajustarSeccionesElastiqueroPorInterno(block, 'REPARACIONES INTERNAS');
 
+  const reparacionSection = block.querySelector('.elastiquero-reparacion-section');
   const addReparacionBtn = reparacionSection ? reparacionSection.querySelector('.btn-secondary') : null;
   if (addReparacionBtn) addElastiqueroReparacionRow(addReparacionBtn);
+}
+
+// "Ordenar / Limpieza" (interno especial "VARIOS"): como no es un camión puntual, no aplica
+// Ejes/Cubiertas ni Reparación - solo Otros (para describir el trabajo) y Empleados y horas.
+function addElastiqueroVariosBlock() {
+  addElastiqueroInternoBlock();
+  const container = document.getElementById('elastiquero-internos-container');
+  const block = container ? container.querySelector('.elastiquero-interno-block:last-child') : null;
+  if (!block) return;
+
+  const internoSelect = block.querySelector('.elastiquero-interno-select');
+  if (internoSelect) setSearchableSelectValue(internoSelect, 'VARIOS');
+
+  ajustarSeccionesElastiqueroPorInterno(block, 'VARIOS');
 }
 
 function addElastiqueroEmpleadoRow(btn) {
@@ -9182,7 +9220,10 @@ function addElastiqueroInternoBlock() {
   addElastiqueroEmpleadoRow(block.querySelector('.elastiquero-empleado-rows-container + button'));
   const internoSelectEl = block.querySelector('.elastiquero-interno-select');
   if (internoSelectEl) {
-    internoSelectEl.addEventListener('change', () => updateElastiqueroOtInfo(internoSelectEl));
+    internoSelectEl.addEventListener('change', () => {
+      updateElastiqueroOtInfo(internoSelectEl);
+      ajustarSeccionesElastiqueroPorInterno(block, internoSelectEl.value);
+    });
     if (typeof convertSelectToSearchable === 'function') {
       convertSelectToSearchable(internoSelectEl);
     }
@@ -9227,12 +9268,25 @@ function renderElastiqueroPendingBlocks() {
   }
 
   pendientes.forEach(order => {
-    addElastiqueroInternoBlock();
-    const block = container.querySelector('.elastiquero-interno-block:last-child');
-    const internoSelect = block ? block.querySelector('.elastiquero-interno-select') : null;
-    if (internoSelect) {
-      setSearchableSelectValue(internoSelect, String(order.interno || '').trim());
+    const interno = String(order.interno || '').trim();
+    // "REPARACIONES INTERNAS" (cubierta suelta reparada) y "VARIOS" (Ordenar/Limpieza) son
+    // internos especiales que necesitan sus propias secciones - no el bloque genérico de Ejes/
+    // Cubiertas Cambiadas, o quedaba mostrando los campos equivocados al pre-cargarlo acá. Esas
+    // dos funciones ya dejan el interno seleccionado y las secciones ajustadas - no volver a
+    // tocar el select acá abajo, porque disparar 'change' de nuevo (con el select recién
+    // poblado) puede pisar el ajuste que acaban de hacer.
+    let block;
+    if (interno === 'REPARACIONES INTERNAS') {
+      addElastiqueroReparacionInternaBlock();
+    } else if (interno === 'VARIOS') {
+      addElastiqueroVariosBlock();
+    } else {
+      addElastiqueroInternoBlock();
+      block = container.querySelector('.elastiquero-interno-block:last-child');
+      const internoSelect = block ? block.querySelector('.elastiquero-interno-select') : null;
+      if (internoSelect) setSearchableSelectValue(internoSelect, interno);
     }
+    block = block || container.querySelector('.elastiquero-interno-block:last-child');
     const clasifSelect = block ? block.querySelector('.elastiquero-clasificacion-select') : null;
     if (clasifSelect && order.clasificacion) {
       clasifSelect.value = order.clasificacion;
