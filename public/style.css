@@ -186,10 +186,28 @@ body {
   max-width: 100%;
 }
 
+.header-clock {
+  /* Mismo alto que el logo de al lado (.header-logo-img: 24px acá, 38px en el media query
+     de abajo) - line-height igualado al height del logo, no solo el font-size, para que
+     ocupen la misma altura visual. */
+  height: 24px;
+  line-height: 24px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 @media (min-width: 480px) {
   .header-logo-img {
     height: 38px;
     max-width: 140px;
+  }
+  .header-clock {
+    height: 38px;
+    line-height: 38px;
+    font-size: 26px;
   }
   .header-middle-title {
     font-size: 16px;

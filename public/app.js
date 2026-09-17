@@ -4,7 +4,47 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '382';
+const CURRENT_APP_VERSION = '383';
+
+// Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
+// se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
+// (comparándolo contra el reloj real de la persona), y a futuro es la misma base de tiempo que
+// van a usar los timestamps de Play/Pausa/Fin.
+let serverTimeOffsetMs = 0;
+
+async function syncServerTimeOffset() {
+  try {
+    const t0 = Date.now();
+    const res = await fetch('/api/server-time');
+    const data = await res.json();
+    const t1 = Date.now();
+    // Resta el tiempo de ida y vuelta del pedido (aproximado a la mitad) para no correr el
+    // reloj el tiempo que tardó la red en responder.
+    const roundTripMs = t1 - t0;
+    serverTimeOffsetMs = (data.now + roundTripMs / 2) - t1;
+  } catch (e) {
+    // Sin conexión momentánea: el reloj sigue andando con el último offset conocido.
+  }
+}
+
+function tickHeaderClock() {
+  const el = document.getElementById('header-clock');
+  if (!el) return;
+  const now = new Date(Date.now() + serverTimeOffsetMs);
+  el.textContent = now.toLocaleTimeString('es-AR', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    timeZone: 'America/Argentina/Buenos_Aires'
+  });
+}
+
+async function startHeaderClock() {
+  await syncServerTimeOffset();
+  tickHeaderClock();
+  setInterval(tickHeaderClock, 1000);
+  // Re-sincroniza cada 5 minutos por si el reloj del dispositivo deriva (drift) durante una
+  // sesión larga, o la primera sincronización falló por un corte de red momentáneo.
+  setInterval(syncServerTimeOffset, 5 * 60 * 1000);
+}
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -453,6 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
   checkUserSession();
   initCardBgPicker();
   startAppVersionWatch();
+  startHeaderClock();
 
   // If logged in, fetch initial data
   if (localStorage.getItem('currentUserUsername')) {

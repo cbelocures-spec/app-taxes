@@ -73,7 +73,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '382';
+const APP_VERSION = '383';
 
 // Middleware
 app.use(cors());
@@ -868,6 +868,13 @@ app.get('/api/db-debug', (req, res) => {
 // and reloads, instead of continuing to run old client logic against the new backend.
 app.get('/api/app-version', (req, res) => {
   res.json({ version: APP_VERSION });
+});
+
+// Reloj del header (y, a futuro, la base de los timestamps reales de Play/Pausa/Fin) - el
+// dispositivo que llama a esto puede tener la hora mal puesta; el servidor es la fuente de
+// verdad.
+app.get('/api/server-time', (req, res) => {
+  res.json({ now: Date.now() });
 });
 
 // Get all work orders (filtered by user sector)
