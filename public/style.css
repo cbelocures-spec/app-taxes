@@ -3571,6 +3571,36 @@ body {
 .eh-fs-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .eh-fs-row-actions .btn { padding: 8px 12px; font-size: 13px; width: auto; }
 
+.eh-success-modal {
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 36px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 320px;
+  box-shadow: var(--shadow-lg);
+  animation: scaleUp 0.2s ease-out;
+}
+.eh-success-check {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.eh-success-check .material-icons { font-size: 54px; color: #fff; }
+.eh-success-text {
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-main);
+  margin: 0;
+}
+
 .eh-recorrido-widget {
   grid-column: 1 / -1;
   align-items: center;

@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '377';
+const CURRENT_APP_VERSION = '378';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9405,20 +9405,25 @@ async function recibirCamionElastiquero(internoOverride) {
   }
 }
 
-// Same match used at submit time: an open Elastiquero-classified order, still Fuera de
-// Servicio, for this exact interno - kept as one function so the live preview and the actual
-// submit never disagree about which order (if any) is going to receive the new tasks.
+// Same match used at submit time: an open Elastiquero-classified order for this exact interno -
+// kept as one function so the live preview and the actual submit never disagree about which
+// order (if any) is going to receive the new tasks.
 // Used to match ANY open Taller order regardless of its own clasificación (Auxilio,
 // Correctivo, etc.), which meant Elastiquero's work landed mixed into whatever unrelated
 // order happened to already have the truck Fuera de Servicio - pedido explicito del usuario
 // para que cada clasificación tenga su propia orden (2026-09-15).
+// NO exige estadoUnidad === 'fuera_de_servicio' - antes lo exigía, pero desde que Operativo/
+// F.Servicio se decide aparte de "Subir Tareas" (ver setElastiqueroOrderEstadoUnidad), alguien
+// podía marcar Operativo ANTES de cargar las tareas y esta función dejaba de encontrar esa
+// orden - "Subir Tareas" entonces creaba una segunda orden duplicada en Taxes para el mismo
+// camión (bug real, detectado 2026-09-17). El estado de la unidad no debe afectar si la orden
+// sigue "abierta" para seguir recibiendo tareas - eso lo decide archived/estado==='cerrada'.
 function findOpenTallerOrderForInterno(interno, clasificacion) {
   const cleanInterno = String(interno || '').trim();
   if (!cleanInterno) return null;
   const targetClasificacion = clasificacion || 'Elastiquero';
   return (activeOrders || []).find(o =>
     String(o.interno || '').trim() === cleanInterno &&
-    o.estadoUnidad === 'fuera_de_servicio' &&
     (!o.estado || o.estado.toLowerCase() !== 'cerrada') &&
     o.clasificacion === targetClasificacion
   ) || null;
@@ -9635,10 +9640,6 @@ async function submitElastiqueroOrders() {
       }
     }
 
-    const parts = [];
-    if (additionsToExistingOrders.length > 0) parts.push(`${additionsToExistingOrders.length} agregada(s) a una orden ya abierta`);
-    if (newOrdersToCreate.length > 0) parts.push(`${newOrdersToCreate.length} orden(es) nueva(s) creada(s)`);
-    showToast(`✅ ${parts.join(' y ')}`, 'success');
     const container = document.getElementById('elastiquero-internos-container');
     if (container) {
       container.innerHTML = '';
@@ -9646,11 +9647,21 @@ async function submitElastiqueroOrders() {
     }
     updateElastiqueroHorasResumen();
     fetchOrders();
-    switchView('orders');
+    mostrarConfirmacionElastiqueroTareas();
   } catch (err) {
     showToast(err.message, 'danger');
     console.error('Error creating elastiquero orders', err);
   }
+}
+
+// Cartel grande de confirmación al terminar "Subir Tareas" en Elastiquero - antes esto mandaba
+// derecho al módulo Órdenes sin avisar nada. Se cierra sola a los 2s, o al tocarla, y el
+// usuario se queda en Elastiquero listo para el próximo camión.
+function mostrarConfirmacionElastiqueroTareas() {
+  const modal = document.getElementById('elastiquero-success-modal');
+  if (!modal) return;
+  modal.classList.add('open');
+  setTimeout(() => modal.classList.remove('open'), 2000);
 }
 
 // --- GOOGLE SHEETS NOVELTIES INTEGRATION ---
