@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '380';
+const CURRENT_APP_VERSION = '382';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -9291,6 +9291,13 @@ function renderElastiqueroPendingBlocks() {
     if (clasifSelect && order.clasificacion) {
       clasifSelect.value = order.clasificacion;
     }
+    // El aviso de "ya tiene una orden abierta" (updateElastiqueroOtInfo) ya se había disparado
+    // por el 'change' del interno, pero en ese momento la Clasificación todavía tenía el valor
+    // por defecto (Elastiquero) - si la orden real es de otra clasificación (p.ej. Gomería), el
+    // aviso quedaba mal (decía "se va a crear una nueva" con la orden ya abierta). Recalcularlo
+    // ahora que la Clasificación ya está en su valor final.
+    const internoSelectFinal = block ? block.querySelector('.elastiquero-interno-select') : null;
+    if (internoSelectFinal) updateElastiqueroOtInfo(internoSelectFinal);
   });
   updateElastiqueroHorasResumen();
 }
@@ -9340,10 +9347,14 @@ function renderElastiqueroFueraDeServicioList() {
   `).join('');
 }
 
-// Botones Operativo/F. Servicio de la lista de arriba. A diferencia de toggleOrderEstadoUnidad
-// (el switch que ya existe en Órdenes), acá NO se dispara el envío de tareas a Taxes al pasar a
-// Operativo - eso lo sigue haciendo únicamente "Subir Tareas", cuando el usuario lo apriete.
-// Este botón solo decide si el camión sigue figurando como pendiente acá y en Parte Taller.
+// Botones Operativo/F. Servicio de la lista de arriba.
+// El propio Sync Worker corta la sincronización mientras estadoUnidad siga en 'fuera_de_servicio'
+// (ver syncWorker.js: syncWorkOrder - "la unidad está Fuera de Servicio... el resto se sube
+// cuando pase a Operativo"), así que pasar a Operativo es el único momento en que algo puede
+// disparar el envío de las tareas ya cargadas - por eso, a diferencia de un primer intento de
+// este botón, SÍ hay que avisarle al worker acá (mismo patrón que applyUnitStatusChange, usado
+// desde Parte Taller): mandar syncStatus:'pending' y llamar a finalize-tasks. Si todavía no hay
+// tareas cargadas (recién "Recibido"), esto no tiene nada para subir y no hace nada visible.
 async function setElastiqueroOrderEstadoUnidad(orderId, nuevoEstado) {
   const order = activeOrders.find(o => o.id === orderId);
   if (!order) return;
@@ -9362,10 +9373,12 @@ async function setElastiqueroOrderEstadoUnidad(orderId, nuevoEstado) {
   renderElastiqueroFueraDeServicioList();
 
   try {
+    const putBody = { estadoUnidad: nuevoEstado };
+    if (nuevoEstado === 'operativo') putBody.syncStatus = 'pending';
     const res = await fetch(`/api/orders/${orderId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estadoUnidad: nuevoEstado })
+      body: JSON.stringify(putBody)
     });
     if (!res.ok) throw new Error('Failed to update status');
     showToast(`Interno ${order.interno} marcado como ${nuevoEstado === 'operativo' ? 'Operativo' : 'Fuera de Servicio'}`, 'success');
@@ -9386,6 +9399,26 @@ async function setElastiqueroOrderEstadoUnidad(orderId, nuevoEstado) {
       if (typeof fetchParteTallerEstado === 'function') fetchParteTallerEstado();
     } catch (ptErr) {
       console.error('[setElastiqueroOrderEstadoUnidad] Error sincronizando Parte Taller:', ptErr);
+    }
+
+    if (nuevoEstado === 'operativo') {
+      showToast("Sincronizando tareas en Taxes al pasar a Operativo...", "info");
+      try {
+        const syncRes = await fetch('/api/orders/finalize-tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId })
+        });
+        const syncData = await syncRes.json();
+        if (syncData.status === 'success' || syncData.success) {
+          showToast("✅ Tareas sincronizadas con éxito en Taxes", "success");
+        } else {
+          showToast(syncData.message || "Error al sincronizar tareas en Taxes", "warning");
+        }
+      } catch (syncErr) {
+        console.error('[setElastiqueroOrderEstadoUnidad] Error al sincronizar tareas:', syncErr);
+      }
+      fetchOrders();
     }
   } catch (err) {
     console.error(err);
@@ -9621,7 +9654,10 @@ async function submitElastiqueroOrders() {
       // se fuerza a Operativo acá - el elastiquero puede no haber terminado el camión (sigue
       // mañana), así que el estado (Operativo/F. Servicio) lo decide el usuario a mano con los
       // botones de la lista de pendientes (ver setElastiqueroOrderEstadoUnidad), no "Subir Tareas".
-      additionsToExistingOrders.push({ orderId: existingOrder.id, interno, tasks, needsUnarchive: false, clearElastiqueroFlag: false, setOperativo: false });
+      // Si YA está Operativo (p.ej. se marcó antes de terminar de cargar todo), el Sync Worker
+      // no la va a levantar sola - agregar tareas acá tiene que avisarle igual que hace el botón
+      // Operativo, o quedan cargadas en la app pero nunca suben a Taxes.
+      additionsToExistingOrders.push({ orderId: existingOrder.id, interno, tasks, needsUnarchive: false, clearElastiqueroFlag: false, setOperativo: false, alreadyOperativo: existingOrder.estadoUnidad === 'operativo' });
     } else if (recentClosedOrder) {
       // Clear the flag once its tasks land - otherwise this same order would keep matching for
       // an unrelated future job on this interno.
@@ -9669,6 +9705,7 @@ async function submitElastiqueroOrders() {
       const putBody = { tasks: addition.tasks };
       if (addition.clearElastiqueroFlag) putBody.pendingElastiquero = false;
       if (addition.setOperativo) putBody.estadoUnidad = 'operativo';
+      if (addition.alreadyOperativo) putBody.syncStatus = 'pending';
       const res = await fetch(`/api/orders/${addition.orderId}`, {
         method: 'PUT',
         headers: commonHeaders,
@@ -9678,6 +9715,20 @@ async function submitElastiqueroOrders() {
         let errMsg = `Error al agregar las tareas del interno ${addition.interno} a su orden ya abierta.`;
         try { const errData = await res.json(); if (errData && errData.error) errMsg = errData.error; } catch (_) {}
         throw new Error(errMsg);
+      }
+      // Fuera de Servicio nunca sincroniza tareas (lo corta el propio Sync Worker) - eso lo
+      // dispara recién "Operativo". Pero si esta orden YA estaba Operativo, nadie más va a
+      // avisarle al worker que hay tareas nuevas esperando - hacerlo acá mismo.
+      if (addition.alreadyOperativo) {
+        try {
+          await fetch('/api/orders/finalize-tasks', {
+            method: 'POST',
+            headers: commonHeaders,
+            body: JSON.stringify({ orderId: addition.orderId })
+          });
+        } catch (syncErr) {
+          console.error('[submitElastiqueroOrders] Error al sincronizar tareas de una orden ya Operativa:', syncErr);
+        }
       }
     }
 
