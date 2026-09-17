@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '388';
+const CURRENT_APP_VERSION = '389';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -11307,9 +11307,13 @@ function loadEmployeeScheduleIntoForm() {
 function populateEmployeeScheduleSelect() {
   const select = document.getElementById('empsched-empleado-select');
   if (!select || !cachedCatalogs || !cachedCatalogs.empleados) return;
+  // Mismo filtro que ya usa Gomería (getGomeriaMecanicaEmployees) - solo empleados de
+  // Taller/Mecánica, no el catálogo entero de la empresa (cientos de nombres de todos los
+  // sectores, la mayoría irrelevantes para este horario).
+  const empleados = (typeof getGomeriaMecanicaEmployees === 'function') ? getGomeriaMecanicaEmployees() : cachedCatalogs.empleados;
   const currentVal = select.value;
   select.innerHTML = '<option value="">Seleccionar empleado...</option>' +
-    cachedCatalogs.empleados.map(e => `<option value="${e.value}">${e.label}</option>`).join('');
+    empleados.map(e => `<option value="${e.value}">${e.label}</option>`).join('');
   if (currentVal) select.value = currentVal;
 }
 
