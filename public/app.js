@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '383';
+const CURRENT_APP_VERSION = '384';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -30,11 +30,20 @@ async function syncServerTimeOffset() {
 function tickHeaderClock() {
   const el = document.getElementById('header-clock');
   if (!el) return;
-  const now = new Date(Date.now() + serverTimeOffsetMs);
+  const now = new Date(serverNow());
   el.textContent = now.toLocaleTimeString('es-AR', {
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
     timeZone: 'America/Argentina/Buenos_Aires'
   });
+}
+
+// La misma hora que se ve en el reloj de al lado del logo (Date.now() del dispositivo,
+// corregido por el offset contra el servidor) - usar esto en vez de Date.now() en cualquier
+// lugar donde el momento exacto importa de verdad (arrancar/pausar/terminar un cronómetro),
+// no en cosas como cache-busting de un fetch o generar un id único, donde el reloj del
+// dispositivo alcanza y sobra.
+function serverNow() {
+  return Date.now() + serverTimeOffsetMs;
 }
 
 async function startHeaderClock() {
@@ -3162,9 +3171,9 @@ function renderTimerHistoryHtml(history) {
 function addTaskTimerEvent(card, type) {
   if (!card) return;
   const history = JSON.parse(card.dataset.timerHistory || '[]');
-  const now = new Date();
-  const formatted = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' });
-  history.push({ type, formatted, timestamp: Date.now() });
+  const nowMs = serverNow();
+  const formatted = new Date(nowMs).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' });
+  history.push({ type, formatted, timestamp: nowMs });
   card.dataset.timerHistory = JSON.stringify(history);
   renderTaskTimerHistory(card);
 }
@@ -4894,9 +4903,10 @@ async function submitWorkOrder() {
         const currentTimerSecs = calculateTotalElapsedSeconds(timerHistoryVal, null);
         const currentTimerHrs = Math.round((currentTimerSecs / 3600) * 100) / 100;
         if (Math.abs(currentTimerHrs - parsedHours) > 0.05) {
+          const fakeFinTimestamp = serverNow();
           timerHistoryVal = [
-            { type: 'Inicio', timestamp: Date.now() - Math.round(parsedHours * 3600 * 1000) },
-            { type: 'Fin', timestamp: Date.now() }
+            { type: 'Inicio', timestamp: fakeFinTimestamp - Math.round(parsedHours * 3600 * 1000) },
+            { type: 'Fin', timestamp: fakeFinTimestamp }
           ];
         }
       }
@@ -5342,7 +5352,7 @@ async function resolveDatabaseConflicts() {
         const startVal = tInfo.timerStart;
 
         // Calculate elapsed time and update hours
-        const elapsedMs = Date.now() - startVal;
+        const elapsedMs = serverNow() - startVal;
         const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
         const currentHours = parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0;
         const currentMinutes = hmmToMinutes(currentHours);
@@ -5577,7 +5587,7 @@ async function toggleTaskTimer(taskId) {
       addTaskTimerEvent(card, 'Reanudó');
     }
 
-    const startTime = Date.now();
+    const startTime = serverNow();
     localStorage.setItem(timerKey, startTime);
     startTimerInterval(taskId, startTime);
 
@@ -5608,7 +5618,7 @@ async function toggleTaskTimer(taskId) {
     }
 
     // Calculate elapsed minutes
-    const elapsedMs = Date.now() - startTime;
+    const elapsedMs = serverNow() - startTime;
     const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
     const addedHoursHmm = minutesToHmm(elapsedMinutes);
 
@@ -5650,7 +5660,7 @@ function minutesToHmm(totalMinutes) {
 }
 
 function calculateTotalElapsedSeconds(timerHistory, timerStart) {
-  const now = Date.now();
+  const now = serverNow();
   
   if (timerStart !== null && timerStart !== undefined && parseInt(timerStart) > 0) {
     const startMs = parseInt(timerStart);
@@ -6203,7 +6213,7 @@ function renderDashboard() {
             } else if (localTimerStart !== null && parseInt(localTimerStart) > 0) {
               resolvedTimerStart = parseInt(localTimerStart);
             } else {
-              resolvedTimerStart = Date.now();
+              resolvedTimerStart = serverNow();
               localStorage.setItem(timerKey, String(resolvedTimerStart));
             }
           } else if (localTimerStart !== null) {
@@ -6438,9 +6448,9 @@ function addTimerEventToTask(task, type) {
   if (!task.timerHistory) {
     task.timerHistory = [];
   }
-  const now = new Date();
-  const formatted = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' });
-  task.timerHistory.push({ type, formatted, timestamp: Date.now() });
+  const nowMs = serverNow();
+  const formatted = new Date(nowMs).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' });
+  task.timerHistory.push({ type, formatted, timestamp: nowMs });
 }
 
 // Fire-and-forget: the moment a mechanic starts (or resumes) working on a truck, push that
@@ -6565,14 +6575,14 @@ async function toggleDashboardTaskTimer(orderId, taskId) {
       addTimerEventToTask(task, 'Reanudó');
     }
 
-    task.timerStart = Date.now();
+    task.timerStart = serverNow();
     localStorage.setItem(timerKey, task.timerStart);
     showToast("Cronómetro iniciado", "info");
     syncTaskStartToParteTaller(order.interno, task.centroCosto, order.sector, task.descripcion);
   } else {
     // --- PAUSE TIMER ---
-    const startTime = (task.timerStart !== null && task.timerStart > 0) ? task.timerStart : (localStart ? parseInt(localStart) : Date.now());
-    const elapsedMs = Date.now() - startTime;
+    const startTime = (task.timerStart !== null && task.timerStart > 0) ? task.timerStart : (localStart ? parseInt(localStart) : serverNow());
+    const elapsedMs = serverNow() - startTime;
     const elapsedMinutes = Math.round(elapsedMs / (1000 * 60));
     const addedHoursHmm = minutesToHmm(elapsedMinutes);
 
@@ -7862,7 +7872,7 @@ function clearGomeriaTimerState() {
 function calcularSegundosGomeria(state) {
   let total = 0;
   (state.timerHistory || []).forEach(h => { total += Math.max(0, (h.end - h.start) / 1000); });
-  if (state.active && state.startTime) total += Math.max(0, (Date.now() - state.startTime) / 1000);
+  if (state.active && state.startTime) total += Math.max(0, (serverNow() - state.startTime) / 1000);
   return total;
 }
 
@@ -7941,7 +7951,7 @@ async function continuarGomeria() {
 
     setGomeriaTimerState({
       active: true,
-      startTime: Date.now(),
+      startTime: serverNow(),
       timerHistory: [],
       interno,
       clasificacion,
@@ -7965,12 +7975,12 @@ function toggleGomeriaPausa() {
   if (!state || state.finished) return;
   state.timerHistory = state.timerHistory || [];
   if (state.active) {
-    state.timerHistory.push({ start: state.startTime, end: Date.now() });
+    state.timerHistory.push({ start: state.startTime, end: serverNow() });
     state.active = false;
     state.startTime = null;
   } else {
     state.active = true;
-    state.startTime = Date.now();
+    state.startTime = serverNow();
   }
   setGomeriaTimerState(state);
   renderGomeriaView();
@@ -7995,7 +8005,7 @@ function finalizarGomeriaTimer() {
   if (!state) return;
   if (state.active && state.startTime) {
     state.timerHistory = state.timerHistory || [];
-    state.timerHistory.push({ start: state.startTime, end: Date.now() });
+    state.timerHistory.push({ start: state.startTime, end: serverNow() });
   }
   state.active = false;
   state.startTime = null;
@@ -8355,7 +8365,7 @@ function clearRecorridoState() {
 function calcularSegundosRecorrido(state) {
   let total = 0;
   (state.timerHistory || []).forEach(h => { total += Math.max(0, (h.end - h.start) / 1000); });
-  if (state.active && state.startTime) total += Math.max(0, (Date.now() - state.startTime) / 1000);
+  if (state.active && state.startTime) total += Math.max(0, (serverNow() - state.startTime) / 1000);
   return total;
 }
 
@@ -8378,7 +8388,7 @@ function iniciarRecorrido() {
     return;
   }
   state.active = true;
-  state.startTime = Date.now();
+  state.startTime = serverNow();
   state.timerHistory = state.timerHistory || [];
   setRecorridoState(state);
   renderRecorridoView();
@@ -8389,12 +8399,12 @@ function toggleRecorridoPausa() {
   const state = getRecorridoState();
   if (state.active) {
     state.timerHistory = state.timerHistory || [];
-    state.timerHistory.push({ start: state.startTime, end: Date.now() });
+    state.timerHistory.push({ start: state.startTime, end: serverNow() });
     state.active = false;
     state.startTime = null;
   } else {
     state.active = true;
-    state.startTime = Date.now();
+    state.startTime = serverNow();
   }
   setRecorridoState(state);
   renderRecorridoView();
@@ -8405,7 +8415,7 @@ function finalizarRecorridoTimer() {
   const state = getRecorridoState();
   if (state.active && state.startTime) {
     state.timerHistory = state.timerHistory || [];
-    state.timerHistory.push({ start: state.startTime, end: Date.now() });
+    state.timerHistory.push({ start: state.startTime, end: serverNow() });
   }
   state.active = false;
   state.startTime = null;
@@ -12281,7 +12291,7 @@ function getEmployeeTotalHours(employeeValue) {
           const timerKey = `timer_start_${card.id}`;
           const timerStartVal = localStorage.getItem(timerKey) ? parseInt(localStorage.getItem(timerKey)) : null;
           if (timerStartVal) {
-            const elapsedMs = Math.min(Date.now() - timerStartVal, 43200000);
+            const elapsedMs = Math.min(serverNow() - timerStartVal, 43200000);
             totalMinutes += elapsedMs / (1000 * 60);
           }
         }
@@ -12308,7 +12318,7 @@ function getEmployeeTotalHours(employeeValue) {
         totalMinutes += hmmToMinutes(savedHours);
         
         if (task.timerStart !== null && task.timerStart > 0) {
-          const elapsedMs = Math.min(Date.now() - task.timerStart, 43200000);
+          const elapsedMs = Math.min(serverNow() - task.timerStart, 43200000);
           totalMinutes += elapsedMs / (1000 * 60);
         }
       }
@@ -12375,7 +12385,7 @@ function getEmployeeTasksDetailsToday(employeeValue) {
           const timerStartVal = localStorage.getItem(timerKey) ? parseInt(localStorage.getItem(timerKey)) : null;
           let runningMins = 0;
           if (timerStartVal) {
-            runningMins = Math.min((Date.now() - timerStartVal) / (1000 * 60), 720);
+            runningMins = Math.min((serverNow() - timerStartVal) / (1000 * 60), 720);
           }
 
           const descEl = card.querySelector('.task-desc');
@@ -12412,7 +12422,7 @@ function getEmployeeTasksDetailsToday(employeeValue) {
         const savedHours = parseFloat(String(task.horasEstimadas).replace(',', '.')) || 0;
         let runningMins = 0;
         if (task.timerStart !== null && task.timerStart > 0) {
-          runningMins = Math.min((Date.now() - task.timerStart) / (1000 * 60), 720);
+          runningMins = Math.min((serverNow() - task.timerStart) / (1000 * 60), 720);
         }
         
         const totalMinsForTask = hmmToMinutes(savedHours) + runningMins;
@@ -17941,7 +17951,7 @@ async function savePtUnit() {
           status: 'Pendiente'
         };
         if (estado === 'reparacion') {
-          task.timerStart = Date.now();
+          task.timerStart = serverNow();
         } else if (estado === 'fuera_de_servicio') {
           task.timerStarted = true;
         }
