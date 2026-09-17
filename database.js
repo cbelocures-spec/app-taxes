@@ -122,6 +122,7 @@ function getDefaultUserPermissions(username, sector) {
       canManageGoogleConfig: true,
       canManageEmployees: true,
       canManageUsers: true,
+      canViewInformes: true,
       allowedSectors: ['Herrería', 'Edilicio', 'Lavadero', 'Taller']
     };
   }
@@ -150,6 +151,9 @@ function getDefaultUserPermissions(username, sector) {
     // 'Admin' sector see/edit Autorizaciones de Usuarios and create accounts. An Admin has to
     // explicitly grant it per-user now, same as any other sensitive flag here.
     canManageUsers: false,
+    // Mismo criterio: el Informe de Turnos/Horas es solo para Pañol/Admin - un Admin lo tiene
+    // que habilitar a mano por usuario si hace falta, no viene prendido de arranque.
+    canViewInformes: false,
     allowedSectors: [defaultSector]
   };
 }
@@ -678,6 +682,7 @@ class LocalDB {
         canManageGoogleConfig: userObj.permissions.canManageGoogleConfig !== undefined ? !!userObj.permissions.canManageGoogleConfig : defaults.canManageGoogleConfig,
         canManageEmployees: userObj.permissions.canManageEmployees !== undefined ? !!userObj.permissions.canManageEmployees : defaults.canManageEmployees,
         canManageUsers: userObj.permissions.canManageUsers !== undefined ? !!userObj.permissions.canManageUsers : defaults.canManageUsers,
+        canViewInformes: userObj.permissions.canViewInformes !== undefined ? !!userObj.permissions.canViewInformes : defaults.canViewInformes,
         allowedSectors
       };
     }

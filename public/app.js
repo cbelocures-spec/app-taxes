@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '389';
+const CURRENT_APP_VERSION = '390';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -10890,7 +10890,7 @@ function getFilteredArchivedOrders() {
 
 const NAV_PERM_GATES = [
   { id: 'nav-historial', flag: 'canViewHistory' },
-  { id: 'nav-informes', flag: 'canViewHistory' },
+  { id: 'nav-informes', flag: 'canViewInformes' },
   { id: 'nav-bulk', flag: 'canViewMasivas' },
   { id: 'nav-preventivos', flag: 'canViewPreventivos' },
   { id: 'nav-partetaller', flag: 'canViewParteTaller' },
@@ -10912,6 +10912,7 @@ let currentUserPermissions = {
   canManageGoogleConfig: true,
   canManageEmployees: true,
   canManageUsers: false,
+  canViewInformes: false,
   allowedSectors: ['Herrería', 'Edilicio', 'Lavadero', 'Taller']
 };
 
@@ -11625,6 +11626,7 @@ async function renderUserAuthorizationsTable() {
             <th style="padding:8px; text-align:center;" title="Permite subir órdenes a Taxes">☁️ Sync</th>
             <th style="padding:8px; text-align:center;" title="Permite crear nuevas órdenes">➕ Crear</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Historial">📜 Historial</th>
+            <th style="padding:8px; text-align:center;" title="Ver y descargar el módulo Informes (Informe de Horas / de Órdenes)">📊 Informe</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Masivas">📋 Masivas</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Parte Taller">🚜 Parte Taller</th>
             <th style="padding:8px; text-align:center;" title="Ver pestaña Preventivos">⚙️ Preventivos</th>
@@ -11679,6 +11681,9 @@ async function renderUserAuthorizationsTable() {
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-canViewHistory" ${p.canViewHistory ? 'checked' : ''}>
+          </td>
+          <td style="padding:8px; text-align:center;">
+            <input type="checkbox" class="chk-canViewInformes" ${p.canViewInformes ? 'checked' : ''}>
           </td>
           <td style="padding:8px; text-align:center;">
             <input type="checkbox" class="chk-canViewMasivas" ${p.canViewMasivas ? 'checked' : ''}>
@@ -11765,6 +11770,7 @@ async function saveAllUserAuthorizations() {
       const canCreateOrder = row.querySelector('.chk-canCreateOrder')?.checked || false;
       const canViewSettings = row.querySelector('.chk-canViewSettings')?.checked || false;
       const canViewHistory = row.querySelector('.chk-canViewHistory')?.checked || false;
+      const canViewInformes = row.querySelector('.chk-canViewInformes')?.checked || false;
       const canViewMasivas = row.querySelector('.chk-canViewMasivas')?.checked || false;
       const canViewParteTaller = row.querySelector('.chk-canViewParteTaller')?.checked || false;
       const canViewPreventivos = row.querySelector('.chk-canViewPreventivos')?.checked || false;
@@ -11798,6 +11804,7 @@ async function saveAllUserAuthorizations() {
         canManageGoogleConfig,
         canManageEmployees,
         canManageUsers,
+        canViewInformes,
         allowedSectors
       };
 
@@ -17212,6 +17219,13 @@ function buildInformeTurnosConteo(turnos) {
 
 // De un timerHistory tipo evento (Inició/Reanudó/Pausó/Fin) saca los intervalos {start,end} ya
 // cerrados - mismo criterio de emparejado que calculateTotalElapsedSeconds.
+// Tope defensivo de 12hs por intervalo - mismo criterio que ya usa el resto de la app
+// (calculateTotalElapsedSeconds, los tickers de mecánicos activos: Math.min(..., 43200000)).
+// Un timerHistory acumulado durante meses puede tener algún evento viejo con timestamp raro
+// (nunca importó antes porque nada sumaba todo el historial junto) - sin este tope, un solo
+// intervalo corrupto de miles de horas arruina "Extra" y "Total" para esa persona.
+const INFORME_INTERVALO_MAX_MS = 12 * 60 * 60 * 1000;
+
 function extraerIntervalosDeTimerHistory(timerHistory) {
   const intervalos = [];
   if (!Array.isArray(timerHistory) || timerHistory.length === 0) return intervalos;
@@ -17223,7 +17237,8 @@ function extraerIntervalosDeTimerHistory(timerHistory) {
       currentStart = event.timestamp;
     } else if (type.startsWith('paus') || type.startsWith('fin')) {
       if (currentStart !== null) {
-        intervalos.push({ start: currentStart, end: event.timestamp });
+        const end = Math.min(event.timestamp, currentStart + INFORME_INTERVALO_MAX_MS);
+        intervalos.push({ start: currentStart, end });
         currentStart = null;
       }
     }
@@ -17331,13 +17346,14 @@ function buildInformeTurnosHoras(turnos) {
         const ociosasBrutoMs = Math.max(0, datos.ventanaMs - datos.trabajadasMs);
         const comidaMs = Math.min(HORA_COMIDA_MS, ociosasBrutoMs);
         const ociosasMs = ociosasBrutoMs - comidaMs;
+        // Total = Trabajadas + Ociosas + Comida + Extra (las 4 columnas sumadas).
         return {
           nombre,
           trabajadasHs: datos.trabajadasMs / 3600000,
           ociosasHs: ociosasMs / 3600000,
           comidaHs: comidaMs / 3600000,
           extraHs: datos.extraMs / 3600000,
-          totalHs: (datos.trabajadasMs + datos.extraMs) / 3600000
+          totalHs: (datos.trabajadasMs + ociosasMs + comidaMs + datos.extraMs) / 3600000
         };
       }).sort((a, b) => b.trabajadasHs - a.trabajadasHs);
     });
@@ -17448,7 +17464,7 @@ async function generarPdfInformeHoras() {
       <tr><td style="background:#1e293b; color:#fff; text-align:center; font-weight:700; font-size:18px; padding:10px;">INFORME DE HORAS - ${dateStr}</td></tr>
       <tr><td style="background:#3b82f6; padding:2px;"></td></tr>
     </table>
-    <p style="font-size:11px; color:#64748b; margin:0 0 8px;">Solo tareas con cronómetro real (Parte Taller, Gomería y Recorrido). Las horas cargadas a mano (Elastiquero, Carga Masiva) no entran acá. "Comida" (1hs) se descuenta de "Ociosas". "Total" = Trabajadas + Extra. Los empleados con horario propio cargado en Ajustes se calculan contra ESE horario y aparecen en "Horario Personalizado".</p>
+    <p style="font-size:11px; color:#64748b; margin:0 0 8px;">Solo tareas con cronómetro real (Parte Taller, Gomería y Recorrido). Las horas cargadas a mano (Elastiquero, Carga Masiva) no entran acá. "Comida" (1hs) se descuenta de "Ociosas". "Total" = Trabajadas + Ociosas + Comida + Extra. Los empleados con horario propio cargado en Ajustes se calculan contra ESE horario y aparecen en "Horario Personalizado".</p>
     ${horasSectionsHtml}
   `;
 
