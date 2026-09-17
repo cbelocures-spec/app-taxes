@@ -689,33 +689,6 @@
 
     <!-- VIEW: INICIO ELASTIQUERO (pantalla de selección para Modo Elastiquero en Ajustes) -->
     <section id="view-elastiquero-home" class="app-view">
-      <div class="eh-intro">
-        <p class="eh-eyebrow">Modo Elastiquero</p>
-        <h2>¿Qué vas a cargar?</h2>
-        <p class="eh-subtitle">Elegí el módulo para empezar.</p>
-      </div>
-
-      <div class="eh-recibir-card">
-        <label for="eh-recibir-interno">Recibir Camión</label>
-        <p class="eh-recibir-hint">Apenas entra el camión, sin cargar tareas todavía - así ya queda Fuera de Servicio y Pañol puede preparar insumos.</p>
-        <div class="eh-recibir-row">
-          <select id="eh-recibir-interno" style="width:100%;">
-            <option value="">Seleccionar Interno...</option>
-          </select>
-          <button type="button" class="btn btn-primary" onclick="recibirCamionElastiquero()">
-            <span class="material-icons" style="font-size:18px;">local_shipping</span> Recibir
-          </button>
-        </div>
-        <div class="eh-recibir-shortcuts">
-          <button type="button" class="btn btn-secondary eh-recibir-varios-btn" onclick="setSearchableSelectValue(document.getElementById('eh-recibir-interno'), 'VARIOS')">
-            <span class="material-icons" style="font-size:18px;">cleaning_services</span> Ordenar / Limpieza
-          </button>
-          <button type="button" class="btn btn-secondary eh-recibir-varios-btn" onclick="setSearchableSelectValue(document.getElementById('eh-recibir-interno'), 'REPARACIONES INTERNAS')">
-            <span class="material-icons" style="font-size:18px;">build</span> Reparación Cubierta
-          </button>
-        </div>
-      </div>
-
       <div class="eh-module-grid">
         <button type="button" class="eh-module-card eh-elastiquero" onclick="switchView('elastiquero')">
           <img src="imagenes/elastiquero.jpg" alt="Elásticos de camión en el estante del taller">
@@ -812,27 +785,69 @@
 
     <!-- VIEW: ELASTIQUERO (CAMBIO/REPARACIÓN DE ELÁSTICOS) -->
     <section id="view-elastiquero" class="app-view">
-      <div class="view-header">
-        <h2>Elastiquero</h2>
+      <div class="eh-intro">
+        <p class="eh-eyebrow">Modo Elastiquero</p>
+        <h2>¿Qué vas a cargar?</h2>
+        <p class="eh-subtitle">Elegí el módulo para empezar.</p>
       </div>
 
-      <div id="elastiquero-internos-container">
-        <!-- Dynamic interno blocks -->
+      <div class="eh-recibir-card">
+        <label for="eh-recibir-interno">Recibir Camión</label>
+        <p class="eh-recibir-hint">Apenas entra el camión, sin cargar tareas todavía - así ya queda Fuera de Servicio y Pañol puede preparar insumos.</p>
+        <div class="eh-recibir-row">
+          <select id="eh-recibir-interno" style="width:100%;">
+            <option value="">Seleccionar Interno...</option>
+          </select>
+          <button type="button" class="btn btn-primary" onclick="recibirCamionElastiquero()">
+            <span class="material-icons" style="font-size:18px;">local_shipping</span> Recibir
+          </button>
+        </div>
+        <div class="eh-recibir-shortcuts">
+          <button type="button" class="btn btn-secondary eh-recibir-varios-btn" onclick="setSearchableSelectValue(document.getElementById('eh-recibir-interno'), 'VARIOS')">
+            <span class="material-icons" style="font-size:18px;">cleaning_services</span> Ordenar / Limpieza
+          </button>
+          <button type="button" class="btn btn-secondary eh-recibir-varios-btn" onclick="setSearchableSelectValue(document.getElementById('eh-recibir-interno'), 'REPARACIONES INTERNAS')">
+            <span class="material-icons" style="font-size:18px;">build</span> Reparación Cubierta
+          </button>
+        </div>
       </div>
 
-      <button type="button" class="btn btn-secondary btn-block" onclick="addElastiqueroInternoBlock()" style="display:flex; align-items:center; justify-content:center; gap:6px; margin: 4px 0 8px;">
-        <span class="material-icons" style="font-size:18px;">add</span> Agregar Interno
+      <button type="button" class="eh-module-card eh-elastiquero" id="eh-elastiquero-photo-gate" onclick="abrirFormularioElastiquero()" style="margin-bottom:16px;">
+        <img src="imagenes/elastiquero_cargar_tareas.jpg" alt="Elastiquero reparando ballesta de camión">
+        <div class="eh-scrim"></div>
+        <span class="eh-chip">Ejes y elásticos</span>
+        <div class="eh-label">
+          <span class="material-icons">construction</span>
+          <div class="eh-label-text">
+            <strong>Cargar Tareas</strong>
+            <small>Tocá para cargar lo que se hizo</small>
+          </div>
+        </div>
       </button>
 
-      <button type="button" class="btn btn-secondary btn-block" onclick="addElastiqueroReparacionInternaBlock()" style="display:flex; align-items:center; justify-content:center; gap:6px; margin: 0 0 20px;">
-        <span class="material-icons" style="font-size:18px;">build</span> Reparación Cubierta
-      </button>
+      <div id="elastiquero-form-body" style="display:none;">
+        <div class="view-header">
+          <h2>Elastiquero</h2>
+        </div>
 
-      <div id="elastiquero-horas-resumen" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:14px;"></div>
+        <div id="elastiquero-internos-container">
+          <!-- Dynamic interno blocks -->
+        </div>
 
-      <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitElastiqueroOrders()" style="margin-bottom: 30px;">
-        <span class="material-icons">send</span> Subir Tareas
-      </button>
+        <button type="button" class="btn btn-secondary btn-block" onclick="addElastiqueroInternoBlock()" style="display:flex; align-items:center; justify-content:center; gap:6px; margin: 4px 0 8px;">
+          <span class="material-icons" style="font-size:18px;">add</span> Agregar Interno
+        </button>
+
+        <button type="button" class="btn btn-secondary btn-block" onclick="addElastiqueroReparacionInternaBlock()" style="display:flex; align-items:center; justify-content:center; gap:6px; margin: 0 0 20px;">
+          <span class="material-icons" style="font-size:18px;">build</span> Reparación Cubierta
+        </button>
+
+        <div id="elastiquero-horas-resumen" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:14px;"></div>
+
+        <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitElastiqueroOrders()" style="margin-bottom: 30px;">
+          <span class="material-icons">send</span> Subir Tareas
+        </button>
+      </div>
     </section>
 
     <!-- VIEW 4: SETTINGS (AJUSTES) -->
@@ -1804,7 +1819,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.12</div>
+      <div class="sidebar-version">Versión 1.27.13</div>
     </div>
   </aside>
 
@@ -3063,6 +3078,6 @@
     }
   </style>
 
-  <script src="app.js?v=371"></script>
+  <script src="app.js?v=372"></script>
 </body>
 </html>

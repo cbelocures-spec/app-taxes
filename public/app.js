@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '371';
+const CURRENT_APP_VERSION = '372';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -903,9 +903,6 @@ function switchView(viewId) {
 
     if (viewId === 'elastiquero') {
       try { renderElastiqueroPendingBlocks(); } catch(e) {}
-    }
-
-    if (viewId === 'elastiquero-home') {
       try {
         const recibirSelect = document.getElementById('eh-recibir-interno');
         if (recibirSelect && cachedInternoOptions && cachedInternoOptions.length > 0) {
@@ -914,6 +911,15 @@ function switchView(viewId) {
           if (recibirSelect.rebuildSearchable) recibirSelect.rebuildSearchable();
         }
       } catch(e) {}
+      // Siempre entra mostrando la foto primero - recién al tocarla se ve el formulario
+      // de carga de tareas (ver abrirFormularioElastiquero).
+      const photoGate = document.getElementById('eh-elastiquero-photo-gate');
+      const formBody = document.getElementById('elastiquero-form-body');
+      if (photoGate) photoGate.style.display = '';
+      if (formBody) formBody.style.display = 'none';
+    }
+
+    if (viewId === 'elastiquero-home') {
       try { renderRecorridoHomeWidget(); } catch(e) {}
       try { renderGomeriaHomeWidget(); } catch(e) {}
     }
@@ -9213,6 +9219,15 @@ function renderElastiqueroPendingBlocks() {
     }
   });
   updateElastiqueroHorasResumen();
+}
+
+// Tocar la foto en la pantalla de Elastiquero destapa el formulario de carga de tareas,
+// que hasta ahí queda oculto (ver el reset en switchView al entrar a 'elastiquero').
+function abrirFormularioElastiquero() {
+  const photoGate = document.getElementById('eh-elastiquero-photo-gate');
+  const formBody = document.getElementById('elastiquero-form-body');
+  if (photoGate) photoGate.style.display = 'none';
+  if (formBody) formBody.style.display = '';
 }
 
 // "Recibir Camión" (Inicio Elastiquero): crea la orden apenas entra el camión, sin tareas
