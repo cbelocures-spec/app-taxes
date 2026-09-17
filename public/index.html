@@ -627,6 +627,7 @@
           <div class="form-group">
             <label>Clasificación *</label>
             <select id="gomeria-clasificacion-select" style="width:100%;">
+              <option value="Gomería" selected>Gomería</option>
               <option value="Correctivo">Correctivo</option>
               <option value="Auxilio">Auxilio</option>
             </select>
@@ -798,6 +799,10 @@
           <div class="eh-recibir-row">
             <select id="eh-recibir-interno" style="width:100%;">
               <option value="">Seleccionar Interno...</option>
+            </select>
+            <select id="eh-recibir-clasificacion" style="width:100%;">
+              <option value="Elastiquero" selected>Elástico</option>
+              <option value="Gomería">Gomería</option>
             </select>
             <button type="button" class="btn btn-primary" onclick="recibirCamionElastiquero()">
               <span class="material-icons" style="font-size:18px;">local_shipping</span> Recibir
@@ -1829,7 +1834,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.15</div>
+      <div class="sidebar-version">Versión 1.27.18</div>
     </div>
   </aside>
 
@@ -3088,6 +3093,6 @@
     }
   </style>
 
-  <script src="app.js?v=374"></script>
+  <script src="app.js?v=377"></script>
 </body>
 </html>

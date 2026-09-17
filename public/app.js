@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '374';
+const CURRENT_APP_VERSION = '377';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7861,7 +7861,7 @@ async function continuarGomeria() {
     return;
   }
   const clasifSelect = document.getElementById('gomeria-clasificacion-select');
-  const clasificacion = clasifSelect ? clasifSelect.value : 'Correctivo';
+  const clasificacion = clasifSelect ? clasifSelect.value : 'Gomería';
   const empleado = empleadoSelect.value;
 
   const continuarBtn = document.querySelector('#gomeria-initial-state .btn-primary');
@@ -8531,7 +8531,10 @@ async function submitRecorridoOrders() {
       rodado: rodadoLabel,
       responsable: "AUTO",
       interno: interno,
-      clasificacion: 'Correctivo',
+      // Recorrido no tiene su propia clasificación en Taxes (no existe esa opción ahí) - va
+      // como Gomería, igual que las cubiertas, porque es el mismo dominio (revisión de
+      // cubiertas).
+      clasificacion: 'Gomería',
       fechaEntrega: new Date().toISOString().split('T')[0],
       horario: new Date().toTimeString().slice(0, 5),
       incidente: novedad ? 'Novedad de cubierta en recorrido' : '',
@@ -9123,6 +9126,7 @@ function addElastiqueroInternoBlock() {
         <label>Clasificación *</label>
         <select class="elastiquero-clasificacion-select" style="width:100%;">
           <option value="Elastiquero" selected>Elastiquero</option>
+          <option value="Gomería">Gomería</option>
           <option value="Correctivo">Correctivo</option>
           <option value="Preventivo">Preventivo</option>
           <option value="Auxilio">Auxilio</option>
@@ -9183,6 +9187,12 @@ function addElastiqueroInternoBlock() {
       convertSelectToSearchable(internoSelectEl);
     }
   }
+  // Cambiar la Clasificación también puede cambiar a qué orden apunta este interno (ver
+  // findOpenTallerOrderForInterno) - refrescar el mismo aviso.
+  const clasifSelectEl = block.querySelector('.elastiquero-clasificacion-select');
+  if (clasifSelectEl && internoSelectEl) {
+    clasifSelectEl.addEventListener('change', () => updateElastiqueroOtInfo(internoSelectEl));
+  }
 }
 
 function removeElastiqueroInternoBlock(btn) {
@@ -9203,8 +9213,10 @@ function renderElastiqueroPendingBlocks() {
   // Ya no exige "sin tareas" - un camión Fuera de Servicio sigue apareciendo acá aunque ya
   // se le hayan cargado tareas antes (p.ej. el elastiquero no lo terminó y sigue mañana), y
   // solo deja de aparecer cuando alguien lo marca Operativo (ver setElastiqueroOrderEstadoUnidad).
+  // Incluye Gomería porque "Recibir Camión" ahora deja elegir esa clasificación también (a
+  // veces entra solo por una cubierta) - cada clasificación sigue siendo su propia orden.
   const pendientes = (activeOrders || []).filter(o =>
-    o.clasificacion === 'Elastiquero' &&
+    (o.clasificacion === 'Elastiquero' || o.clasificacion === 'Gomería') &&
     o.estadoUnidad === 'fuera_de_servicio' &&
     (!o.estado || o.estado.toLowerCase() !== 'cerrada')
   );
@@ -9220,6 +9232,10 @@ function renderElastiqueroPendingBlocks() {
     const internoSelect = block ? block.querySelector('.elastiquero-interno-select') : null;
     if (internoSelect) {
       setSearchableSelectValue(internoSelect, String(order.interno || '').trim());
+    }
+    const clasifSelect = block ? block.querySelector('.elastiquero-clasificacion-select') : null;
+    if (clasifSelect && order.clasificacion) {
+      clasifSelect.value = order.clasificacion;
     }
   });
   updateElastiqueroHorasResumen();
@@ -9244,7 +9260,7 @@ function renderElastiqueroFueraDeServicioList() {
   if (!container) return;
 
   const pendientes = (activeOrders || []).filter(o =>
-    o.clasificacion === 'Elastiquero' &&
+    (o.clasificacion === 'Elastiquero' || o.clasificacion === 'Gomería') &&
     o.estadoUnidad === 'fuera_de_servicio' &&
     (!o.estado || o.estado.toLowerCase() !== 'cerrada')
   );
@@ -9259,7 +9275,7 @@ function renderElastiqueroFueraDeServicioList() {
   container.innerHTML = pendientes.map(o => `
     <div class="eh-fs-row">
       <div class="eh-fs-row-label">
-        <strong>Interno ${o.interno}</strong>
+        <strong>Interno ${o.interno}</strong> <small>(${o.clasificacion})</small>
         <small>${o.taxesOrderNumber ? 'OT #' + o.taxesOrderNumber : 'Sin sincronizar aún'}</small>
       </div>
       <div class="eh-fs-row-actions">
@@ -9340,8 +9356,15 @@ async function recibirCamionElastiquero(internoOverride) {
     return;
   }
 
-  if (findOpenTallerOrderForInterno(interno)) {
-    showToast('Ese interno ya tiene una orden de Elastiquero abierta.', 'warning');
+  // Quién recibe el camión elige acá si entra como trabajo de Elástico o de Gomería (a veces
+  // solo viene por una cubierta, sin nada de elástico) - cada clasificación es su propia orden
+  // (ver findOpenTallerOrderForInterno), así que un mismo interno puede tener las dos abiertas
+  // a la vez sin pisarse.
+  const clasifEl = document.getElementById('eh-recibir-clasificacion');
+  const clasificacion = clasifEl ? clasifEl.value : 'Elastiquero';
+
+  if (findOpenTallerOrderForInterno(interno, clasificacion)) {
+    showToast(`Ese interno ya tiene una orden de ${clasificacion} abierta.`, 'warning');
     return;
   }
 
@@ -9360,7 +9383,7 @@ async function recibirCamionElastiquero(internoOverride) {
           rodado: rodadoLabel,
           responsable: "AUTO",
           interno: interno,
-          clasificacion: 'Elastiquero',
+          clasificacion: clasificacion,
           fechaEntrega: new Date().toISOString().split('T')[0],
           horario: new Date().toTimeString().slice(0, 5),
           incidente: '',
@@ -9389,14 +9412,15 @@ async function recibirCamionElastiquero(internoOverride) {
 // Correctivo, etc.), which meant Elastiquero's work landed mixed into whatever unrelated
 // order happened to already have the truck Fuera de Servicio - pedido explicito del usuario
 // para que cada clasificación tenga su propia orden (2026-09-15).
-function findOpenTallerOrderForInterno(interno) {
+function findOpenTallerOrderForInterno(interno, clasificacion) {
   const cleanInterno = String(interno || '').trim();
   if (!cleanInterno) return null;
+  const targetClasificacion = clasificacion || 'Elastiquero';
   return (activeOrders || []).find(o =>
     String(o.interno || '').trim() === cleanInterno &&
     o.estadoUnidad === 'fuera_de_servicio' &&
     (!o.estado || o.estado.toLowerCase() !== 'cerrada') &&
-    o.clasificacion === 'Elastiquero'
+    o.clasificacion === targetClasificacion
   ) || null;
 }
 
@@ -9431,7 +9455,9 @@ function updateElastiqueroOtInfo(selectEl) {
     return;
   }
 
-  const existingOrder = findOpenTallerOrderForInterno(interno);
+  const clasifSelect = block ? block.querySelector('.elastiquero-clasificacion-select') : null;
+  const clasificacion = clasifSelect ? clasifSelect.value : 'Elastiquero';
+  const existingOrder = findOpenTallerOrderForInterno(interno, clasificacion);
   const recentClosedOrder = existingOrder ? null : findRecentClosedTallerOrderForInterno(interno);
   infoEl.style.display = 'block';
   if (existingOrder) {
@@ -9496,6 +9522,8 @@ async function submitElastiqueroOrders() {
       showToast('Todos los internos agregados deben estar seleccionados.', 'danger');
       return;
     }
+    const clasifSelect = block.querySelector('.elastiquero-clasificacion-select');
+    const clasificacion = clasifSelect ? clasifSelect.value : 'Elastiquero';
     const ejeDescripcion = buildElastiqueroDescription(block);
     const cubiertaDescripcion = buildElastiqueroCubiertaDescription(block);
     const otrosDescripcion = buildElastiqueroOtrosDescription(block);
@@ -9526,7 +9554,7 @@ async function submitElastiqueroOrders() {
       });
     }
 
-    const existingOrder = findOpenTallerOrderForInterno(interno);
+    const existingOrder = findOpenTallerOrderForInterno(interno, clasificacion);
     const recentClosedOrder = existingOrder ? null : findRecentClosedTallerOrderForInterno(interno);
 
     if (existingOrder) {
@@ -9544,8 +9572,6 @@ async function submitElastiqueroOrders() {
         ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === interno)
         : null;
       const rodadoLabel = rodadoOpt ? rodadoOpt.label : `Interno ${interno}`;
-      const clasifSelect = block.querySelector('.elastiquero-clasificacion-select');
-      const clasificacion = clasifSelect ? clasifSelect.value : 'Elastiquero';
       const incidenteParts = [];
       if (ejeDescripcion) incidenteParts.push('Cambio/Reparación de elástico');
       if (cubiertaDescripcion) incidenteParts.push('Cambio de cubiertas');
