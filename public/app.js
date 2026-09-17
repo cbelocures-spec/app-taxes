@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '369';
+const CURRENT_APP_VERSION = '370';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -2783,10 +2783,13 @@ async function fetchCatalogs() {
     populateSelect('eh-recibir-interno', internoOptions, "Seleccionar Interno...");
     populateSelect('gomeria-rodado-select', internoOptions, "Seleccionar Interno...");
     populateSelect('gomeria-empleado-select', getGomeriaMecanicaEmployees(), "Seleccionar Empleado...");
+    populateSelect('recorrido-empleado-select', getGomeriaMecanicaEmployees(), "Seleccionar Empleado...");
     const gomeriaRodadoSelectEl = document.getElementById('gomeria-rodado-select');
     if (gomeriaRodadoSelectEl && typeof convertSelectToSearchable === 'function') convertSelectToSearchable(gomeriaRodadoSelectEl);
     const gomeriaEmpleadoSelectEl = document.getElementById('gomeria-empleado-select');
     if (gomeriaEmpleadoSelectEl && typeof convertSelectToSearchable === 'function') convertSelectToSearchable(gomeriaEmpleadoSelectEl);
+    const recorridoEmpleadoSelectEl = document.getElementById('recorrido-empleado-select');
+    if (recorridoEmpleadoSelectEl && typeof convertSelectToSearchable === 'function') convertSelectToSearchable(recorridoEmpleadoSelectEl);
 
     // Populate Parte Taller datalist for internal selection
     const ptDatalist = document.getElementById('pt-interno-list');
@@ -8320,6 +8323,11 @@ let recorridoTickInterval = null;
 function iniciarRecorrido() {
   const state = getRecorridoState();
   if (state.active || state.finished) return;
+  const empleadoSelect = document.getElementById('recorrido-empleado-select');
+  if (!empleadoSelect || !empleadoSelect.value) {
+    showToast('Elegí el Empleado antes de iniciar el recorrido.', 'danger');
+    return;
+  }
   state.active = true;
   state.startTime = Date.now();
   state.timerHistory = state.timerHistory || [];
@@ -8383,6 +8391,18 @@ function renderRecorridoView() {
 
   const state = getRecorridoState();
 
+  // Se llena una sola vez y sirve para todo el ciclo (se elige antes de "Iniciar Recorrido",
+  // ver recorrido-idle-state) - por eso va acá afuera, no solo cuando termina el cronómetro.
+  const empleadoSelect = document.getElementById('recorrido-empleado-select');
+  if (empleadoSelect && empleadoSelect.options.length <= 1) {
+    getGomeriaMecanicaEmployees().forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.value; opt.textContent = e.label;
+      empleadoSelect.appendChild(opt);
+    });
+    if (typeof convertSelectToSearchable === 'function') convertSelectToSearchable(empleadoSelect);
+  }
+
   if (state.finished) {
     idleEl.style.display = 'none';
     runningEl.style.display = 'none';
@@ -8391,16 +8411,6 @@ function renderRecorridoView() {
     const totalSeconds = calcularSegundosRecorrido(state);
     const totalEl = document.getElementById('recorrido-total-tiempo');
     if (totalEl) totalEl.textContent = formatSegundosHms(totalSeconds);
-
-    const empleadoSelect = document.getElementById('recorrido-empleado-select');
-    if (empleadoSelect && empleadoSelect.options.length <= 1) {
-      getGomeriaMecanicaEmployees().forEach(e => {
-        const opt = document.createElement('option');
-        opt.value = e.value; opt.textContent = e.label;
-        empleadoSelect.appendChild(opt);
-      });
-      if (typeof convertSelectToSearchable === 'function') convertSelectToSearchable(empleadoSelect);
-    }
 
     const container = document.getElementById('recorrido-internos-container');
     if (container && container.children.length === 0) {
@@ -8994,6 +9004,12 @@ function setSearchableSelectValue(selectEl, value) {
   const labelSpan = wrapper ? wrapper.querySelector('.trigger-label') : null;
   const matchedOpt = Array.from(selectEl.options).find(o => o.value === value);
   if (labelSpan && matchedOpt) labelSpan.textContent = matchedOpt.text;
+}
+
+// Igual que setSearchableSelectValue pero buscando el select por id - para accesos rapidos de
+// empleado en botones que no tienen el select a mano (Gomería, Recorrido).
+function setSearchableSelectValueById(id, value) {
+  setSearchableSelectValue(document.getElementById(id), value);
 }
 
 // Accesos rapidos para los empleados de Elastiquero que mas se repiten - llena la primera

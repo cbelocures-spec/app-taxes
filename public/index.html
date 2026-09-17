@@ -636,6 +636,7 @@
             <select id="gomeria-empleado-select" style="width:100%;">
               <option value="">Seleccionar Empleado...</option>
             </select>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="setSearchableSelectValueById('gomeria-empleado-select', 'LOPEZ GUSTAVO')" style="margin-top:8px; border-radius:999px;">+ Lopez Gustavo</button>
           </div>
           <button type="button" class="btn btn-primary btn-block" onclick="continuarGomeria()" style="margin-top:14px;">
             Continuar
@@ -769,7 +770,14 @@
 
       <div id="recorrido-idle-state" class="form-section-card" style="text-align:center;">
         <p style="color:var(--text-muted); margin-top:0;">Arrancá el cronómetro al salir a revisar el estado de las cubiertas de los camiones.</p>
-        <button type="button" class="btn btn-primary btn-block btn-lg" onclick="iniciarRecorrido()">
+        <div class="form-group" style="text-align:left;">
+          <label>Empleado *</label>
+          <select id="recorrido-empleado-select" style="width:100%;">
+            <option value="">Seleccionar Empleado...</option>
+          </select>
+          <button type="button" class="btn btn-secondary btn-xs" onclick="setSearchableSelectValueById('recorrido-empleado-select', 'LOPEZ GUSTAVO')" style="margin-top:8px; border-radius:999px;">+ Lopez Gustavo</button>
+        </div>
+        <button type="button" class="btn btn-primary btn-block btn-lg" onclick="iniciarRecorrido()" style="margin-top:14px;">
           <span class="material-icons">play_arrow</span> Iniciar Recorrido
         </button>
       </div>
@@ -788,13 +796,7 @@
 
       <div id="recorrido-review-state" style="display:none;">
         <div class="form-section-card">
-          <p style="margin-top:0; color:var(--text-muted);">Tiempo total del recorrido: <strong id="recorrido-total-tiempo">00:00:00</strong></p>
-          <div class="form-group" style="margin-bottom:0;">
-            <label>Empleado (quién hizo el recorrido) *</label>
-            <select id="recorrido-empleado-select" style="width:100%;">
-              <option value="">Seleccionar Empleado...</option>
-            </select>
-          </div>
+          <p style="margin-top:0; margin-bottom:0; color:var(--text-muted);">Tiempo total del recorrido: <strong id="recorrido-total-tiempo">00:00:00</strong></p>
         </div>
 
         <div id="recorrido-internos-container"></div>
@@ -1802,7 +1804,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.10</div>
+      <div class="sidebar-version">Versión 1.27.11</div>
     </div>
   </aside>
 
@@ -3061,6 +3063,6 @@
     }
   </style>
 
-  <script src="app.js?v=369"></script>
+  <script src="app.js?v=370"></script>
 </body>
 </html>
