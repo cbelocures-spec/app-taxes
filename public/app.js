@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '384';
+const CURRENT_APP_VERSION = '387';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -8194,7 +8194,10 @@ async function submitGomeriaSingleOrder() {
     empleado: state.empleado,
     horasEstimadas,
     descripcion,
-    status: "Finalizada"
+    status: "Finalizada",
+    // Para el Informe de Turnos (horas trabajadas/ociosas/extra) - mismo formato que usa
+    // Parte Taller, convertido de los pares {start,end} que ya venía llevando el cronómetro.
+    timerHistory: convertirParesAEventLogTimerHistory(state.timerHistory)
   };
 
   try {
@@ -8570,7 +8573,14 @@ async function submitRecorridoOrders() {
   const totalHoras = totalSeconds / 3600;
   const horasPorInterno = totalHoras / entries.length;
 
-  const orders = entries.map(({ interno, novedad }) => {
+  // Recorrido lleva UN solo cronómetro continuo para toda la caminata, repartido en partes
+  // iguales entre los internos revisados (más abajo, horasPorInterno) - no hay un horario real
+  // separado por interno. Adjuntar el timerHistory completo a cada tarea contaría esas mismas
+  // horas varias veces en el Informe de Turnos, así que va SOLO en la primera (el total de
+  // horas trabajadas del recorrido queda bien igual, sin duplicarlo).
+  const timerHistoryRecorrido = convertirParesAEventLogTimerHistory(state.timerHistory);
+
+  const orders = entries.map(({ interno, novedad }, idx) => {
     const rodadoOpt = cachedCatalogs.rodados
       ? cachedCatalogs.rodados.find(r => String(r.interno || '').trim() === interno)
       : null;
@@ -8595,7 +8605,8 @@ async function submitRecorridoOrders() {
         empleado: empleado,
         horasEstimadas: parseFloat(horasPorInterno.toFixed(2)),
         descripcion: descripcion,
-        status: "Finalizada"
+        status: "Finalizada",
+        ...(idx === 0 ? { timerHistory: timerHistoryRecorrido } : {})
       }]
     };
   });
@@ -10875,6 +10886,7 @@ function getFilteredArchivedOrders() {
 
 const NAV_PERM_GATES = [
   { id: 'nav-historial', flag: 'canViewHistory' },
+  { id: 'nav-informes', flag: 'canViewHistory' },
   { id: 'nav-bulk', flag: 'canViewMasivas' },
   { id: 'nav-preventivos', flag: 'canViewPreventivos' },
   { id: 'nav-partetaller', flag: 'canViewParteTaller' },
@@ -16931,6 +16943,280 @@ async function syncResponsableToParteTaller() {
   } catch (e) {
     console.error('Error sincronizando responsable a Parte Taller:', e);
   }
+}
+
+// ============================================================
+// INFORME DE TURNOS (PDF) - conteo de Correctivo/Preventivo/Auxilio y horas trabajadas/
+// ociosas/extra por turno (Mañana 06-14, Tarde 14-22, Noche 22-06), para el día de hoy.
+// Pensado junto al usuario en memoria de proyecto - reusa el mismo mecanismo de "Descargar
+// PDF" de Parte Taller (armar el HTML acá, mandarlo a un endpoint que lo renderiza con
+// Chromium headless vía pdfGenerator.js).
+// ============================================================
+
+const INFORME_TURNOS_KEYS = ['Mañana', 'Tarde', 'Noche'];
+
+// Argentina no tiene horario de verano desde 2009 - UTC-3 todo el año, así que se puede armar
+// el límite de cada turno como epoch UTC directamente, sin pelearse con Intl.DateTimeFormat
+// para cada comparación. Mismos rangos que getTurnoForDate en database.js.
+function getTurnoBoundariesForToday(nowMs) {
+  const ART_OFFSET_HOURS = 3; // ART = UTC-3 → sumarle 3 a la hora de Argentina da la hora UTC
+  const todayStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date(nowMs));
+  const [y, m, d] = todayStr.split('-').map(Number);
+  const mk = (dayOffset, hour) => Date.UTC(y, m - 1, d + dayOffset, hour + ART_OFFSET_HOURS, 0, 0);
+  return {
+    dateStr: todayStr,
+    'Mañana': { start: mk(0, 6), end: mk(0, 14) },
+    'Tarde': { start: mk(0, 14), end: mk(0, 22) },
+    'Noche': { start: mk(0, 22), end: mk(1, 6) }
+  };
+}
+
+function turnoParaMomento(turnos, ms) {
+  for (const key of INFORME_TURNOS_KEYS) {
+    if (ms >= turnos[key].start && ms < turnos[key].end) return key;
+  }
+  return null;
+}
+
+// Conteo de Correctivo/Preventivo/Auxilio por turno - usa fechaEntrega+horario de cada orden.
+// No hace falta cronómetro real para esto, así que suma todo (Elastiquero, Masivas, etc.).
+function buildInformeTurnosConteo(turnos) {
+  const counts = {};
+  INFORME_TURNOS_KEYS.forEach(k => { counts[k] = { Correctivo: 0, Preventivo: 0, Auxilio: 0 }; });
+  const clasifsValidas = new Set(['Correctivo', 'Preventivo', 'Auxilio']);
+  const allOrders = [...(activeOrders || []), ...(archivedOrders || [])];
+  allOrders.forEach(o => {
+    if (o.deleted === true) return;
+    if (!clasifsValidas.has(o.clasificacion)) return;
+    if (!o.fechaEntrega) return;
+    const horario = /^\d{2}:\d{2}$/.test(o.horario || '') ? o.horario : '00:00';
+    const momentMs = new Date(`${o.fechaEntrega}T${horario}:00-03:00`).getTime();
+    if (isNaN(momentMs)) return;
+    const turno = turnoParaMomento(turnos, momentMs);
+    if (turno) counts[turno][o.clasificacion]++;
+  });
+  return counts;
+}
+
+// De un timerHistory tipo evento (Inició/Reanudó/Pausó/Fin) saca los intervalos {start,end} ya
+// cerrados - mismo criterio de emparejado que calculateTotalElapsedSeconds.
+function extraerIntervalosDeTimerHistory(timerHistory) {
+  const intervalos = [];
+  if (!Array.isArray(timerHistory) || timerHistory.length === 0) return intervalos;
+  const sorted = [...timerHistory].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  let currentStart = null;
+  sorted.forEach(event => {
+    const type = String(event.type || event.event || '').trim().toLowerCase();
+    if (type.startsWith('inici') || type.startsWith('reanud')) {
+      currentStart = event.timestamp;
+    } else if (type.startsWith('paus') || type.startsWith('fin')) {
+      if (currentStart !== null) {
+        intervalos.push({ start: currentStart, end: event.timestamp });
+        currentStart = null;
+      }
+    }
+  });
+  return intervalos;
+}
+
+// Gomería y Recorrido guardan su cronómetro como pares {start,end} (no como el log de eventos
+// Inició/Pausó/Fin que usa Parte Taller) - convertirlos a ese mismo formato de evento antes de
+// mandarlos en la tarea, así el informe de horas (extraerIntervalosDeTimerHistory) los puede
+// leer igual que a cualquier otra tarea con cronómetro real, sin un caso aparte.
+function convertirParesAEventLogTimerHistory(pares) {
+  const eventos = [];
+  (pares || []).forEach((par, idx) => {
+    if (!par || !(par.end > par.start)) return;
+    const esUltimo = idx === pares.length - 1;
+    eventos.push({ type: idx === 0 ? 'Inició' : 'Reanudó', timestamp: par.start });
+    eventos.push({ type: esUltimo ? 'Fin' : 'Pausó', timestamp: par.end });
+  });
+  return eventos;
+}
+
+// Horas trabajadas/ociosas/extra por empleado y turno - tareas con timerHistory real: Parte
+// Taller (ya lo guarda así) y ahora también Gomería/Recorrido (ver
+// convertirParesAEventLogTimerHistory, usado en submitGomeriaSingleOrder/submitRecorridoOrders).
+function buildInformeTurnosHoras(turnos) {
+  const porTurno = {};
+  INFORME_TURNOS_KEYS.forEach(k => { porTurno[k] = {}; });
+
+  const allOrders = [...(activeOrders || []), ...(archivedOrders || [])];
+  allOrders.forEach(order => {
+    if (order.deleted === true) return;
+    (order.tasks || []).forEach(task => {
+      if (!task.empleado) return;
+      const intervalos = extraerIntervalosDeTimerHistory(task.timerHistory);
+      intervalos.forEach(({ start, end }) => {
+        if (!(end > start)) return;
+        const turno = turnoParaMomento(turnos, start);
+        if (!turno) return; // el intervalo no arrancó dentro de un turno de hoy
+        const turnoFin = turnos[turno].end;
+        const trabajadasMs = Math.max(0, Math.min(end, turnoFin) - start);
+        const extraMs = Math.max(0, end - turnoFin);
+        const emp = task.empleado;
+        if (!porTurno[turno][emp]) porTurno[turno][emp] = { trabajadasMs: 0, extraMs: 0 };
+        porTurno[turno][emp].trabajadasMs += trabajadasMs;
+        porTurno[turno][emp].extraMs += extraMs;
+      });
+    });
+  });
+
+  // Ociosas = 8hs del turno menos lo trabajado (piso en 0 - un empleado con intervalos que se
+  // solapan, o que ya venía de un turno anterior, puede superar las 8hs "trabajadas").
+  const TURNO_MS = 8 * 60 * 60 * 1000;
+  const resultado = {};
+  INFORME_TURNOS_KEYS.forEach(turno => {
+    resultado[turno] = Object.entries(porTurno[turno]).map(([empValue, datos]) => {
+      const empOpt = (cachedCatalogs && cachedCatalogs.empleados) ? cachedCatalogs.empleados.find(e => e.value === empValue) : null;
+      const nombre = empOpt ? empOpt.label : empValue;
+      const ociosasMs = Math.max(0, TURNO_MS - datos.trabajadasMs);
+      return {
+        nombre,
+        trabajadasHs: datos.trabajadasMs / 3600000,
+        ociosasHs: ociosasMs / 3600000,
+        extraHs: datos.extraMs / 3600000
+      };
+    }).sort((a, b) => b.trabajadasHs - a.trabajadasHs);
+  });
+  return resultado;
+}
+
+function fmtHsInforme(hs) {
+  if (hs <= 0) return '0min';
+  const totalMin = Math.round(hs * 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${String(m).padStart(2, '0')}min`;
+}
+
+// Boilerplate compartido por los dos informes: arma el documento final (con el CSS de la app
+// inyectado, igual que Parte Taller), lo manda al mismo endpoint genérico HTML->PDF, y baja el
+// archivo resultante. `btn` es el botón "Descargar PDF" propio de cada informe (se deshabilita
+// mientras genera y vuelve a su texto original al terminar, haya salido bien o mal).
+async function descargarInformePdf({ btn, reportHtml, filename }) {
+  const defaultBtnHtml = '<span class="material-icons">picture_as_pdf</span> Descargar PDF';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons">hourglass_top</span> Generando...';
+  }
+  try {
+    const cssRes = await fetch('style.css');
+    const css = await cssRes.text();
+    const fullHtml = `<!doctype html><html><head><meta charset="utf-8"><style>
+      ${css}
+      body { background: #fff; padding: 10px; font-family: Arial, sans-serif; }
+      table { width: 100%; }
+      th, td { border: 1px solid #e2e8f0; }
+    </style></head><body>${reportHtml}</body></html>`;
+
+    const res = await fetch('/api/informe-turnos/generar-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html: fullHtml })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Error al generar el PDF.');
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('PDF generado correctamente', 'success');
+  } catch (e) {
+    console.error('Error generando PDF de informe:', e);
+    showToast('Error al generar el PDF: ' + e.message, 'danger');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = defaultBtnHtml;
+    }
+  }
+}
+
+async function generarPdfInformeHoras() {
+  if (typeof fetchArchivedOrders === 'function') await fetchArchivedOrders();
+
+  const turnos = getTurnoBoundariesForToday(serverNow());
+  const horas = buildInformeTurnosHoras(turnos);
+
+  const horasSectionsHtml = INFORME_TURNOS_KEYS.map(turno => {
+    const filas = horas[turno];
+    const filasHtml = filas.length > 0
+      ? filas.map(f => `
+        <tr>
+          <td style="padding:6px;">${f.nombre}</td>
+          <td style="text-align:center; padding:6px;">${fmtHsInforme(f.trabajadasHs)}</td>
+          <td style="text-align:center; padding:6px;">${fmtHsInforme(f.ociosasHs)}</td>
+          <td style="text-align:center; padding:6px; ${f.extraHs > 0 ? 'color:#dc2626; font-weight:700;' : ''}">${fmtHsInforme(f.extraHs)}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="4" style="text-align:center; color:#94a3b8; padding:6px;">Sin cronómetros reales registrados en este turno</td></tr>`;
+    return `
+      <h3 style="font-size:13px; font-weight:700; margin:16px 0 6px;">Turno ${turno}</h3>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+        <thead><tr style="background:#0f172a; color:#fff;"><th style="padding:6px;">Empleado</th><th style="padding:6px;">Trabajadas</th><th style="padding:6px;">Ociosas</th><th style="padding:6px;">Extra</th></tr></thead>
+        <tbody>${filasHtml}</tbody>
+      </table>`;
+  }).join('');
+
+  const dateStr = new Date(serverNow()).toLocaleDateString('es-AR', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' });
+
+  const reportHtml = `
+    <table style="width:100%; border-collapse:collapse; margin-bottom:14px;">
+      <tr><td style="background:#1e293b; color:#fff; text-align:center; font-weight:700; font-size:18px; padding:10px;">INFORME DE HORAS - ${dateStr}</td></tr>
+      <tr><td style="background:#3b82f6; padding:2px;"></td></tr>
+    </table>
+    <p style="font-size:11px; color:#64748b; margin:0 0 8px;">Solo tareas con cronómetro real (Parte Taller, Gomería y Recorrido). Las horas cargadas a mano (Elastiquero, Carga Masiva) no entran acá.</p>
+    ${horasSectionsHtml}
+  `;
+
+  await descargarInformePdf({
+    btn: document.getElementById('informe-horas-pdf-btn'),
+    reportHtml,
+    filename: `Informe_Horas_${turnos.dateStr}.pdf`
+  });
+}
+
+async function generarPdfInformeOrdenes() {
+  if (typeof fetchArchivedOrders === 'function') await fetchArchivedOrders();
+
+  const turnos = getTurnoBoundariesForToday(serverNow());
+  const conteo = buildInformeTurnosConteo(turnos);
+
+  const conteoRowsHtml = INFORME_TURNOS_KEYS.map(turno => `
+    <tr>
+      <td style="font-weight:700; padding:6px;">${turno}</td>
+      <td style="text-align:center; padding:6px;">${conteo[turno].Correctivo}</td>
+      <td style="text-align:center; padding:6px;">${conteo[turno].Preventivo}</td>
+      <td style="text-align:center; padding:6px;">${conteo[turno].Auxilio}</td>
+    </tr>`).join('');
+
+  const dateStr = new Date(serverNow()).toLocaleDateString('es-AR', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' });
+
+  const reportHtml = `
+    <table style="width:100%; border-collapse:collapse; margin-bottom:14px;">
+      <tr><td style="background:#1e293b; color:#fff; text-align:center; font-weight:700; font-size:18px; padding:10px;">INFORME DE ÓRDENES - ${dateStr}</td></tr>
+      <tr><td style="background:#3b82f6; padding:2px;"></td></tr>
+    </table>
+    <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+      <thead><tr style="background:#0f172a; color:#fff;"><th style="padding:6px;">Turno</th><th style="padding:6px;">Correctivo</th><th style="padding:6px;">Preventivo</th><th style="padding:6px;">Auxilio</th></tr></thead>
+      <tbody>${conteoRowsHtml}</tbody>
+    </table>
+  `;
+
+  await descargarInformePdf({
+    btn: document.getElementById('informe-ordenes-pdf-btn'),
+    reportHtml,
+    filename: `Informe_Ordenes_${turnos.dateStr}.pdf`
+  });
 }
 
 // Builds a print-ready copy of the currently-rendered dashboard cards + Transito/Fuera de

@@ -73,7 +73,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '384';
+const APP_VERSION = '387';
 
 // Middleware
 app.use(cors());
@@ -4648,6 +4648,27 @@ app.post('/api/parte-taller/generar-pdf', async (req, res) => {
     res.send(Buffer.from(pdfBuffer));
   } catch (error) {
     console.error("[POST /api/parte-taller/generar-pdf] Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Informe de Turnos (conteo por turno + horas) - reusa la misma función genérica de HTML->PDF
+// que Parte Taller (pdfGenerator.js no le importa de qué pantalla vino el HTML).
+app.post('/api/informe-turnos/generar-pdf', async (req, res) => {
+  const { html } = req.body || {};
+  if (!html) {
+    return res.status(400).json({ error: "Falta el HTML del reporte." });
+  }
+
+  try {
+    const pdfBuffer = await syncChildManager.callSync('generarPdfParteTaller', html);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="Informe_Turnos_${new Date().toISOString().split('T')[0]}.pdf"`
+    });
+    res.send(Buffer.from(pdfBuffer));
+  } catch (error) {
+    console.error("[POST /api/informe-turnos/generar-pdf] Error:", error.message);
     res.status(500).json({ error: error.message });
   }
 });

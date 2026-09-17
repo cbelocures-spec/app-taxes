@@ -1666,6 +1666,30 @@
       </div>
     </section>
 
+    <!-- VIEW: INFORMES (PDF) - Solo Admin (Pañol) -->
+    <section id="view-informes" class="app-view">
+      <div class="view-header">
+        <span class="material-icons" style="color:#0369a1;">summarize</span>
+        <h2>Informes</h2>
+      </div>
+
+      <div class="settings-card" style="margin-bottom:16px; text-align:center;">
+        <h3 style="margin:0 0 4px;">Informe de Horas</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 14px;">Horas trabajadas, ociosas y extra por empleado y turno (Mañana/Tarde/Noche) - hoy.</p>
+        <button class="btn btn-primary btn-block" id="informe-horas-pdf-btn" onclick="generarPdfInformeHoras()">
+          <span class="material-icons">picture_as_pdf</span> Descargar PDF
+        </button>
+      </div>
+
+      <div class="settings-card" style="text-align:center;">
+        <h3 style="margin:0 0 4px;">Informe de Órdenes</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 14px;">Correctivo/Preventivo/Auxilio por turno (Mañana/Tarde/Noche) - hoy.</p>
+        <button class="btn btn-primary btn-block" id="informe-ordenes-pdf-btn" onclick="generarPdfInformeOrdenes()">
+          <span class="material-icons">picture_as_pdf</span> Descargar PDF
+        </button>
+      </div>
+    </section>
+
     <!-- VIEW 7: HISTORIAL (ÓRDENES ARCHIVADAS) - Solo Admin (Pañol/Taller) -->
     <section id="view-historial" class="app-view">
       <div class="view-header">
@@ -1804,6 +1828,11 @@
         <span class="material-icons">archive</span>
         <span>Historial</span>
       </button>
+      <!-- Informes: solo visible para Admin (Pañol) -->
+      <button class="nav-item" onclick="switchView('informes')" id="nav-informes" style="display:none;">
+        <span class="material-icons">summarize</span>
+        <span>Informes</span>
+      </button>
     </nav>
     <div class="sidebar-menu-footer">
       <div style="padding: 0 16px 12px;">
@@ -1835,7 +1864,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.26</div>
+      <div class="sidebar-version">Versión 1.27.29</div>
     </div>
   </aside>
 
@@ -3105,6 +3134,6 @@
     }
   </style>
 
-  <script src="app.js?v=384"></script>
+  <script src="app.js?v=387"></script>
 </body>
 </html>
