@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '368';
+const CURRENT_APP_VERSION = '369';
 
 function startAppVersionWatch() {
   setInterval(async () => {
@@ -7717,6 +7717,39 @@ function toggleCubiertaMedidaOtro(selectEl) {
   if (otroInput) otroInput.style.display = (selectEl.value === '__otro__') ? 'block' : 'none';
 }
 
+// Lado "Se colocó" de una fila de cambio de cubierta (Gomería y Elastiquero comparten esto): a
+// veces la cubierta que se sacó no se cambia por otra, sino que se repara la misma y se vuelve a
+// colocar - por eso el título de este lado es un desplegable ("Se colocó" o "Reparación") en vez
+// de un label fijo, y cambia los campos de abajo según lo que se elija.
+function cubiertaEntradaModoHtml(prefix) {
+  return `
+    <select class="${prefix}-modo-select" style="width:100%; margin-bottom:6px; font-size:11px; font-weight:700; text-transform:uppercase; color:var(--success); border-color:var(--success);" onchange="toggleCubiertaEntradaModo(this)">
+      <option value="coloco">Se colocó</option>
+      <option value="reparacion">Reparación (misma cubierta)</option>
+    </select>
+    <div class="${prefix}-coloco-fields">
+      <input type="text" class="${prefix}-fuego" placeholder="N° Fuego" style="width:100%; margin-bottom:6px;">
+      ${cubiertaTipoSelectHtml(`${prefix}-tipo`)}
+      <input type="text" class="${prefix}-marca" placeholder="Marca" style="width:100%; margin-bottom:6px;">
+      ${cubiertaMedidaSelectHtml(`${prefix}-medida`, `${prefix}-medida-otro`)}
+      <input type="text" class="${prefix}-estado" placeholder="Estado (recapada nueva...)" style="width:100%;">
+    </div>
+    <div class="${prefix}-reparacion-fields" style="display:none;">
+      <textarea class="${prefix}-reparacion-descripcion" rows="2" placeholder="Ej: se parchó pinchadura, se reforzó talón" style="width:100%;"></textarea>
+    </div>
+  `;
+}
+
+function toggleCubiertaEntradaModo(selectEl) {
+  const wrapper = selectEl.parentElement;
+  if (!wrapper) return;
+  const colocoFields = wrapper.querySelector('[class$="-coloco-fields"]');
+  const reparacionFields = wrapper.querySelector('[class$="-reparacion-fields"]');
+  const esReparacion = selectEl.value === 'reparacion';
+  if (colocoFields) colocoFields.style.display = esReparacion ? 'none' : 'block';
+  if (reparacionFields) reparacionFields.style.display = esReparacion ? 'block' : 'none';
+}
+
 // Igual que "field(row, cls)" pero para un select de Medida: si eligieron "+ Agregar otra
 // medida" lee el texto libre de al lado en vez del valor "__otro__" literal.
 function cubiertaMedidaFieldValue(row, cls) {
@@ -7727,6 +7760,28 @@ function cubiertaMedidaFieldValue(row, cls) {
     return otroInput ? otroInput.value.trim() : '';
   }
   return el.value.trim();
+}
+
+// Arma el texto del lado "se colocó"/"se reparó" de una fila (ver cubiertaEntradaModoHtml):
+// según lo elegido en el desplegable, o bien lista los datos de la cubierta nueva, o bien
+// indica que se reparó la misma cubierta que se sacó, con su descripción.
+function buildCubiertaEntradaSegment(row, prefix) {
+  const field = (cls) => {
+    const el = row.querySelector(`.${cls}`);
+    return el ? el.value.trim() : '';
+  };
+  const modoSelect = row.querySelector(`.${prefix}-modo-select`);
+  const esReparacion = !!(modoSelect && modoSelect.value === 'reparacion');
+  if (esReparacion) {
+    const descripcion = field(`${prefix}-reparacion-descripcion`);
+    return { hasValue: !!descripcion, text: `se reparó la misma cubierta${descripcion ? ' - ' + descripcion : ''}` };
+  }
+  const fuego = field(`${prefix}-fuego`);
+  const tipo = field(`${prefix}-tipo`);
+  const marca = field(`${prefix}-marca`);
+  const medida = cubiertaMedidaFieldValue(row, `${prefix}-medida`);
+  const estado = field(`${prefix}-estado`);
+  return { hasValue: !!fuego, text: `se colocó = N° Fuego ${fuego || '-'} - Tipo ${tipo || '-'} - Marca ${marca || '-'} - Medida ${medida || '-'} - Estado ${estado || '-'}` };
 }
 
 // --- GOMERÍA (de a un interno por vez, con cronómetro propio) ---
@@ -7762,6 +7817,20 @@ function calcularSegundosGomeria(state) {
 function setGomeriaRodadoShortcutSingle(value) {
   const select = document.getElementById('gomeria-rodado-select');
   if (select) setSearchableSelectValue(select, value);
+}
+
+// "Reparación Cubierta" (interno especial REPARACIONES INTERNAS): es una cubierta suelta que se
+// repara en el taller, no montada en ningún camión - por eso no tiene Eje/Posición ni el par Se
+// sacó/Se colocó (no se cambia una cubierta por otra, se arregla la misma). Mismo criterio que
+// addElastiqueroReparacionRow para el bloque embebido de Elastiquero.
+function isGomeriaReparacionMode() {
+  const state = getGomeriaTimerState();
+  return !!(state && String(state.interno || '').trim().toUpperCase() === 'REPARACIONES INTERNAS');
+}
+
+function updateGomeriaAddButtonLabel() {
+  const label = document.getElementById('gomeria-add-tire-label');
+  if (label) label.textContent = isGomeriaReparacionMode() ? 'Agregar Cubierta Reparada' : 'Agregar Cubierta Cambiada';
 }
 
 // Paso 1 (Rodado/Clasificación/Empleado) primero solo - al confirmar acá se crea de una el
@@ -7863,6 +7932,7 @@ function mostrarGomeriaDatosCubierta() {
   const detailsEl = document.getElementById('gomeria-details-state');
   if (!detailsEl) return;
   detailsEl.style.display = 'block';
+  updateGomeriaAddButtonLabel();
   if (!detailsEl.querySelector('.gomeria-tire-row')) {
     addGomeriaTireRow(detailsEl.querySelector('.btn-secondary'));
   }
@@ -7933,6 +8003,7 @@ function renderGomeriaView() {
   } else if (state.finished) {
     detailsEl.style.display = 'block';
     syncEl.style.display = 'none';
+    updateGomeriaAddButtonLabel();
     // Guards against landing on this screen with an empty form - normally Fin/"Llenar Ahora"
     // already added one row, but a reload or re-visit while finished+not-yet-submitted
     // skipped both of those and would otherwise show nothing to fill in.
@@ -8124,8 +8195,30 @@ function addGomeriaTireRow(btn) {
   if (!rowsContainer) return;
 
   const row = document.createElement('div');
-  row.className = 'gomeria-tire-row';
   row.style.cssText = 'border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-top:10px; position:relative;';
+
+  if (isGomeriaReparacionMode()) {
+    row.className = 'gomeria-tire-row gomeria-reparacion-row';
+    row.innerHTML = `
+      <button type="button" onclick="removeGomeriaTireRow(this)" style="position:absolute; top:6px; right:6px; border:none; background:none; color:var(--danger); cursor:pointer; padding:2px;" title="Quitar">
+        <span class="material-icons" style="font-size:16px;">close</span>
+      </button>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Descripción</label>
+        <textarea class="gomeria-reparacion-descripcion" rows="2" placeholder="Ej: se parchó pinchadura, se reforzó talón" style="width:100%;"></textarea>
+      </div>
+      <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Cubierta reparada</label>
+      <input type="text" class="gomeria-reparacion-fuego" placeholder="N° Fuego" style="width:100%; margin-bottom:6px;">
+      ${cubiertaTipoSelectHtml('gomeria-reparacion-tipo')}
+      <input type="text" class="gomeria-reparacion-marca" placeholder="Marca" style="width:100%; margin-bottom:6px;">
+      ${cubiertaMedidaSelectHtml('gomeria-reparacion-medida', 'gomeria-reparacion-medida-otro')}
+      <input type="text" class="gomeria-reparacion-estado" placeholder="Estado (pinchada, liza...)" style="width:100%;">
+    `;
+    rowsContainer.appendChild(row);
+    return;
+  }
+
+  row.className = 'gomeria-tire-row';
   row.innerHTML = `
     <button type="button" onclick="removeGomeriaTireRow(this)" style="position:absolute; top:6px; right:6px; border:none; background:none; color:var(--danger); cursor:pointer; padding:2px;" title="Quitar esta cubierta">
       <span class="material-icons" style="font-size:16px;">close</span>
@@ -8166,12 +8259,7 @@ function addGomeriaTireRow(btn) {
         <input type="text" class="gomeria-salida-estado" placeholder="Estado (pinchada, liza...)" style="width:100%;">
       </div>
       <div>
-        <label style="font-size:11px; font-weight:700; color:var(--success); text-transform:uppercase; display:block; margin-bottom:6px;">Se colocó</label>
-        <input type="text" class="gomeria-entrada-fuego" placeholder="N° Fuego" style="width:100%; margin-bottom:6px;">
-        ${cubiertaTipoSelectHtml('gomeria-entrada-tipo')}
-        <input type="text" class="gomeria-entrada-marca" placeholder="Marca" style="width:100%; margin-bottom:6px;">
-        ${cubiertaMedidaSelectHtml('gomeria-entrada-medida', 'gomeria-entrada-medida-otro')}
-        <input type="text" class="gomeria-entrada-estado" placeholder="Estado (recapada nueva...)" style="width:100%;">
+        ${cubiertaEntradaModoHtml('gomeria-entrada')}
       </div>
     </div>
   `;
@@ -8525,14 +8613,32 @@ function ptGomeriaUpdatePosicionBadge(selectEl) {
   if (otroInput) otroInput.style.display = (selectEl.value === '__otro__') ? 'block' : 'none';
 }
 
-// Builds the task description text for one interno block, one line per tire changed, matching
-// the paper form's own wording ("se sacó ... = se colocó = ...").
+// Builds the task description text for one interno block, one line per tire reparada (modo
+// "Reparación Cubierta") o cambiada, matching the paper form's own wording.
 function buildGomeriaDescription(block) {
-  const rows = Array.from(block.querySelectorAll('.gomeria-tire-row'));
   const field = (row, cls) => {
     const el = row.querySelector(`.${cls}`);
     return el ? el.value.trim() : '';
   };
+
+  if (isGomeriaReparacionMode()) {
+    const repRows = Array.from(block.querySelectorAll('.gomeria-reparacion-row'));
+    const repLines = repRows.map((row, idx) => {
+      const fuego = field(row, 'gomeria-reparacion-fuego');
+      const tipo = field(row, 'gomeria-reparacion-tipo');
+      const marca = field(row, 'gomeria-reparacion-marca');
+      const medida = cubiertaMedidaFieldValue(row, 'gomeria-reparacion-medida');
+      const estado = field(row, 'gomeria-reparacion-estado');
+      const descripcion = field(row, 'gomeria-reparacion-descripcion');
+      if (!fuego && !descripcion) return null;
+      const prefix = repRows.length > 1 ? `Cubierta reparada ${idx + 1}` : 'Cubierta reparada';
+      const descSuffix = descripcion ? ` - ${descripcion}` : '';
+      return `${prefix}: N° Fuego ${fuego || '-'} - Tipo ${tipo || '-'} - Marca ${marca || '-'} - Medida ${medida || '-'} - Estado ${estado || '-'}${descSuffix}`;
+    }).filter(Boolean);
+    return repLines.join('\n');
+  }
+
+  const rows = Array.from(block.querySelectorAll('.gomeria-tire-row'));
   const lines = rows.map((row, idx) => {
     const posSelect = row.querySelector('.gomeria-posicion-select');
     const posOtro = row.querySelector('.gomeria-posicion-otro');
@@ -8544,15 +8650,11 @@ function buildGomeriaDescription(block) {
     const sMarca = field(row, 'gomeria-salida-marca');
     const sMedida = cubiertaMedidaFieldValue(row, 'gomeria-salida-medida');
     const sEstado = field(row, 'gomeria-salida-estado');
-    const eFuego = field(row, 'gomeria-entrada-fuego');
-    const eTipo = field(row, 'gomeria-entrada-tipo');
-    const eMarca = field(row, 'gomeria-entrada-marca');
-    const eMedida = cubiertaMedidaFieldValue(row, 'gomeria-entrada-medida');
-    const eEstado = field(row, 'gomeria-entrada-estado');
-    if (!sFuego && !eFuego) return null;
+    const entrada = buildCubiertaEntradaSegment(row, 'gomeria-entrada');
+    if (!sFuego && !entrada.hasValue) return null;
     const prefix = rows.length > 1 ? `Cambio cubierta ${idx + 1}` : 'Cambio cubierta';
     const posSuffix = posicion ? ` (${posicion})` : '';
-    return `${prefix}${posSuffix}: se sacó N° Fuego ${sFuego || '-'} - Tipo ${sTipo || '-'} - Marca ${sMarca || '-'} - Medida ${sMedida || '-'} - Estado ${sEstado || '-'} = se colocó = N° Fuego ${eFuego || '-'} - Tipo ${eTipo || '-'} - Marca ${eMarca || '-'} - Medida ${eMedida || '-'} - Estado ${eEstado || '-'}`;
+    return `${prefix}${posSuffix}: se sacó N° Fuego ${sFuego || '-'} - Tipo ${sTipo || '-'} - Marca ${sMarca || '-'} - Medida ${sMedida || '-'} - Estado ${sEstado || '-'} = ${entrada.text}`;
   }).filter(Boolean);
   return lines.join('\n');
 }
@@ -8677,12 +8779,7 @@ function addElastiqueroCubiertaRow(btn) {
         <input type="text" class="elastiquero-cubierta-salida-estado" placeholder="Estado (pinchada, liza...)" style="width:100%;">
       </div>
       <div>
-        <label style="font-size:11px; font-weight:700; color:var(--success); text-transform:uppercase; display:block; margin-bottom:6px;">Se colocó</label>
-        <input type="text" class="elastiquero-cubierta-entrada-fuego" placeholder="N° Fuego" style="width:100%; margin-bottom:6px;">
-        ${cubiertaTipoSelectHtml('elastiquero-cubierta-entrada-tipo')}
-        <input type="text" class="elastiquero-cubierta-entrada-marca" placeholder="Marca" style="width:100%; margin-bottom:6px;">
-        ${cubiertaMedidaSelectHtml('elastiquero-cubierta-entrada-medida', 'elastiquero-cubierta-entrada-medida-otro')}
-        <input type="text" class="elastiquero-cubierta-entrada-estado" placeholder="Estado (recapada nueva...)" style="width:100%;">
+        ${cubiertaEntradaModoHtml('elastiquero-cubierta-entrada')}
       </div>
     </div>
   `;
@@ -8733,17 +8830,13 @@ function buildElastiqueroCubiertaDescription(block) {
     const sMarca = field(row, 'elastiquero-cubierta-salida-marca');
     const sMedida = cubiertaMedidaFieldValue(row, 'elastiquero-cubierta-salida-medida');
     const sEstado = field(row, 'elastiquero-cubierta-salida-estado');
-    const eFuego = field(row, 'elastiquero-cubierta-entrada-fuego');
-    const eTipo = field(row, 'elastiquero-cubierta-entrada-tipo');
-    const eMarca = field(row, 'elastiquero-cubierta-entrada-marca');
-    const eMedida = cubiertaMedidaFieldValue(row, 'elastiquero-cubierta-entrada-medida');
-    const eEstado = field(row, 'elastiquero-cubierta-entrada-estado');
+    const entrada = buildCubiertaEntradaSegment(row, 'elastiquero-cubierta-entrada');
     const descripcion = field(row, 'elastiquero-cubierta-descripcion');
-    if (!sFuego && !eFuego && !descripcion) return null;
+    if (!sFuego && !entrada.hasValue && !descripcion) return null;
     const prefix = rows.length > 1 ? `Cambio cubierta ${idx + 1}` : 'Cambio cubierta';
     const posSuffix = posicion ? ` (${posicion})` : '';
     const descSuffix = descripcion ? ` - ${descripcion}` : '';
-    return `${prefix}${posSuffix}: se sacó N° Fuego ${sFuego || '-'} - Tipo ${sTipo || '-'} - Marca ${sMarca || '-'} - Medida ${sMedida || '-'} - Estado ${sEstado || '-'} = se colocó = N° Fuego ${eFuego || '-'} - Tipo ${eTipo || '-'} - Marca ${eMarca || '-'} - Medida ${eMedida || '-'} - Estado ${eEstado || '-'}${descSuffix}`;
+    return `${prefix}${posSuffix}: se sacó N° Fuego ${sFuego || '-'} - Tipo ${sTipo || '-'} - Marca ${sMarca || '-'} - Medida ${sMedida || '-'} - Estado ${sEstado || '-'} = ${entrada.text}${descSuffix}`;
   }).filter(Boolean);
   return lines.join('\n');
 }
