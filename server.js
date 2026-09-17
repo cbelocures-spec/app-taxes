@@ -73,7 +73,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '387';
+const APP_VERSION = '388';
 
 // Middleware
 app.use(cors());
@@ -2869,7 +2869,8 @@ app.get('/api/settings', (req, res) => {
       catalogSyncStatus: catalogStatus,
       catalogSyncError: settings.catalogSyncError || null,
       isSupervisor: !!isMainSupervisor,
-      employeeMappings: settings.employeeMappings || null
+      employeeMappings: settings.employeeMappings || null,
+      employeeSchedules: settings.employeeSchedules || null
     };
     res.json(responseSettings);
   } catch (error) {
@@ -2881,7 +2882,7 @@ app.get('/api/settings', (req, res) => {
 // Save connection settings
 app.post('/api/settings', (req, res) => {
   try {
-    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, controlesMasivaScriptUrl, controlesMasivaSheetUrl, aguaScriptUrl, geminiApiKey, claudeApiKey, employeeMappings } = req.body;
+    const { username, password, portalUrl, googleScriptUrl, googleActiveTasksUrl, preventivoScriptUrl, parteTallerScriptUrl, controlesMasivaScriptUrl, controlesMasivaSheetUrl, aguaScriptUrl, geminiApiKey, claudeApiKey, employeeMappings, employeeSchedules } = req.body;
     const requestingUser = req.headers['x-user-username'] || null;
     const current = db.getSettings();
     
@@ -2916,6 +2917,13 @@ app.post('/api/settings', (req, res) => {
       console.log(`[Settings] Employee mappings updated by ${requestingUser || 'unknown'}`);
     }
 
+    // Horario semanal por empleado (Lunes a Domingo) - usado por el Informe de Horas para
+    // calcular ociosas/extra contra el horario real de cada uno en vez del turno estándar fijo.
+    if (employeeSchedules !== undefined) {
+      updates.employeeSchedules = employeeSchedules;
+      console.log(`[Settings] Employee schedules updated by ${requestingUser || 'unknown'}`);
+    }
+
     // Only update global username/password if this is the global/primary user
     const isPrimaryUser = !current.username || 
                           (requestingUser && current.username.toLowerCase().trim() === (username || '').toLowerCase().trim());
@@ -2932,7 +2940,7 @@ app.post('/api/settings', (req, res) => {
     }
 
     const saved = db.saveSettings(updates);
-    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl, googleActiveTasksUrl: saved.googleActiveTasksUrl, preventivoScriptUrl: saved.preventivoScriptUrl, parteTallerScriptUrl: saved.parteTallerScriptUrl, controlesMasivaScriptUrl: saved.controlesMasivaScriptUrl, controlesMasivaSheetUrl: saved.controlesMasivaSheetUrl, aguaScriptUrl: saved.aguaScriptUrl, employeeMappings: saved.employeeMappings || null } });
+    res.json({ success: true, settings: { username: saved.username, portalUrl: saved.portalUrl, googleScriptUrl: saved.googleScriptUrl, googleActiveTasksUrl: saved.googleActiveTasksUrl, preventivoScriptUrl: saved.preventivoScriptUrl, parteTallerScriptUrl: saved.parteTallerScriptUrl, controlesMasivaScriptUrl: saved.controlesMasivaScriptUrl, controlesMasivaSheetUrl: saved.controlesMasivaSheetUrl, aguaScriptUrl: saved.aguaScriptUrl, employeeMappings: saved.employeeMappings || null, employeeSchedules: saved.employeeSchedules || null } });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

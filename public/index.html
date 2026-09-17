@@ -1082,6 +1082,36 @@
         </div>
       </div>
 
+      <!-- Horarios de Empleados: para el Informe de Horas (ver módulo Informes) - solo hace
+           falta cargar acá a quien NO siga el turno estándar (Mañana 06-14, Tarde 14-22, Noche
+           22-06, con sábado 4hs Mañana/Tarde y viernes noche 22-02). -->
+      <div id="employee-schedules-section" style="display: block; margin-top: 16px;">
+        <div class="section-title">
+          <h3>Horarios de Empleados (Solo Pañol / Admin)</h3>
+        </div>
+        <div class="catalog-sync-card" style="padding: 16px;">
+          <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 14px 0; line-height: 1.5;">
+            Para que el <strong>Informe de Horas</strong> calcule bien ociosas/extra, cargá acá el horario real de los empleados que NO siguen el turno estándar (ej. entra más temprano/tarde, o tiene un horario propio distinto según el día). Quien no tenga nada cargado sigue calculado como siempre.
+          </p>
+
+          <div class="form-group">
+            <label>Empleado</label>
+            <select id="empsched-empleado-select" style="width:100%;" onchange="loadEmployeeScheduleIntoForm()">
+              <option value="">Seleccionar empleado...</option>
+            </select>
+          </div>
+
+          <div id="empsched-days-container" style="margin-top:10px;"></div>
+
+          <button type="button" class="btn btn-primary" onclick="saveEmployeeSchedule()" style="width:100%; margin-top:14px; padding:10px; font-size:14px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;">
+            <span class="material-icons" style="font-size:18px;">save</span> Guardar Horario
+          </button>
+          <div id="empsched-save-msg" style="display:none; margin-top:8px; text-align:center; font-size:13px; font-weight:600; color: var(--success);"></div>
+
+          <div id="empsched-list-container" style="margin-top:16px;"></div>
+        </div>
+      </div>
+
       <details id="backup-recovery-section" style="display: none; margin-top: 24px;" ontoggle="if(this.open) renderBackupRecoveryTable()">
         <summary style="cursor:pointer; list-style:none; user-select:none;">
           <div class="section-title" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0;">
@@ -1864,7 +1894,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.29</div>
+      <div class="sidebar-version">Versión 1.27.30</div>
     </div>
   </aside>
 
@@ -3134,6 +3164,6 @@
     }
   </style>
 
-  <script src="app.js?v=387"></script>
+  <script src="app.js?v=388"></script>
 </body>
 </html>

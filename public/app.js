@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '387';
+const CURRENT_APP_VERSION = '388';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -701,6 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Fetch novelties and employee mappings on startup
   fetchNovelties();
   if (typeof loadAndRenderEmployeeMappings === 'function') loadAndRenderEmployeeMappings();
+  if (typeof loadAndRenderEmployeeSchedules === 'function') loadAndRenderEmployeeSchedules();
 
   const preClasifEl = document.getElementById('pre-form-clasificacion');
   if (preClasifEl) preClasifEl.addEventListener('change', setupAllFieldsForSector);
@@ -920,6 +921,9 @@ function switchView(viewId) {
         if (typeof loadAndRenderEmployeeMappings === 'function') {
           try { loadAndRenderEmployeeMappings(); } catch(e) {}
         }
+      }
+      if (typeof loadAndRenderEmployeeSchedules === 'function') {
+        try { loadAndRenderEmployeeSchedules(); } catch(e) {}
       }
       if (typeof loadUserPermissionsUI === 'function') {
         try { loadUserPermissionsUI(); } catch(e) {}
@@ -11258,6 +11262,142 @@ async function saveEmployeeMappings() {
 }
 // ── END EMPLOYEE MAPPINGS ────────────────────────────────────────────────────────
 
+// ── EMPLOYEE SCHEDULES (para el Informe de Horas - ver cachedEmployeeSchedules,
+// resolverVentanaEmpleadoHoy, EMP_SCHEDULE_DIAS más arriba) ────────────────────────
+function renderEmployeeScheduleDayRows(schedule) {
+  const container = document.getElementById('empsched-days-container');
+  if (!container) return;
+  container.innerHTML = EMP_SCHEDULE_DIAS.map(({ key, label }) => {
+    const dia = (schedule && schedule[key]) || { tipo: 'automatico' };
+    const esPersonalizado = dia.tipo === 'personalizado';
+    return `
+      <div style="display:grid; grid-template-columns: 84px 1fr; gap:8px; align-items:start; margin-bottom:8px;">
+        <label style="font-size:13px; font-weight:600; padding-top:8px;">${label}</label>
+        <div>
+          <select class="empsched-day-tipo" data-dia="${key}" style="width:100%;" onchange="onEmpScheduleDayTypeChange('${key}')">
+            <option value="automatico" ${dia.tipo === 'automatico' ? 'selected' : ''}>Automático (detecta el turno solo)</option>
+            <option value="manana" ${dia.tipo === 'manana' ? 'selected' : ''}>Turno Mañana</option>
+            <option value="tarde" ${dia.tipo === 'tarde' ? 'selected' : ''}>Turno Tarde</option>
+            <option value="noche" ${dia.tipo === 'noche' ? 'selected' : ''}>Turno Noche</option>
+            <option value="personalizado" ${esPersonalizado ? 'selected' : ''}>Personalizado (entrada/salida propias)</option>
+            <option value="libre" ${dia.tipo === 'libre' ? 'selected' : ''}>No trabaja</option>
+          </select>
+          <div class="empsched-day-horarios" data-dia="${key}" style="display:${esPersonalizado ? 'flex' : 'none'}; gap:6px; margin-top:6px;">
+            <input type="time" class="empsched-day-entrada" data-dia="${key}" value="${dia.entrada || ''}" style="flex:1;">
+            <input type="time" class="empsched-day-salida" data-dia="${key}" value="${dia.salida || ''}" style="flex:1;">
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function onEmpScheduleDayTypeChange(diaKey) {
+  const select = document.querySelector(`.empsched-day-tipo[data-dia="${diaKey}"]`);
+  const horariosDiv = document.querySelector(`.empsched-day-horarios[data-dia="${diaKey}"]`);
+  if (!select || !horariosDiv) return;
+  horariosDiv.style.display = select.value === 'personalizado' ? 'flex' : 'none';
+}
+
+function loadEmployeeScheduleIntoForm() {
+  const select = document.getElementById('empsched-empleado-select');
+  const empValue = select ? select.value : '';
+  renderEmployeeScheduleDayRows(empValue ? cachedEmployeeSchedules[empValue] : null);
+}
+
+function populateEmployeeScheduleSelect() {
+  const select = document.getElementById('empsched-empleado-select');
+  if (!select || !cachedCatalogs || !cachedCatalogs.empleados) return;
+  const currentVal = select.value;
+  select.innerHTML = '<option value="">Seleccionar empleado...</option>' +
+    cachedCatalogs.empleados.map(e => `<option value="${e.value}">${e.label}</option>`).join('');
+  if (currentVal) select.value = currentVal;
+}
+
+function renderEmployeeScheduleList() {
+  const container = document.getElementById('empsched-list-container');
+  if (!container) return;
+  const configurados = Object.keys(cachedEmployeeSchedules).filter(v => {
+    const sched = cachedEmployeeSchedules[v];
+    return sched && Object.values(sched).some(d => d && d.tipo && d.tipo !== 'automatico');
+  });
+  if (configurados.length === 0) {
+    container.innerHTML = '<p style="font-size:12px; color:var(--text-muted); text-align:center;">Ningún empleado tiene un horario propio cargado todavía.</p>';
+    return;
+  }
+  const empleados = (cachedCatalogs && cachedCatalogs.empleados) || [];
+  container.innerHTML = '<label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Con horario propio cargado</label>' +
+    configurados.map(v => {
+      const empOpt = empleados.find(e => e.value === v);
+      const nombre = empOpt ? empOpt.label : v;
+      return `<button type="button" class="btn btn-secondary btn-xs" style="margin:2px; border-radius:999px;" onclick="document.getElementById('empsched-empleado-select').value='${v}'; loadEmployeeScheduleIntoForm();">${nombre}</button>`;
+    }).join('');
+}
+
+async function loadAndRenderEmployeeSchedules() {
+  try {
+    const username = localStorage.getItem('currentUserUsername') || '';
+    const res = await originalFetch('/api/settings', { headers: { 'x-user-username': username } });
+    if (!res.ok) throw new Error('Error cargando ajustes');
+    const data = await res.json();
+    cachedEmployeeSchedules = (data.employeeSchedules && typeof data.employeeSchedules === 'object') ? data.employeeSchedules : {};
+  } catch (err) {
+    console.warn('Could not load employee schedules, usando lo que hubiera en memoria:', err.message);
+    cachedEmployeeSchedules = cachedEmployeeSchedules || {};
+  }
+  populateEmployeeScheduleSelect();
+  renderEmployeeScheduleList();
+  renderEmployeeScheduleDayRows(null);
+}
+
+async function saveEmployeeSchedule() {
+  const select = document.getElementById('empsched-empleado-select');
+  const empValue = select ? select.value : '';
+  if (!empValue) {
+    showToast('Elegí un empleado primero.', 'danger');
+    return;
+  }
+  const schedule = {};
+  for (const { key, label } of EMP_SCHEDULE_DIAS) {
+    const tipoSelect = document.querySelector(`.empsched-day-tipo[data-dia="${key}"]`);
+    const tipo = tipoSelect ? tipoSelect.value : 'automatico';
+    const dia = { tipo };
+    if (tipo === 'personalizado') {
+      const entradaInput = document.querySelector(`.empsched-day-entrada[data-dia="${key}"]`);
+      const salidaInput = document.querySelector(`.empsched-day-salida[data-dia="${key}"]`);
+      dia.entrada = entradaInput ? entradaInput.value : '';
+      dia.salida = salidaInput ? salidaInput.value : '';
+      if (!dia.entrada || !dia.salida) {
+        showToast(`Completá entrada y salida de ${label}, o cambiá ese día a otra opción.`, 'danger');
+        return;
+      }
+    }
+    schedule[key] = dia;
+  }
+
+  cachedEmployeeSchedules[empValue] = schedule;
+
+  const username = localStorage.getItem('currentUserUsername') || '';
+  const msgEl = document.getElementById('empsched-save-msg');
+  try {
+    const res = await originalFetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-username': username },
+      body: JSON.stringify({ employeeSchedules: cachedEmployeeSchedules })
+    });
+    if (!res.ok) throw new Error('Error al guardar');
+    if (msgEl) {
+      msgEl.textContent = '✓ Horario guardado correctamente';
+      msgEl.style.color = 'var(--success)';
+      msgEl.style.display = 'block';
+      setTimeout(() => { msgEl.style.display = 'none'; }, 3500);
+    }
+    renderEmployeeScheduleList();
+  } catch (err) {
+    showToast('Error al guardar el horario: ' + err.message, 'danger');
+  }
+}
+// ── END EMPLOYEE SCHEDULES ───────────────────────────────────────────────────────
+
 async function renderBackupRecoveryTable() {
   const container = document.getElementById('backup-table-container');
   const backupSection = document.getElementById('backup-recovery-section');
@@ -16957,20 +17097,81 @@ const INFORME_TURNOS_KEYS = ['Mañana', 'Tarde', 'Noche'];
 
 // Argentina no tiene horario de verano desde 2009 - UTC-3 todo el año, así que se puede armar
 // el límite de cada turno como epoch UTC directamente, sin pelearse con Intl.DateTimeFormat
-// para cada comparación. Mismos rangos que getTurnoForDate en database.js.
+// para cada comparación. Mismos rangos que getTurnoForDate en database.js, con dos
+// excepciones generales que pidió el usuario (aplican a CUALQUIER empleado, tenga o no un
+// horario personalizado propio - ver EMP_SCHEDULE_DIAS más abajo para eso):
+// - Sábado: Mañana y Tarde duran 4hs (no 8) - Noche del sábado sigue siendo de 8hs.
+// - Viernes: el turno Noche dura 4hs (22:00 a 02:00), no las 8hs hasta las 06:00.
 function getTurnoBoundariesForToday(nowMs) {
   const ART_OFFSET_HOURS = 3; // ART = UTC-3 → sumarle 3 a la hora de Argentina da la hora UTC
   const todayStr = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit'
   }).format(new Date(nowMs));
   const [y, m, d] = todayStr.split('-').map(Number);
-  const mk = (dayOffset, hour) => Date.UTC(y, m - 1, d + dayOffset, hour + ART_OFFSET_HOURS, 0, 0);
+  const mk = (dayOffset, hour, minute) => Date.UTC(y, m - 1, d + dayOffset, hour + ART_OFFSET_HOURS, minute || 0, 0);
+
+  const diaSemanaEn = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Argentina/Buenos_Aires', weekday: 'long'
+  }).format(new Date(mk(0, 12))).toLowerCase();
+  const esSabado = diaSemanaEn === 'saturday';
+  const esViernes = diaSemanaEn === 'friday';
+
   return {
     dateStr: todayStr,
-    'Mañana': { start: mk(0, 6), end: mk(0, 14) },
-    'Tarde': { start: mk(0, 14), end: mk(0, 22) },
-    'Noche': { start: mk(0, 22), end: mk(1, 6) }
+    diaSemana: diaSemanaEn,
+    'Mañana': { start: mk(0, 6), end: esSabado ? mk(0, 10) : mk(0, 14) },
+    'Tarde': { start: mk(0, 14), end: esSabado ? mk(0, 18) : mk(0, 22) },
+    'Noche': { start: mk(0, 22), end: esViernes ? mk(1, 2) : mk(1, 6) }
   };
+}
+
+// Horario semanal por empleado, cargado en Ajustes (ver renderEmployeeScheduleUI/
+// saveEmployeeSchedule) - clave = value del catálogo de empleados, valor = un objeto con una
+// entrada por día ('lunes'..'domingo'), cada una { tipo: 'automatico'|'manana'|'tarde'|'noche'|
+// 'personalizado'|'libre', entrada?, salida? }. Sin nada cargado, un empleado sigue
+// calculándose como siempre (detectando el turno según el horario real de sus tareas).
+let cachedEmployeeSchedules = {};
+
+const EMP_SCHEDULE_DIAS = [
+  { key: 'lunes', label: 'Lunes' }, { key: 'martes', label: 'Martes' },
+  { key: 'miercoles', label: 'Miércoles' }, { key: 'jueves', label: 'Jueves' },
+  { key: 'viernes', label: 'Viernes' }, { key: 'sabado', label: 'Sábado' },
+  { key: 'domingo', label: 'Domingo' }
+];
+const EMP_SCHEDULE_DIA_EN_A_ES = {
+  monday: 'lunes', tuesday: 'martes', wednesday: 'miercoles', thursday: 'jueves',
+  friday: 'viernes', saturday: 'sabado', sunday: 'domingo'
+};
+
+function artTimeEnFecha(dateStr, hh, mm) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return Date.UTC(y, m - 1, d, hh + 3, mm, 0);
+}
+
+// Ventana de trabajo esperada de un empleado HOY, según su horario personal cargado (si tiene).
+// Devuelve null si no tiene nada cargado ese día (o está en "Automático") - en ese caso, el
+// cálculo sigue el comportamiento de siempre (detectar el turno por el horario real del
+// cronómetro). Devuelve {libre:true} si ese día no trabaja. Si no, {start,end,label}.
+function resolverVentanaEmpleadoHoy(empValue, turnos) {
+  const diaEs = EMP_SCHEDULE_DIA_EN_A_ES[turnos.diaSemana];
+  const horario = cachedEmployeeSchedules && cachedEmployeeSchedules[empValue]
+    ? cachedEmployeeSchedules[empValue][diaEs]
+    : null;
+  if (!horario || !horario.tipo || horario.tipo === 'automatico') return null;
+  if (horario.tipo === 'libre') return { libre: true };
+  if (horario.tipo === 'manana' || horario.tipo === 'tarde' || horario.tipo === 'noche') {
+    const label = horario.tipo === 'manana' ? 'Mañana' : horario.tipo === 'tarde' ? 'Tarde' : 'Noche';
+    return { start: turnos[label].start, end: turnos[label].end, label };
+  }
+  if (horario.tipo === 'personalizado' && horario.entrada && horario.salida) {
+    const [hE, mE] = horario.entrada.split(':').map(Number);
+    const [hS, mS] = horario.salida.split(':').map(Number);
+    const start = artTimeEnFecha(turnos.dateStr, hE, mE);
+    let end = artTimeEnFecha(turnos.dateStr, hS, mS);
+    if (end <= start) end += 24 * 3600000; // el turno cruza medianoche (ej. Noche)
+    return { start, end, label: 'Personalizado' };
+  }
+  return null;
 }
 
 function turnoParaMomento(turnos, ms) {
@@ -16980,24 +17181,29 @@ function turnoParaMomento(turnos, ms) {
   return null;
 }
 
-// Conteo de Correctivo/Preventivo/Auxilio por turno - usa fechaEntrega+horario de cada orden.
-// No hace falta cronómetro real para esto, así que suma todo (Elastiquero, Masivas, etc.).
+// Conteo por turno de TODAS las clasificaciones que aparezcan hoy (Correctivo, Preventivo,
+// Auxilio, Herrería, Puesta a Punto, Edilicio, etc.) - antes solo contaba esas tres primeras y
+// el resto quedaba afuera del informe sin avisar. Usa fechaEntrega+horario de cada orden; no
+// hace falta cronómetro real para esto, así que suma todo (Elastiquero, Masivas, etc.).
 function buildInformeTurnosConteo(turnos) {
   const counts = {};
-  INFORME_TURNOS_KEYS.forEach(k => { counts[k] = { Correctivo: 0, Preventivo: 0, Auxilio: 0 }; });
-  const clasifsValidas = new Set(['Correctivo', 'Preventivo', 'Auxilio']);
+  INFORME_TURNOS_KEYS.forEach(k => { counts[k] = {}; });
+  const clasificacionesVistas = new Set();
   const allOrders = [...(activeOrders || []), ...(archivedOrders || [])];
   allOrders.forEach(o => {
     if (o.deleted === true) return;
-    if (!clasifsValidas.has(o.clasificacion)) return;
+    const clasif = String(o.clasificacion || '').trim();
+    if (!clasif) return;
     if (!o.fechaEntrega) return;
     const horario = /^\d{2}:\d{2}$/.test(o.horario || '') ? o.horario : '00:00';
     const momentMs = new Date(`${o.fechaEntrega}T${horario}:00-03:00`).getTime();
     if (isNaN(momentMs)) return;
     const turno = turnoParaMomento(turnos, momentMs);
-    if (turno) counts[turno][o.clasificacion]++;
+    if (!turno) return;
+    clasificacionesVistas.add(clasif);
+    counts[turno][clasif] = (counts[turno][clasif] || 0) + 1;
   });
-  return counts;
+  return { counts, clasificaciones: [...clasificacionesVistas].sort((a, b) => a.localeCompare(b, 'es')) };
 }
 
 // De un timerHistory tipo evento (Inició/Reanudó/Pausó/Fin) saca los intervalos {start,end} ya
@@ -17036,50 +17242,101 @@ function convertirParesAEventLogTimerHistory(pares) {
   return eventos;
 }
 
-// Horas trabajadas/ociosas/extra por empleado y turno - tareas con timerHistory real: Parte
-// Taller (ya lo guarda así) y ahora también Gomería/Recorrido (ver
-// convertirParesAEventLogTimerHistory, usado en submitGomeriaSingleOrder/submitRecorridoOrders).
+// Mismo criterio que getOrderSector en server.js (isHerreriaOrder/isEdilicioOrder/
+// isLavaderoOrder ya existen acá y miran clasificación+sector) - default Taller.
+function getOrderSectorLabel(order) {
+  if (isHerreriaOrder(order)) return 'Herrería';
+  if (isEdilicioOrder(order)) return 'Edilicio';
+  if (isLavaderoOrder(order)) return 'Lavadero';
+  return 'Taller';
+}
+
+const INFORME_HORAS_BUCKETS = ['Mañana', 'Tarde', 'Noche', 'Personalizado'];
+
+// Horas trabajadas/ociosas/comida/extra por empleado, separado por turno Y por sector -
+// tareas con timerHistory real: Parte Taller (ya lo guarda así) y ahora también Gomería/
+// Recorrido (ver convertirParesAEventLogTimerHistory, usado en
+// submitGomeriaSingleOrder/submitRecorridoOrders). Si el empleado tiene un horario propio
+// cargado para hoy (ver resolverVentanaEmpleadoHoy), se mide contra ESE horario en vez del
+// turno detectado automáticamente, y cae en el bloque "Personalizado" del informe.
 function buildInformeTurnosHoras(turnos) {
-  const porTurno = {};
-  INFORME_TURNOS_KEYS.forEach(k => { porTurno[k] = {}; });
+  const porTurnoSector = {};
+  INFORME_HORAS_BUCKETS.forEach(k => { porTurnoSector[k] = {}; });
 
   const allOrders = [...(activeOrders || []), ...(archivedOrders || [])];
   allOrders.forEach(order => {
     if (order.deleted === true) return;
+    const sector = getOrderSectorLabel(order);
     (order.tasks || []).forEach(task => {
       if (!task.empleado) return;
+      const emp = task.empleado;
       const intervalos = extraerIntervalosDeTimerHistory(task.timerHistory);
       intervalos.forEach(({ start, end }) => {
         if (!(end > start)) return;
-        const turno = turnoParaMomento(turnos, start);
-        if (!turno) return; // el intervalo no arrancó dentro de un turno de hoy
-        const turnoFin = turnos[turno].end;
-        const trabajadasMs = Math.max(0, Math.min(end, turnoFin) - start);
-        const extraMs = Math.max(0, end - turnoFin);
-        const emp = task.empleado;
-        if (!porTurno[turno][emp]) porTurno[turno][emp] = { trabajadasMs: 0, extraMs: 0 };
-        porTurno[turno][emp].trabajadasMs += trabajadasMs;
-        porTurno[turno][emp].extraMs += extraMs;
+
+        const override = resolverVentanaEmpleadoHoy(emp, turnos);
+        let turno, trabajadasMs, extraMs, ventanaMs;
+
+        if (override && override.libre) {
+          // No trabaja ese día, pero hay una tarea real igual - todo cuenta como extra, no hay
+          // ventana "esperada" contra la cual medir ociosas.
+          turno = 'Personalizado';
+          trabajadasMs = 0;
+          extraMs = end - start;
+          ventanaMs = 0;
+        } else if (override) {
+          // Horario forzado (Mañana/Tarde/Noche de otro empleado, o personalizado con
+          // entrada/salida propias) - lo que caiga fuera de esa ventana (antes de entrar O
+          // después de salir) es extra, no solo lo que pase del final.
+          turno = override.label;
+          trabajadasMs = Math.max(0, Math.min(end, override.end) - Math.max(start, override.start));
+          extraMs = Math.max(0, end - override.end) + Math.max(0, override.start - start);
+          ventanaMs = override.end - override.start;
+        } else {
+          // Sin horario personal cargado - comportamiento de siempre: detectar el turno según
+          // el horario real en el que arrancó.
+          turno = turnoParaMomento(turnos, start);
+          if (!turno) return; // el intervalo no arrancó dentro de un turno de hoy
+          trabajadasMs = Math.max(0, Math.min(end, turnos[turno].end) - start);
+          extraMs = Math.max(0, end - turnos[turno].end);
+          ventanaMs = turnos[turno].end - turnos[turno].start;
+        }
+
+        if (!porTurnoSector[turno][sector]) porTurnoSector[turno][sector] = {};
+        if (!porTurnoSector[turno][sector][emp]) porTurnoSector[turno][sector][emp] = { trabajadasMs: 0, extraMs: 0, ventanaMs: 0 };
+        porTurnoSector[turno][sector][emp].trabajadasMs += trabajadasMs;
+        porTurnoSector[turno][sector][emp].extraMs += extraMs;
+        // La ventana es la misma durante todo el día para este empleado - con más de un
+        // intervalo alcanza con quedarse con la más grande vista (deberían ser todas iguales).
+        porTurnoSector[turno][sector][emp].ventanaMs = Math.max(porTurnoSector[turno][sector][emp].ventanaMs, ventanaMs);
       });
     });
   });
 
-  // Ociosas = 8hs del turno menos lo trabajado (piso en 0 - un empleado con intervalos que se
-  // solapan, o que ya venía de un turno anterior, puede superar las 8hs "trabajadas").
-  const TURNO_MS = 8 * 60 * 60 * 1000;
+  // Ociosas = duración de la ventana (turno estándar, u 8/4hs según corresponda, o el horario
+  // personal del empleado) menos lo trabajado (piso en 0), menos 1hs de comida (si hay de
+  // dónde sacarla). Total = trabajadas + extra, el total de horas puestas ese turno.
+  const HORA_COMIDA_MS = 60 * 60 * 1000;
   const resultado = {};
-  INFORME_TURNOS_KEYS.forEach(turno => {
-    resultado[turno] = Object.entries(porTurno[turno]).map(([empValue, datos]) => {
-      const empOpt = (cachedCatalogs && cachedCatalogs.empleados) ? cachedCatalogs.empleados.find(e => e.value === empValue) : null;
-      const nombre = empOpt ? empOpt.label : empValue;
-      const ociosasMs = Math.max(0, TURNO_MS - datos.trabajadasMs);
-      return {
-        nombre,
-        trabajadasHs: datos.trabajadasMs / 3600000,
-        ociosasHs: ociosasMs / 3600000,
-        extraHs: datos.extraMs / 3600000
-      };
-    }).sort((a, b) => b.trabajadasHs - a.trabajadasHs);
+  INFORME_HORAS_BUCKETS.forEach(turno => {
+    resultado[turno] = {};
+    Object.entries(porTurnoSector[turno]).forEach(([sector, empleadosDatos]) => {
+      resultado[turno][sector] = Object.entries(empleadosDatos).map(([empValue, datos]) => {
+        const empOpt = (cachedCatalogs && cachedCatalogs.empleados) ? cachedCatalogs.empleados.find(e => e.value === empValue) : null;
+        const nombre = empOpt ? empOpt.label : empValue;
+        const ociosasBrutoMs = Math.max(0, datos.ventanaMs - datos.trabajadasMs);
+        const comidaMs = Math.min(HORA_COMIDA_MS, ociosasBrutoMs);
+        const ociosasMs = ociosasBrutoMs - comidaMs;
+        return {
+          nombre,
+          trabajadasHs: datos.trabajadasMs / 3600000,
+          ociosasHs: ociosasMs / 3600000,
+          comidaHs: comidaMs / 3600000,
+          extraHs: datos.extraMs / 3600000,
+          totalHs: (datos.trabajadasMs + datos.extraMs) / 3600000
+        };
+      }).sort((a, b) => b.trabajadasHs - a.trabajadasHs);
+    });
   });
   return resultado;
 }
@@ -17148,23 +17405,36 @@ async function generarPdfInformeHoras() {
   const turnos = getTurnoBoundariesForToday(serverNow());
   const horas = buildInformeTurnosHoras(turnos);
 
-  const horasSectionsHtml = INFORME_TURNOS_KEYS.map(turno => {
-    const filas = horas[turno];
-    const filasHtml = filas.length > 0
-      ? filas.map(f => `
-        <tr>
-          <td style="padding:6px;">${f.nombre}</td>
-          <td style="text-align:center; padding:6px;">${fmtHsInforme(f.trabajadasHs)}</td>
-          <td style="text-align:center; padding:6px;">${fmtHsInforme(f.ociosasHs)}</td>
-          <td style="text-align:center; padding:6px; ${f.extraHs > 0 ? 'color:#dc2626; font-weight:700;' : ''}">${fmtHsInforme(f.extraHs)}</td>
-        </tr>`).join('')
-      : `<tr><td colspan="4" style="text-align:center; color:#94a3b8; padding:6px;">Sin cronómetros reales registrados en este turno</td></tr>`;
+  const SECTOR_ORDEN = ['Taller', 'Herrería', 'Edilicio', 'Lavadero'];
+  const horasSectionsHtml = INFORME_HORAS_BUCKETS.map(turno => {
+    const sectoresDelTurno = horas[turno];
+    const sectoresConDatos = SECTOR_ORDEN.filter(s => sectoresDelTurno[s] && sectoresDelTurno[s].length > 0);
+    if (turno === 'Personalizado' && sectoresConDatos.length === 0) return ''; // no mostrar la sección vacía si nadie tiene horario propio
+
+    const sectoresHtml = sectoresConDatos.length > 0
+      ? sectoresConDatos.map(sector => {
+          const filasHtml = sectoresDelTurno[sector].map(f => `
+            <tr>
+              <td style="padding:6px;">${f.nombre}</td>
+              <td style="text-align:center; padding:6px;">${fmtHsInforme(f.trabajadasHs)}</td>
+              <td style="text-align:center; padding:6px;">${fmtHsInforme(f.ociosasHs)}</td>
+              <td style="text-align:center; padding:6px;">${fmtHsInforme(f.comidaHs)}</td>
+              <td style="text-align:center; padding:6px; ${f.extraHs > 0 ? 'color:#dc2626; font-weight:700;' : ''}">${fmtHsInforme(f.extraHs)}</td>
+              <td style="text-align:center; padding:6px; font-weight:700;">${fmtHsInforme(f.totalHs)}</td>
+            </tr>`).join('');
+          return `
+            <h4 style="font-size:12px; font-weight:700; margin:10px 0 4px; color:#334155;">${sector}</h4>
+            <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+              <thead><tr style="background:#0f172a; color:#fff;"><th style="padding:6px;">Empleado</th><th style="padding:6px;">Trabajadas</th><th style="padding:6px;">Ociosas</th><th style="padding:6px;">Comida</th><th style="padding:6px;">Extra</th><th style="padding:6px;">Total</th></tr></thead>
+              <tbody>${filasHtml}</tbody>
+            </table>`;
+        }).join('')
+      : `<p style="text-align:center; color:#94a3b8; font-size:12px; margin:4px 0 12px;">Sin cronómetros reales registrados en este turno</p>`;
+
+    const titulo = turno === 'Personalizado' ? 'Horario Personalizado' : `Turno ${turno}`;
     return `
-      <h3 style="font-size:13px; font-weight:700; margin:16px 0 6px;">Turno ${turno}</h3>
-      <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
-        <thead><tr style="background:#0f172a; color:#fff;"><th style="padding:6px;">Empleado</th><th style="padding:6px;">Trabajadas</th><th style="padding:6px;">Ociosas</th><th style="padding:6px;">Extra</th></tr></thead>
-        <tbody>${filasHtml}</tbody>
-      </table>`;
+      <h3 style="font-size:13px; font-weight:700; margin:16px 0 6px;">${titulo}</h3>
+      ${sectoresHtml}`;
   }).join('');
 
   const dateStr = new Date(serverNow()).toLocaleDateString('es-AR', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' });
@@ -17174,7 +17444,7 @@ async function generarPdfInformeHoras() {
       <tr><td style="background:#1e293b; color:#fff; text-align:center; font-weight:700; font-size:18px; padding:10px;">INFORME DE HORAS - ${dateStr}</td></tr>
       <tr><td style="background:#3b82f6; padding:2px;"></td></tr>
     </table>
-    <p style="font-size:11px; color:#64748b; margin:0 0 8px;">Solo tareas con cronómetro real (Parte Taller, Gomería y Recorrido). Las horas cargadas a mano (Elastiquero, Carga Masiva) no entran acá.</p>
+    <p style="font-size:11px; color:#64748b; margin:0 0 8px;">Solo tareas con cronómetro real (Parte Taller, Gomería y Recorrido). Las horas cargadas a mano (Elastiquero, Carga Masiva) no entran acá. "Comida" (1hs) se descuenta de "Ociosas". "Total" = Trabajadas + Extra. Los empleados con horario propio cargado en Ajustes se calculan contra ESE horario y aparecen en "Horario Personalizado".</p>
     ${horasSectionsHtml}
   `;
 
@@ -17189,14 +17459,13 @@ async function generarPdfInformeOrdenes() {
   if (typeof fetchArchivedOrders === 'function') await fetchArchivedOrders();
 
   const turnos = getTurnoBoundariesForToday(serverNow());
-  const conteo = buildInformeTurnosConteo(turnos);
+  const { counts, clasificaciones } = buildInformeTurnosConteo(turnos);
 
+  const columnasHeaderHtml = clasificaciones.map(c => `<th style="padding:6px;">${c}</th>`).join('');
   const conteoRowsHtml = INFORME_TURNOS_KEYS.map(turno => `
     <tr>
       <td style="font-weight:700; padding:6px;">${turno}</td>
-      <td style="text-align:center; padding:6px;">${conteo[turno].Correctivo}</td>
-      <td style="text-align:center; padding:6px;">${conteo[turno].Preventivo}</td>
-      <td style="text-align:center; padding:6px;">${conteo[turno].Auxilio}</td>
+      ${clasificaciones.map(c => `<td style="text-align:center; padding:6px;">${counts[turno][c] || 0}</td>`).join('')}
     </tr>`).join('');
 
   const dateStr = new Date(serverNow()).toLocaleDateString('es-AR', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' });
@@ -17206,10 +17475,11 @@ async function generarPdfInformeOrdenes() {
       <tr><td style="background:#1e293b; color:#fff; text-align:center; font-weight:700; font-size:18px; padding:10px;">INFORME DE ÓRDENES - ${dateStr}</td></tr>
       <tr><td style="background:#3b82f6; padding:2px;"></td></tr>
     </table>
+    ${clasificaciones.length > 0 ? `
     <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
-      <thead><tr style="background:#0f172a; color:#fff;"><th style="padding:6px;">Turno</th><th style="padding:6px;">Correctivo</th><th style="padding:6px;">Preventivo</th><th style="padding:6px;">Auxilio</th></tr></thead>
+      <thead><tr style="background:#0f172a; color:#fff;"><th style="padding:6px;">Turno</th>${columnasHeaderHtml}</tr></thead>
       <tbody>${conteoRowsHtml}</tbody>
-    </table>
+    </table>` : `<p style="text-align:center; color:#94a3b8;">Sin órdenes registradas hoy.</p>`}
   `;
 
   await descargarInformePdf({
