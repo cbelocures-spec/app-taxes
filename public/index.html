@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=56">
+  <link rel="stylesheet" href="style.css?v=57">
   <script>
     (function() {
       try {
@@ -1705,7 +1705,30 @@
 
       <div class="settings-card" style="margin-bottom:16px;">
         <label for="informe-fecha-selector" style="display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px;">Fecha del informe</label>
-        <input type="date" id="informe-fecha-selector" class="form-control">
+        <input type="date" id="informe-fecha-selector" class="form-control" onchange="if(typeof renderTareasAsignadasList==='function') renderTareasAsignadasList()">
+      </div>
+
+      <div class="settings-card" style="margin-bottom:16px;">
+        <h3 style="margin:0 0 4px;">Tareas Asignadas</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">Elegí qué tareas pendientes de Parte Taller le tocan a cada turno, para la fecha elegida arriba.</p>
+        <div id="tareas-asignadas-list"></div>
+        <button class="btn btn-primary btn-block" id="guardar-asignaciones-btn" style="margin-top:12px;" onclick="guardarAsignacionesTareas()">Guardar Asignaciones</button>
+      </div>
+
+      <div class="settings-card" style="margin-bottom:16px; text-align:center;">
+        <h3 style="margin:0 0 4px;">PDF Tareas Asignadas</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 14px;">Hoja para el supervisor del turno: qué le toca hacer, para la fecha elegida arriba.</p>
+        <button class="btn btn-primary btn-block" id="tareas-asignadas-pdf-btn" onclick="generarPdfTareasAsignadas()">
+          <span class="material-icons">picture_as_pdf</span> Descargar PDF
+        </button>
+      </div>
+
+      <div class="settings-card" style="margin-bottom:16px; text-align:center;">
+        <h3 style="margin:0 0 4px;">PDF Cumplimiento de Tareas</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 14px;">Mismas tareas asignadas + quién las hizo, horario y demora, para la fecha elegida arriba.</p>
+        <button class="btn btn-primary btn-block" id="cumplimiento-tareas-pdf-btn" onclick="generarPdfCumplimientoTareas()">
+          <span class="material-icons">picture_as_pdf</span> Descargar PDF
+        </button>
       </div>
 
       <div class="settings-card" style="margin-bottom:16px; text-align:center;">
@@ -1899,7 +1922,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.34</div>
+      <div class="sidebar-version">Versión 1.27.35</div>
     </div>
   </aside>
 
@@ -3169,6 +3192,6 @@
     }
   </style>
 
-  <script src="app.js?v=392"></script>
+  <script src="app.js?v=393"></script>
 </body>
 </html>

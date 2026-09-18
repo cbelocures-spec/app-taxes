@@ -3567,6 +3567,26 @@ body {
   padding-top: 14px;
 }
 
+.ta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+.ta-row:last-child { border-bottom: none; }
+.ta-info { flex: 1; min-width: 0; }
+.ta-interno { font-weight: 700; font-size: 13px; }
+.ta-tarea { font-size: 12px; color: var(--text-muted); }
+.ta-sector {
+  display: inline-block; font-size: 10px; background: #e0f2fe; color: #0369a1;
+  padding: 1px 6px; border-radius: 6px; margin-top: 2px;
+}
+.ta-turno-select {
+  flex-shrink: 0; width: 110px; font-size: 12px; padding: 6px;
+  border-radius: 6px; border: 1px solid #cbd5e1;
+}
+
 .eh-fs-list {
   display: flex;
   flex-direction: column;

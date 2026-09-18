@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '392';
+const CURRENT_APP_VERSION = '393';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -940,6 +940,7 @@ function switchView(viewId) {
           fechaInput.max = hoyStr;
           if (!fechaInput.value) fechaInput.value = hoyStr;
         }
+        if (typeof renderTareasAsignadasList === 'function') renderTareasAsignadasList();
       } catch(e) {}
     }
 
@@ -17449,6 +17450,249 @@ function formatDateStrEs(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString('es-AR', {
     day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires'
+  });
+}
+
+// "Tareas Asignadas" (modulo Informes): dejar marcado que tarea pendiente de Parte Taller le
+// toca a que turno, y despues chequear cumplimiento (quien la hizo, cuando, cuanto demoro).
+// Elastiquero/Gomeria/Recorrido quedan afuera a proposito - el usuario pidio que sea solo de
+// los camiones/items que ya estan en Parte Taller (Taller/Herrería/Edilicio/Lavadero).
+function esOrdenDeParteTaller(order) {
+  return order.clasificacion !== 'Elastiquero' && order.clasificacion !== 'Gomería';
+}
+
+function getPendingTasksForAsignacion() {
+  if (!Array.isArray(activeOrders)) return [];
+  const rows = [];
+  activeOrders.forEach(order => {
+    if (order.status === 'Archivada' || order.status === 'Eliminada') return;
+    if (!esOrdenDeParteTaller(order)) return;
+    (order.tasks || []).forEach(task => {
+      if (task.status === 'Finalizada') return;
+      rows.push({
+        orderId: order.id,
+        taskId: task.id,
+        interno: order.interno || '(sin interno)',
+        descripcion: task.descripcion || '(sin descripción)',
+        sector: getOrderSectorLabel(order),
+        turnoAsignado: task.turnoAsignado || '',
+        fechaAsignada: task.fechaAsignada || ''
+      });
+    });
+  });
+  return rows;
+}
+
+function renderTareasAsignadasList() {
+  const container = document.getElementById('tareas-asignadas-list');
+  if (!container) return;
+  const fechaSel = getInformeFechaSeleccionada();
+  const rows = getPendingTasksForAsignacion();
+
+  if (rows.length === 0) {
+    container.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:12px; margin:8px 0;">No hay tareas pendientes cargadas en Parte Taller.</p>';
+    return;
+  }
+
+  container.innerHTML = rows.map(r => {
+    const valorActual = (r.fechaAsignada === fechaSel) ? r.turnoAsignado : '';
+    const opciones = ['', 'Mañana', 'Tarde', 'Noche'].map(t =>
+      `<option value="${t}" ${valorActual === t ? 'selected' : ''}>${t || 'Sin asignar'}</option>`
+    ).join('');
+    return `
+      <div class="ta-row" data-order-id="${r.orderId}" data-task-id="${r.taskId}" data-original="${valorActual}">
+        <div class="ta-info">
+          <div class="ta-interno">Interno ${r.interno}</div>
+          <div class="ta-tarea">${r.descripcion}</div>
+          <span class="ta-sector">${r.sector}</span>
+        </div>
+        <select class="ta-turno-select">${opciones}</select>
+      </div>`;
+  }).join('');
+}
+
+async function guardarAsignacionesTareas() {
+  const container = document.getElementById('tareas-asignadas-list');
+  const btn = document.getElementById('guardar-asignaciones-btn');
+  if (!container) return;
+  const fechaSel = getInformeFechaSeleccionada();
+  const filas = Array.from(container.querySelectorAll('.ta-row'));
+  const cambiadas = filas.filter(f => f.querySelector('.ta-turno-select').value !== f.dataset.original);
+
+  if (cambiadas.length === 0) {
+    showToast('No hay cambios para guardar', 'info');
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Guardando...'; }
+  try {
+    for (const fila of cambiadas) {
+      const turnoAsignado = fila.querySelector('.ta-turno-select').value || null;
+      const res = await fetch(`/api/orders/${fila.dataset.orderId}/tasks/${fila.dataset.taskId}/asignacion`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ turnoAsignado, fechaAsignada: turnoAsignado ? fechaSel : null })
+      });
+      if (!res.ok) throw new Error('Error al guardar una asignación');
+    }
+    showToast('Asignaciones guardadas', 'success');
+    if (typeof fetchOrders === 'function') await fetchOrders();
+    renderTareasAsignadasList();
+  } catch (e) {
+    console.error('Error guardando asignaciones:', e);
+    showToast('Error al guardar: ' + e.message, 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar Asignaciones'; }
+  }
+}
+
+// Detalle de horario real (para el PDF de Cumplimiento): primer evento del cronómetro = hora de
+// inicio, último evento = hora de fin (solo si la tarea ya está Finalizada), y la demora es el
+// tiempo de reloj entre ambos (incluye pausas - "cuánto tardó" de punta a punta, no solo el
+// tiempo activo). Tareas sin cronómetro real (horas a mano) muestran la estimación cargada.
+function calcularDetalleTareaAsignada(task) {
+  const hist = Array.isArray(task.timerHistory)
+    ? [...task.timerHistory].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+    : [];
+
+  if (hist.length === 0) {
+    return {
+      horaInicio: '-',
+      horaFin: '-',
+      demora: task.horasEstimadas ? `${task.horasEstimadas}h (estimado)` : '-'
+    };
+  }
+
+  const fmtHora = ts => new Date(ts).toLocaleTimeString('es-AR', {
+    hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires'
+  });
+  const primero = hist[0];
+  const ultimo = hist[hist.length - 1];
+  const terminada = task.status === 'Finalizada';
+  const demoraHs = Math.max(0, (ultimo.timestamp - primero.timestamp)) / 3600000;
+
+  return {
+    horaInicio: fmtHora(primero.timestamp),
+    horaFin: terminada ? fmtHora(ultimo.timestamp) : '-',
+    demora: terminada ? fmtHsInforme(demoraHs) : 'en curso'
+  };
+}
+
+// Cumplimiento mira tanto activas como archivadas - para la fecha del informe, lo más probable
+// es que la tarea ya se haya archivado antes de que alguien chequee si se cumplió o no.
+function getTareasAsignadasParaFecha(fechaSel) {
+  const todasOrders = [
+    ...(Array.isArray(activeOrders) ? activeOrders : []),
+    ...(Array.isArray(archivedOrders) ? archivedOrders : [])
+  ];
+  const rows = [];
+  const vistos = new Set();
+
+  todasOrders.forEach(order => {
+    if (!esOrdenDeParteTaller(order)) return;
+    (order.tasks || []).forEach(task => {
+      if (!task.turnoAsignado || task.fechaAsignada !== fechaSel) return;
+      const key = order.id + '_' + task.id;
+      if (vistos.has(key)) return;
+      vistos.add(key);
+
+      const empOpt = task.empleado ? cachedCatalogs.empleados.find(e => e.value === task.empleado) : null;
+      rows.push({
+        interno: order.interno || '(sin interno)',
+        descripcion: task.descripcion || '(sin descripción)',
+        sector: getOrderSectorLabel(order),
+        turnoAsignado: task.turnoAsignado,
+        estado: task.status === 'Finalizada' ? 'Finalizada' : 'Pendiente',
+        empleado: task.empleado ? (empOpt ? empOpt.label : task.empleado) : '-',
+        ...calcularDetalleTareaAsignada(task)
+      });
+    });
+  });
+  return rows;
+}
+
+async function generarPdfTareasAsignadas() {
+  if (typeof fetchArchivedOrders === 'function') await fetchArchivedOrders();
+  const fechaSel = getInformeFechaSeleccionada();
+  const rows = getTareasAsignadasParaFecha(fechaSel);
+
+  const seccionesHtml = ['Mañana', 'Tarde', 'Noche'].map(turno => {
+    const items = rows.filter(r => r.turnoAsignado === turno);
+    if (items.length === 0) return '';
+    const filasHtml = items.map(r => `
+      <tr>
+        <td style="padding:6px; font-weight:700;">Interno ${r.interno}</td>
+        <td style="padding:6px;">${r.descripcion}</td>
+        <td style="padding:6px; text-align:center;">${r.sector}</td>
+      </tr>`).join('');
+    return `
+      <h3 style="font-size:13px; font-weight:700; margin:16px 0 6px;">Turno ${turno}</h3>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+        <thead><tr style="background:#0f172a; color:#fff;"><th style="padding:6px;">Interno</th><th style="padding:6px;">Tarea</th><th style="padding:6px;">Sector</th></tr></thead>
+        <tbody>${filasHtml}</tbody>
+      </table>`;
+  }).join('');
+
+  const dateStr = formatDateStrEs(fechaSel);
+  const reportHtml = `
+    <table style="width:100%; border-collapse:collapse; margin-bottom:14px;">
+      <tr><td style="background:#1e293b; color:#fff; text-align:center; font-weight:700; font-size:18px; padding:10px;">TAREAS ASIGNADAS - ${dateStr}</td></tr>
+      <tr><td style="background:#3b82f6; padding:2px;"></td></tr>
+    </table>
+    ${seccionesHtml || '<p style="text-align:center; color:#94a3b8;">Sin tareas asignadas para esta fecha.</p>'}
+  `;
+
+  await descargarInformePdf({
+    btn: document.getElementById('tareas-asignadas-pdf-btn'),
+    reportHtml,
+    filename: `Tareas_Asignadas_${fechaSel}.pdf`
+  });
+}
+
+async function generarPdfCumplimientoTareas() {
+  if (typeof fetchArchivedOrders === 'function') await fetchArchivedOrders();
+  const fechaSel = getInformeFechaSeleccionada();
+  const rows = getTareasAsignadasParaFecha(fechaSel);
+
+  const seccionesHtml = ['Mañana', 'Tarde', 'Noche'].map(turno => {
+    const items = rows.filter(r => r.turnoAsignado === turno);
+    if (items.length === 0) return '';
+    const filasHtml = items.map(r => `
+      <tr>
+        <td style="padding:6px; font-weight:700;">Interno ${r.interno}</td>
+        <td style="padding:6px;">${r.descripcion}</td>
+        <td style="padding:6px; text-align:center;">${r.sector}</td>
+        <td style="padding:6px; text-align:center; ${r.estado === 'Finalizada' ? 'color:#166534; font-weight:700;' : 'color:#92400e; font-weight:700;'}">${r.estado}</td>
+        <td style="padding:6px; text-align:center;">${r.empleado}</td>
+        <td style="padding:6px; text-align:center;">${r.horaInicio}</td>
+        <td style="padding:6px; text-align:center;">${r.horaFin}</td>
+        <td style="padding:6px; text-align:center;">${r.demora}</td>
+      </tr>`).join('');
+    return `
+      <h3 style="font-size:13px; font-weight:700; margin:16px 0 6px;">Turno ${turno}</h3>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+        <thead><tr style="background:#0f172a; color:#fff;">
+          <th style="padding:6px;">Interno</th><th style="padding:6px;">Tarea</th><th style="padding:6px;">Sector</th>
+          <th style="padding:6px;">Estado</th><th style="padding:6px;">Empleado</th>
+          <th style="padding:6px;">Inicio</th><th style="padding:6px;">Fin</th><th style="padding:6px;">Demora</th>
+        </tr></thead>
+        <tbody>${filasHtml}</tbody>
+      </table>`;
+  }).join('');
+
+  const dateStr = formatDateStrEs(fechaSel);
+  const reportHtml = `
+    <table style="width:100%; border-collapse:collapse; margin-bottom:14px;">
+      <tr><td style="background:#1e293b; color:#fff; text-align:center; font-weight:700; font-size:18px; padding:10px;">CUMPLIMIENTO DE TAREAS - ${dateStr}</td></tr>
+      <tr><td style="background:#3b82f6; padding:2px;"></td></tr>
+    </table>
+    ${seccionesHtml || '<p style="text-align:center; color:#94a3b8;">Sin tareas asignadas para esta fecha.</p>'}
+  `;
+
+  await descargarInformePdf({
+    btn: document.getElementById('cumplimiento-tareas-pdf-btn'),
+    reportHtml,
+    filename: `Cumplimiento_Tareas_${fechaSel}.pdf`
   });
 }
 

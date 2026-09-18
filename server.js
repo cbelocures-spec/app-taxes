@@ -73,7 +73,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '392';
+const APP_VERSION = '393';
 
 // Middleware
 app.use(cors());
@@ -1825,6 +1825,36 @@ app.patch('/api/orders/:id/sector', (req, res) => {
     res.json({ success: true, order: updated });
   } catch (err) {
     console.error('[PATCH order sector] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Asigna una tarea pendiente de Parte Taller a un turno/fecha para el modulo "Tareas
+// Asignadas" de Informes. Campo interno solamente (Taxes nunca lo ve) - a diferencia del PATCH
+// generico de arriba, deliberadamente NO toca synced/syncStatus asi que nunca dispara un resync.
+app.patch('/api/orders/:id/tasks/:taskId/asignacion', (req, res) => {
+  try {
+    const order = db.getWorkOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const taskIdx = (order.tasks || []).findIndex(t => t.id === req.params.taskId);
+    if (taskIdx === -1) return res.status(404).json({ error: 'Task not found' });
+
+    const VALID_TURNOS = ['Mañana', 'Tarde', 'Noche'];
+    const { turnoAsignado, fechaAsignada } = req.body;
+    if (turnoAsignado !== null && !VALID_TURNOS.includes(turnoAsignado)) {
+      return res.status(400).json({ error: `turnoAsignado debe ser uno de: ${VALID_TURNOS.join(', ')}, o null` });
+    }
+
+    const updatedTasks = [...order.tasks];
+    updatedTasks[taskIdx] = {
+      ...updatedTasks[taskIdx],
+      turnoAsignado,
+      fechaAsignada: turnoAsignado ? (fechaAsignada || null) : null
+    };
+    db.updateWorkOrder(req.params.id, { tasks: updatedTasks });
+    res.json({ success: true, task: updatedTasks[taskIdx] });
+  } catch (err) {
+    console.error('[PATCH task asignacion] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
