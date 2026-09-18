@@ -1703,9 +1703,14 @@
         <h2>Informes</h2>
       </div>
 
+      <div class="settings-card" style="margin-bottom:16px;">
+        <label for="informe-fecha-selector" style="display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px;">Fecha del informe</label>
+        <input type="date" id="informe-fecha-selector" class="form-control">
+      </div>
+
       <div class="settings-card" style="margin-bottom:16px; text-align:center;">
         <h3 style="margin:0 0 4px;">Informe de Horas</h3>
-        <p style="font-size:12px; color:var(--text-muted); margin:0 0 14px;">Horas trabajadas, ociosas y extra por empleado y turno (Mañana/Tarde/Noche) - hoy.</p>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 14px;">Horas trabajadas, ociosas y extra por empleado y turno (Mañana/Tarde/Noche) - para la fecha elegida arriba.</p>
         <button class="btn btn-primary btn-block" id="informe-horas-pdf-btn" onclick="generarPdfInformeHoras()">
           <span class="material-icons">picture_as_pdf</span> Descargar PDF
         </button>
@@ -1713,7 +1718,7 @@
 
       <div class="settings-card" style="text-align:center;">
         <h3 style="margin:0 0 4px;">Informe de Órdenes</h3>
-        <p style="font-size:12px; color:var(--text-muted); margin:0 0 14px;">Correctivo/Preventivo/Auxilio por turno (Mañana/Tarde/Noche) - hoy.</p>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 14px;">Correctivo/Preventivo/Auxilio por turno (Mañana/Tarde/Noche) - para la fecha elegida arriba.</p>
         <button class="btn btn-primary btn-block" id="informe-ordenes-pdf-btn" onclick="generarPdfInformeOrdenes()">
           <span class="material-icons">picture_as_pdf</span> Descargar PDF
         </button>
@@ -1894,7 +1899,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.33</div>
+      <div class="sidebar-version">Versión 1.27.34</div>
     </div>
   </aside>
 
@@ -3164,6 +3169,6 @@
     }
   </style>
 
-  <script src="app.js?v=391"></script>
+  <script src="app.js?v=392"></script>
 </body>
 </html>

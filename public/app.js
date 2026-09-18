@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '391';
+const CURRENT_APP_VERSION = '392';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -928,6 +928,19 @@ function switchView(viewId) {
       if (typeof loadUserPermissionsUI === 'function') {
         try { loadUserPermissionsUI(); } catch(e) {}
       }
+    }
+
+    if (viewId === 'informes') {
+      try {
+        const fechaInput = document.getElementById('informe-fecha-selector');
+        if (fechaInput) {
+          const hoyStr = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit'
+          }).format(new Date(serverNow()));
+          fechaInput.max = hoyStr;
+          if (!fechaInput.value) fechaInput.value = hoyStr;
+        }
+      } catch(e) {}
     }
 
     if (viewId === 'bulk') {
@@ -17113,12 +17126,9 @@ const INFORME_TURNOS_KEYS = ['Mañana', 'Tarde', 'Noche'];
 // horario personalizado propio - ver EMP_SCHEDULE_DIAS más abajo para eso):
 // - Sábado: Mañana y Tarde duran 4hs (no 8) - Noche del sábado sigue siendo de 8hs.
 // - Viernes: el turno Noche dura 4hs (22:00 a 02:00), no las 8hs hasta las 06:00.
-function getTurnoBoundariesForToday(nowMs) {
+function getTurnoBoundariesForDate(dateStr) {
   const ART_OFFSET_HOURS = 3; // ART = UTC-3 → sumarle 3 a la hora de Argentina da la hora UTC
-  const todayStr = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit'
-  }).format(new Date(nowMs));
-  const [y, m, d] = todayStr.split('-').map(Number);
+  const [y, m, d] = dateStr.split('-').map(Number);
   const mk = (dayOffset, hour, minute) => Date.UTC(y, m - 1, d + dayOffset, hour + ART_OFFSET_HOURS, minute || 0, 0);
 
   const diaSemanaEn = new Intl.DateTimeFormat('en-US', {
@@ -17128,12 +17138,19 @@ function getTurnoBoundariesForToday(nowMs) {
   const esViernes = diaSemanaEn === 'friday';
 
   return {
-    dateStr: todayStr,
+    dateStr,
     diaSemana: diaSemanaEn,
     'Mañana': { start: mk(0, 6), end: esSabado ? mk(0, 10) : mk(0, 14) },
     'Tarde': { start: mk(0, 14), end: esSabado ? mk(0, 18) : mk(0, 22) },
     'Noche': { start: mk(0, 22), end: esViernes ? mk(1, 2) : mk(1, 6) }
   };
+}
+
+function getTurnoBoundariesForToday(nowMs) {
+  const todayStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date(nowMs));
+  return getTurnoBoundariesForDate(todayStr);
 }
 
 // Horario semanal por empleado, cargado en Ajustes (ver renderEmployeeScheduleUI/
@@ -17426,10 +17443,27 @@ async function descargarInformePdf({ btn, reportHtml, filename }) {
   }
 }
 
+// dateStr en formato YYYY-MM-DD (como lo entrega <input type="date">). Se muestra en el título
+// del PDF vía formatDateStrEs, parseando ese mismo string para no depender de "hoy"/serverNow().
+function formatDateStrEs(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString('es-AR', {
+    day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires'
+  });
+}
+
+function getInformeFechaSeleccionada() {
+  const input = document.getElementById('informe-fecha-selector');
+  if (input && input.value) return input.value;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date(serverNow()));
+}
+
 async function generarPdfInformeHoras() {
   if (typeof fetchArchivedOrders === 'function') await fetchArchivedOrders();
 
-  const turnos = getTurnoBoundariesForToday(serverNow());
+  const turnos = getTurnoBoundariesForDate(getInformeFechaSeleccionada());
   const horas = buildInformeTurnosHoras(turnos);
 
   const SECTOR_ORDEN = ['Taller', 'Herrería', 'Edilicio', 'Lavadero'];
@@ -17464,7 +17498,7 @@ async function generarPdfInformeHoras() {
       ${sectoresHtml}`;
   }).join('');
 
-  const dateStr = new Date(serverNow()).toLocaleDateString('es-AR', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' });
+  const dateStr = formatDateStrEs(turnos.dateStr);
 
   const reportHtml = `
     <table style="width:100%; border-collapse:collapse; margin-bottom:14px;">
@@ -17485,7 +17519,7 @@ async function generarPdfInformeHoras() {
 async function generarPdfInformeOrdenes() {
   if (typeof fetchArchivedOrders === 'function') await fetchArchivedOrders();
 
-  const turnos = getTurnoBoundariesForToday(serverNow());
+  const turnos = getTurnoBoundariesForDate(getInformeFechaSeleccionada());
   const { counts, clasificaciones } = buildInformeTurnosConteo(turnos);
 
   const columnasHeaderHtml = clasificaciones.map(c => `<th style="padding:6px;">${c}</th>`).join('');
@@ -17495,7 +17529,7 @@ async function generarPdfInformeOrdenes() {
       ${clasificaciones.map(c => `<td style="text-align:center; padding:6px;">${counts[turno][c] || 0}</td>`).join('')}
     </tr>`).join('');
 
-  const dateStr = new Date(serverNow()).toLocaleDateString('es-AR', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' });
+  const dateStr = formatDateStrEs(turnos.dateStr);
 
   const reportHtml = `
     <table style="width:100%; border-collapse:collapse; margin-bottom:14px;">
@@ -17506,7 +17540,7 @@ async function generarPdfInformeOrdenes() {
     <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
       <thead><tr style="background:#0f172a; color:#fff;"><th style="padding:6px;">Turno</th>${columnasHeaderHtml}</tr></thead>
       <tbody>${conteoRowsHtml}</tbody>
-    </table>` : `<p style="text-align:center; color:#94a3b8;">Sin órdenes registradas hoy.</p>`}
+    </table>` : `<p style="text-align:center; color:#94a3b8;">Sin órdenes registradas en esta fecha.</p>`}
   `;
 
   await descargarInformePdf({
