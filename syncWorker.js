@@ -2669,48 +2669,73 @@ async function syncWorkOrder(orderId) {
         throw new Error("No se pudo crear la tarjeta de tarea real en Taxes (el botón AGREGAR TAREA no generó ninguna tarjeta en el DOM).");
       }
 
-      // Match cards <-> tasks by employee+description (strict pass, then loose pass).
+      // Longest common substring length — used below to SCORE how similar two descriptions
+      // are, instead of just a boolean includes() check.
+      const lcsLength = (a, b) => {
+        if (!a || !b) return 0;
+        const n = a.length, m = b.length;
+        let prev = new Array(m + 1).fill(0);
+        let max = 0;
+        for (let i = 1; i <= n; i++) {
+          const curr = new Array(m + 1).fill(0);
+          for (let j = 1; j <= m; j++) {
+            if (a[i - 1] === b[j - 1]) {
+              curr[j] = prev[j - 1] + 1;
+              if (curr[j] > max) max = curr[j];
+            }
+          }
+          prev = curr;
+        }
+        return max;
+      };
+
+      // Match cards <-> tasks by employee+description similarity.
       // Returns { cardMatch, taskMatch } where cardMatch[ci] = matched task index (or -1) and
       // taskMatch[ai] = matched card index (or -1). Re-run whenever the DOM card order may not
       // correspond to order.tasks index order (e.g. after Taxes renders cards in a different
       // order than they were created, or after we've deleted/added cards).
+      //
+      // IMPORTANT: this scores EVERY (task, card) pair and assigns globally best-first, instead
+      // of walking tasks in order.tasks order and grabbing the first card that merely satisfies
+      // a substring check. That older approach broke down whenever the same employee appears on
+      // several tasks of the same order (very common — one mechanic doing 3-4 jobs): the first
+      // task in the array would grab whichever matching card came first, even if it actually
+      // belonged to a later task, leaving that later task falsely "unmatched". The reconcile
+      // logic then deleted that task's real card as a "duplicate" and recreated it at the END
+      // of the list — which is exactly what shuffled the task order/numbering in Taxes.
       const matchCardsToTasks = (cards, tasks) => {
         const cardMatch = new Array(cards.length).fill(-1);
         const taskMatch = new Array(tasks.length).fill(-1);
 
-        // Strict pass: both employee and description agree
+        const candidates = [];
         for (let ai = 0; ai < tasks.length; ai++) {
           const appTask = tasks[ai];
           const { employeeLabel } = resolveAndMapEmployee(appTask);
+          const empClean = cleanStr(employeeLabel);
+          const descClean = cleanStr(appTask.descripcion);
           for (let ci = 0; ci < cards.length; ci++) {
-            if (cardMatch[ci] !== -1) continue;
             const card = cards[ci];
-            const empOk = cleanStr(card.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(card.employee));
-            const descOk = cleanStr(card.description).includes(cleanStr(appTask.descripcion)) || cleanStr(appTask.descripcion).includes(cleanStr(card.description));
-            if (empOk && descOk) {
-              cardMatch[ci] = ai;
-              taskMatch[ai] = ci;
-              break;
-            }
+            const cardEmpClean = cleanStr(card.employee);
+            const cardDescClean = cleanStr(card.description);
+            const empOk = !!empClean && !!cardEmpClean && (cardEmpClean.includes(empClean) || empClean.includes(cardEmpClean));
+            const descOverlap = (descClean && cardDescClean)
+              ? lcsLength(descClean, cardDescClean) / Math.max(descClean.length, cardDescClean.length)
+              : 0;
+            const descOk = descOverlap > 0.5;
+            if (!empOk && !descOk) continue;
+            // Employee agreement weighs far more than description overlap, but among several
+            // candidates that share the same employee, the one with the most similar
+            // description wins the card instead of whichever was checked first.
+            const score = (empOk ? 1000 : 0) + descOverlap * 100;
+            candidates.push({ ai, ci, score });
           }
         }
 
-        // Loose pass: either employee or description agree
-        for (let ai = 0; ai < tasks.length; ai++) {
-          if (taskMatch[ai] !== -1) continue;
-          const appTask = tasks[ai];
-          const { employeeLabel } = resolveAndMapEmployee(appTask);
-          for (let ci = 0; ci < cards.length; ci++) {
-            if (cardMatch[ci] !== -1) continue;
-            const card = cards[ci];
-            const empOk = cleanStr(card.employee).includes(cleanStr(employeeLabel)) || cleanStr(employeeLabel).includes(cleanStr(card.employee));
-            const descOk = cleanStr(card.description).includes(cleanStr(appTask.descripcion)) || cleanStr(appTask.descripcion).includes(cleanStr(card.description));
-            if (empOk || descOk) {
-              cardMatch[ci] = ai;
-              taskMatch[ai] = ci;
-              break;
-            }
-          }
+        candidates.sort((a, b) => b.score - a.score);
+        for (const { ai, ci } of candidates) {
+          if (taskMatch[ai] !== -1 || cardMatch[ci] !== -1) continue;
+          cardMatch[ci] = ai;
+          taskMatch[ai] = ci;
         }
 
         return { cardMatch, taskMatch };
