@@ -1734,6 +1734,21 @@ function resolveAndMapEmployee(task) {
   ];
 
   let finalDescription = (task.descripcion || '').trim();
+
+  // Prepend the task's own "Fecha Tarea" to the text that actually lands in Taxes - Taxes has
+  // no per-task date field (only one date for the whole O.T.), and an order can span several
+  // days as tasks get added to it over time, so without this there's no way to tell from Taxes
+  // alone which day a given task happened. Only touches the text sent to Taxes; the app's own
+  // Descripción field/textarea is untouched.
+  if (task.date) {
+    const dateStr = String(task.date).split('T')[0];
+    const dateParts = dateStr.split('-');
+    if (dateParts.length === 3) {
+      const [yyyy, mm, dd] = dateParts;
+      finalDescription = `[ ${dd}/${mm}/${yyyy} ]${finalDescription}`;
+    }
+  }
+
   const cleanDescLower = finalDescription.toLowerCase();
 
   const matchedEntry = allMappings.find(entry =>
@@ -2710,9 +2725,12 @@ async function syncWorkOrder(orderId) {
         const candidates = [];
         for (let ai = 0; ai < tasks.length; ai++) {
           const appTask = tasks[ai];
-          const { employeeLabel } = resolveAndMapEmployee(appTask);
+          // Compare against finalDescription (what actually got typed into Taxes, date prefix
+          // included), not the raw appTask.descripcion - otherwise every already-synced card
+          // would look "unmatched" against its own task from here on.
+          const { employeeLabel, finalDescription: appFinalDescription } = resolveAndMapEmployee(appTask);
           const empClean = cleanStr(employeeLabel);
-          const descClean = cleanStr(appTask.descripcion);
+          const descClean = cleanStr(appFinalDescription);
           for (let ci = 0; ci < cards.length; ci++) {
             const card = cards[ci];
             const cardEmpClean = cleanStr(card.employee);
