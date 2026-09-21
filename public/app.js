@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '393';
+const CURRENT_APP_VERSION = '394';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -4997,7 +4997,13 @@ async function submitWorkOrder() {
       clasificacion: clasificacionEl.value,
       fechaEntrega: fechaEl ? fechaEl.value : '',
       horario: horaEl ? horaEl.value : '',
-      incidente: incidenteEl ? incidenteEl.value : '',
+      // Servicio Tercerizado: el campo "Incidente o Requisito" no es editable desde este modal
+      // (el <textarea> #form-incidente queda oculto), así que para esta clasificación se arma
+      // solo con el mismo formato que ya usa la creación automática desde Preventivos
+      // (savePrevService, más abajo en este archivo) en vez de mandar el campo vacío a Taxes.
+      incidente: (clasificacionEl.value === 'Servicio Tercerizado')
+        ? `Servicio de la unidad a las ${horaEl && horaEl.value ? horaEl.value : ''} hs`
+        : (incidenteEl ? incidenteEl.value : ''),
       tasks: tasks,
       deletedTaskIds: Array.from(deletedTaskIdsInModal),
       estadoUnidad: editingOrder ? (editingOrder.estadoUnidad || 'fuera_de_servicio') : 'fuera_de_servicio',
