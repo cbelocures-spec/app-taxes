@@ -3935,39 +3935,6 @@ app.get('/api/preventivos/alertas', async (req, res) => {
   }
 });
 
-app.post('/api/preventivos/service', async (req, res) => {
-  const settings = db.getSettings();
-  const scriptUrl = settings.preventivoScriptUrl;
-  const { rowIndex, km, hs, interno, vehicleType } = req.body;
-
-  if (interno) {
-    db.setServiceOverride(interno, km, hs);
-  }
-
-  if (!scriptUrl) {
-    return res.json({ ok: true, message: "Service actualizado localmente." });
-  }
-
-  try {
-    const params = new URLSearchParams({
-      accion: 'updateService',
-      rowIndex,
-      km: km || 0,
-      hs: hs || 0,
-      interno: interno || '',
-      vehicleType: vehicleType || ''
-    });
-    const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${params.toString()}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Google Apps Script error: ${response.status}`);
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    console.error("Error updating preventivos service:", error);
-    res.json({ ok: true, message: "Service actualizado localmente." });
-  }
-});
-
 app.get('/api/preventivos/historial', async (req, res) => {
   const settings = db.getSettings();
   const scriptUrl = settings.preventivoScriptUrl;
