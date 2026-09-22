@@ -3822,6 +3822,22 @@ app.post('/api/preventivos/odometer-override', (req, res) => {
   }
 });
 
+// Corrige/repone SOLO el cache local de "ultimo service" (ultServiceKm/Hs/Fecha) sin volver a
+// tocar la planilla de Google - util cuando el service en si ya quedo bien en Sheets (hs/restante
+// correctos) pero el override local se perdio despues por otra via (ej. el bug de
+// setOdometerOverride pisando el objeto entero en una Actualizacion de Odometro posterior).
+// Acepta `fecha` opcional para poder backdatear a la fecha real en que se hizo el service.
+app.post('/api/preventivos/service-override', (req, res) => {
+  try {
+    const { interno, km, hs, fecha } = req.body;
+    if (!interno) return res.status(400).json({ error: "interno requerido" });
+    const result = db.setServiceOverride(interno, km, hs, fecha);
+    res.json({ success: true, override: result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Clear a manual override (once Google Sheets data is fresh again)
 app.delete('/api/preventivos/odometer-override/:interno', (req, res) => {
   try {

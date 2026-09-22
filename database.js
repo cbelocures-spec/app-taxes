@@ -1211,17 +1211,27 @@ class LocalDB {
     const db = this.read();
     if (!db.odometerOverrides) db.odometerOverrides = {};
     const key = String(interno).trim();
+    // Merge into whatever is already there instead of replacing the whole object - a plain
+    // odometer refresh ("Actualizar") has no business wiping out ultServiceKm/Hs/Fecha that a
+    // previous REAL service ("Hacer Service") set on this same key. Replacing the object
+    // outright silently erased the last-service date every time someone updated the odometer
+    // afterward (reported as "el service ya está resuelto pero le falta la fecha").
+    const existing = db.odometerOverrides[key] || {};
     db.odometerOverrides[key] = {
+      ...existing,
       interno: key,
-      km: km !== undefined && km !== '' ? Number(String(km).replace(',', '.')) : undefined,
-      hs: hs !== undefined && hs !== '' ? Number(String(hs).replace(',', '.')) : undefined,
+      km: km !== undefined && km !== '' ? Number(String(km).replace(',', '.')) : existing.km,
+      hs: hs !== undefined && hs !== '' ? Number(String(hs).replace(',', '.')) : existing.hs,
       updatedAt: new Date().toISOString()
     };
     this.write(db);
     return db.odometerOverrides[key];
   }
 
-  setServiceOverride(interno, km, hs) {
+  // `fecha` is optional (ISO string or anything `new Date()` parses) - lets a correction be
+  // backdated to when the service actually happened (e.g. recovering a date lost to the
+  // setOdometerOverride bug above) instead of always stamping "now".
+  setServiceOverride(interno, km, hs, fecha) {
     const db = this.read();
     if (!db.odometerOverrides) db.odometerOverrides = {};
     const key = String(interno).trim();
@@ -1234,7 +1244,8 @@ class LocalDB {
     // Campo aparte de updatedAt (que tambien pisa una simple lectura de odometro con
     // "Actualizar") para que la fecha mostrada en la tabla sea la del ultimo SERVICE real,
     // no la de cualquier actualizacion de km/hs posterior.
-    db.odometerOverrides[key].ultServiceFecha = new Date().toISOString();
+    const parsedFecha = fecha ? new Date(fecha) : new Date();
+    db.odometerOverrides[key].ultServiceFecha = (!isNaN(parsedFecha.getTime()) ? parsedFecha : new Date()).toISOString();
     db.odometerOverrides[key].updatedAt = new Date().toISOString();
     this.write(db);
     return db.odometerOverrides[key];
