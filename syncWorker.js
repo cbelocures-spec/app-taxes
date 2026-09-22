@@ -2515,6 +2515,25 @@ async function syncWorkOrder(orderId) {
 
       // 3. Wait 1.5 seconds for OT edit form animation & scroll directly to task section
       await delay(1500);
+
+      // Servicio Tercerizado: reponer el Incidente/Requisito tambien aca (edicion de una O.T.
+      // ya existente vía Lápiz), no solo en la creación de cabecera (FASE 1, más arriba) - una
+      // orden creada antes de este fix, o que nunca paso por FASE 1 con el texto ya armado,
+      // se re-sincroniza siempre por este camino y jamás volvía a tocar ese campo.
+      if (String(order.clasificacion || '').trim() === 'Servicio Tercerizado') {
+        const incidenteReconcile = `Servicio de la unidad a las ${order.horario || ''} hs`;
+        await safeEvaluate(page, (incidenteVal) => {
+          const descTextarea = document.querySelector('textarea[name="descripcion"]');
+          if (descTextarea) {
+            const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+            nativeSetter.call(descTextarea, incidenteVal);
+            descTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+            descTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }, incidenteReconcile);
+        await delay(300);
+      }
+
       await safeEvaluate(page, () => {
         const btns = Array.from(document.querySelectorAll('button, a.btn, a, input[type="button"]'));
         const addBtn = btns.find(b => {
@@ -3696,7 +3715,15 @@ async function syncWorkOrder(orderId) {
     const internoForTaxes = order.lavadoParticularPersona
       ? `Lavado A.P.: ${order.lavadoParticularPersona}`
       : (areaPrefix ? `${areaPrefix} - ${order.interno}` : order.interno);
-    const incidenteForTaxes = areaPrefix ? `[${areaPrefix}] ${order.incidente || ''}`.trim() : (order.incidente || '');
+    // Servicio Tercerizado: generar el texto aca (en vez de confiar en order.incidente ya
+    // guardado) para que las ordenes viejas -creadas antes de este fix, o que nunca se
+    // reabrieron en el modal de la app, que es el unico lugar que hoy arma este texto- tambien
+    // queden autocompletadas al sincronizar, en vez de mandar el campo vacio a Taxes.
+    const isServicioTercerizado = String(order.clasificacion || '').trim() === 'Servicio Tercerizado';
+    const incidenteBase = isServicioTercerizado
+      ? `Servicio de la unidad a las ${order.horario || ''} hs`
+      : (order.incidente || '');
+    const incidenteForTaxes = areaPrefix ? `[${areaPrefix}] ${incidenteBase}`.trim() : incidenteBase;
 
     await safeEvaluate(page, (clasificacionVal, internoVal, incidenteVal) => {
       // Classification select (name: inv_ot_clasificacion_id)
