@@ -397,6 +397,28 @@ async function fillInputByLabel(page, labelText, value) {
   return false;
 }
 
+// El modal "Nueva Orden de Trabajo" muestra el <input> de Rodado apenas se abre, pero el
+// catalogo de rodados que alimenta ese buscador se carga aparte (fetch asíncrono de Vue) - a
+// veces el modal ya está "listo" (el input existe) antes de que ese catalogo haya terminado de
+// llegar, y tipear ahí en ese momento siempre termina en "No se encontraron opciones" aunque el
+// rodado exista. El <select> de Clasificación se llena del mismo carga inicial de catálogos, y
+// a diferencia del buscador de Rodado (un widget Vue custom, difícil de inspeccionar) es un
+// <select> nativo simple: contar sus <option> reales (más allá del placeholder) es una señal
+// barata y confiable de que ese catalogo ya llegó, para esperar antes de tipear en Rodado.
+async function waitForClasificacionCatalogLoaded(page, timeoutMs = 8000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const loaded = await safeEvaluate(page, () => {
+      const sel = document.querySelector('select[name="inv_ot_clasificacion_id"]');
+      return !!sel && sel.options.length > 1;
+    }).catch(() => false);
+    if (loaded) return true;
+    await delay(300);
+  }
+  console.warn('[Rodado] El catálogo de Clasificación no terminó de cargar tras la espera - se sigue igual, puede fallar la búsqueda de Rodado.');
+  return false;
+}
+
 // Puppeteer helper to fill custom searchable selects
 async function fillSearchableSelect(page, labelText, searchValue) {
 
@@ -2076,6 +2098,7 @@ async function syncWorkOrder(orderId) {
           await delay(500);
 
           // 2. CARGAR RODADO
+          await waitForClasificacionCatalogLoaded(page);
           console.log(`[Puppeteer] 1. Cargar Rodado: ${order.rodado || order.interno}`);
           let rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado || String(order.interno));
           if (!rodadoFilled && order.interno) {
@@ -3616,6 +3639,7 @@ async function syncWorkOrder(orderId) {
     }
 
     // Fill searchable select fields (Rodado and Responsable)
+    await waitForClasificacionCatalogLoaded(page);
     let rodadoFilled = await fillSearchableSelect(page, 'Rodado', order.rodado);
     if (!rodadoFilled && order.interno) {
       console.warn(`[Rodado] Selection with full name "${order.rodado}" failed. Trying search by Interno "${order.interno}"...`);
