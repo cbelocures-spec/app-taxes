@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '394';
+const CURRENT_APP_VERSION = '395';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -4984,6 +4984,28 @@ async function submitWorkOrder() {
       }
     }
    
+    // Preventivo Combustible (5.000/10.000 Lts): currentCombustibleReset se pone al abrir este
+    // modal desde el botón "Service" de la pestaña Combustible, pero es una variable global en
+    // memoria - si algo interrumpe el llenado (se cierra el modal sin querer, se recarga la
+    // página, etc.) queda en null y el aviso a la planilla para resetear el contador de litros
+    // nunca se dispara (reportado como "se hizo el preventivo y no se reseteó"). Si se perdió,
+    // se reconstruye acá mismo a partir de los datos de Combustible ya cacheados (los mismos
+    // que alimentan esa pestaña), en vez de depender de que ese global haya sobrevivido intacto.
+    let combustibleResetPayload = currentCombustibleReset;
+    const clasifForCombustible = clasificacionEl.value;
+    const isPrevCombustible = clasifForCombustible === 'Preventivo 5.000 Lts' || clasifForCombustible === 'Preventivo 10.000 Lts';
+    if (isPrevCombustible && !combustibleResetPayload) {
+      const tipo = clasifForCombustible === 'Preventivo 5.000 Lts' ? '5k' : '10k';
+      const internoClean = String(finalInternoVal).trim();
+      const row = (prevCombustibleData || []).find(r => String(r.interno).trim() === internoClean);
+      if (row) {
+        combustibleResetPayload = { tipo, rowIndex: row.originalRowIndex, litrosTotales: row.litrosTotales || 0 };
+        console.warn('[CombustibleReset] currentCombustibleReset se había perdido - reconstruido desde prevCombustibleData para interno', internoClean);
+      } else {
+        console.warn('[CombustibleReset] No se pudo reconstruir combustibleReset para interno', internoClean, '- prevCombustibleData no tiene esa fila cacheada.');
+      }
+    }
+
     const payload = {
       rodado: finalRodadoLabel,
       // The select's own value is a numeric catalog id (e.g. "507"), not a name - send the
@@ -5007,7 +5029,7 @@ async function submitWorkOrder() {
       tasks: tasks,
       deletedTaskIds: Array.from(deletedTaskIdsInModal),
       estadoUnidad: editingOrder ? (editingOrder.estadoUnidad || 'fuera_de_servicio') : 'fuera_de_servicio',
-      combustibleReset: currentCombustibleReset,
+      combustibleReset: combustibleResetPayload,
       // Al editar una orden que ya estaba en Historial (archivada), no forzar su regreso a Activas:
       // solo las ediciones desde la vista Activa deben garantizar archived:false.
       archived: editingOrder ? !!editingOrder.archived : false,
