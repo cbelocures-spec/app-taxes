@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '395';
+const CURRENT_APP_VERSION = '396';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -17242,25 +17242,50 @@ function turnoParaMomento(turnos, ms) {
 // Auxilio, Herrería, Puesta a Punto, Edilicio, etc.) - antes solo contaba esas tres primeras y
 // el resto quedaba afuera del informe sin avisar. Usa fechaEntrega+horario de cada orden; no
 // hace falta cronómetro real para esto, así que suma todo (Elastiquero, Masivas, etc.).
+// Columnas fijas del Informe de Órdenes: el catálogo de clasificaciones de Taxes, en ese
+// orden. Antes solo salían las que tuvieran alguna orden ese día, y el informe parecía
+// incompleto (faltaban Lavadero, Gomería, Servicio Tercerizado, etc.).
+const INFORME_CLASIFICACIONES_FIJAS = [
+  'Auxilio', 'Correctivo', 'Preventivo 5.000 Lts', 'Preventivo 10.000 Lts', 'checklist',
+  'Puesta a Punto', 'Servicio Tercerizado', 'Herrería', 'Fabricación', 'Edilicio',
+  'Lavadero', 'Elastiquero', 'Gomería'
+];
+
+// Taxes/la app mezclan mayúsculas y acentos ("Herreria"/"Herrería", "ELASTIQUERO") - se
+// comparan normalizados para que no se abran dos columnas para la misma clasificación.
+function normalizarClasifInforme(c) {
+  return String(c || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 function buildInformeTurnosConteo(turnos) {
   const counts = {};
-  INFORME_TURNOS_KEYS.forEach(k => { counts[k] = {}; });
-  const clasificacionesVistas = new Set();
+  const tareas = {};
+  INFORME_TURNOS_KEYS.forEach(k => { counts[k] = {}; tareas[k] = {}; });
+  const clasificaciones = [...INFORME_CLASIFICACIONES_FIJAS];
+  const porNorm = new Map(clasificaciones.map(c => [normalizarClasifInforme(c), c]));
   const allOrders = [...(activeOrders || []), ...(archivedOrders || [])];
   allOrders.forEach(o => {
     if (o.deleted === true) return;
-    const clasif = String(o.clasificacion || '').trim();
-    if (!clasif) return;
+    const raw = String(o.clasificacion || '').trim();
+    if (!raw) return;
     if (!o.fechaEntrega) return;
     const horario = /^\d{2}:\d{2}$/.test(o.horario || '') ? o.horario : '00:00';
     const momentMs = new Date(`${o.fechaEntrega}T${horario}:00-03:00`).getTime();
     if (isNaN(momentMs)) return;
     const turno = turnoParaMomento(turnos, momentMs);
     if (!turno) return;
-    clasificacionesVistas.add(clasif);
+    // Una clasificación que no está en el catálogo fijo igual se muestra (columna extra al final).
+    let clasif = porNorm.get(normalizarClasifInforme(raw));
+    if (!clasif) {
+      clasif = raw;
+      porNorm.set(normalizarClasifInforme(raw), raw);
+      clasificaciones.push(raw);
+    }
+    const nTareas = (o.tasks || []).filter(t => t !== null && t !== undefined && t.deleted !== true).length;
     counts[turno][clasif] = (counts[turno][clasif] || 0) + 1;
+    tareas[turno][clasif] = (tareas[turno][clasif] || 0) + nTareas;
   });
-  return { counts, clasificaciones: [...clasificacionesVistas].sort((a, b) => a.localeCompare(b, 'es')) };
+  return { counts, tareas, clasificaciones };
 }
 
 // De un timerHistory tipo evento (Inició/Reanudó/Pausó/Fin) saca los intervalos {start,end} ya
@@ -17792,14 +17817,30 @@ async function generarPdfInformeOrdenes() {
   if (typeof fetchArchivedOrders === 'function') await fetchArchivedOrders();
 
   const turnos = getTurnoBoundariesForDate(getInformeFechaSeleccionada());
-  const { counts, clasificaciones } = buildInformeTurnosConteo(turnos);
+  const { counts, tareas, clasificaciones } = buildInformeTurnosConteo(turnos);
 
-  const columnasHeaderHtml = clasificaciones.map(c => `<th style="padding:6px;">${c}</th>`).join('');
+  // Cada celda: órdenes y, al lado, las tareas que generaron (ej. "5 · 12t").
+  const celda = (ord, tar, bold) => ord > 0
+    ? `<td style="text-align:center; padding:5px 3px; ${bold ? 'font-weight:700; background:#f1f5f9;' : ''}">${ord} <span style="color:#2563eb; font-size:10px; font-weight:600;">· ${tar}t</span></td>`
+    : `<td style="text-align:center; padding:5px 3px; color:#cbd5e1; ${bold ? 'background:#f1f5f9;' : ''}">0</td>`;
+  const sumaTurno = (obj, turno) => clasificaciones.reduce((s, c) => s + (obj[turno][c] || 0), 0);
+  const sumaClasif = (obj, c) => INFORME_TURNOS_KEYS.reduce((s, t) => s + (obj[t][c] || 0), 0);
+
+  const columnasHeaderHtml = clasificaciones.map(c => `<th style="padding:6px 3px; font-size:10px;">${c}</th>`).join('')
+    + `<th style="padding:6px 3px; font-size:10px; background:#1e3a8a;">Total órdenes</th><th style="padding:6px 3px; font-size:10px; background:#1e3a8a;">Total tareas</th>`;
   const conteoRowsHtml = INFORME_TURNOS_KEYS.map(turno => `
     <tr>
       <td style="font-weight:700; padding:6px;">${turno}</td>
-      ${clasificaciones.map(c => `<td style="text-align:center; padding:6px;">${counts[turno][c] || 0}</td>`).join('')}
-    </tr>`).join('');
+      ${clasificaciones.map(c => celda(counts[turno][c] || 0, tareas[turno][c] || 0)).join('')}
+      <td style="text-align:center; padding:6px; font-weight:700; background:#eff6ff;">${sumaTurno(counts, turno)}</td>
+      <td style="text-align:center; padding:6px; font-weight:700; background:#eff6ff; color:#2563eb;">${sumaTurno(tareas, turno)}</td>
+    </tr>`).join('') + `
+    <tr>
+      <td style="font-weight:800; padding:6px; background:#f1f5f9;">Total</td>
+      ${clasificaciones.map(c => celda(sumaClasif(counts, c), sumaClasif(tareas, c), true)).join('')}
+      <td style="text-align:center; padding:6px; font-weight:800; background:#dbeafe;">${INFORME_TURNOS_KEYS.reduce((s, t) => s + sumaTurno(counts, t), 0)}</td>
+      <td style="text-align:center; padding:6px; font-weight:800; background:#dbeafe; color:#2563eb;">${INFORME_TURNOS_KEYS.reduce((s, t) => s + sumaTurno(tareas, t), 0)}</td>
+    </tr>`;
 
   const dateStr = formatDateStrEs(turnos.dateStr);
 
@@ -17808,11 +17849,11 @@ async function generarPdfInformeOrdenes() {
       <tr><td style="background:#1e293b; color:#fff; text-align:center; font-weight:700; font-size:18px; padding:10px;">INFORME DE ÓRDENES - ${dateStr}</td></tr>
       <tr><td style="background:#3b82f6; padding:2px;"></td></tr>
     </table>
-    ${clasificaciones.length > 0 ? `
-    <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <table style="width:100%; border-collapse:collapse; margin-bottom:8px; font-size:11px;">
       <thead><tr style="background:#0f172a; color:#fff;"><th style="padding:6px;">Turno</th>${columnasHeaderHtml}</tr></thead>
       <tbody>${conteoRowsHtml}</tbody>
-    </table>` : `<p style="text-align:center; color:#94a3b8;">Sin órdenes registradas en esta fecha.</p>`}
+    </table>
+    <p style="font-size:10px; color:#64748b; margin:0 0 20px;">Cada celda: cantidad de órdenes <span style="color:#2563eb; font-weight:600;">· tareas generadas</span>.</p>
   `;
 
   await descargarInformePdf({
