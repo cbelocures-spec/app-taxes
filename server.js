@@ -73,7 +73,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '396';
+const APP_VERSION = '397';
 
 // Middleware
 app.use(cors());
@@ -1855,6 +1855,48 @@ app.patch('/api/orders/:id/tasks/:taskId/asignacion', (req, res) => {
     res.json({ success: true, task: updatedTasks[taskIdx] });
   } catch (err) {
     console.error('[PATCH task asignacion] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Tareas Asignadas escritas a mano (Informes): interno + descripción + turno para una fecha.
+app.get('/api/tareas-asignadas-manuales', (req, res) => {
+  try {
+    res.json(db.getTareasAsignadasManuales(req.query.fecha || null));
+  } catch (err) {
+    console.error('[GET tareas-asignadas-manuales] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/tareas-asignadas-manuales', (req, res) => {
+  try {
+    const VALID_TURNOS = ['Mañana', 'Tarde', 'Noche'];
+    const { fecha, turno, interno, descripcion, sector, createdBy } = req.body || {};
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha || '')) return res.status(400).json({ error: 'Fecha inválida' });
+    if (!VALID_TURNOS.includes(turno)) return res.status(400).json({ error: `turno debe ser uno de: ${VALID_TURNOS.join(', ')}` });
+    if (!String(interno || '').trim()) return res.status(400).json({ error: 'Falta el interno' });
+    if (!String(descripcion || '').trim()) return res.status(400).json({ error: 'Falta la tarea a realizar' });
+    const nueva = db.addTareaAsignadaManual({
+      fecha, turno,
+      interno: String(interno).trim(),
+      descripcion: String(descripcion).trim(),
+      sector: String(sector || 'Taller').trim(),
+      createdBy: createdBy || null
+    });
+    res.json({ success: true, tarea: nueva });
+  } catch (err) {
+    console.error('[POST tareas-asignadas-manuales] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/tareas-asignadas-manuales/:id', (req, res) => {
+  try {
+    if (!db.deleteTareaAsignadaManual(req.params.id)) return res.status(404).json({ error: 'No encontrada' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[DELETE tareas-asignadas-manuales] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });

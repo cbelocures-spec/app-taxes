@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '396';
+const CURRENT_APP_VERSION = '397';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -17536,11 +17536,162 @@ function getPendingTasksForAsignacion() {
   return rows;
 }
 
+// Tareas escritas a mano (interno + descripción + turno) para la fecha del informe. Viven en
+// el server (db.tareasAsignadasManuales), no dentro de una orden: el mecánico igual tiene que
+// generar su orden de trabajo, y el PDF de Cumplimiento la encuentra sola por interno + fecha/turno.
+let cachedTareasManuales = [];
+
+async function fetchTareasAsignadasManuales(fecha) {
+  try {
+    const res = await fetch(`/api/tareas-asignadas-manuales?fecha=${encodeURIComponent(fecha)}`);
+    cachedTareasManuales = res.ok ? await res.json() : [];
+  } catch (e) {
+    console.error('Error cargando tareas asignadas manuales:', e);
+    cachedTareasManuales = [];
+  }
+  return cachedTareasManuales;
+}
+
+// Tareas de Parte Taller que ya tienen turno elegido para esa fecha (vía la lista plegada).
+function getAsignadasParteTallerParaFecha(fechaSel) {
+  const rows = [];
+  (Array.isArray(activeOrders) ? activeOrders : []).forEach(order => {
+    if (order.deleted === true || !esOrdenDeParteTaller(order)) return;
+    (order.tasks || []).forEach(task => {
+      if (!task || !task.turnoAsignado || task.fechaAsignada !== fechaSel) return;
+      rows.push({
+        tipo: 'pt', orderId: order.id, taskId: task.id, turno: task.turnoAsignado,
+        interno: order.interno || '(sin interno)', descripcion: task.descripcion || '(sin descripción)',
+        sector: getOrderSectorLabel(order)
+      });
+    });
+  });
+  return rows;
+}
+
+function renderTareasAsignadasTurnos() {
+  const cont = document.getElementById('tareas-asignadas-turnos');
+  if (!cont) return;
+  const fechaSel = getInformeFechaSeleccionada();
+  const items = [
+    ...getAsignadasParteTallerParaFecha(fechaSel),
+    ...cachedTareasManuales.filter(t => t.fecha === fechaSel).map(t => ({
+      tipo: 'man', id: t.id, turno: t.turno, interno: t.interno, descripcion: t.descripcion, sector: t.sector
+    }))
+  ];
+  const clases = { 'Mañana': 'ta-t-manana', 'Tarde': 'ta-t-tarde', 'Noche': 'ta-t-noche' };
+  cont.innerHTML = INFORME_TURNOS_KEYS.map(turno => {
+    const delTurno = items.filter(i => i.turno === turno);
+    const lista = delTurno.length === 0
+      ? '<div class="ta-empty">Sin tareas asignadas</div>'
+      : delTurno.map(i => {
+          const quitar = i.tipo === 'man'
+            ? `quitarTareaAsignadaManual('${i.id}')`
+            : `quitarAsignacionParteTaller('${i.orderId}', '${i.taskId}')`;
+          return `
+            <div class="ta-item">
+              <div class="ta-item-info">
+                <b>Interno ${escapeHtml(String(i.interno))}</b>
+                <p>${escapeHtml(String(i.descripcion))}</p>
+                <span class="ta-tag ${i.tipo === 'man' ? 'ta-tag-man' : 'ta-tag-pt'}">${i.tipo === 'man' ? 'Escrita a mano' : 'Parte Taller'}</span>
+                <span class="ta-tag ta-tag-pt" style="margin-left:4px;">${escapeHtml(String(i.sector || 'Taller'))}</span>
+              </div>
+              <button class="ta-item-x" title="Quitar de este turno" onclick="${quitar}"><span class="material-icons">close</span></button>
+            </div>`;
+        }).join('');
+    return `
+      <div class="ta-turno-col">
+        <div class="ta-turno-h ${clases[turno]}">Turno ${turno} <span>${delTurno.length}</span></div>
+        ${lista}
+      </div>`;
+  }).join('');
+}
+
+function poblarInternosTareaManual() {
+  const dl = document.getElementById('ta-man-internos-list');
+  if (!dl || dl.dataset.count === String(cachedInternoOptions.length)) return;
+  dl.innerHTML = (cachedInternoOptions || []).map(o =>
+    `<option value="${escapeHtml(String(o.value))}">${escapeHtml(String(o.label))}</option>`).join('');
+  dl.dataset.count = String(cachedInternoOptions.length);
+}
+
+async function agregarTareaAsignadaManual() {
+  const internoEl = document.getElementById('ta-man-interno');
+  const descEl = document.getElementById('ta-man-descripcion');
+  const interno = (internoEl.value || '').trim();
+  const descripcion = (descEl.value || '').trim();
+  if (!interno) { showToast('Escribí el interno', 'warning'); internoEl.focus(); return; }
+  if (!descripcion) { showToast('Escribí la tarea a realizar', 'warning'); descEl.focus(); return; }
+
+  const btn = document.getElementById('ta-man-add-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/tareas-asignadas-manuales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fecha: getInformeFechaSeleccionada(),
+        turno: document.getElementById('ta-man-turno').value,
+        sector: document.getElementById('ta-man-sector').value,
+        interno, descripcion,
+        createdBy: localStorage.getItem('currentUserUsername') || null
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Error al guardar');
+    cachedTareasManuales.push(data.tarea);
+    internoEl.value = '';
+    descEl.value = '';
+    internoEl.focus();
+    renderTareasAsignadasTurnos();
+    showToast('Tarea asignada', 'success');
+  } catch (e) {
+    console.error('Error agregando tarea asignada manual:', e);
+    showToast('Error al asignar: ' + e.message, 'danger');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function quitarTareaAsignadaManual(id) {
+  if (!confirm('¿Quitar esta tarea del turno?')) return;
+  try {
+    const res = await fetch(`/api/tareas-asignadas-manuales/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Error al quitar');
+    cachedTareasManuales = cachedTareasManuales.filter(t => t.id !== id);
+    renderTareasAsignadasTurnos();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'danger');
+  }
+}
+
+async function quitarAsignacionParteTaller(orderId, taskId) {
+  if (!confirm('¿Quitar esta tarea del turno? (la tarea sigue en el Parte Taller)')) return;
+  try {
+    const res = await fetch(`/api/orders/${orderId}/tasks/${taskId}/asignacion`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ turnoAsignado: null, fechaAsignada: null })
+    });
+    if (!res.ok) throw new Error('Error al quitar');
+    if (typeof fetchOrders === 'function') await fetchOrders();
+    renderTareasAsignadasList();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'danger');
+  }
+}
+
 function renderTareasAsignadasList() {
+  poblarInternosTareaManual();
+  renderTareasAsignadasTurnos();
+  fetchTareasAsignadasManuales(getInformeFechaSeleccionada()).then(renderTareasAsignadasTurnos);
+
   const container = document.getElementById('tareas-asignadas-list');
   if (!container) return;
   const fechaSel = getInformeFechaSeleccionada();
   const rows = getPendingTasksForAsignacion();
+  const summary = document.getElementById('ta-pendientes-summary');
+  if (summary) summary.textContent = `+ Elegir de las tareas pendientes del Parte Taller (${rows.length})`;
 
   if (rows.length === 0) {
     container.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:12px; margin:8px 0;">No hay tareas pendientes cargadas en Parte Taller.</p>';
@@ -17651,12 +17802,13 @@ function getTareasAsignadasParaFecha(fechaSel) {
 
       const empOpt = task.empleado ? cachedCatalogs.empleados.find(e => e.value === task.empleado) : null;
       rows.push({
-        interno: order.interno || '(sin interno)',
-        descripcion: task.descripcion || '(sin descripción)',
+        interno: escapeHtml(String(order.interno || '(sin interno)')),
+        descripcion: escapeHtml(String(task.descripcion || '(sin descripción)')),
         sector: getOrderSectorLabel(order),
         turnoAsignado: task.turnoAsignado,
         estado: task.status === 'Finalizada' ? 'Finalizada' : 'Pendiente',
         empleado: task.empleado ? (empOpt ? empOpt.label : task.empleado) : '-',
+        ordenCreada: fmtHoraOrdenInforme(momentoCreacionOrden(order)),
         ...calcularDetalleTareaAsignada(task)
       });
     });
@@ -17664,10 +17816,104 @@ function getTareasAsignadasParaFecha(fechaSel) {
   return rows;
 }
 
+function momentoCreacionOrden(order) {
+  const c = order.createdAt ? Date.parse(order.createdAt) : NaN;
+  if (!isNaN(c)) return c;
+  const horario = /^\d{2}:\d{2}$/.test(order.horario || '') ? order.horario : '00:00';
+  const m = order.fechaEntrega ? Date.parse(`${order.fechaEntrega}T${horario}:00-03:00`) : NaN;
+  return isNaN(m) ? null : m;
+}
+
+function fmtHoraOrdenInforme(ms) {
+  if (!ms) return '-';
+  return new Date(ms).toLocaleString('es-AR', {
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires'
+  });
+}
+
+const normInternoInforme = v => String(v || '').trim().toLowerCase();
+
+// Cumplimiento de una tarea escrita a mano: la app no crea órdenes, así que se busca la orden de
+// trabajo que el mecánico haya generado para ese interno desde el inicio del turno asignado
+// hasta el fin del día (Noche). Una tarea "entra" si su primer evento de cronómetro - o, si
+// todavía no arrancó, la creación de la orden - cae en esa ventana.
+function buscarOrdenesParaTareaManual(tm, todasOrders) {
+  const turnos = getTurnoBoundariesForDate(tm.fecha);
+  const desde = turnos[tm.turno] ? turnos[tm.turno].start : turnos['Mañana'].start;
+  const hasta = turnos['Noche'].end;
+  const objetivo = normInternoInforme(tm.interno);
+  const matches = [];
+  todasOrders.forEach(order => {
+    if (order.deleted === true || normInternoInforme(order.interno) !== objetivo) return;
+    const creada = momentoCreacionOrden(order);
+    (order.tasks || []).forEach(task => {
+      if (!task) return;
+      const ts = (Array.isArray(task.timerHistory) ? task.timerHistory : [])
+        .map(e => e && e.timestamp).filter(t => typeof t === 'number');
+      const momento = ts.length ? Math.min(...ts) : creada;
+      if (momento && momento >= desde && momento < hasta) matches.push({ order, task, creada });
+    });
+  });
+  return matches;
+}
+
+async function getTareasManualesRowsParaFecha(fechaSel, conCumplimiento) {
+  const manuales = await fetchTareasAsignadasManuales(fechaSel);
+  const todasOrders = [
+    ...(Array.isArray(activeOrders) ? activeOrders : []),
+    ...(Array.isArray(archivedOrders) ? archivedOrders : [])
+  ];
+  const rows = [];
+  manuales.forEach(tm => {
+    const base = {
+      interno: escapeHtml(tm.interno),
+      descripcion: escapeHtml(tm.descripcion),
+      sector: escapeHtml(tm.sector || 'Taller'),
+      turnoAsignado: tm.turno
+    };
+    if (!conCumplimiento) { rows.push(base); return; }
+    const matches = buscarOrdenesParaTareaManual(tm, todasOrders);
+    if (matches.length === 0) {
+      rows.push({ ...base, estado: 'Sin orden generada', empleado: '-', ordenCreada: '-', horaInicio: '-', horaFin: '-', demora: '-' });
+      return;
+    }
+    // Si hay varias tareas de ese interno en la ventana, se listan todas (no hay forma segura de
+    // saber cuál corresponde a la asignación) con la descripción real que cargó el mecánico.
+    const vistos = new Set();
+    matches.forEach(({ order, task, creada }) => {
+      const key = order.id + '_' + task.id;
+      if (vistos.has(key)) return;
+      vistos.add(key);
+      const empOpt = task.empleado ? cachedCatalogs.empleados.find(e => e.value === task.empleado) : null;
+      const ot = order.taxesOrderNumber ? ` · O.T. ${escapeHtml(String(order.taxesOrderNumber))}` : '';
+      rows.push({
+        ...base,
+        descripcion: `${base.descripcion}<br><span style="font-size:10px; color:#64748b;">Orden: ${escapeHtml(String(task.descripcion || '(sin descripción)'))}${ot}</span>`,
+        estado: task.status === 'Finalizada' ? 'Finalizada' : 'Pendiente',
+        empleado: task.empleado ? (empOpt ? empOpt.label : task.empleado) : '-',
+        ordenCreada: fmtHoraOrdenInforme(creada),
+        ...calcularDetalleTareaAsignada(task)
+      });
+    });
+  });
+  return rows;
+}
+
+const ACLARACION_TAREAS_ASIGNADAS_HTML = `
+  <div style="margin-top:22px; padding:10px 12px; border:1px solid #fcd34d; background:#fffbeb; border-radius:6px; font-size:11px; color:#78350f; line-height:1.5;">
+    <b>IMPORTANTE:</b> Las tareas detalladas en esta hoja son las asignadas en forma específica al turno y
+    <b>no reemplazan</b> sus responsabilidades habituales. El personal del turno también debe atender
+    <b>todas las unidades que ingresen al taller durante su horario</b> (auxilios, roturas, fallas y
+    novedades que surjan en el transcurso del turno), con la prioridad que indique el supervisor.
+  </div>`;
+
 async function generarPdfTareasAsignadas() {
   if (typeof fetchArchivedOrders === 'function') await fetchArchivedOrders();
   const fechaSel = getInformeFechaSeleccionada();
-  const rows = getTareasAsignadasParaFecha(fechaSel);
+  const rows = [
+    ...getTareasAsignadasParaFecha(fechaSel),
+    ...await getTareasManualesRowsParaFecha(fechaSel, false)
+  ];
 
   const seccionesHtml = ['Mañana', 'Tarde', 'Noche'].map(turno => {
     const items = rows.filter(r => r.turnoAsignado === turno);
@@ -17693,6 +17939,7 @@ async function generarPdfTareasAsignadas() {
       <tr><td style="background:#3b82f6; padding:2px;"></td></tr>
     </table>
     ${seccionesHtml || '<p style="text-align:center; color:#94a3b8;">Sin tareas asignadas para esta fecha.</p>'}
+    ${ACLARACION_TAREAS_ASIGNADAS_HTML}
   `;
 
   await descargarInformePdf({
@@ -17705,7 +17952,12 @@ async function generarPdfTareasAsignadas() {
 async function generarPdfCumplimientoTareas() {
   if (typeof fetchArchivedOrders === 'function') await fetchArchivedOrders();
   const fechaSel = getInformeFechaSeleccionada();
-  const rows = getTareasAsignadasParaFecha(fechaSel);
+  const rows = [
+    ...getTareasAsignadasParaFecha(fechaSel),
+    ...await getTareasManualesRowsParaFecha(fechaSel, true)
+  ];
+  const colorEstado = e => e === 'Finalizada' ? 'color:#166534; font-weight:700;'
+    : e === 'Sin orden generada' ? 'color:#dc2626; font-weight:700;' : 'color:#92400e; font-weight:700;';
 
   const seccionesHtml = ['Mañana', 'Tarde', 'Noche'].map(turno => {
     const items = rows.filter(r => r.turnoAsignado === turno);
@@ -17715,8 +17967,9 @@ async function generarPdfCumplimientoTareas() {
         <td style="padding:6px; font-weight:700;">Interno ${r.interno}</td>
         <td style="padding:6px;">${r.descripcion}</td>
         <td style="padding:6px; text-align:center;">${r.sector}</td>
-        <td style="padding:6px; text-align:center; ${r.estado === 'Finalizada' ? 'color:#166534; font-weight:700;' : 'color:#92400e; font-weight:700;'}">${r.estado}</td>
+        <td style="padding:6px; text-align:center; ${colorEstado(r.estado)}">${r.estado}</td>
         <td style="padding:6px; text-align:center;">${r.empleado}</td>
+        <td style="padding:6px; text-align:center;">${r.ordenCreada || '-'}</td>
         <td style="padding:6px; text-align:center;">${r.horaInicio}</td>
         <td style="padding:6px; text-align:center;">${r.horaFin}</td>
         <td style="padding:6px; text-align:center;">${r.demora}</td>
@@ -17726,7 +17979,7 @@ async function generarPdfCumplimientoTareas() {
       <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
         <thead><tr style="background:#0f172a; color:#fff;">
           <th style="padding:6px;">Interno</th><th style="padding:6px;">Tarea</th><th style="padding:6px;">Sector</th>
-          <th style="padding:6px;">Estado</th><th style="padding:6px;">Empleado</th>
+          <th style="padding:6px;">Estado</th><th style="padding:6px;">Empleado</th><th style="padding:6px;">Orden creada</th>
           <th style="padding:6px;">Inicio</th><th style="padding:6px;">Fin</th><th style="padding:6px;">Demora</th>
         </tr></thead>
         <tbody>${filasHtml}</tbody>
@@ -17740,6 +17993,7 @@ async function generarPdfCumplimientoTareas() {
       <tr><td style="background:#3b82f6; padding:2px;"></td></tr>
     </table>
     ${seccionesHtml || '<p style="text-align:center; color:#94a3b8;">Sin tareas asignadas para esta fecha.</p>'}
+    <p style="font-size:10px; color:#64748b; margin-top:14px;">Tareas escritas a mano: se busca la orden de trabajo que se haya generado para ese interno desde el inicio del turno asignado hasta el fin del día. "Sin orden generada" = nadie cargó una orden para esa unidad en ese período.</p>
   `;
 
   await descargarInformePdf({

@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=57">
+  <link rel="stylesheet" href="style.css?v=58">
   <script>
     (function() {
       try {
@@ -1710,9 +1710,35 @@
 
       <div class="settings-card" style="margin-bottom:16px;">
         <h3 style="margin:0 0 4px;">Tareas Asignadas</h3>
-        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">Elegí qué tareas pendientes de Parte Taller le tocan a cada turno, para la fecha elegida arriba.</p>
-        <div id="tareas-asignadas-list"></div>
-        <button class="btn btn-primary btn-block" id="guardar-asignaciones-btn" style="margin-top:12px;" onclick="guardarAsignacionesTareas()">Guardar Asignaciones</button>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">Escribí el interno y lo que hay que hacer, elegí el turno y tocá Agregar (para la fecha elegida arriba).</p>
+        <div class="ta-man-form">
+          <div class="ta-man-f ta-man-f-interno">
+            <label for="ta-man-interno">Interno *</label>
+            <input type="text" id="ta-man-interno" list="ta-man-internos-list" autocomplete="off" placeholder="Ej: 131">
+            <datalist id="ta-man-internos-list"></datalist>
+          </div>
+          <div class="ta-man-f ta-man-f-desc">
+            <label for="ta-man-descripcion">Tarea a realizar *</label>
+            <input type="text" id="ta-man-descripcion" placeholder="Ej: Revisión de luces" onkeydown="if(event.key==='Enter') agregarTareaAsignadaManual()">
+          </div>
+          <div class="ta-man-f">
+            <label for="ta-man-sector">Sector</label>
+            <select id="ta-man-sector"><option>Taller</option><option>Herrería</option><option>Edilicio</option><option>Lavadero</option></select>
+          </div>
+          <div class="ta-man-f">
+            <label for="ta-man-turno">Turno *</label>
+            <select id="ta-man-turno"><option>Mañana</option><option>Tarde</option><option>Noche</option></select>
+          </div>
+          <button class="btn btn-primary ta-man-add" id="ta-man-add-btn" onclick="agregarTareaAsignadaManual()"><span class="material-icons" style="font-size:18px;">add</span> Agregar</button>
+        </div>
+
+        <div id="tareas-asignadas-turnos" class="ta-turnos"></div>
+
+        <details id="ta-pendientes-details" class="ta-pendientes">
+          <summary id="ta-pendientes-summary">+ Elegir de las tareas pendientes del Parte Taller</summary>
+          <div id="tareas-asignadas-list"></div>
+          <button class="btn btn-primary btn-block" id="guardar-asignaciones-btn" style="margin-top:12px;" onclick="guardarAsignacionesTareas()">Guardar Asignaciones</button>
+        </details>
       </div>
 
       <div class="settings-card" style="margin-bottom:16px; text-align:center;">
@@ -1922,7 +1948,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.38</div>
+      <div class="sidebar-version">Versión 1.27.39</div>
     </div>
   </aside>
 
@@ -3192,6 +3218,6 @@
     }
   </style>
 
-  <script src="app.js?v=396"></script>
+  <script src="app.js?v=397"></script>
 </body>
 </html>

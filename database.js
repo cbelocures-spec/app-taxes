@@ -364,7 +364,11 @@ const DEFAULT_DB = {
   users: {},
   insumosPendientes: [],
   preventivosMasivaCustom: [],
-  tiposLavado: []
+  tiposLavado: [],
+  // Tareas escritas a mano en Informes > Tareas Asignadas (interno + descripción + turno para
+  // una fecha). No son tareas de una orden: el cumplimiento se detecta buscando una orden del
+  // mismo interno creada en esa fecha/turno.
+  tareasAsignadasManuales: []
 };
 
 // Thread-safe read/write helper
@@ -1704,6 +1708,31 @@ class LocalDB {
       this.write(db);
     }
     return autoPausedInfo;
+  }
+
+  // --- Tareas Asignadas escritas a mano (Informes) ---
+  getTareasAsignadasManuales(fecha) {
+    const list = this.read().tareasAsignadasManuales || [];
+    return fecha ? list.filter(t => t.fecha === fecha) : list;
+  }
+
+  addTareaAsignadaManual(tarea) {
+    const db = this.read();
+    if (!Array.isArray(db.tareasAsignadasManuales)) db.tareasAsignadasManuales = [];
+    const nueva = { id: genUniqueId(), createdAt: new Date().toISOString(), ...tarea };
+    db.tareasAsignadasManuales.push(nueva);
+    this.write(db);
+    return nueva;
+  }
+
+  deleteTareaAsignadaManual(id) {
+    const db = this.read();
+    const list = db.tareasAsignadasManuales || [];
+    const idx = list.findIndex(t => t.id === id);
+    if (idx === -1) return false;
+    list.splice(idx, 1);
+    this.write(db);
+    return true;
   }
 }
 

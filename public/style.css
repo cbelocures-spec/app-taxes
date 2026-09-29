@@ -3587,6 +3587,39 @@ body {
   border-radius: 6px; border: 1px solid #cbd5e1;
 }
 
+/* Tareas Asignadas escritas a mano: formulario + columnas por turno */
+.ta-man-form { display: grid; grid-template-columns: 160px 1fr 140px 130px auto; gap: 10px; align-items: end; margin-bottom: 16px; }
+.ta-man-f label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
+.ta-man-f input, .ta-man-f select { width: 100%; padding: 9px 10px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; background: #fff; margin: 0; }
+.ta-man-add { display: flex; align-items: center; justify-content: center; gap: 4px; height: 39px; white-space: nowrap; }
+.ta-turnos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.ta-turno-col { border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; overflow: hidden; background: #fff; }
+.ta-turno-h { padding: 9px 12px; font-weight: 800; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+.ta-turno-h span { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 8px; background: rgba(255,255,255,.65); }
+.ta-t-manana { background: #fef9c3; color: #854d0e; }
+.ta-t-tarde { background: #ffedd5; color: #9a3412; }
+.ta-t-noche { background: #e0e7ff; color: #3730a3; }
+.ta-item { padding: 9px 12px; border-top: 1px solid #f1f5f9; display: flex; gap: 8px; align-items: flex-start; }
+.ta-item-info { flex: 1; min-width: 0; }
+.ta-item-info b { font-size: 13px; color: #0f172a; }
+.ta-item-info p { margin: 2px 0 0; font-size: 12px; color: #475569; word-break: break-word; }
+.ta-tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 6px; margin-top: 4px; }
+.ta-tag-pt { background: #e0f2fe; color: #0369a1; }
+.ta-tag-man { background: #f3e8ff; color: #7e22ce; }
+.ta-item-x { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0; line-height: 1; }
+.ta-item-x:hover { color: #dc2626; }
+.ta-item-x .material-icons { font-size: 18px; }
+.ta-empty { padding: 12px; font-size: 12px; color: #94a3b8; text-align: center; }
+.ta-pendientes { margin-top: 14px; }
+.ta-pendientes summary { cursor: pointer; font-size: 13px; font-weight: 700; color: #0284c7; padding: 4px 0; }
+@media (max-width: 800px) {
+  .ta-man-form { grid-template-columns: 1fr 1fr; }
+  .ta-man-f-desc { grid-column: 1 / -1; order: -1; }
+  .ta-man-f-interno { order: -2; grid-column: 1 / -1; }
+  .ta-man-add { grid-column: 1 / -1; }
+  .ta-turnos { grid-template-columns: 1fr; }
+}
+
 .eh-fs-list {
   display: flex;
   flex-direction: column;
