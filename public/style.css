@@ -3587,6 +3587,71 @@ body {
   border-radius: 6px; border: 1px solid #cbd5e1;
 }
 
+/* Pedidos de soporte: botón flotante (arriba del +), formulario y campana */
+.soporte-fab { position: fixed; bottom: 86px; right: 18px; width: 56px; height: 56px; border-radius: 50%; padding: 0; overflow: hidden; background: #fff; border: 3px solid #0ea5e9; box-shadow: 0 4px 18px rgba(15,23,42,.35); cursor: pointer; z-index: 900; transition: transform .18s cubic-bezier(.34,1.56,.64,1); }
+.soporte-fab:hover { transform: scale(1.1); }
+.soporte-fab:active { transform: scale(.95); }
+.soporte-fab img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.soporte-dialog { max-width: 460px; width: 94vw; max-height: 92vh; display: flex; flex-direction: column; }
+.soporte-dialog-h { background: linear-gradient(135deg, #0ea5e9, #0369a1); color: #fff; padding: 14px 16px; display: flex; gap: 12px; align-items: center; }
+.soporte-dialog-h img { width: 44px; height: 44px; border-radius: 50%; background: #fff; object-fit: cover; flex-shrink: 0; }
+.soporte-dialog-h div { flex: 1; min-width: 0; }
+.soporte-dialog-h b { display: block; font-size: 17px; }
+.soporte-dialog-h span { font-size: 12px; opacity: .9; }
+.soporte-dialog-h .dialog-close { color: #fff; }
+.soporte-dialog-b { overflow-y: auto; padding: 4px 16px 12px; }
+.soporte-lbl { display: block; font-size: 12px; font-weight: 700; color: #334155; margin: 12px 0 6px; }
+.soporte-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.soporte-chip { border: 1px solid #cbd5e1; background: #fff; border-radius: 999px; padding: 6px 11px; font-size: 12px; font-weight: 600; color: #334155; display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
+.soporte-chip .material-icons { font-size: 15px; }
+.soporte-chip.on { background: #0369a1; border-color: #0369a1; color: #fff; }
+.soporte-inp { width: 100%; padding: 10px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-family: inherit; background: #fff; margin: 0; }
+textarea.soporte-inp { resize: vertical; min-height: 80px; }
+.soporte-prio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.soporte-prio button { padding: 9px 4px; border-radius: 8px; font-size: 12px; font-weight: 700; border: 1px solid #e2e8f0; color: #475569; background: #fff; cursor: pointer; }
+.soporte-prio button.on[data-v="baja"] { background: #dcfce7; border-color: #86efac; color: #166534; }
+.soporte-prio button.on[data-v="media"] { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+.soporte-prio button.on[data-v="alta"] { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+.soporte-foto { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #0369a1; margin-top: 12px; cursor: pointer; }
+.soporte-captura-preview { max-width: 100%; max-height: 140px; border-radius: 8px; margin-top: 8px; border: 1px solid #e2e8f0; }
+.soporte-auto { background: #f1f5f9; border-radius: 8px; padding: 8px 10px; font-size: 11px; color: #64748b; margin-top: 12px; line-height: 1.5; }
+.soporte-dialog-f { gap: 8px; }
+
+.soporte-bell { position: relative; width: 36px; height: 36px; border-radius: 50%; border: none; background: transparent; color: #64748b; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.soporte-bell .material-icons { font-size: 24px; }
+.soporte-bell.alerta { background: #fee2e2; color: #dc2626; animation: soporte-bell-ring 2.4s ease-in-out infinite; }
+.soporte-bell-n { position: absolute; top: -3px; right: -3px; background: #dc2626; color: #fff; font-size: 10px; font-weight: 800; min-width: 18px; height: 18px; border-radius: 999px; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; padding: 0 3px; box-sizing: border-box; }
+@keyframes soporte-bell-ring { 0%, 88%, 100% { transform: rotate(0); } 91% { transform: rotate(14deg); } 94% { transform: rotate(-12deg); } 97% { transform: rotate(6deg); } }
+.soporte-panel { position: fixed; top: 62px; right: 10px; width: 420px; max-width: calc(100vw - 20px); max-height: 75vh; background: #fff; border-radius: 12px; box-shadow: 0 14px 36px rgba(0,0,0,.22); overflow: hidden; z-index: 1200; display: flex; flex-direction: column; }
+.soporte-panel-h { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+.soporte-panel-h span { font-size: 11px; color: #0369a1; font-weight: 700; }
+.soporte-panel-list { overflow-y: auto; }
+.soporte-tk { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; display: flex; gap: 10px; }
+.soporte-tk.nuevo { background: #fff7ed; }
+.soporte-tk-dot { width: 9px; height: 9px; border-radius: 50%; background: #cbd5e1; margin-top: 5px; flex-shrink: 0; }
+.soporte-tk.nuevo .soporte-tk-dot { background: #dc2626; }
+.soporte-tk-body { flex: 1; min-width: 0; }
+.soporte-tk-body b.t { font-size: 13px; color: #0f172a; }
+.soporte-tk-body p { margin: 4px 0; font-size: 12px; color: #475569; word-break: break-word; }
+.soporte-tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 6px; margin: 3px 4px 0 0; }
+.soporte-tag.baja { background: #dcfce7; color: #166534; }
+.soporte-tag.media { background: #fef3c7; color: #92400e; }
+.soporte-tag.alta { background: #fee2e2; color: #991b1b; }
+.soporte-tag.area { background: #e0f2fe; color: #075985; }
+.soporte-tag.est-pendiente { background: #f1f5f9; color: #475569; }
+.soporte-tag.est-en_revision { background: #ede9fe; color: #5b21b6; }
+.soporte-tag.est-resuelto { background: #dcfce7; color: #166534; }
+.soporte-who { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; color: #0f172a; margin: 4px 0 2px; }
+.soporte-who .material-icons { font-size: 15px; color: #0369a1; }
+.soporte-who .sec { background: #1e293b; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 6px; }
+.soporte-meta { font-size: 11px; color: #94a3b8; }
+.soporte-resp { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 6px 9px; font-size: 12px; color: #14532d; margin-top: 6px; }
+.soporte-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.soporte-acts button { font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 6px; border: 1px solid #cbd5e1; color: #334155; background: #fff; cursor: pointer; }
+.soporte-acts button.ok { background: #16a34a; border-color: #16a34a; color: #fff; }
+.soporte-empty { padding: 24px 16px; text-align: center; font-size: 13px; color: #94a3b8; }
+.soporte-captura-thumb { max-width: 100%; max-height: 120px; border-radius: 6px; margin-top: 6px; border: 1px solid #e2e8f0; cursor: zoom-in; }
+
 /* Lavado de varios tachos juntos (filtro de Lavadero > Tachos) */
 .lav-tacho-extra-row { display: flex; gap: 8px; margin-top: 8px; }
 .lav-tacho-extra-row input { flex: 1; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; }

@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=59">
+  <link rel="stylesheet" href="style.css?v=60">
   <script>
     (function() {
       try {
@@ -56,10 +56,24 @@
       <span class="header-middle-title">Gestión de Mantenimiento</span>
       <small class="header-middle-user" id="current-user">paniol@contenedoreshugo.com.ar</small>
     </div>    <div class="header-actions" style="display: flex; align-items: center; gap: 6px;">
+      <!-- Campana de soporte: Pañol ve todos los pedidos; cada usuario, los suyos y sus avisos -->
+      <button type="button" class="soporte-bell" id="soporte-bell" onclick="toggleSoportePanel(event)" title="Pedidos de soporte" style="display: none;">
+        <span class="material-icons" translate="no">notifications</span>
+        <span class="soporte-bell-n" id="soporte-bell-n" style="display: none;"></span>
+      </button>
       <span class="material-icons refresh-btn" id="header-refresh-btn" onclick="location.reload()" title="Refrescar Pantalla" translate="no">refresh</span>
       <span class="material-icons sync-indicator idle" id="global-sync-icon" translate="no">sync</span>
     </div>
   </header>
+
+  <!-- Panel desplegable de la campana de soporte -->
+  <div class="soporte-panel" id="soporte-panel" style="display: none;">
+    <div class="soporte-panel-h">
+      <b id="soporte-panel-title">Pedidos de soporte</b>
+      <span id="soporte-panel-sub"></span>
+    </div>
+    <div class="soporte-panel-list" id="soporte-panel-list"></div>
+  </div>
 
   <!-- Main View Container -->
   <main class="app-container">
@@ -1948,7 +1962,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.41</div>
+      <div class="sidebar-version">Versión 1.27.42</div>
     </div>
   </aside>
 
@@ -1956,6 +1970,57 @@
   <button class="voice-fab" id="voice-fab" onclick="openVoiceModal()" title="Crear orden por voz" style="display: none;">
     <span class="material-icons">mic</span>
   </button>
+
+  <!-- FLOATING SUPPORT BUTTON (arriba del +) -->
+  <button type="button" class="soporte-fab" id="soporte-fab" onclick="openSoporteModal()" title="¿Algún problema? Pedí soporte" style="display: none;">
+    <img src="imagenes/soporte.jpg" alt="Pedir soporte">
+  </button>
+
+  <div class="modal-overlay" id="soporte-modal">
+    <div class="dialog-modal soporte-dialog">
+      <div class="soporte-dialog-h">
+        <img src="imagenes/soporte.jpg" alt="">
+        <div><b>Pedir soporte</b><span>Contanos qué pasó y lo revisamos</span></div>
+        <button class="dialog-close" onclick="closeSoporteModal()">&#x2715;</button>
+      </div>
+      <div class="dialog-body soporte-dialog-b">
+        <label class="soporte-lbl">¿En qué parte de la app? *</label>
+        <div class="soporte-chips" id="soporte-areas"></div>
+
+        <label class="soporte-lbl" for="soporte-orden">Orden relacionada (opcional)</label>
+        <select id="soporte-orden" class="soporte-inp"><option value="">Ninguna / no tiene que ver con una orden</option></select>
+
+        <label class="soporte-lbl" for="soporte-titulo">Título corto (opcional)</label>
+        <input type="text" id="soporte-titulo" class="soporte-inp" maxlength="100" placeholder="Ej: No sube la tarea a Taxes">
+
+        <label class="soporte-lbl" for="soporte-desc">¿Qué pasó? *</label>
+        <textarea id="soporte-desc" class="soporte-inp" rows="4" maxlength="2000" placeholder="Contá qué estabas haciendo, qué esperabas que pase y qué pasó en realidad."></textarea>
+
+        <label class="soporte-lbl">¿Qué tan urgente es?</label>
+        <div class="soporte-prio" id="soporte-prio">
+          <button type="button" data-v="baja" onclick="selectSoporteUrgencia('baja')">Puede esperar</button>
+          <button type="button" data-v="media" onclick="selectSoporteUrgencia('media')">Me complica</button>
+          <button type="button" data-v="alta" onclick="selectSoporteUrgencia('alta')">No puedo trabajar</button>
+        </div>
+
+        <label class="soporte-lbl" for="soporte-nombre">Tu nombre *</label>
+        <input type="text" id="soporte-nombre" class="soporte-inp" maxlength="80" list="soporte-nombres-list" placeholder="Ej: Brahim Adrian">
+        <datalist id="soporte-nombres-list"></datalist>
+
+        <label class="soporte-foto" for="soporte-captura">
+          <span class="material-icons">photo_camera</span> <span id="soporte-captura-label">Adjuntar captura de pantalla (opcional)</span>
+        </label>
+        <input type="file" id="soporte-captura" accept="image/*" style="display: none;" onchange="onSoporteCapturaChange()">
+        <img id="soporte-captura-preview" class="soporte-captura-preview" style="display: none;" alt="">
+
+        <div class="soporte-auto" id="soporte-auto"></div>
+      </div>
+      <div class="dialog-footer soporte-dialog-f">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeSoporteModal()">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm" id="soporte-enviar-btn" onclick="enviarSoporte()">Enviar a soporte</button>
+      </div>
+    </div>
+  </div>
 
   <!-- FLOATING CREATE ORDER BUTTON -->
   <button class="voice-fab" id="create-order-fab" onclick="handleCreateOrderFabClick()" title="Crear orden de trabajo">
@@ -3223,6 +3288,6 @@
     }
   </style>
 
-  <script src="app.js?v=399"></script>
+  <script src="app.js?v=400"></script>
 </body>
 </html>

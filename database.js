@@ -368,7 +368,10 @@ const DEFAULT_DB = {
   // Tareas escritas a mano en Informes > Tareas Asignadas (interno + descripción + turno para
   // una fecha). No son tareas de una orden: el cumplimiento se detecta buscando una orden del
   // mismo interno creada en esa fecha/turno.
-  tareasAsignadasManuales: []
+  tareasAsignadasManuales: [],
+  // Pedidos de soporte (botón "Pedir soporte"): los ve Pañol en su campana; cada usuario ve
+  // los suyos y recibe el aviso cuando cambian de estado.
+  soporteTickets: []
 };
 
 // Horas decimales de una tarea: horasEstimadas si ya las tiene, si no desde su cronómetro
@@ -1802,6 +1805,29 @@ class LocalDB {
     db.tareasAsignadasManuales.push(nueva);
     this.write(db);
     return nueva;
+  }
+
+  // --- Pedidos de soporte ---
+  getSoporteTickets() {
+    return this.read().soporteTickets || [];
+  }
+
+  addSoporteTicket(ticket) {
+    const db = this.read();
+    if (!Array.isArray(db.soporteTickets)) db.soporteTickets = [];
+    const nuevo = { id: genUniqueId(), createdAt: new Date().toISOString(), estado: 'pendiente', leidoPanol: false, ...ticket };
+    db.soporteTickets.push(nuevo);
+    this.write(db);
+    return nuevo;
+  }
+
+  updateSoporteTicket(id, updates) {
+    const db = this.read();
+    const t = (db.soporteTickets || []).find(x => x.id === id);
+    if (!t) return null;
+    Object.assign(t, updates, { updatedAt: new Date().toISOString() });
+    this.write(db);
+    return t;
   }
 
   deleteTareaAsignadaManual(id) {

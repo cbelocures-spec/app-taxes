@@ -73,7 +73,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '399';
+const APP_VERSION = '400';
 
 // Middleware
 app.use(cors());
@@ -1937,6 +1937,139 @@ app.post('/api/tareas-asignadas-manuales', (req, res) => {
   } catch (err) {
     console.error('[POST tareas-asignadas-manuales] Error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// --- PEDIDOS DE SOPORTE ---
+// Cualquier usuario manda un pedido desde el botón flotante; solo Pañol los ve todos (campana)
+// y los pasa a En revisión / Resuelto. Cada usuario ve los suyos y recibe el aviso del cambio.
+// El wrapper global de fetch del cliente ya manda X-User-Username; si llegara repetido
+// ("a, a") se toma el primero. Ojo: estos endpoints NUNCA devuelven 401 - el cliente trata
+// un 401 como sesión vencida y desloguea al usuario.
+function usuarioDelPedido(req) {
+  return String(req.headers['x-user-username'] || '').split(',')[0].trim().toLowerCase();
+}
+function esUsuarioPanol(username) {
+  const u = String(username || '').toLowerCase();
+  return u.includes('paniol') || u.includes('panol') || u.includes('pañol');
+}
+const SOPORTE_CAPTURAS_DIR = path.join(path.dirname(db.DB_PATH), 'soporte_capturas');
+const SOPORTE_ESTADOS = ['pendiente', 'en_revision', 'resuelto'];
+
+// La captura no va al JSON de la base (lo haría pesado): se guarda como archivo al lado.
+function sinCaptura(t) {
+  const { capturaArchivo, ...rest } = t;
+  return { ...rest, tieneCaptura: !!capturaArchivo };
+}
+
+app.get('/api/soporte', (req, res) => {
+  try {
+    const user = usuarioDelPedido(req);
+    if (!user) return res.status(400).json({ error: 'Falta el usuario' });
+    const panol = esUsuarioPanol(user);
+    const list = db.getSoporteTickets().filter(t => panol || String(t.createdBy || '').toLowerCase() === user);
+    res.json({ esPanol: panol, tickets: list.map(sinCaptura).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))) });
+  } catch (err) {
+    console.error('[GET soporte] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/soporte', (req, res) => {
+  try {
+    const user = usuarioDelPedido(req);
+    if (!user) return res.status(400).json({ error: 'Falta el usuario' });
+    const b = req.body || {};
+    const descripcion = String(b.descripcion || '').trim();
+    const area = String(b.area || '').trim();
+    const nombre = String(b.nombre || '').trim();
+    if (!area) return res.status(400).json({ error: 'Elegí en qué parte de la app fue el problema' });
+    if (!descripcion) return res.status(400).json({ error: 'Contanos qué pasó' });
+    if (!nombre) return res.status(400).json({ error: 'Escribí tu nombre' });
+    const urgencia = ['baja', 'media', 'alta'].includes(b.urgencia) ? b.urgencia : 'media';
+
+    const ticket = db.addSoporteTicket({
+      createdBy: user,
+      nombre: nombre.slice(0, 80),
+      sector: String(b.sector || getSectorByUsername(user) || '').trim().slice(0, 40),
+      area: area.slice(0, 60),
+      titulo: String(b.titulo || '').trim().slice(0, 100) || descripcion.slice(0, 60),
+      descripcion: descripcion.slice(0, 2000),
+      urgencia,
+      orderId: b.orderId ? String(b.orderId) : null,
+      orderLabel: b.orderLabel ? String(b.orderLabel).slice(0, 120) : null,
+      pantalla: b.pantalla ? String(b.pantalla).slice(0, 60) : null,
+      appVersion: b.appVersion ? String(b.appVersion).slice(0, 20) : null,
+      notifUsuario: false
+    });
+
+    // Captura opcional (data URL JPEG/PNG que la app ya achicó antes de mandarla).
+    const m = typeof b.captura === 'string' ? b.captura.match(/^data:image\/(jpeg|png);base64,(.+)$/) : null;
+    if (m) {
+      try {
+        fs.mkdirSync(SOPORTE_CAPTURAS_DIR, { recursive: true });
+        const archivo = `${ticket.id}.${m[1] === 'png' ? 'png' : 'jpg'}`;
+        fs.writeFileSync(path.join(SOPORTE_CAPTURAS_DIR, archivo), Buffer.from(m[2], 'base64'));
+        db.updateSoporteTicket(ticket.id, { capturaArchivo: archivo });
+        ticket.capturaArchivo = archivo;
+      } catch (e) {
+        console.error('[POST soporte] No se pudo guardar la captura:', e.message);
+      }
+    }
+    console.log(`[Soporte] Nuevo pedido ${ticket.id} de ${user} (${ticket.sector}) - ${ticket.area} - urgencia ${urgencia}`);
+    res.json({ success: true, ticket: sinCaptura(ticket) });
+  } catch (err) {
+    console.error('[POST soporte] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Pañol cambia el estado (y opcionalmente responde). Le deja al usuario un aviso sin leer.
+app.patch('/api/soporte/:id', (req, res) => {
+  try {
+    const user = usuarioDelPedido(req);
+    if (!esUsuarioPanol(user)) return res.status(403).json({ error: 'Solo Pañol puede actualizar los pedidos de soporte' });
+    const { estado, respuesta } = req.body || {};
+    if (!SOPORTE_ESTADOS.includes(estado)) return res.status(400).json({ error: 'Estado inválido' });
+    const updates = { estado, leidoPanol: true, notifUsuario: true };
+    if (respuesta !== undefined) updates.respuesta = String(respuesta || '').trim().slice(0, 1000);
+    if (estado === 'resuelto') { updates.resueltoAt = new Date().toISOString(); updates.resueltoPor = user; }
+    const t = db.updateSoporteTicket(req.params.id, updates);
+    if (!t) return res.status(404).json({ error: 'No encontrado' });
+    res.json({ success: true, ticket: sinCaptura(t) });
+  } catch (err) {
+    console.error('[PATCH soporte] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Marcar como leído: Pañol (pedido nuevo visto) o el usuario (aviso de cambio visto).
+app.post('/api/soporte/marcar-leidos', (req, res) => {
+  try {
+    const user = usuarioDelPedido(req);
+    if (!user) return res.status(400).json({ error: 'Falta el usuario' });
+    const panol = esUsuarioPanol(user);
+    const ids = new Set(Array.isArray(req.body && req.body.ids) ? req.body.ids : []);
+    db.getSoporteTickets().forEach(t => {
+      if (!ids.has(t.id)) return;
+      if (panol && !t.leidoPanol) db.updateSoporteTicket(t.id, { leidoPanol: true });
+      if (!panol && String(t.createdBy || '').toLowerCase() === user && t.notifUsuario) db.updateSoporteTicket(t.id, { notifUsuario: false });
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/soporte/:id/captura', (req, res) => {
+  try {
+    const user = usuarioDelPedido(req) || String(req.query.u || '').trim().toLowerCase();
+    const t = db.getSoporteTickets().find(x => x.id === req.params.id);
+    if (!t || !t.capturaArchivo) return res.status(404).send('Sin captura');
+    if (!esUsuarioPanol(user) && String(t.createdBy || '').toLowerCase() !== user) return res.status(403).send('Sin permiso');
+    res.sendFile(path.join(SOPORTE_CAPTURAS_DIR, path.basename(t.capturaArchivo)));
+  } catch (err) {
+    res.status(500).send(err.message);
   }
 });
 

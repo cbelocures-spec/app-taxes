@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '399';
+const CURRENT_APP_VERSION = '400';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -906,6 +906,9 @@ function switchView(viewId) {
     const createOrderFab = document.getElementById('create-order-fab');
     if (createOrderFab) {
       createOrderFab.style.display = (viewId === 'elastiquero' || viewId === 'elastiquero-home' || viewId === 'recorrido') ? 'none' : '';
+      // Sin el "+", el botón de soporte baja a su lugar en vez de quedar flotando solo más arriba.
+      const soporteFab = document.getElementById('soporte-fab');
+      if (soporteFab) soporteFab.style.bottom = createOrderFab.style.display === 'none' ? '18px' : '';
     }
 
     if (viewId === 'orders') {
@@ -11954,6 +11957,8 @@ function checkUserSession() {
     userDisplay.textContent = username;
   }
 
+  if (typeof initSoporte === 'function') initSoporte();
+
   // A Herrería/Edilicio-sector user (e.g. Carmona, Toledo) should land on their own
   // sector view by default, not the generic Taller one - otherwise the Clasificación
   // dropdown shows the wrong option set until they manually click their sector tab.
@@ -19962,3 +19967,343 @@ async function sendHugoAIMessage() {
 // time on every load, which consumed the one-shot post-logout flag before the user ever saw the
 // login screen long enough to use it, making "Cerrar Sesión" look like it logged back in on its
 // own after a few seconds.
+
+
+// ============================================================================================
+// PEDIDOS DE SOPORTE: botón flotante arriba del "+", formulario, y campana en el encabezado.
+// Pañol ve todos los pedidos (roja si hay sin resolver) y los pasa a En revisión / Resuelto;
+// cada usuario ve los suyos y su campana se pone roja cuando le cambian el estado.
+// ============================================================================================
+const SOPORTE_AREAS = [
+  { k: 'Órdenes / Taxes', i: 'assignment' },
+  { k: 'Cronómetro', i: 'timer' },
+  { k: 'Parte Taller', i: 'summarize' },
+  { k: 'Preventivos', i: 'build' },
+  { k: 'Lavadero', i: 'local_car_wash' },
+  { k: 'Insumos / Pañol', i: 'inventory_2' },
+  { k: 'Informes', i: 'picture_as_pdf' },
+  { k: 'Ingreso / Usuario', i: 'login' },
+  { k: 'Otro', i: 'more_horiz' }
+];
+const SOPORTE_URGENCIA_LABEL = { baja: 'Puede esperar', media: 'Me complica', alta: 'No puedo trabajar' };
+const SOPORTE_ESTADO_LABEL = { pendiente: 'Pendiente', en_revision: 'En revisión', resuelto: 'Resuelto' };
+let soporteArea = '';
+let soporteUrgencia = 'media';
+let soporteCapturaDataUrl = null;
+let soporteTickets = [];
+let soporteEsPanol = false;
+let soportePollTimer = null;
+let soporteNoLeidosPanolPrev = null;
+
+function soporteHeaders() {
+  // El usuario (X-User-Username) lo agrega solo el wrapper global de fetch.
+  return { 'Content-Type': 'application/json' };
+}
+
+function initSoporte() {
+  const fab = document.getElementById('soporte-fab');
+  const bell = document.getElementById('soporte-bell');
+  if (fab) fab.style.display = '';
+  if (bell) bell.style.display = '';
+  fetchSoporte();
+  if (soportePollTimer) clearInterval(soportePollTimer);
+  soportePollTimer = setInterval(fetchSoporte, 60000);
+  if (!window._soporteOutsideClickBound) {
+    window._soporteOutsideClickBound = true;
+    document.addEventListener('click', e => {
+      const panel = document.getElementById('soporte-panel');
+      if (panel && panel.style.display !== 'none' && !panel.contains(e.target) && !e.target.closest('#soporte-bell')) cerrarSoportePanel();
+    });
+  }
+}
+
+function soportePantallaActual() {
+  // El nombre que ve el usuario en el menú lateral (ej. "Inicio"), no el id interno de la vista.
+  const nav = document.querySelector('.nav-item.active');
+  let navTxt = '';
+  if (nav) {
+    const clon = nav.cloneNode(true);
+    clon.querySelectorAll('.material-icons, .material-icons-outlined').forEach(i => i.remove());
+    navTxt = clon.textContent.replace(/\s+/g, ' ').trim();
+  }
+  if (navTxt) return navTxt;
+  const v = document.querySelector('.app-view.active');
+  if (!v || !v.id) return '';
+  const h = v.querySelector('h2');
+  return h ? h.textContent.trim() : v.id.replace(/^view-/, '');
+}
+
+function soporteSectorActual() {
+  return currentSelectedSector || getSectorByUsername(localStorage.getItem('currentUserUsername')) || '';
+}
+
+function openSoporteModal() {
+  soporteArea = '';
+  soporteUrgencia = 'media';
+  soporteCapturaDataUrl = null;
+  document.getElementById('soporte-areas').innerHTML = SOPORTE_AREAS.map(a =>
+    `<button type="button" class="soporte-chip" data-k="${escapeHtml(a.k)}" onclick="selectSoporteArea(this)"><span class="material-icons">${a.i}</span>${escapeHtml(a.k)}</button>`).join('');
+
+  const ordenSel = document.getElementById('soporte-orden');
+  const ordenes = (Array.isArray(activeOrders) ? activeOrders : [])
+    .filter(o => o && o.deleted !== true && !(o.grupoLavado && o.grupoLavado.rol === 'miembro'))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  ordenSel.innerHTML = '<option value="">Ninguna / no tiene que ver con una orden</option>' + ordenes.map(o => {
+    const label = `Interno ${o.interno || '-'}${o.taxesOrderNumber ? ` · O.T. ${o.taxesOrderNumber}` : ''} — ${o.clasificacion || ''}`;
+    return `<option value="${escapeHtml(String(o.id))}">${escapeHtml(label)}</option>`;
+  }).join('');
+
+  document.getElementById('soporte-titulo').value = '';
+  document.getElementById('soporte-desc').value = '';
+  const nombreEl = document.getElementById('soporte-nombre');
+  nombreEl.value = localStorage.getItem('soporteNombre') || resolveSupervisorFromUsername() || '';
+  const nombres = [...new Set(Object.values(typeof SUPERVISOR_USERNAME_MAP === 'object' ? SUPERVISOR_USERNAME_MAP : {}))];
+  document.getElementById('soporte-nombres-list').innerHTML = nombres.map(n => `<option value="${escapeHtml(String(n))}">`).join('');
+
+  document.getElementById('soporte-captura').value = '';
+  document.getElementById('soporte-captura-preview').style.display = 'none';
+  document.getElementById('soporte-captura-label').textContent = 'Adjuntar captura de pantalla (opcional)';
+  selectSoporteUrgencia('media');
+
+  const version = (document.querySelector('.sidebar-version') || {}).textContent || '';
+  const pantalla = soportePantallaActual();
+  document.getElementById('soporte-auto').innerHTML =
+    `<b>Se envía automáticamente:</b> tu usuario (${escapeHtml(localStorage.getItem('currentUserUsername') || '')}), ` +
+    `sector ${escapeHtml(soporteSectorActual() || '-')}, ${pantalla ? `la pantalla donde estabas (${escapeHtml(pantalla)}), ` : ''}` +
+    `${escapeHtml(version.trim() || 'la versión de la app')}, fecha y hora.`;
+  document.getElementById('soporte-modal').classList.add('open');
+}
+
+function closeSoporteModal() {
+  document.getElementById('soporte-modal').classList.remove('open');
+}
+
+function selectSoporteArea(btn) {
+  soporteArea = btn.dataset.k;
+  document.querySelectorAll('#soporte-areas .soporte-chip').forEach(b => b.classList.toggle('on', b === btn));
+}
+
+function selectSoporteUrgencia(v) {
+  soporteUrgencia = v;
+  document.querySelectorAll('#soporte-prio button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+}
+
+// Achica la captura antes de mandarla (una foto del celular puede pesar varios MB).
+function onSoporteCapturaChange() {
+  const input = document.getElementById('soporte-captura');
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 1280;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      soporteCapturaDataUrl = canvas.toDataURL('image/jpeg', 0.72);
+      const prev = document.getElementById('soporte-captura-preview');
+      prev.src = soporteCapturaDataUrl;
+      prev.style.display = 'block';
+      document.getElementById('soporte-captura-label').textContent = 'Cambiar captura';
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function enviarSoporte() {
+  const desc = document.getElementById('soporte-desc').value.trim();
+  const nombre = document.getElementById('soporte-nombre').value.trim();
+  if (!soporteArea) return showToast('Elegí en qué parte de la app fue el problema', 'warning');
+  if (!desc) { document.getElementById('soporte-desc').focus(); return showToast('Contanos qué pasó', 'warning'); }
+  if (!nombre) { document.getElementById('soporte-nombre').focus(); return showToast('Escribí tu nombre', 'warning'); }
+
+  const ordenSel = document.getElementById('soporte-orden');
+  const btn = document.getElementById('soporte-enviar-btn');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  try {
+    const res = await fetch('/api/soporte', {
+      method: 'POST',
+      headers: soporteHeaders(),
+      body: JSON.stringify({
+        area: soporteArea,
+        urgencia: soporteUrgencia,
+        titulo: document.getElementById('soporte-titulo').value.trim(),
+        descripcion: desc,
+        nombre,
+        sector: soporteSectorActual(),
+        orderId: ordenSel.value || null,
+        orderLabel: ordenSel.value ? ordenSel.options[ordenSel.selectedIndex].textContent : null,
+        pantalla: soportePantallaActual(),
+        appVersion: typeof CURRENT_APP_VERSION !== 'undefined' ? CURRENT_APP_VERSION : null,
+        captura: soporteCapturaDataUrl
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'No se pudo enviar');
+    localStorage.setItem('soporteNombre', nombre);
+    closeSoporteModal();
+    showToast('Pedido de soporte enviado. Te avisamos en la campana cuando esté resuelto.', 'success');
+    fetchSoporte();
+  } catch (e) {
+    showToast('Error al enviar: ' + e.message, 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Enviar a soporte';
+  }
+}
+
+async function fetchSoporte() {
+  if (!localStorage.getItem('currentUserUsername')) return;
+  try {
+    const res = await fetch('/api/soporte', { headers: soporteHeaders() });
+    if (!res.ok) return;
+    const data = await res.json();
+    soporteEsPanol = !!data.esPanol;
+    soporteTickets = Array.isArray(data.tickets) ? data.tickets : [];
+    actualizarSoporteBell();
+    const panel = document.getElementById('soporte-panel');
+    if (panel && panel.style.display !== 'none') renderSoportePanel();
+  } catch (e) {
+    console.warn('[Soporte] No se pudo actualizar:', e.message);
+  }
+}
+
+function actualizarSoporteBell() {
+  const bell = document.getElementById('soporte-bell');
+  const n = document.getElementById('soporte-bell-n');
+  if (!bell || !n) return;
+  // Pañol: pedidos sin resolver. Usuario: avisos de cambio de estado sin ver.
+  const count = soporteEsPanol
+    ? soporteTickets.filter(t => t.estado !== 'resuelto').length
+    : soporteTickets.filter(t => t.notifUsuario).length;
+  bell.classList.toggle('alerta', count > 0);
+  n.style.display = count > 0 ? 'flex' : 'none';
+  n.textContent = count > 99 ? '99+' : String(count);
+  bell.title = soporteEsPanol
+    ? (count ? `${count} pedido(s) de soporte sin resolver` : 'Pedidos de soporte')
+    : (count ? `${count} novedad(es) en tus pedidos de soporte` : 'Mis pedidos de soporte');
+
+  if (soporteEsPanol) {
+    const noLeidos = soporteTickets.filter(t => !t.leidoPanol && t.estado !== 'resuelto');
+    if (soporteNoLeidosPanolPrev !== null && noLeidos.length > soporteNoLeidosPanolPrev) {
+      const ult = noLeidos[0];
+      showToast(`Nuevo pedido de soporte de ${ult.nombre || ult.createdBy} (${ult.sector || '-'})`, 'warning');
+    }
+    soporteNoLeidosPanolPrev = noLeidos.length;
+  }
+}
+
+function soporteHace(iso) {
+  const ms = Date.now() - Date.parse(iso || '');
+  if (isNaN(ms)) return '';
+  const min = Math.round(ms / 60000);
+  if (min < 1) return 'recién';
+  if (min < 60) return `hace ${min} min`;
+  const hs = Math.round(min / 60);
+  if (hs < 24) return `hace ${hs} h`;
+  return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
+}
+
+function renderSoportePanel() {
+  const list = document.getElementById('soporte-panel-list');
+  const title = document.getElementById('soporte-panel-title');
+  const sub = document.getElementById('soporte-panel-sub');
+  if (!list) return;
+  const prioridad = { alta: 0, media: 1, baja: 2 };
+  let items = [...soporteTickets];
+  if (soporteEsPanol) {
+    const abiertos = items.filter(t => t.estado !== 'resuelto')
+      .sort((a, b) => (prioridad[a.urgencia] ?? 1) - (prioridad[b.urgencia] ?? 1) || String(b.createdAt).localeCompare(String(a.createdAt)));
+    const resueltos = items.filter(t => t.estado === 'resuelto').slice(0, 20);
+    items = [...abiertos, ...resueltos];
+    title.textContent = 'Pedidos de soporte';
+    sub.textContent = abiertos.length ? `${abiertos.length} sin resolver` : 'Todo resuelto';
+  } else {
+    title.textContent = 'Mis pedidos de soporte';
+    sub.textContent = '';
+  }
+  if (items.length === 0) {
+    list.innerHTML = `<div class="soporte-empty">${soporteEsPanol ? 'No hay pedidos de soporte.' : 'Todavía no mandaste pedidos de soporte.<br>Usá el botón redondo de abajo a la derecha si algo no anda.'}</div>`;
+    return;
+  }
+  const u = encodeURIComponent(localStorage.getItem('currentUserUsername') || '');
+  list.innerHTML = items.map(t => {
+    const nuevo = soporteEsPanol ? (!t.leidoPanol && t.estado !== 'resuelto') : !!t.notifUsuario;
+    const acciones = soporteEsPanol ? `
+      <div class="soporte-acts">
+        ${t.orderId ? `<button type="button" onclick="soporteVerOrden('${escapeHtml(t.orderId)}')">Ver orden</button>` : ''}
+        ${t.estado === 'pendiente' ? `<button type="button" onclick="soporteCambiarEstado('${t.id}', 'en_revision')">En revisión</button>` : ''}
+        ${t.estado !== 'resuelto' ? `<button type="button" class="ok" onclick="soporteCambiarEstado('${t.id}', 'resuelto')">Resuelto</button>` : `<button type="button" onclick="soporteCambiarEstado('${t.id}', 'pendiente')">Reabrir</button>`}
+      </div>` : '';
+    return `
+      <div class="soporte-tk ${nuevo ? 'nuevo' : ''}">
+        <div class="soporte-tk-dot"></div>
+        <div class="soporte-tk-body">
+          <b class="t">${escapeHtml(t.titulo || '(sin título)')}</b>
+          <div>
+            <span class="soporte-tag est-${t.estado}">${SOPORTE_ESTADO_LABEL[t.estado] || t.estado}</span>
+            <span class="soporte-tag ${t.urgencia}">${SOPORTE_URGENCIA_LABEL[t.urgencia] || ''}</span>
+            <span class="soporte-tag area">${escapeHtml(t.area || '')}</span>
+          </div>
+          <p>${escapeHtml(t.descripcion || '')}</p>
+          ${soporteEsPanol ? `<div class="soporte-who"><span class="material-icons">person</span><b>Pedido por:</b> ${escapeHtml(t.nombre || '-')} <span style="color:#94a3b8;">(${escapeHtml(t.createdBy || '')})</span> <span class="sec">Sector: ${escapeHtml(t.sector || '-')}</span></div>` : ''}
+          <div class="soporte-meta">${t.orderLabel ? escapeHtml(t.orderLabel) + ' · ' : ''}${t.pantalla ? 'Pantalla: ' + escapeHtml(t.pantalla) + ' · ' : ''}${soporteHace(t.createdAt)}${t.estado === 'resuelto' && t.resueltoAt ? ' · resuelto ' + soporteHace(t.resueltoAt) : ''}</div>
+          ${t.respuesta ? `<div class="soporte-resp"><b>Respuesta de Pañol:</b> ${escapeHtml(t.respuesta)}</div>` : ''}
+          ${t.tieneCaptura ? `<img class="soporte-captura-thumb" src="/api/soporte/${t.id}/captura?u=${u}" alt="Captura" onclick="window.open(this.src, '_blank')">` : ''}
+          ${acciones}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleSoportePanel(e) {
+  if (e) e.stopPropagation();
+  const panel = document.getElementById('soporte-panel');
+  if (!panel) return;
+  if (panel.style.display !== 'none') { cerrarSoportePanel(); return; }
+  renderSoportePanel();
+  panel.style.display = 'flex';
+  fetchSoporte();
+}
+
+// Al cerrar el panel, lo que se vio queda como leído (el resaltado se mantiene mientras está abierto).
+function cerrarSoportePanel() {
+  const panel = document.getElementById('soporte-panel');
+  if (panel) panel.style.display = 'none';
+  const ids = soporteEsPanol
+    ? soporteTickets.filter(t => !t.leidoPanol).map(t => t.id)
+    : soporteTickets.filter(t => t.notifUsuario).map(t => t.id);
+  if (ids.length === 0) return;
+  soporteTickets.forEach(t => { if (ids.includes(t.id)) { if (soporteEsPanol) t.leidoPanol = true; else t.notifUsuario = false; } });
+  actualizarSoporteBell();
+  fetch('/api/soporte/marcar-leidos', { method: 'POST', headers: soporteHeaders(), body: JSON.stringify({ ids }) }).catch(() => {});
+}
+
+async function soporteCambiarEstado(id, estado) {
+  let respuesta;
+  if (estado === 'resuelto') {
+    respuesta = prompt('Respuesta para el que pidió soporte (opcional):', '');
+    if (respuesta === null) return; // canceló
+  }
+  try {
+    const res = await fetch(`/api/soporte/${encodeURIComponent(id)}`, {
+      method: 'PATCH', headers: soporteHeaders(), body: JSON.stringify({ estado, respuesta })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'No se pudo actualizar');
+    showToast(estado === 'resuelto' ? 'Marcado como resuelto: se le avisó al usuario' : `Estado: ${SOPORTE_ESTADO_LABEL[estado]}`, 'success');
+    await fetchSoporte();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'danger');
+  }
+}
+
+function soporteVerOrden(orderId) {
+  cerrarSoportePanel();
+  if (typeof viewOrder === 'function') viewOrder(orderId);
+}
