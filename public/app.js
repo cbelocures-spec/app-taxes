@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '397';
+const CURRENT_APP_VERSION = '398';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -1930,6 +1930,21 @@ async function submitPreOrderCheck() {
     // el Rodado fijo real de esta categoria a mano.
     if (window._lavaderoNumberedRodado) {
       setSearchableSelectValue(document.getElementById('form-rodado'), window._lavaderoNumberedRodado);
+      // El 'change' del Rodado autocompleta el Interno con el interno del catálogo de ese
+      // "cajón" (ej. "Lavado Tachos") y pisaba el interno numerado ("Lavado Tachos 55") - así
+      // se subía a Taxes sin el número. Se vuelve a poner el interno real después.
+      const formInternoEl = document.getElementById('form-interno');
+      if (formInternoEl && formInternoEl.value !== interno) {
+        if (!Array.from(formInternoEl.options).some(opt => opt.value === interno)) {
+          const newOpt = document.createElement('option');
+          newOpt.value = interno;
+          newOpt.textContent = interno;
+          formInternoEl.appendChild(newOpt);
+        }
+        formInternoEl.value = interno;
+        if (formInternoEl.rebuildSearchable) formInternoEl.rebuildSearchable();
+        showNoveltiesForInterno(interno);
+      }
     }
     if (isParticularPreOrder) {
       // Activa el modo Lavado Particular en la pantalla completa (oculta Rodado/Interno reales
