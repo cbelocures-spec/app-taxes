@@ -939,7 +939,11 @@ class LocalDB {
       // orders for the same building (one per área), and without área here they all share
       // the same interno+sector+clasificacion and got wrongly folded into a single card,
       // silently dumping every área's tasks into whichever order was created first.
-      const key = order.interno
+      // Las órdenes de un lavado de varios tachos nunca se fusionan con otra del mismo interno:
+      // si el primer tacho ya tenía una orden abierta, las dos quedaban en una sola tarjeta y el
+      // "Fin" terminaba guardándose en la orden vieja - la del grupo nunca se finalizaba y el
+      // tiempo no se repartía entre los tachos.
+      const key = (order.interno && !order.grupoLavado)
         ? `${String(order.interno).trim().toLowerCase()}::${classifySectorFromClasificacion(order.clasificacion)}::${String(order.clasificacion || '').trim().toLowerCase()}::${String(order.area || '').trim().toLowerCase()}`
         : String(order.id);
       if (!uniqueMap.has(key)) {

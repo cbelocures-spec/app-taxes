@@ -1882,6 +1882,21 @@ function otClaimedByDifferentArea(otNumero, area, excludeOrderId) {
   );
 }
 
+// Una orden de un lavado de varios tachos siempre tiene su propia O.T.: no reutiliza una que ya
+// esté asignada a OTRA orden local (pasó con el primer tacho, que ya tenía una orden abierta del
+// mismo interno: el grupo terminó compartiendo la O.T. y el tiempo nunca se repartió).
+function otYaAsignadaAOtraOrden(otNumero, excludeOrderId) {
+  if (!otNumero) return false;
+  const otClean = String(otNumero).replace(/\D/g, '');
+  return (db.read().workOrders || []).some(o =>
+    String(o.id) !== String(excludeOrderId) && o.deleted !== true &&
+    o.taxesOrderNumber && String(o.taxesOrderNumber).replace(/\D/g, '') === otClean);
+}
+function otNoReutilizable(otNumero, order, orderId) {
+  return otClaimedByDifferentArea(otNumero, order.area, orderId) ||
+    (!!order.grupoLavado && otYaAsignadaAOtraOrden(otNumero, orderId));
+}
+
 // 2. SYNCHRONIZE SINGLE WORK ORDER (REPARADO ANTI-DUPLICADOS VELOCES)
 async function syncWorkOrder(orderId) {
   let order = db.getWorkOrderById(orderId);
@@ -1947,7 +1962,7 @@ async function syncWorkOrder(orderId) {
     // IMPORTANT: never reuse an OT whose order already went back to Operativo — eso significa
     // que esa avería quedó cerrada, y una orden nueva para el mismo interno es una avería
     // distinta que necesita su propio O.T.
-    if (!order.taxesOrderNumber && order.interno) {
+    if (!order.taxesOrderNumber && order.interno && !order.grupoLavado) {
       const dbData = db.read();
       const existingWithOt = (dbData.workOrders || []).find(o =>
         String(o.id) !== String(orderId) &&
@@ -2057,7 +2072,7 @@ async function syncWorkOrder(orderId) {
 
         if (existingOpenTaxesOt && otBloqueadaPorUnidadOperativa(order.interno, order.clasificacion, existingOpenTaxesOt, orderId)) {
           console.log(`[Alta O.T.] O.T. #${existingOpenTaxesOt} detectada para Interno ${order.interno}, pero esa unidad ya pasó a Operativo en BD local (avería cerrada). Se procederá a crear una NUEVA O.T.`);
-        } else if (existingOpenTaxesOt && otClaimedByDifferentArea(existingOpenTaxesOt, order.area, orderId)) {
+        } else if (existingOpenTaxesOt && otNoReutilizable(existingOpenTaxesOt, order, orderId)) {
           console.log(`[Alta O.T.] O.T. #${existingOpenTaxesOt} detectada para Interno ${order.interno}, pero ya pertenece a otra orden local de distinta área ("${order.area}"). Se procederá a crear una NUEVA O.T.`);
         } else if (existingOpenTaxesOt) {
           console.log(`[Alta O.T.] O.T. abierta en proceso #${existingOpenTaxesOt} detectada para Interno ${order.interno}. Vinculando sin crear nueva...`);
@@ -3565,7 +3580,7 @@ async function syncWorkOrder(orderId) {
 
       if (existingOtOnPage && otBloqueadaPorUnidadOperativa(order.interno, order.clasificacion, existingOtOnPage, orderId)) {
         console.log(`[Pre-Check Safeguard] OT #${existingOtOnPage} para Interno ${order.interno} corresponde a una avería ya Operativa en BD local. No se reutiliza; se continuará creando una O.T. nueva.`);
-      } else if (existingOtOnPage && otClaimedByDifferentArea(existingOtOnPage, order.area, orderId)) {
+      } else if (existingOtOnPage && otNoReutilizable(existingOtOnPage, order, orderId)) {
         console.log(`[Pre-Check Safeguard] OT #${existingOtOnPage} para Interno ${order.interno} ya pertenece a otra orden local de distinta área ("${order.area}"). No se reutiliza; se continuará creando una O.T. nueva.`);
       } else if (existingOtOnPage) {
         console.log(`[Pre-Check Safeguard] Found pre-existing OT #${existingOtOnPage} for Interno ${order.interno} on date ${todayDateStr} in Taxes! Linking and switching to reconciliation...`);
@@ -4876,7 +4891,7 @@ async function syncExpressOtHeader(orderId) {
 
     if (existingTableOt && otBloqueadaPorUnidadOperativa(order.interno, order.clasificacion, existingTableOt, orderId)) {
       console.log(`[Express OT Pre-Check] OT #${existingTableOt} para Interno ${order.interno} corresponde a una avería ya Operativa en BD local. No se reutiliza; se creará una O.T. nueva.`);
-    } else if (existingTableOt && otClaimedByDifferentArea(existingTableOt, order.area, orderId)) {
+    } else if (existingTableOt && otNoReutilizable(existingTableOt, order, orderId)) {
       console.log(`[Express OT Pre-Check] OT #${existingTableOt} para Interno ${order.interno} ya pertenece a otra orden local de distinta área ("${order.area}"). No se reutiliza; se creará una O.T. nueva.`);
     } else if (existingTableOt) {
       console.log(`[Express OT Pre-Check] Found pre-existing OT #${existingTableOt} in Taxes for Interno ${order.interno} on ${expressTodayDateStr}! Linking immediately.`);

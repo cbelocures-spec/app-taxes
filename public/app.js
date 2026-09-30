@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '401';
+const CURRENT_APP_VERSION = '402';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -1741,6 +1741,11 @@ async function submitPreOrderCheck() {
     // cronómetro; el server crea una orden por cada tacho extra (ver POST /api/orders).
     if (window._lavaderoMultiTachos) {
       const numeros = getLavaderoTachosNumeros();
+      const invalido = numeros.find(n => !/\d/.test(n));
+      if (invalido) {
+        showToast(`"${invalido}" no es un número de tacho válido. Revisá los números antes de continuar.`, 'danger');
+        return;
+      }
       numero = numeros[0] || '';
       if (numeros.length > 1) {
         window._grupoLavadoPendiente = { prefijo: window._lavaderoNumberedPrefix, tachos: numeros };
@@ -6315,6 +6320,10 @@ function renderDashboard() {
     const seenTaskKeys = new Set();
 
     activeLocalOrders.forEach(order => {
+      // Lavado de varios tachos: las órdenes "miembro" no tienen cronómetro propio (su tiempo
+      // sale del reparto de la líder) - no van al tablero, si no aparecen como "en pausa" con
+      // Iniciar/Fin y el lavador las termina por separado.
+      if (order.grupoLavado && order.grupoLavado.rol === 'miembro') return;
       (order.tasks || []).forEach(task => {
         if (task && task.status !== 'Finalizada') {
           const empOpt = (cachedCatalogs && cachedCatalogs.empleados)
