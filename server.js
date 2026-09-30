@@ -73,7 +73,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '398';
+const APP_VERSION = '399';
 
 // Middleware
 app.use(cors());
@@ -1085,6 +1085,52 @@ app.post('/api/orders', (req, res) => {
     // conflicts here too, not just on later edits.
     autoPauseConflictingTimers(newOrder.id, newOrder.tasks, null);
 
+    // Lavado de varios tachos juntos (Lavadero > Tachos): esta orden (primer tacho) es la
+    // "líder" y lleva el cronómetro real; por cada tacho extra se crea acá mismo una orden
+    // "miembro" con las mismas tareas pero sin cronómetro. Al finalizar, repartirGrupoLavado
+    // (database.js) divide el tiempo en partes iguales. Se crean en el server, en el mismo
+    // pedido, para que nunca quede un grupo a medio crear si se corta la conexión del celular.
+    let responseOrder = newOrder;
+    const grupoIn = req.body.grupoLavado;
+    if (grupoIn && isLavadero(finalClasificacion) && Array.isArray(grupoIn.tachos) && grupoIn.prefijo) {
+      const prefijo = String(grupoIn.prefijo).trim();
+      const tachos = [...new Set(grupoIn.tachos.map(t => String(t || '').trim()).filter(Boolean))].slice(0, 30);
+      if (tachos.length > 1) {
+        const gid = db.genUniqueId();
+        responseOrder = db.updateWorkOrder(newOrder.id, {
+          grupoLavado: { id: gid, rol: 'lider', prefijo, tachos, internos: tachos.map(t => `${prefijo} ${t}`) }
+        }) || newOrder;
+        tachos.slice(1).forEach(numero => {
+          db.createWorkOrder({
+            rodado: resolvedRodado,
+            responsable,
+            fechaEntrega,
+            horario,
+            interno: `${prefijo} ${numero}`,
+            clasificacion: finalClasificacion,
+            incidente,
+            tasks: (newOrder.tasks || []).map(t => ({
+              centroCosto: t.centroCosto,
+              empleado: t.empleado,
+              descripcion: t.descripcion,
+              insumos: t.insumos,
+              status: 'Pendiente',
+              horasEstimadas: 0,
+              timerStart: null,
+              timerStarted: false,
+              timerHistory: [],
+              grupoLiderTaskId: t.id
+            })),
+            createdBy,
+            estadoUnidad: newOrder.estadoUnidad,
+            sector,
+            grupoLavado: { id: gid, rol: 'miembro', liderOrderId: newOrder.id }
+          });
+        });
+        console.log(`[POST /api/orders] Grupo de lavado ${gid}: ${tachos.length} tachos (${tachos.join(', ')}), líder ${newOrder.id}`);
+      }
+    }
+
     ['Herrería', 'Edilicio', 'Taller', 'Lavadero'].forEach(foreignSector => {
       if (foreignSector === homeSector) return;
       routeForeignTasksToSiblingOrder(foreignSector, foreignTasksForNewOrder[foreignSector], {
@@ -1103,7 +1149,7 @@ app.post('/api/orders', (req, res) => {
     });
 
     // Respond immediately to the frontend so UI never freezes or hangs
-    res.status(201).json(newOrder);
+    res.status(201).json(responseOrder);
 
     // Run all background webhooks asynchronously after response
     setImmediate(() => {
@@ -1617,6 +1663,9 @@ app.put('/api/orders/:id', (req, res) => {
         synced: synced,
         taxesRealizadaSynced: taxesRealizadaSynced,
         verifiedLocked: existingTask ? (existingTask.verifiedLocked === true) : false,
+        // Lavado de varios tachos: el vínculo con la tarea de la orden líder no viene del cliente.
+        grupoLiderTaskId: existingTask ? (existingTask.grupoLiderTaskId || null) : null,
+        grupoHorasTotal: existingTask ? existingTask.grupoHorasTotal : undefined,
         // Preserve which insumos were already pushed to the Google Sheet - without this,
         // every save of the order forgot this field and re-sent the same insumos again.
         sentInsumos: Array.isArray(existingTask ? existingTask.sentInsumos : null) ? existingTask.sentInsumos : []

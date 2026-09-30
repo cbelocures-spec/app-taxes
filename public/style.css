@@ -3587,6 +3587,14 @@ body {
   border-radius: 6px; border: 1px solid #cbd5e1;
 }
 
+/* Lavado de varios tachos juntos (filtro de Lavadero > Tachos) */
+.lav-tacho-extra-row { display: flex; gap: 8px; margin-top: 8px; }
+.lav-tacho-extra-row input { flex: 1; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; }
+.lav-tacho-extra-row button { width: 42px; flex-shrink: 0; border: none; background: #fee2e2; color: #dc2626; border-radius: 8px; font-size: 20px; cursor: pointer; }
+.lav-add-tacho-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 8px; padding: 10px 14px; background: #fff; border: 1px dashed #1e40af; color: #1e40af; font-weight: 700; font-size: 14px; border-radius: 8px; cursor: pointer; }
+.lav-grupo-badge { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 6px; font-size: 12px; font-weight: 700; color: #075985; }
+.lav-grupo-badge span { background: #e0f2fe; border-radius: 6px; padding: 2px 7px; }
+
 /* Tareas Asignadas escritas a mano: formulario + columnas por turno */
 .ta-man-form { display: grid; grid-template-columns: 160px 1fr 140px 130px auto; gap: 10px; align-items: end; margin-bottom: 16px; }
 .ta-man-f label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }

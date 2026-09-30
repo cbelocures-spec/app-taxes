@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '398';
+const CURRENT_APP_VERSION = '399';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -1100,6 +1100,13 @@ function openPreOrderModal() {
   // vuelve a mostrar selectLavaderoCategoria si la categoria elegida lo necesita.
   window._lavaderoNumberedPrefix = null;
   window._lavaderoNumberedRodado = null;
+  // Lavado de varios tachos: se reactiva solo si se elige la categoría Tachos.
+  window._lavaderoMultiTachos = false;
+  window._grupoLavadoPendiente = null;
+  const extraTachos = document.getElementById('pre-lavadero-extra-tachos');
+  if (extraTachos) extraTachos.innerHTML = '';
+  const addTachoBtn = document.getElementById('pre-lavadero-add-tacho-btn');
+  if (addTachoBtn) addTachoBtn.style.display = 'none';
   const preLavaderoNumberedGroup = document.getElementById('pre-lavadero-numbered-group');
   const preLavaderoNumberedInput = document.getElementById('pre-lavadero-numbered-input');
   if (preLavaderoNumberedGroup) preLavaderoNumberedGroup.style.display = 'none';
@@ -1723,9 +1730,19 @@ async function submitPreOrderCheck() {
   // Categorias de Lavadero con numero propio (Volquetes/Cajas/Prensas/Tachos): el Interno de
   // la orden no es el Rodado fijo del catalogo, es "<categoria> <numero tipeado>" (ej. "Lavado
   // Volquete 55") - el Rodado real se reaplica mas abajo, despues de abrir la pantalla completa.
+  window._grupoLavadoPendiente = null;
   if (window._lavaderoNumberedPrefix) {
     const numberedInput = document.getElementById('pre-lavadero-numbered-input');
-    const numero = numberedInput ? numberedInput.value.trim() : '';
+    let numero = numberedInput ? numberedInput.value.trim() : '';
+    // Tachos: pueden venir varios (casilleros extra). El primero es la orden "líder" con el
+    // cronómetro; el server crea una orden por cada tacho extra (ver POST /api/orders).
+    if (window._lavaderoMultiTachos) {
+      const numeros = getLavaderoTachosNumeros();
+      numero = numeros[0] || '';
+      if (numeros.length > 1) {
+        window._grupoLavadoPendiente = { prefijo: window._lavaderoNumberedPrefix, tachos: numeros };
+      }
+    }
     if (!numero) {
       showToast('Ingresá el número de interno de la unidad.', 'danger');
       return;
@@ -1823,7 +1840,8 @@ async function submitPreOrderCheck() {
   // "Lavado Otros: <item>" son internos compartidos por cualquier auto/objeto de ese mismo
   // tipo, asi que matchear por interno mezclaria un lavado con otro sin relacion - cada uno
   // tiene que crear su propia orden nueva siempre.
-  if (!isCarmona && !isParticularPreOrder && !isOtrosItemPreOrder) {
+  // Un lavado de varios tachos siempre es una orden nueva (con su grupo), nunca reusa una abierta.
+  if (!isCarmona && !isParticularPreOrder && !isOtrosItemPreOrder && !window._grupoLavadoPendiente) {
     // Only match existing order if it is fuera_de_servicio, belongs to the SAME sector group,
     // AND has the SAME clasificacion - a Correctivo/Preventivo/Auxilio for the same vehicle
     // are separate jobs and must always get their own order, never get merged into whichever
@@ -4233,8 +4251,10 @@ function renderOrders() {
 
   // Apply search filtering for all orders
   const query = document.getElementById('order-search').value.toLowerCase();
-  const filtered = filteredActiveOrders.filter(o => 
-    (o.rodado || '').toLowerCase().includes(query) || 
+  // Lavado de varios tachos: las órdenes "miembro" no tienen tarjeta propia - se manejan desde
+  // la del primer tacho (líder), que muestra todos los tachos del grupo y lleva el cronómetro.
+  const filtered = filteredActiveOrders.filter(o => !(o.grupoLavado && o.grupoLavado.rol === 'miembro')).filter(o =>
+    (o.rodado || '').toLowerCase().includes(query) ||
     (o.interno || '').toLowerCase().includes(query) || 
     (o.clasificacion || '').toLowerCase().includes(query)
   );
@@ -4578,6 +4598,13 @@ function createOrderCardHtml(order) {
               <div style="font-size:12px; color:var(--text-muted); margin-top:4px; display:flex; align-items:flex-start; gap:4px;" title="Motivo con el que se creó esta orden">
                 <span class="material-icons" style="font-size:14px; flex-shrink:0; margin-top:1px;">info</span>
                 <span style="font-style:italic;">${escapeHtml(order.incidente)}</span>
+              </div>
+            ` : ''}
+            ${(order.grupoLavado && order.grupoLavado.rol === 'lider' && Array.isArray(order.grupoLavado.tachos)) ? `
+              <div class="lav-grupo-badge" title="Un solo cronómetro: al finalizar, el tiempo se reparte en partes iguales entre estos tachos (una orden por tacho)">
+                <span class="material-icons" style="font-size:15px; background:none; padding:0;">layers</span>
+                Lavado de ${order.grupoLavado.tachos.length} tachos:
+                ${order.grupoLavado.tachos.map(t => `<span>#${escapeHtml(String(t))}</span>`).join('')}
               </div>
             ` : ''}
           </div>
@@ -5054,9 +5081,11 @@ async function submitWorkOrder() {
       // (which used to make it invisible to Edilicio/Herrería users, since the server otherwise
       // only had the creator's own login-derived sector to go on).
       sector: currentSelectedSector,
-      area: isEdilicioForm ? areaVal : (editingOrder ? editingOrder.area : null)
+      area: isEdilicioForm ? areaVal : (editingOrder ? editingOrder.area : null),
+      // Lavado de varios tachos (solo al crear): el server arma las órdenes de los otros tachos.
+      grupoLavado: (!currentEditingOrderId && window._grupoLavadoPendiente) ? window._grupoLavadoPendiente : undefined
     };
-   
+
     const url = currentEditingOrderId ? `/api/orders/${currentEditingOrderId}` : '/api/orders';
     const method = currentEditingOrderId ? 'PUT' : 'POST';
    
@@ -5086,7 +5115,11 @@ async function submitWorkOrder() {
       }
     });
     
-    const msg = currentEditingOrderId ? "Orden de Trabajo actualizada y encolada" : "Orden de Trabajo guardada y encolada para Taxes";
+    const grupoCreado = !currentEditingOrderId && window._grupoLavadoPendiente;
+    window._grupoLavadoPendiente = null;
+    const msg = currentEditingOrderId
+      ? "Orden de Trabajo actualizada y encolada"
+      : (grupoCreado ? `Lavado de ${grupoCreado.tachos.length} tachos en marcha (una orden por tacho)` : "Orden de Trabajo guardada y encolada para Taxes");
     showToast(msg, "success");
     closeNewOrderModal();
     await fetchOrders();
@@ -13579,7 +13612,8 @@ const LAVADERO_CATEGORIAS = {
   caja_rolloff:    { imagen: 'lavadero/caja_rolloff.jpg', rodado: 'lavado Caja Roll-Off', numeradoPrefijo: 'Lavado Caja Roll-Off', numeradoLabel: 'Número de Interno de la Caja *' },
   prensa_volquete: { imagen: 'lavadero/prensa_volquete.jpg', rodado: 'Lavado Prensa Volquete', numeradoPrefijo: 'Lavado Prensa Volquete', numeradoLabel: 'Número de Interno de la Prensa *' },
   prensa_rolloff:  { imagen: 'lavadero/prensa_rolloff.jpg', rodado: 'Lavado Prensa Roll-off', numeradoPrefijo: 'Lavado Prensa Roll-Off', numeradoLabel: 'Número de Interno de la Prensa *' },
-  tachos:          { imagen: 'lavadero/tachos.jpg', rodado: 'Lavado Tachos', numeradoPrefijo: 'Lavado Tachos', numeradoLabel: 'Número de Interno del Tacho *' },
+  // multiTachos: se pueden lavar varios juntos con un solo cronómetro (una orden por tacho).
+  tachos:          { imagen: 'lavadero/tachos.jpg', rodado: 'Lavado Tachos', numeradoPrefijo: 'Lavado Tachos', numeradoLabel: 'Número de Interno del Tacho *', multiTachos: true },
   playa:           { imagen: 'lavadero/playa.jpg', rodado: 'Lavado Playa', sectorMode: true },
   otros:           { imagen: 'lavadero/otros.jpg', rodado: 'Lavado Otros', otrosItemMode: true },
   particular:      { imagen: 'lavadero/particular.jpg', personaMode: true },
@@ -13656,6 +13690,9 @@ function selectLavaderoCategoria(categoria) {
     if (rodadoGroup) rodadoGroup.style.display = 'none';
     if (numberedGroup) numberedGroup.style.display = 'block';
     if (numberedLabel) numberedLabel.textContent = config.numeradoLabel;
+    window._lavaderoMultiTachos = !!config.multiTachos;
+    const addTachoBtn = document.getElementById('pre-lavadero-add-tacho-btn');
+    if (addTachoBtn) addTachoBtn.style.display = config.multiTachos ? 'flex' : 'none';
     updateLavaderoNumberedPreview();
   }
 
@@ -13698,7 +13735,33 @@ function updateLavaderoNumberedPreview() {
   if (!input || !preview) return;
   const num = input.value.trim();
   const prefix = window._lavaderoNumberedPrefix || 'Lavado';
+  const numeros = getLavaderoTachosNumeros();
+  if (window._lavaderoMultiTachos && numeros.length > 1) {
+    preview.textContent = `Se van a crear ${numeros.length} órdenes (un solo cronómetro, el tiempo se reparte en partes iguales): ${numeros.map(n => `${prefix} ${n}`).join(' · ')}`;
+    return;
+  }
   preview.textContent = `Título de la orden: ${prefix}${num ? ' ' + num : ''}`;
+}
+
+// Números de tacho cargados en el filtro: el casillero principal + los extra, sin vacíos ni repetidos.
+function getLavaderoTachosNumeros() {
+  const principal = document.getElementById('pre-lavadero-numbered-input');
+  const vals = [principal ? principal.value : '',
+    ...Array.from(document.querySelectorAll('#pre-lavadero-extra-tachos .lav-tacho-extra-input')).map(i => i.value)];
+  return [...new Set(vals.map(v => String(v || '').trim()).filter(Boolean))];
+}
+
+function addLavaderoTachoExtra() {
+  const cont = document.getElementById('pre-lavadero-extra-tachos');
+  if (!cont) return;
+  const row = document.createElement('div');
+  row.className = 'lav-tacho-extra-row';
+  row.innerHTML = `
+    <input type="text" class="lav-tacho-extra-input" placeholder="Número del otro tacho" inputmode="numeric" oninput="updateLavaderoNumberedPreview()">
+    <button type="button" title="Quitar este tacho" onclick="this.parentElement.remove(); updateLavaderoNumberedPreview();">×</button>`;
+  cont.appendChild(row);
+  row.querySelector('input').focus();
+  updateLavaderoNumberedPreview();
 }
 
 // --- Lavado Particular (Lavadero) ---
@@ -17535,6 +17598,7 @@ function getPendingTasksForAsignacion() {
   activeOrders.forEach(order => {
     if (order.status === 'Archivada' || order.status === 'Eliminada') return;
     if (!esOrdenDeParteTaller(order)) return;
+    if (order.grupoLavado && order.grupoLavado.rol === 'miembro') return; // se maneja desde la líder
     (order.tasks || []).forEach(task => {
       if (task.status === 'Finalizada') return;
       rows.push({

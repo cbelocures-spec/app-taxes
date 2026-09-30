@@ -371,6 +371,77 @@ const DEFAULT_DB = {
   tareasAsignadasManuales: []
 };
 
+// Horas decimales de una tarea: horasEstimadas si ya las tiene, si no desde su cronómetro
+// (mismo emparejado Inició/Reanudó -> Pausó/Fin que usa syncWorker para subir a Taxes).
+function horasDeTareaParaGrupo(task) {
+  const h = parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0;
+  if (h > 0) return h;
+  let totalMs = 0, start = null;
+  [...(task.timerHistory || [])].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)).forEach(e => {
+    const type = String(e.type || e.event || '').trim().toLowerCase();
+    if (type.startsWith('inici') || type.startsWith('reanud')) start = e.timestamp;
+    else if ((type.startsWith('paus') || type.startsWith('fin')) && start !== null) { totalMs += e.timestamp - start; start = null; }
+  });
+  return Math.round((totalMs / 3600000) * 100) / 100;
+}
+
+// Lavado de varios tachos juntos: el cronómetro real vive SOLO en la orden líder (así el
+// Informe de Horas cuenta una sola vez el tiempo del lavador). Cuando una tarea de la líder
+// queda Finalizada, su tiempo total se divide en partes iguales entre todos los tachos del
+// grupo: la líder se queda con su parte y cada orden miembro recibe la suya en la tarea
+// equivalente, que se finaliza y se encola para Taxes. Muta `db` en el lugar - lo guarda
+// quien llama (updateWorkOrder).
+function repartirGrupoLavado(db, lider) {
+  if (!lider || !lider.grupoLavado || lider.grupoLavado.rol !== 'lider') return;
+  const gid = lider.grupoLavado.id;
+  const miembros = (db.workOrders || []).filter(o =>
+    o && o.id !== lider.id && o.deleted !== true && o.grupoLavado && o.grupoLavado.id === gid && o.grupoLavado.rol === 'miembro');
+  if (miembros.length === 0) return;
+  const n = miembros.length + 1;
+  const partes = lider.grupoLavado.partes || {};
+
+  (lider.tasks || []).forEach(lt => {
+    if (!lt || lt.status !== 'Finalizada') return;
+    if (partes[lt.id] !== undefined) {
+      // Ya repartida: si la app re-envía el total (recalculado del cronómetro), se vuelve a su parte.
+      lt.horasEstimadas = partes[lt.id];
+      return;
+    }
+    const total = horasDeTareaParaGrupo(lt);
+    const parte = Math.round((total / n) * 100) / 100;
+    lt.horasEstimadas = parte;
+    lt.grupoHorasTotal = total;
+    partes[lt.id] = parte;
+    miembros.forEach(m => {
+      const tasks = m.tasks || [];
+      const mt = tasks.find(t => t && t.grupoLiderTaskId === lt.id)
+        || tasks.find(t => t && t.status !== 'Finalizada' && t.empleado === lt.empleado);
+      if (!mt || mt.status === 'Finalizada') return;
+      mt.horasEstimadas = parte;
+      mt.status = 'Finalizada';
+      mt.taxesRealizadaSynced = false;
+      if (!mt.date && lt.date) mt.date = lt.date;
+      m.estadoUnidad = lider.estadoUnidad || m.estadoUnidad;
+      m.syncStatus = 'pending';
+      m.syncError = null;
+    });
+    console.log(`[GrupoLavado ${gid}] Tarea ${lt.id} (${lt.empleado}): ${total}h / ${n} tachos = ${parte}h c/u`);
+  });
+  lider.grupoLavado = { ...lider.grupoLavado, partes };
+
+  // Las miembro no tienen tarjeta propia en la app (se manejan desde la líder): cuando la líder
+  // cambia de estado (ej. pasa a Operativo), las miembro ya terminadas la siguen - si no, el
+  // worker nunca las sube (saltea las fuera de servicio que ya tienen O.T.).
+  miembros.forEach(m => {
+    const terminada = (m.tasks || []).length > 0 && m.tasks.every(t => t && t.status === 'Finalizada');
+    if (terminada && lider.estadoUnidad && m.estadoUnidad !== lider.estadoUnidad) {
+      m.estadoUnidad = lider.estadoUnidad;
+      m.syncStatus = 'pending';
+      m.syncError = null;
+    }
+  });
+}
+
 // Thread-safe read/write helper
 class LocalDB {
   constructor() {
@@ -980,6 +1051,9 @@ class LocalDB {
       timerStart: t.timerStart || null,
       timerStarted: t.timerStarted === true || t.timerStarted === 'true',
       timerHistory: Array.isArray(t.timerHistory) ? t.timerHistory : [],
+      // Lavado de varios tachos juntos: en las órdenes "miembro" del grupo, id de la tarea de la
+      // orden líder de la que esta tarea recibe su parte del tiempo (ver repartirGrupoLavado).
+      grupoLiderTaskId: t.grupoLiderTaskId || null,
       synced: false // Tracks if initially created in Taxes
     }));
 
@@ -1015,6 +1089,8 @@ class LocalDB {
       // Nombre de la persona elegida en "Lavado Particular" (Lavadero) - reemplaza el interno
       // real (que no existe para un auto que no es de flota) como título de la orden en Taxes.
       lavadoParticularPersona: orderData.lavadoParticularPersona || null,
+      // Lavado de varios tachos juntos: { id, rol: 'lider'|'miembro', ... } - ver repartirGrupoLavado.
+      grupoLavado: orderData.grupoLavado || null,
       archived: !!orderData.archived,
       deleted: !!orderData.deleted,
       deletedAt: orderData.deletedAt || null
@@ -1061,6 +1137,9 @@ class LocalDB {
 
       const explicitArchiveOverride = Object.prototype.hasOwnProperty.call(cleanUpdates, 'archived');
       db.workOrders[idx] = { ...db.workOrders[idx], ...cleanUpdates };
+      // Va acá (y no en cada endpoint) porque todo lo que finaliza una tarea - la app, el
+      // sincronizador, finalize-tasks - termina pasando por updateWorkOrder.
+      repartirGrupoLavado(db, db.workOrders[idx]);
 
       // Auto-archive to Historial once every task is both Finalizada/Completada AND already
       // synced to Taxes, and the unit is back in service. syncWorker.js/railway_sync_agent.js

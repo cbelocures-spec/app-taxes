@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=58">
+  <link rel="stylesheet" href="style.css?v=59">
   <script>
     (function() {
       try {
@@ -1948,7 +1948,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.40</div>
+      <div class="sidebar-version">Versión 1.27.41</div>
     </div>
   </aside>
 
@@ -2043,6 +2043,11 @@
         <div class="form-group" id="pre-lavadero-numbered-group" style="margin-top: 15px; display: none;">
           <label id="pre-lavadero-numbered-label" for="pre-lavadero-numbered-input">Número de Interno de la Unidad *</label>
           <input type="text" id="pre-lavadero-numbered-input" placeholder="Ej: 55" inputmode="numeric" oninput="updateLavaderoNumberedPreview()" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box;">
+          <!-- Lavado de varios tachos juntos: un casillero extra por tacho (solo categoría Tachos) -->
+          <div id="pre-lavadero-extra-tachos"></div>
+          <button type="button" id="pre-lavadero-add-tacho-btn" class="lav-add-tacho-btn" style="display: none;" onclick="addLavaderoTachoExtra()">
+            <span class="material-icons" style="font-size: 18px;">add</span> Agregar otro tacho
+          </button>
           <div id="pre-lavadero-numbered-preview" style="margin-top: 8px; background: var(--primary-light); color: var(--primary-hover); border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 600;"></div>
         </div>
         <div class="form-group" id="pre-lavado-particular-persona-group" style="margin-top: 15px; display: none;">
@@ -3218,6 +3223,6 @@
     }
   </style>
 
-  <script src="app.js?v=398"></script>
+  <script src="app.js?v=399"></script>
 </body>
 </html>
