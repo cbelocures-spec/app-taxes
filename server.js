@@ -73,7 +73,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '402';
+const APP_VERSION = '403';
 
 // Middleware
 app.use(cors());
@@ -1094,7 +1094,14 @@ app.post('/api/orders', (req, res) => {
     const grupoIn = req.body.grupoLavado;
     if (grupoIn && isLavadero(finalClasificacion) && Array.isArray(grupoIn.tachos) && grupoIn.prefijo) {
       const prefijo = String(grupoIn.prefijo).trim();
-      const tachos = [...new Set(grupoIn.tachos.map(t => String(t || '').trim()).filter(Boolean))].slice(0, 30);
+      // Un número repetido se descarta (error de tipeo); los tachos sin número ("S/N") pueden repetirse.
+      const vistosTachos = new Set();
+      const tachos = grupoIn.tachos.map(t => String(t || '').trim()).filter(Boolean).filter(t => {
+        if (!/\d/.test(t)) return true;
+        if (vistosTachos.has(t)) return false;
+        vistosTachos.add(t);
+        return true;
+      }).slice(0, 30);
       if (tachos.length > 1) {
         const gid = db.genUniqueId();
         responseOrder = db.updateWorkOrder(newOrder.id, {

@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '402';
+const CURRENT_APP_VERSION = '403';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -1740,12 +1740,8 @@ async function submitPreOrderCheck() {
     // Tachos: pueden venir varios (casilleros extra). El primero es la orden "líder" con el
     // cronómetro; el server crea una orden por cada tacho extra (ver POST /api/orders).
     if (window._lavaderoMultiTachos) {
+      // Sin validar que tenga dígitos: hay tachos que no tienen número (se cargan como "S/N", etc).
       const numeros = getLavaderoTachosNumeros();
-      const invalido = numeros.find(n => !/\d/.test(n));
-      if (invalido) {
-        showToast(`"${invalido}" no es un número de tacho válido. Revisá los números antes de continuar.`, 'danger');
-        return;
-      }
       numero = numeros[0] || '';
       if (numeros.length > 1) {
         window._grupoLavadoPendiente = { prefijo: window._lavaderoNumberedPrefix, tachos: numeros };
@@ -13815,7 +13811,15 @@ function getLavaderoTachosNumeros() {
   const principal = document.getElementById('pre-lavadero-numbered-input');
   const vals = [principal ? principal.value : '',
     ...Array.from(document.querySelectorAll('#pre-lavadero-extra-tachos .lav-tacho-extra-input')).map(i => i.value)];
-  return [...new Set(vals.map(v => String(v || '').trim()).filter(Boolean))];
+  // Un número repetido es un error de tipeo (se descarta); un tacho SIN número ("S/N") puede
+  // repetirse, porque son tachos distintos que no tienen número propio.
+  const vistos = new Set();
+  return vals.map(v => String(v || '').trim()).filter(Boolean).filter(v => {
+    if (!/\d/.test(v)) return true;
+    if (vistos.has(v)) return false;
+    vistos.add(v);
+    return true;
+  });
 }
 
 function addLavaderoTachoExtra() {
