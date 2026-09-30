@@ -83,6 +83,17 @@ function buscarResponsablePorNombre(nombre) {
   return candidatos.length === 1 ? candidatos[0].label : null;
 }
 
+// Texto con el que una orden figura en la tabla de O.T. de Taxes: su interno o, en un Lavado
+// Particular (sin interno), su título "Lavado A.P.: <persona>". Las búsquedas de "O.T. ya
+// existente" usaban `celda.includes(interno)`, y con interno vacío eso da true para CUALQUIER
+// fila - un Lavado Particular podía quedar vinculado a la O.T. abierta de otra unidad.
+function claveBusquedaTaxes(order) {
+  if (!order) return '';
+  if (order.interno && String(order.interno).trim()) return String(order.interno).trim();
+  if (order.lavadoParticularPersona) return `Lavado A.P.: ${order.lavadoParticularPersona}`;
+  return '';
+}
+
 // Lavado Particular: el Responsable en Taxes es la persona dueña del auto, no el supervisor.
 function resolveResponsableLavadoParticular(order) {
   if (!order || !order.lavadoParticularPersona) return null;
@@ -1889,7 +1900,7 @@ async function syncWorkOrder(orderId) {
   // per área) - without área in this key, syncing one blocks/serializes with every other área's
   // order sharing that same building, which is at best a needless bottleneck and worth fixing
   // alongside the rest of this investigation even if it isn't the root cause of the duplication.
-  const claveCandado = `${order.interno}_${order.clasificacion}_${order.area || ''}`;
+  const claveCandado = `${claveBusquedaTaxes(order)}_${order.clasificacion}_${order.area || ''}`;
   if (candadoInternosActivos.has(claveCandado)) {
     console.warn(`[Anti-Duplicado] 🛑 Petición duplicada veloz bloqueada para el camión: ${order.interno}`);
     return { success: false, message: "Esta orden ya se está procesando o está en cola de espera." };
@@ -2015,6 +2026,7 @@ async function syncWorkOrder(orderId) {
         
         const existingOpenTaxesOt = await safeEvaluate(page, (targetInterno, targetClasif) => {
           const clean = s => (s || '').toString().trim().toUpperCase();
+          if (!clean(targetInterno)) return null; // sin clave no se puede asegurar que la fila sea de esta orden
           const todayStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' });
           
           const tables = Array.from(document.querySelectorAll('table'));
@@ -2041,7 +2053,7 @@ async function syncWorkOrder(orderId) {
             }
           }
           return null;
-        }, order.interno, order.clasificacion);
+        }, claveBusquedaTaxes(order), order.clasificacion);
 
         if (existingOpenTaxesOt && otBloqueadaPorUnidadOperativa(order.interno, order.clasificacion, existingOpenTaxesOt, orderId)) {
           console.log(`[Alta O.T.] O.T. #${existingOpenTaxesOt} detectada para Interno ${order.interno}, pero esa unidad ya pasó a Operativo en BD local (avería cerrada). Se procederá a crear una NUEVA O.T.`);
@@ -2155,7 +2167,12 @@ async function syncWorkOrder(orderId) {
           // areaPrefix logic further below) - otherwise the O.T. gets created with just the
           // building's address/interno and the área only appears once someone loads tasks onto it.
           const altaAreaPrefix = order.area ? String(order.area).trim() : '';
-          const altaInternoForTaxes = altaAreaPrefix ? `${altaAreaPrefix} - ${order.interno}` : order.interno;
+          // Lavado Particular no tiene interno: el título es "Lavado A.P.: <persona>" (igual que en
+          // el flujo completo, internoForTaxes). Sin esto el campo quedaba vacío y Taxes no dejaba
+          // guardar ("Campo Requerido"), así que nunca se generaba el número de O.T.
+          const altaInternoForTaxes = order.lavadoParticularPersona
+            ? `Lavado A.P.: ${order.lavadoParticularPersona}`
+            : (altaAreaPrefix ? `${altaAreaPrefix} - ${order.interno}` : order.interno);
           console.log(`[Puppeteer] 3. Cargar Título (número de interno): ${altaInternoForTaxes}`);
           await safeEvaluate(page, (interno) => {
             let input = document.querySelector('input[name="titulo"]');
@@ -3517,6 +3534,7 @@ async function syncWorkOrder(orderId) {
         };
         const targetNorm = normalizeDateStr(targetDateStr);
         const targetCleanInt = clean(targetInterno).toUpperCase();
+        if (!targetCleanInt) return null; // sin clave no se puede asegurar que la fila sea de esta orden
         const targetCleanClasif = clean(targetClasif).toUpperCase();
 
         const tables = Array.from(document.querySelectorAll('table'));
@@ -3543,7 +3561,7 @@ async function syncWorkOrder(orderId) {
           }
         }
         return null;
-      }, order.interno, order.clasificacion || '', todayDateStr);
+      }, claveBusquedaTaxes(order), order.clasificacion || '', todayDateStr);
 
       if (existingOtOnPage && otBloqueadaPorUnidadOperativa(order.interno, order.clasificacion, existingOtOnPage, orderId)) {
         console.log(`[Pre-Check Safeguard] OT #${existingOtOnPage} para Interno ${order.interno} corresponde a una avería ya Operativa en BD local. No se reutiliza; se continuará creando una O.T. nueva.`);
@@ -4779,7 +4797,8 @@ async function syncExpressOtHeader(orderId) {
   }
 
   // CONTROL INTERNO EN MEMORIA (Rechazo instantáneo en menos de 1 milisegundo)
-  const claveCandado = `${order.interno}_${order.clasificacion}`;
+  // Misma clave que el delete del finally de más abajo (si no coinciden, el candado nunca se suelta).
+  const claveCandado = `${claveBusquedaTaxes(order)}_${order.clasificacion}`;
   if (candadoInternosActivos.has(claveCandado)) {
     console.warn(`[Anti-Duplicado Express] 🛑 Petición duplicada veloz bloqueada para el camión: ${order.interno}`);
     return { success: false, message: "Esta orden ya se está procesando o está en cola de espera." };
@@ -4822,6 +4841,7 @@ async function syncExpressOtHeader(orderId) {
 
     const existingTableOt = await safeEvaluate(page, (targetInterno, targetClasif, targetDateStr) => {
       const clean = s => (s || '').toString().trim().toUpperCase();
+      if (!clean(targetInterno)) return null; // sin clave no se puede asegurar que la fila sea de esta orden
       const normalizeDateStr = (str) => {
         const parts = (str || '').match(/\d+/g);
         if (!parts || parts.length < 3) return '';
@@ -4852,7 +4872,7 @@ async function syncExpressOtHeader(orderId) {
         }
       }
       return null;
-    }, order.interno, order.clasificacion, expressTodayDateStr);
+    }, claveBusquedaTaxes(order), order.clasificacion, expressTodayDateStr);
 
     if (existingTableOt && otBloqueadaPorUnidadOperativa(order.interno, order.clasificacion, existingTableOt, orderId)) {
       console.log(`[Express OT Pre-Check] OT #${existingTableOt} para Interno ${order.interno} corresponde a una avería ya Operativa en BD local. No se reutiliza; se creará una O.T. nueva.`);
@@ -4936,6 +4956,7 @@ async function syncExpressOtHeader(orderId) {
 
     const generatedOt = await safeEvaluate(page, (targetInterno) => {
       const clean = s => (s || '').toString().trim();
+      if (!clean(targetInterno)) return null; // sin clave no se puede asegurar que la fila sea de esta orden
       const tables = Array.from(document.querySelectorAll('table'));
       for (const table of tables) {
         const rows = Array.from(table.querySelectorAll('tbody tr'));
@@ -4951,7 +4972,7 @@ async function syncExpressOtHeader(orderId) {
         }
       }
       return null;
-    }, order.interno);
+    }, claveBusquedaTaxes(order));
 
     if (generatedOt) {
       console.log(`[Express OT] Generated OT #${generatedOt} for Interno ${order.interno} in 3 seconds!`);
@@ -4963,7 +4984,7 @@ async function syncExpressOtHeader(orderId) {
   } catch (err) {
     return { success: false, message: err.message };
   } finally {
-    const claveCandado = `${order.interno}_${order.clasificacion}`;
+    const claveCandado = `${claveBusquedaTaxes(order)}_${order.clasificacion}`;
     candadoInternosActivos.delete(claveCandado);
     releaseBrowserLock();
     if (browser) try { await browser.close(); } catch (_) {}
