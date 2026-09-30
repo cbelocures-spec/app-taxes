@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '400';
+const CURRENT_APP_VERSION = '401';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -2385,8 +2385,57 @@ function editOrder(orderId) {
     updateTaskCountBadge();
   }
   
+  aplicarContextoLavaderoDeOrden(order);
+
   // Show novelties side panel if present
   showNoveltiesForInterno(order.interno);
+}
+
+// Categoría de "¿Qué se lava?" de una orden ya creada, deducida de su interno (ver
+// LAVADERO_CATEGORIAS) - al abrir una orden existente no hay categoría elegida en el filtro.
+function inferirCategoriaLavaderoDeOrden(order) {
+  if (!order || String(order.clasificacion || '').toLowerCase() !== 'lavadero') return null;
+  if (order.lavadoParticularPersona) return 'particular';
+  const i = String(order.interno || '').trim().toLowerCase();
+  if (i.startsWith('lavado tachos')) return 'tachos';
+  if (i.startsWith('lavado volquete')) return 'volquetes';
+  if (i.startsWith('lavado caja roll-off')) return 'caja_rolloff';
+  if (i.startsWith('lavado prensa volquete')) return 'prensa_volquete';
+  if (i.startsWith('lavado prensa roll-off')) return 'prensa_rolloff';
+  if (i.startsWith('lavado playa:')) return 'playa';
+  if (i.startsWith('lavado otros:')) return 'otros';
+  if (i.startsWith('lavado ')) return 'tercerizado';
+  return 'camiones';
+}
+
+// Al abrir una orden existente (editar o ver), reconstruye el contexto de Lavadero que en una
+// orden nueva arma el filtro: sin esto, un Lavado Particular abría sin el desplegable de la
+// persona (y al guardar se perdía el nombre), los tipos de lavado salían de TODAS las
+// categorías juntas (Rápido/Completo repetidos), y un _lavaderoNumberedRodado viejo del último
+// filtro usado podía pisar el Rodado real de esta orden al guardar.
+function aplicarContextoLavaderoDeOrden(order) {
+  window._lavaderoNumberedRodado = null;
+  window._lavaderoNumberedPrefix = null;
+  window._grupoLavadoPendiente = null;
+  window._preSelectedLavaderoCategoria = inferirCategoriaLavaderoDeOrden(order);
+
+  const persona = order && order.lavadoParticularPersona ? String(order.lavadoParticularPersona) : '';
+  if (persona) {
+    if (!window._lavadoParticularActive) toggleLavadoParticular();
+    const sel = document.getElementById('form-lavado-particular-persona');
+    if (sel) {
+      if (!Array.from(sel.options).some(o => o.value === persona)) {
+        const opt = document.createElement('option');
+        opt.value = persona;
+        opt.textContent = persona;
+        sel.insertBefore(opt, sel.options[1] || null);
+      }
+      sel.value = persona;
+    }
+  } else if (window._lavadoParticularActive) {
+    toggleLavadoParticular();
+  }
+  if (typeof renderTipoLavadoChips === 'function') renderTipoLavadoChips();
 }
 
 function viewOrder(orderId) {
@@ -2486,7 +2535,9 @@ function viewOrder(orderId) {
     `;
     updateTaskCountBadge();
   }
-  
+
+  aplicarContextoLavaderoDeOrden(order);
+
   // Clear/Hide novelties side panel in read-only mode
   showNoveltiesForInterno("");
 }
@@ -4578,7 +4629,9 @@ function createOrderCardHtml(order) {
           <div style="min-width: 0; flex: 1;">
             <div class="order-card-title">${order.rodado}${order.area ? ` <span style="color:#7c3aed;font-weight:600;">- ${order.area}</span>` : ''}</div>
             <div class="order-card-subtitle" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
-              <span>Interno: <strong>${(order.interno && order.interno !== '--') ? order.interno : '0KM'}</strong> | Clasificación: <strong>${order.clasificacion || 'Sin Clasificar'}</strong></span>
+              <span>${order.lavadoParticularPersona
+                ? `Auto de: <strong>${escapeHtml(String(order.lavadoParticularPersona))}</strong>`
+                : `Interno: <strong>${(order.interno && order.interno !== '--') ? order.interno : '0KM'}</strong>`} | Clasificación: <strong>${order.clasificacion || 'Sin Clasificar'}</strong></span>
               ${(() => {
                 const isOutOfService = order.estadoUnidad === 'fuera_de_servicio';
                 const tooltip = isOutOfService ? 'Haga clic para cambiar a Operativo' : 'Haga clic para cambiar a Fuera de Servicio';

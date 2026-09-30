@@ -68,7 +68,30 @@ const CREATOR_USERNAME_TO_RESPONSABLE = {
 // Resolves who should be selected as "Responsable" in Taxes for a given order: the real
 // name already saved on the order wins if present; otherwise map whoever created it in the
 // app (order.createdBy) to their real name via the table above.
+// Busca en el catálogo de Responsables de Taxes a la persona por las palabras de su nombre,
+// sin importar orden, acentos ni un segundo nombre: "Gaston Diharse" -> "Diharse, Gastón Alejandro".
+function buscarResponsablePorNombre(nombre) {
+  const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const palabras = norm(nombre).split(/[^a-z0-9]+/).filter(w => w.length >= 2);
+  if (palabras.length === 0) return null;
+  const list = (db.getCatalogs().responsables || []);
+  const candidatos = list.filter(r => {
+    const del = norm(r.label).split(/[^a-z0-9]+/);
+    return palabras.every(w => del.includes(w));
+  });
+  // Si hay más de uno (dos personas con el mismo nombre y apellido), no adivinar.
+  return candidatos.length === 1 ? candidatos[0].label : null;
+}
+
+// Lavado Particular: el Responsable en Taxes es la persona dueña del auto, no el supervisor.
+function resolveResponsableLavadoParticular(order) {
+  if (!order || !order.lavadoParticularPersona) return null;
+  return buscarResponsablePorNombre(order.lavadoParticularPersona);
+}
+
 function resolveResponsableFromCreator(order) {
+  const particular = resolveResponsableLavadoParticular(order);
+  if (particular) return particular;
   const raw = order && order.responsable;
   const isEmailOrAuto = !raw || raw === 'AUTO' || String(raw).includes('@');
   if (!isEmailOrAuto) return raw;
@@ -2237,9 +2260,19 @@ async function syncWorkOrder(orderId) {
           // orders keeps the table-search fallback (option B) from grabbing an area's existing
           // OT for a brand-new one - the toast (option A) is the reliable path and doesn't need
           // this, but the fallback previously had no way to tell two same-interno rows apart.
-          const otherOrdersSameInterno = (db.getWorkOrders() || []).filter(o =>
-            o.id !== orderId && String(o.interno || '').trim().toUpperCase() === String(order.interno || '').trim().toUpperCase()
-          );
+          // Lavado Particular no tiene interno: en Taxes figura con el título "Lavado A.P.: <persona>"
+          // (ver internoForTaxes más abajo), así que se busca por ese título - buscar por un
+          // interno vacío nunca encontraba la fila y la orden quedaba en "No se pudo capturar".
+          const targetBusquedaOT = order.interno
+            ? order.interno
+            : (order.lavadoParticularPersona ? `Lavado A.P.: ${order.lavadoParticularPersona}` : '');
+          const otherOrdersSameInterno = (db.getWorkOrders() || []).filter(o => {
+            if (o.id === orderId) return false;
+            if (!order.interno && order.lavadoParticularPersona) {
+              return String(o.lavadoParticularPersona || '').trim().toUpperCase() === String(order.lavadoParticularPersona).trim().toUpperCase();
+            }
+            return String(o.interno || '').trim().toUpperCase() === String(order.interno || '').trim().toUpperCase();
+          });
           const alreadyClaimedOtNumbers = otherOrdersSameInterno.map(o => String(o.taxesOrderNumber || '').trim()).filter(Boolean);
 
           for (let check = 1; check <= 12; check++) {
@@ -2271,6 +2304,13 @@ async function syncWorkOrder(orderId) {
                   const rowMatchesInterno = cells.some(cellTxt => {
                     if (!cleanTargetInt) return false;
                     if (cellTxt === cleanTargetInt) return true;
+                    // Un título de varias palabras ("LAVADO A.P.: GASTON DIHARSE") se busca entero.
+                    // Sin que siga otra letra/número: "LAVADO TACHOS 5" no tiene que agarrar "LAVADO TACHOS 55".
+                    if (/\s/.test(cleanTargetInt)) {
+                      const pos = cellTxt.indexOf(cleanTargetInt);
+                      const sigue = pos >= 0 ? cellTxt.charAt(pos + cleanTargetInt.length) : '';
+                      if (pos >= 0 && !/[A-Z0-9ÁÉÍÓÚÑ]/.test(sigue)) return true;
+                    }
                     const words = cellTxt.split(/\s+/);
                     return words.includes(cleanTargetInt) || cellTxt.includes(`INTERNO ${cleanTargetInt}`);
                   });
@@ -2287,7 +2327,7 @@ async function syncWorkOrder(orderId) {
               }
 
               return null;
-            }, order.interno, alreadyClaimedOtNumbers);
+            }, targetBusquedaOT, alreadyClaimedOtNumbers);
 
             if (numeroGenerado) {
               console.log(`[Alta O.T.] ¡Número de O.T. #${numeroGenerado} capturado exitosamente para Interno ${order.interno} en intento ${check}!`);
@@ -3553,6 +3593,12 @@ async function syncWorkOrder(orderId) {
     // Resolve "AUTO" Responsable to currently logged-in user
     // Also treat email addresses as AUTO (e.g. paniol@contenedoreshugo.com.ar stored by mistake)
     let targetResponsable = order.responsable;
+    // Lavado Particular: Responsable = la persona dueña del auto (tal cual figura en Taxes).
+    const responsableParticular = resolveResponsableLavadoParticular(order);
+    if (responsableParticular) {
+      targetResponsable = responsableParticular;
+      console.log("Lavado Particular - Responsable = dueño del auto:", targetResponsable);
+    }
     const isEmailOrAuto = !targetResponsable || targetResponsable === 'AUTO' || targetResponsable.includes('@');
     if (isEmailOrAuto) {
       console.log("Resolving Responsable automatically...");
