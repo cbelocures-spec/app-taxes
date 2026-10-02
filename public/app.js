@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '404';
+const CURRENT_APP_VERSION = '405';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -13851,6 +13851,18 @@ function updateLavaderoNumberedPreview() {
   const num = input.value.trim();
   const prefix = window._lavaderoNumberedPrefix || 'Lavado';
   const numeros = getLavaderoTachosNumeros();
+
+  // Aviso en vivo (mientras se tipean los números) si alguno ya tiene un lavado cargado hoy.
+  const dup = document.getElementById('pre-lavadero-dup-warning');
+  if (dup) {
+    const repetidos = window._lavaderoNumberedPrefix
+      ? buscarLavadosDeHoy(numeros.map(n => `${prefix} ${n}`))
+      : [];
+    dup.style.display = repetidos.length ? 'block' : 'none';
+    dup.innerHTML = repetidos.length
+      ? `<b>⚠ Ya tienen un lavado cargado hoy:</b><br>${repetidos.map(r => `${escapeHtml(r.interno)} — ${escapeHtml(r.hora)}${r.ot ? ` · O.T. ${escapeHtml(String(r.ot))}` : ''}`).join('<br>')}`
+      : '';
+  }
   if (window._lavaderoMultiTachos && numeros.length > 1) {
     preview.textContent = `Se van a crear ${numeros.length} órdenes (un solo cronómetro, el tiempo se reparte en partes iguales): ${numeros.map(n => `${prefix} ${n}`).join(' · ')}`;
     return;
