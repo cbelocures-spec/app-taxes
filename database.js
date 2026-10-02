@@ -374,18 +374,32 @@ const DEFAULT_DB = {
   soporteTickets: []
 };
 
-// Horas decimales de una tarea: horasEstimadas si ya las tiene, si no desde su cronómetro
+// horasEstimadas en la app es "horas.minutos" (minutesToHmm en app.js: 0.34 = 34 min, 1.30 =
+// 1 h 30 min), NO horas decimales. Dividirlo directo daba mal desde la hora (1.30 / 3 = 0.43,
+// cuando lo correcto es 0.30). Si los "minutos" pasan de 59 (ej. 0.75) es un valor decimal viejo.
+function hmmAMinutos(v) {
+  const n = parseFloat(String(v || '0').replace(',', '.')) || 0;
+  const h = Math.floor(n);
+  const m = Math.round((n - h) * 100);
+  return m >= 60 ? Math.round(n * 60) : h * 60 + m;
+}
+function minutosAHmm(min) {
+  const total = Math.max(0, Math.round(min));
+  return parseFloat((Math.floor(total / 60) + (total % 60) / 100).toFixed(2));
+}
+
+// Minutos de una tarea: de horasEstimadas si ya las tiene, si no desde su cronómetro
 // (mismo emparejado Inició/Reanudó -> Pausó/Fin que usa syncWorker para subir a Taxes).
-function horasDeTareaParaGrupo(task) {
-  const h = parseFloat(String(task.horasEstimadas || '0').replace(',', '.')) || 0;
-  if (h > 0) return h;
+function minutosDeTareaParaGrupo(task) {
+  const desdeHoras = hmmAMinutos(task.horasEstimadas);
+  if (desdeHoras > 0) return desdeHoras;
   let totalMs = 0, start = null;
   [...(task.timerHistory || [])].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)).forEach(e => {
     const type = String(e.type || e.event || '').trim().toLowerCase();
     if (type.startsWith('inici') || type.startsWith('reanud')) start = e.timestamp;
     else if ((type.startsWith('paus') || type.startsWith('fin')) && start !== null) { totalMs += e.timestamp - start; start = null; }
   });
-  return Math.round((totalMs / 3600000) * 100) / 100;
+  return Math.round(totalMs / 60000);
 }
 
 // Lavado de varios tachos juntos: el cronómetro real vive SOLO en la orden líder (así el
@@ -410,8 +424,9 @@ function repartirGrupoLavado(db, lider) {
       lt.horasEstimadas = partes[lt.id];
       return;
     }
-    const total = horasDeTareaParaGrupo(lt);
-    const parte = Math.round((total / n) * 100) / 100;
+    const totalMin = minutosDeTareaParaGrupo(lt);
+    const total = minutosAHmm(totalMin);
+    const parte = minutosAHmm(totalMin / n);
     lt.horasEstimadas = parte;
     lt.grupoHorasTotal = total;
     partes[lt.id] = parte;
@@ -422,6 +437,8 @@ function repartirGrupoLavado(db, lider) {
       if (!mt || mt.status === 'Finalizada') return;
       mt.horasEstimadas = parte;
       mt.status = 'Finalizada';
+      // Mismo lavado: la descripción final (con la observación del lavador) va a todos los tachos.
+      if (lt.descripcion) mt.descripcion = lt.descripcion;
       mt.taxesRealizadaSynced = false;
       if (!mt.date && lt.date) mt.date = lt.date;
       m.estadoUnidad = lider.estadoUnidad || m.estadoUnidad;

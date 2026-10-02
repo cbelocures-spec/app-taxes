@@ -3657,6 +3657,19 @@ textarea.soporte-inp { resize: vertical; min-height: 80px; }
 .lav-tacho-extra-row input { flex: 1; padding: 10px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; }
 .lav-tacho-extra-row button { width: 42px; flex-shrink: 0; border: none; background: #fee2e2; color: #dc2626; border-radius: 8px; font-size: 20px; cursor: pointer; }
 .lav-add-tacho-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 8px; padding: 10px 14px; background: #fff; border: 1px dashed #1e40af; color: #1e40af; font-weight: 700; font-size: 14px; border-radius: 8px; cursor: pointer; }
+.lavado-fin-dialog { max-width: 420px; margin: auto; padding: 24px; border-radius: 16px; background: var(--card-bg); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: slideUp 0.3s ease-out; }
+.lavado-fin-ic { width: 60px; height: 60px; border-radius: 50%; background: #e0f2fe; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+.lavado-fin-ic .material-icons { font-size: 32px; color: #0284c7; }
+.lavado-fin-title { text-align: center; font-size: 20px; font-weight: 800; color: #0d233a; margin: 0 0 6px; }
+.lavado-fin-sub { text-align: center; font-size: 14px; color: var(--text-muted); margin: 0 0 18px; }
+.lavado-fin-sum { background: #f1f5f9; border-left: 4px solid #0284c7; border-radius: 8px; padding: 12px; font-size: 13px; line-height: 1.6; color: #0f172a; margin-bottom: 16px; }
+.lavado-fin-sum b { color: #0369a1; }
+.lavado-fin-sum .t { display: inline-block; background: #e0f2fe; color: #075985; font-weight: 800; font-size: 12px; border-radius: 6px; padding: 1px 7px; margin-right: 3px; }
+.lavado-fin-lbl { display: block; font-weight: 700; font-size: 12px; text-transform: uppercase; color: #334155; margin-bottom: 6px; }
+#lavado-fin-desc { width: 100%; box-sizing: border-box; padding: 12px; font-size: 15px; border: 1px solid var(--border-color); border-radius: 8px; font-family: inherit; resize: vertical; }
+.lavado-fin-hint { font-size: 12px; color: #94a3b8; margin: 6px 0 18px; }
+.lavado-fin-ok { width: 100%; padding: 15px; border: none; border-radius: 10px; background: #16a34a; color: #fff; font-size: 17px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 6px 16px rgba(22,163,74,.35); cursor: pointer; }
+.lavado-fin-cancel { display: block; width: 100%; margin-top: 12px; background: none; border: none; font-size: 13px; color: var(--text-muted); font-weight: 600; cursor: pointer; }
 .lav-dup-warning { margin-top: 8px; background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; border-radius: 8px; padding: 8px 12px; font-size: 13px; line-height: 1.5; }
 .lav-grupo-badge { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 6px; font-size: 12px; font-weight: 700; color: #075985; }
 .lav-grupo-badge span { background: #e0f2fe; border-radius: 6px; padding: 2px 7px; }

@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=61">
+  <link rel="stylesheet" href="style.css?v=62">
   <script>
     (function() {
       try {
@@ -1962,7 +1962,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.47</div>
+      <div class="sidebar-version">Versión 1.27.48</div>
     </div>
   </aside>
 
@@ -2319,6 +2319,22 @@
   </div>
 
   <!-- DIAGNOSIS MODAL -->
+  <!-- Lavadero: menú único al finalizar (descripción opcional + Operativo). Reemplaza al
+       diagnóstico + Operativo/Fuera de Servicio de Taller: Lavadero no deja unidades F/S. -->
+  <div class="popup-modal-backdrop" id="lavado-fin-modal">
+    <div class="modal-content lavado-fin-dialog">
+      <div class="lavado-fin-ic"><span class="material-icons">local_car_wash</span></div>
+      <h3 class="lavado-fin-title">Lavado terminado</h3>
+      <p class="lavado-fin-sub">¿Querés agregar algo sobre el lavado?</p>
+      <div class="lavado-fin-sum" id="lavado-fin-sum"></div>
+      <label for="lavado-fin-desc" class="lavado-fin-lbl">Descripción del lavado (opcional)</label>
+      <textarea id="lavado-fin-desc" rows="4" placeholder="Ej: Tenía mucho material pegado adentro, se usó agua caliente extra."></textarea>
+      <div class="lavado-fin-hint">Se agrega a la descripción de la tarea en Taxes.</div>
+      <button type="button" class="lavado-fin-ok" id="lavado-fin-ok"><span class="material-icons">check_circle</span> Finalizar · queda OPERATIVO</button>
+      <button type="button" class="lavado-fin-cancel" id="lavado-fin-cancel">Cancelar (sigue el cronómetro)</button>
+    </div>
+  </div>
+
   <div class="popup-modal-backdrop" id="diagnosis-modal">
     <div class="modal-content" style="max-width: 450px; margin: auto; padding: 24px; border-radius: 16px; background: var(--card-bg); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: slideUp 0.3s ease-out;">
       <div style="text-align: center;">
@@ -3284,6 +3300,6 @@
     }
   </style>
 
-  <script src="app.js?v=405"></script>
+  <script src="app.js?v=406"></script>
 </body>
 </html>

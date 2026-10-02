@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '405';
+const CURRENT_APP_VERSION = '406';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -658,6 +658,24 @@ document.addEventListener('DOMContentLoaded', () => {
             insumos: insumosVal
           };
 
+          // Lavadero: menú único (descripción opcional) en vez de diagnóstico + Operativo/F.S.
+          const clasifFormEl = document.getElementById('form-clasificacion');
+          if (clasifFormEl && String(clasifFormEl.value || '').toLowerCase() === 'lavadero') {
+            const ordenEnEdicion = currentEditingOrderId ? (activeOrders || []).find(o => o.id === currentEditingOrderId) : null;
+            const info = infoFinalizarLavado(ordenEnEdicion || { interno: internoVal }, { descripcion: descVal }, empName, totalMinutes);
+            info.sinCancelar = true; // acá la tarea ya quedó Finalizada al cambiar el estado
+            promptFinalizarLavado(info).then(lav => {
+              const obs = lav && lav.descripcion;
+              const textareaEl = card.querySelector('.task-desc');
+              if (obs && textareaEl) {
+                const prefix = textareaEl.value.trim() ? ' - ' : '';
+                textareaEl.value = textareaEl.value.trim() + prefix + 'Obs: ' + obs;
+                textareaEl.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+            });
+            return;
+          }
+
           promptDiagnosis(taskInfo).then(result => {
             if (result) {
               const textareaEl = card.querySelector('.task-desc');
@@ -1213,6 +1231,65 @@ function updateDiagInsumosBadge() {
       badge.style.display = 'none';
     }
   }
+}
+
+// Lavadero: menú único al finalizar (ver #lavado-fin-modal). Devuelve { descripcion } si toca
+// "Finalizar · queda OPERATIVO", o null si cancela (no se finaliza nada).
+// info: { titulo, tachos[], tipo, lavador, minutos }
+function promptFinalizarLavado(info = {}) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('lavado-fin-modal');
+    const sum = document.getElementById('lavado-fin-sum');
+    const desc = document.getElementById('lavado-fin-desc');
+    if (!modal || !desc) { resolve({ descripcion: '' }); return; }
+
+    const tachos = Array.isArray(info.tachos) ? info.tachos : [];
+    const fmt = min => {
+      const m = Math.max(0, Math.round(min || 0));
+      return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+    };
+    let html = `<b>${escapeHtml(info.titulo || 'Lavado')}</b>`;
+    if (tachos.length > 1) html += ' · ' + tachos.map(t => `<span class="t">#${escapeHtml(String(t))}</span>`).join('');
+    html += '<br>';
+    const linea = [info.tipo, info.lavador ? `Lavador: ${info.lavador}` : ''].filter(Boolean).map(escapeHtml).join(' · ');
+    if (linea) html += linea + '<br>';
+    if (info.minutos != null) {
+      html += `Tiempo: <b>${fmt(info.minutos)}</b>`;
+      if (tachos.length > 1) html += ` (${fmt(info.minutos / tachos.length)} por tacho)`;
+    }
+    sum.innerHTML = html;
+    desc.value = '';
+    const cancelEl = document.getElementById('lavado-fin-cancel');
+    if (cancelEl) cancelEl.style.display = info.sinCancelar ? 'none' : '';
+    const okEl = document.getElementById('lavado-fin-ok');
+    if (okEl) okEl.innerHTML = `<span class="material-icons">check_circle</span> ${info.sinCancelar ? 'Listo · queda OPERATIVO al guardar' : 'Finalizar · queda OPERATIVO'}`;
+
+    // Clonar los botones limpia los listeners de una apertura anterior.
+    const ok = document.getElementById('lavado-fin-ok');
+    const cancel = document.getElementById('lavado-fin-cancel');
+    const ok2 = ok.cloneNode(true);
+    const cancel2 = cancel.cloneNode(true);
+    ok.parentNode.replaceChild(ok2, ok);
+    cancel.parentNode.replaceChild(cancel2, cancel);
+    const cerrar = () => modal.classList.remove('open');
+    ok2.addEventListener('click', () => { cerrar(); resolve({ descripcion: desc.value.trim() }); });
+    cancel2.addEventListener('click', () => { cerrar(); resolve(null); });
+    modal.classList.add('open');
+    setTimeout(() => desc.focus(), 50);
+  });
+}
+
+// Datos para el resumen del menú de fin de lavado, a partir de la orden y la tarea.
+function infoFinalizarLavado(order, task, empName, minutos) {
+  const g = order && order.grupoLavado && order.grupoLavado.rol === 'lider' ? order.grupoLavado : null;
+  const desc = String((task && task.descripcion) || '');
+  return {
+    titulo: g ? (g.prefijo || 'Lavado') : (order && order.lavadoParticularPersona ? `Auto de ${order.lavadoParticularPersona}` : ((order && order.interno) || 'Lavado')),
+    tachos: g ? g.tachos : [],
+    tipo: desc.split(':')[0].trim().slice(0, 60),
+    lavador: empName || '',
+    minutos
+  };
 }
 
 function promptDiagnosis(taskInfo = null) {
@@ -5162,7 +5239,10 @@ async function submitWorkOrder() {
         : (incidenteEl ? incidenteEl.value : ''),
       tasks: tasks,
       deletedTaskIds: Array.from(deletedTaskIdsInModal),
-      estadoUnidad: editingOrder ? (editingOrder.estadoUnidad || 'fuera_de_servicio') : 'fuera_de_servicio',
+      // Lavadero no deja unidades Fuera de Servicio: con todas las tareas finalizadas queda Operativa.
+      estadoUnidad: (String(clasificacionEl.value || '').toLowerCase() === 'lavadero' && tasks.length > 0 && tasks.every(t => t.status === 'Finalizada'))
+        ? 'operativo'
+        : (editingOrder ? (editingOrder.estadoUnidad || 'fuera_de_servicio') : 'fuera_de_servicio'),
       combustibleReset: combustibleResetPayload,
       // Al editar una orden que ya estaba en Historial (archivada), no forzar su regreso a Activas:
       // solo las ediciones desde la vista Activa deben garantizar archived:false.
@@ -6889,7 +6969,11 @@ async function markDashboardTaskFinished(orderId, taskId) {
   let order = activeOrders.find(o => o.id === orderId);
   if (!order) return;
 
-  if (!confirm("¿Estás seguro de marcar esta tarea como FINALIZADA?")) return;
+  // Lavadero: un solo menú (descripción opcional + Operativo) en vez de la confirmación,
+  // el diagnóstico y la elección Operativo/Fuera de Servicio de Taller.
+  const esLavado = isLavaderoOrder(order);
+
+  if (!esLavado && !confirm("¿Estás seguro de marcar esta tarea como FINALIZADA?")) return;
 
   // Find the actual task object inside order.tasks (by reference)
   let task = order.tasks.find(t => t.id === taskId);
@@ -6911,8 +6995,16 @@ async function markDashboardTaskFinished(orderId, taskId) {
     estadoUnidad: order.estadoUnidad || 'operativo'
   };
 
-  // Prompt for optional diagnosis and insumos
-  const result = await promptDiagnosis(taskInfo);
+  let result;
+  if (esLavado) {
+    const minutos = Math.round(calculateTotalElapsedSeconds(task.timerHistory, task.timerStart) / 60);
+    const lav = await promptFinalizarLavado(infoFinalizarLavado(order, task, empName, minutos));
+    if (!lav) return; // canceló: no se finaliza, el cronómetro sigue
+    result = lav.descripcion ? { diagnosis: '', insumos: '', obsLavado: lav.descripcion } : null;
+  } else {
+    // Prompt for optional diagnosis and insumos
+    result = await promptDiagnosis(taskInfo);
+  }
 
   // The background poll (fetchOrders) can replace `activeOrders` wholesale while the diagnosis
   // dialog was open (it has no timeout - the user can take as long as they want) - re-resolve
@@ -6929,6 +7021,7 @@ async function markDashboardTaskFinished(orderId, taskId) {
     let additions = [];
     if (result.diagnosis) additions.push('Diagnóstico: ' + result.diagnosis);
     if (result.insumos) additions.push('Insumos: ' + result.insumos);
+    if (result.obsLavado) additions.push('Obs: ' + result.obsLavado);
     if (additions.length > 0) {
       const prefix = task.descripcion ? ' - ' : '';
       task.descripcion = (task.descripcion || '').trim() + prefix + additions.join(' - ');
@@ -6936,6 +7029,10 @@ async function markDashboardTaskFinished(orderId, taskId) {
     if (result.insumos) {
       task.insumos = result.insumos;
     }
+  }
+  // Lavadero no deja unidades Fuera de Servicio: al terminar el lavado queda Operativa.
+  if (esLavado && (order.tasks || []).every(t => !t || t.id === taskId || t.status === 'Finalizada')) {
+    order.estadoUnidad = 'operativo';
   }
 
   // Shield this task from the background poll until this save round-trips (see
@@ -7001,7 +7098,13 @@ async function markDashboardTaskFinished(orderId, taskId) {
 
     const stillHasPendingTasks = (order.tasks || []).some(t => t.id !== taskId && t.status !== 'Finalizada');
     if (!stillHasPendingTasks) {
-      openUnitStatusModal(order.interno, orderId);
+      if (esLavado) {
+        // Mismo efecto que elegir "Operativo" en el selector de Taller (estado + subir a Taxes),
+        // sin mostrar ese paso: Lavadero no tiene la opción de dejarla Fuera de Servicio.
+        await applyUnitStatusChange(order.interno, orderId, 'operativo');
+      } else {
+        openUnitStatusModal(order.interno, orderId);
+      }
     }
 
     if (allCompleted) {
