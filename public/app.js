@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '403';
+const CURRENT_APP_VERSION = '404';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -1095,6 +1095,7 @@ function openPreOrderModal() {
   const preLavaderoImage = document.getElementById('pre-lavadero-image');
   if (preTipoLavadoGroup) preTipoLavadoGroup.style.display = isLavaderoUserForPreOrder ? 'block' : 'none';
   if (preLavadorGroup) preLavadorGroup.style.display = isLavaderoUserForPreOrder ? 'block' : 'none';
+  if (isLavaderoUserForPreOrder) renderPreLavadorQuickChips();
   if (preLavaderoImage) {
     preLavaderoImage.style.display = isLavaderoUserForPreOrder ? 'block' : 'none';
     preLavaderoImage.src = 'lavadero/camiones.jpg';
@@ -1810,6 +1811,21 @@ async function submitPreOrderCheck() {
     return;
   }
 
+  // Lavadero: avisar si alguna de estas unidades/tachos ya tiene un lavado cargado HOY, para no
+  // duplicar sin darse cuenta (pasó: el mismo tacho quedó en una orden suelta y en dos grupos).
+  // Particular / Otros / Playa no: su "interno" es compartido por cosas distintas.
+  if (String(clasificacion).toLowerCase() === 'lavadero' && !isParticularPreOrder && !isOtrosItemPreOrder && !isPlayaSectorPreOrder) {
+    const internosACrear = window._grupoLavadoPendiente
+      ? window._grupoLavadoPendiente.tachos.map(t => `${window._grupoLavadoPendiente.prefijo} ${t}`)
+      : [interno];
+    const repetidos = buscarLavadosDeHoy(internosACrear);
+    if (repetidos.length > 0) {
+      const detalle = repetidos.map(r => `• ${r.interno} (${r.hora}${r.ot ? `, O.T. ${r.ot}` : ''})`).join('\n');
+      const ok = confirm(`Ya hay un lavado cargado hoy para:\n\n${detalle}\n\n¿Querés crear otro igual de todos modos?`);
+      if (!ok) return;
+    }
+  }
+
   const isEdilicioUserForPreOrder = (userSector === 'Edilicio' || currentSelectedSector === 'Edilicio');
   let preAreaVal = "";
   if (isEdilicioUserForPreOrder) {
@@ -2016,6 +2032,28 @@ async function submitPreOrderCheck() {
       await submitWorkOrder();
     }
   }
+}
+
+// Lavados (clasificación Lavadero) ya creados HOY para alguno de estos internos - activos o en
+// Historial (lo que la app tenga cargado). Un tacho "S/N" no cuenta: varios tachos distintos
+// comparten ese texto.
+function buscarLavadosDeHoy(internos) {
+  const hoyArt = d => new Date(d).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const hoy = hoyArt(serverNow());
+  const buscados = new Set(internos.filter(i => /\d/.test(i)).map(i => String(i).trim().toLowerCase()));
+  if (buscados.size === 0) return [];
+  const vistos = new Set();
+  return [...(activeOrders || []), ...(archivedOrders || [])].filter(o => {
+    if (!o || o.deleted === true || vistos.has(o.id)) return false;
+    vistos.add(o.id);
+    return String(o.clasificacion || '').toLowerCase() === 'lavadero' &&
+      buscados.has(String(o.interno || '').trim().toLowerCase()) &&
+      o.createdAt && hoyArt(o.createdAt) === hoy;
+  }).map(o => ({
+    interno: o.interno,
+    ot: o.taxesOrderNumber || '',
+    hora: new Date(o.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })
+  }));
 }
 
 // Splits items into exactly `groupCount` contiguous, balanced groups (never empty,
@@ -3455,10 +3493,7 @@ function addTaskField(taskData = null, forceNew = false) {
             <label>${isLavaderoTask ? 'Lavador *' : 'Empleado Asignado *'}</label>
             ${isLavaderoTask ? `
             <div style="display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
-              <button type="button" class="btn btn-secondary btn-xs" onclick="quickSetTaskEmpleado('${taskId}', '531')" style="border-radius:999px;">+ Santiago</button>
-              <button type="button" class="btn btn-secondary btn-xs" onclick="quickSetTaskEmpleado('${taskId}', '262')" style="border-radius:999px;">+ Martín</button>
-              <button type="button" class="btn btn-secondary btn-xs" onclick="quickSetTaskEmpleado('${taskId}', '606')" style="border-radius:999px;">+ Pablo</button>
-              <button type="button" class="btn btn-secondary btn-xs" onclick="quickSetTaskEmpleado('${taskId}', '540')" style="border-radius:999px;">+ Thiago</button>
+              ${lavadoresRapidosHtml(v => `quickSetTaskEmpleado('${taskId}', '${v}')`)}
             </div>` : ''}
             <select class="task-emp" required ${lockedAttr}>
               <option value="">Seleccionar Empleado...</option>
@@ -13542,6 +13577,23 @@ function applyTipoLavadoPre(key) {
 
 // A veces lavan el camión entre varios - cada lavador tiene su propia fila (y va a terminar
 // con su propia tarea y cronómetro, uno por persona, igual que ya funciona en Elastiquero).
+// Botones "+ Lavador" de acceso rápido: salen de los lavadores configurados en Ajustes para el
+// sector Lavadero (antes eran fijos en el código, y al sacar/agregar a alguien de la lista - ej.
+// salió Quiroga, entró Ponce - los botones quedaban desactualizados).
+function lavadoresRapidosHtml(onclickDe) {
+  const corto = label => String(label || '').replace(',', '').trim().split(/\s+/).slice(0, 2)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  return getOnlySectorEmployees('Lavadero').map(e => {
+    const v = String(e.value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return `<button type="button" class="btn btn-secondary btn-xs" onclick="${escapeHtml(onclickDe(v))}" style="border-radius:999px;" title="${escapeHtml(String(e.label))}">+ ${escapeHtml(corto(e.label))}</button>`;
+  }).join('');
+}
+
+function renderPreLavadorQuickChips() {
+  const cont = document.getElementById('pre-lavador-quick-chips');
+  if (cont) cont.innerHTML = lavadoresRapidosHtml(v => `quickSetPreLavador('${v}')`);
+}
+
 function addPreLavadorRow() {
   const rowsContainer = document.getElementById('pre-lavador-rows-container');
   if (!rowsContainer) return;
