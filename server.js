@@ -66,6 +66,23 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Corriendo en Railway (la nube) en vez de en la PC/Debian del taller.
+const IS_RAILWAY = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_STATIC_URL || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_SERVICE_ID);
+
+// El "instant push" a Railway solo tiene sentido desde la PC/Debian del taller. En Railway se
+// mandaba la orden A SÍ MISMO (local-sync-result), y esa copia llegaba un instante después:
+// si en el medio otro operario agregaba una tarea a la misma orden, la copia vieja la pisaba
+// y la tarea desaparecía (pasó en Herrería, 02/10, con el cronómetro andando).
+// Tampoco con DISABLE_RAILWAY_SYNC_AGENT=true (copia aislada para pruebas): si no, una copia
+// de prueba local mandaba sus órdenes de prueba a producción, que las creaba y las subía al
+// Taxes real (pasó el 30/09: tres "Lavado Tachos 901" de prueba generaron O.T. reales).
+function pushOrderToRailwaySiCorresponde(order) {
+  if (IS_RAILWAY || process.env.DISABLE_RAILWAY_SYNC_AGENT === 'true' || !order) return;
+  try {
+    require('./railway_sync_agent').pushOrderToRailway(order);
+  } catch (e) { /* sin agente disponible */ }
+}
 const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 
 // Bump together with the ?v=NN query param on public/index.html's <script src="app.js">.
@@ -1493,10 +1510,7 @@ app.post('/api/orders/bulk', async (req, res) => {
     setImmediate(() => {
       try {
         for (const newOrder of createdOrders) {
-          try {
-            const rwAgent = require('./railway_sync_agent');
-            rwAgent.pushOrderToRailway(newOrder);
-          } catch (rwErr) {}
+          pushOrderToRailwaySiCorresponde(newOrder);
           checkAndTriggerGoogleSheetUpdates(null, newOrder.tasks, newOrder.responsable, newOrder.interno);
         }
         triggerActiveTasksGoogleSheetSync();
@@ -1800,12 +1814,7 @@ app.put('/api/orders/:id', (req, res) => {
     // Run background webhooks and instant Railway push asynchronously after response
     setImmediate(() => {
       try {
-        try {
-          const rwAgent = require('./railway_sync_agent');
-          rwAgent.pushOrderToRailway(updated);
-        } catch (rwErr) {
-          // Ignore if on Railway cloud
-        }
+        pushOrderToRailwaySiCorresponde(updated);
 
         checkAndTriggerGoogleSheetUpdates(existing, updated.tasks, responsable, interno);
         checkAndSendInsumosToSheet(existing, updated.tasks, responsable, interno);
@@ -2862,8 +2871,22 @@ app.post('/api/orders/local-sync-result/:id', (req, res) => {
     if (req.body.hasOwnProperty('archived')) updates.archived = req.body.archived === true;
 
     // CRITICAL: Only update 'tasks' if it was explicitly sent in the body.
+    // Nunca REEMPLAZAR la lista entera: la copia que manda el agente puede ser de un instante
+    // antes (llega por la red después de que otro operario ya agregó una tarea a la misma
+    // orden), y reemplazar borraba esa tarea nueva. Se combina por id de tarea: las que llegan
+    // actualizan a la suya, las que ya existían y no vienen se mantienen. Se compara SOLO por
+    // id - dos tareas con la misma descripción (ej. "Continúa soldadura" de días distintos)
+    // son tareas distintas y quedan las dos.
     if (req.body.hasOwnProperty('tasks') && Array.isArray(tasks) && tasks.length > 0) {
-      updates.tasks = tasks;
+      const porId = new Map();
+      (existing.tasks || []).forEach(t => { if (t && t.id) porId.set(t.id, t); });
+      const sinId = [];
+      tasks.forEach(t => {
+        if (!t) return;
+        if (t.id) porId.set(t.id, { ...(porId.get(t.id) || {}), ...t });
+        else sinId.push(t);
+      });
+      updates.tasks = [...porId.values(), ...sinId];
     }
 
     if (taxesOrderNumber !== undefined && taxesOrderNumber !== null) {
