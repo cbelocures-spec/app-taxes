@@ -1210,14 +1210,19 @@ class LocalDB {
         // Ojeda Fernández, Miguel on Interno 158). Removed - a one-off cleanup belongs in a
         // one-off script, never in code that runs unconditionally on every boot.
 
-        // Generic deduplication by clean description + employee
+        // Solo se descarta una tarea si es EXACTAMENTE la misma (mismo id repetido dentro de la
+        // orden). Antes deduplicaba por empleado + descripción, y como esto corre en CADA
+        // arranque del server (cada deploy), borraba tareas legítimas: el mismo operario hace el
+        // mismo trabajo varios días ("Continúa reparación" de ayer finalizada + la de hoy con el
+        // cronómetro andando) y se quedaba con la vieja, eliminando la de hoy. Pasó en Herrería
+        // el 02/10 (Lara, Romero, Victor, Franco Portillo, Banegas).
         const seen = new Set();
         const cleanTasks = [];
         (order.tasks || []).forEach(t => {
           if (!t) return;
-          const key = `${String(t.empleado || '').trim().toLowerCase()}_${String(t.descripcion || '').trim().toLowerCase()}`;
-          if (!seen.has(key)) {
-            seen.add(key);
+          if (!t.id) { cleanTasks.push(t); return; }
+          if (!seen.has(t.id)) {
+            seen.add(t.id);
             cleanTasks.push(t);
           }
         });
