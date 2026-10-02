@@ -1892,8 +1892,14 @@ function otYaAsignadaAOtraOrden(otNumero, excludeOrderId) {
     String(o.id) !== String(excludeOrderId) && o.deleted !== true &&
     o.taxesOrderNumber && String(o.taxesOrderNumber).replace(/\D/g, '') === otClean);
 }
+// Lavadero siempre genera su propia O.T. en el momento: nunca se engancha a una ya existente
+// para esa unidad (ej. una de Taller), aunque esté abierta y sea del mismo día.
+function esOrdenLavadero(order) {
+  return String((order && order.clasificacion) || '').trim().toLowerCase() === 'lavadero';
+}
 function otNoReutilizable(otNumero, order, orderId) {
-  return otClaimedByDifferentArea(otNumero, order.area, orderId) ||
+  return esOrdenLavadero(order) ||
+    otClaimedByDifferentArea(otNumero, order.area, orderId) ||
     (!!order.grupoLavado && otYaAsignadaAOtraOrden(otNumero, orderId));
 }
 
@@ -1962,7 +1968,7 @@ async function syncWorkOrder(orderId) {
     // IMPORTANT: never reuse an OT whose order already went back to Operativo — eso significa
     // que esa avería quedó cerrada, y una orden nueva para el mismo interno es una avería
     // distinta que necesita su propio O.T.
-    if (!order.taxesOrderNumber && order.interno && !order.grupoLavado) {
+    if (!order.taxesOrderNumber && order.interno && !order.grupoLavado && !esOrdenLavadero(order)) {
       const dbData = db.read();
       const existingWithOt = (dbData.workOrders || []).find(o =>
         String(o.id) !== String(orderId) &&
@@ -2261,6 +2267,18 @@ async function syncWorkOrder(orderId) {
           }, order.fechaEntrega || new Date().toISOString().split('T')[0]);
           await delay(500);
 
+          // Foto de las O.T. que YA están en la tabla antes de guardar: el número nuevo tiene que
+          // ser uno que no estaba. Sin esto, la búsqueda por interno de más abajo agarraba una O.T.
+          // vieja de la misma unidad (pasó con el Interno 5: un Correctivo y un Lavado nuevos
+          // quedaron con la #28448 del 28/08, ya cerrada, y después fallaban al abrir el lápiz).
+          const otsPreviasEnPantalla = await safeEvaluate(page, () => {
+            const nums = new Set();
+            document.querySelectorAll('table tbody tr td').forEach(td => {
+              (td.textContent || '').replace(/#?\b([1-9]\d{4})\b/g, (m, n) => { nums.add(n); return m; });
+            });
+            return Array.from(nums);
+          }).catch(() => []) || [];
+
           // 6. GUARDAR
           console.log("[Puppeteer] 5. Guardar: Buscando el botón verde de Guardar...");
           const guardadoExitoso = await safeEvaluate(page, () => {
@@ -2298,14 +2316,19 @@ async function syncWorkOrder(orderId) {
           const targetBusquedaOT = order.interno
             ? order.interno
             : (order.lavadoParticularPersona ? `Lavado A.P.: ${order.lavadoParticularPersona}` : '');
-          const otherOrdersSameInterno = (db.getWorkOrders() || []).filter(o => {
-            if (o.id === orderId) return false;
+          // Todas las órdenes (también las archivadas en Historial): una O.T. de una orden ya
+          // archivada sigue siendo de esa orden, no está "libre" para una nueva.
+          const otherOrdersSameInterno = ((db.read().workOrders) || []).filter(o => {
+            if (o.id === orderId || o.deleted === true) return false;
             if (!order.interno && order.lavadoParticularPersona) {
               return String(o.lavadoParticularPersona || '').trim().toUpperCase() === String(order.lavadoParticularPersona).trim().toUpperCase();
             }
             return String(o.interno || '').trim().toUpperCase() === String(order.interno || '').trim().toUpperCase();
           });
-          const alreadyClaimedOtNumbers = otherOrdersSameInterno.map(o => String(o.taxesOrderNumber || '').trim()).filter(Boolean);
+          const alreadyClaimedOtNumbers = [
+            ...otherOrdersSameInterno.map(o => String(o.taxesOrderNumber || '').trim()).filter(Boolean),
+            ...otsPreviasEnPantalla
+          ];
 
           for (let check = 1; check <= 12; check++) {
             await delay(600);
@@ -2320,7 +2343,7 @@ async function syncWorkOrder(orderId) {
                 const txt = el.textContent || '';
                 if (txt.includes('Creada') || txt.includes('Exito') || txt.includes('Éxito')) {
                   const match = txt.match(/\b([1-9]\d{4})\b/); // Números de OT reales de 5 dígitos (no fijo a "2..." - Taxes ya pasó de 29999 a 30000+)
-                  if (match) return match[1];
+                  if (match && !isAlreadyClaimed(match[1])) return match[1];
                 }
               }
 
@@ -4946,6 +4969,16 @@ async function syncExpressOtHeader(orderId) {
 
     await delay(1000);
 
+    // Foto de las O.T. que ya estaban antes de guardar (ver el mismo arreglo en el Alta O.T.):
+    // el número capturado después tiene que ser uno nuevo, no una O.T. vieja de la misma unidad.
+    const otsPreviasExpress = await safeEvaluate(page, () => {
+      const nums = new Set();
+      document.querySelectorAll('table tbody tr td').forEach(td => {
+        (td.textContent || '').replace(/#?\b([1-9]\d{4})\b/g, (m, n) => { nums.add(n); return m; });
+      });
+      return Array.from(nums);
+    }).catch(() => []) || [];
+
     const guardarBtnId = await safeEvaluate(page, () => {
       const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
       const b = btns.find(x => (x.textContent || x.value || '').trim().toLowerCase().includes('guardar'));
@@ -4969,7 +5002,7 @@ async function syncExpressOtHeader(orderId) {
       await delay(3000);
     }
 
-    const generatedOt = await safeEvaluate(page, (targetInterno) => {
+    const generatedOt = await safeEvaluate(page, (targetInterno, previas) => {
       const clean = s => (s || '').toString().trim();
       if (!clean(targetInterno)) return null; // sin clave no se puede asegurar que la fila sea de esta orden
       const tables = Array.from(document.querySelectorAll('table'));
@@ -4980,14 +5013,15 @@ async function syncExpressOtHeader(orderId) {
           if (cells.length >= 3) {
             const rowInterno = cells[1] || cells[0] || '';
             const rowOt = cells[2] || cells[1] || '';
-            if (rowInterno.toUpperCase().includes(String(targetInterno).toUpperCase()) && /^\d+$/.test(rowOt.replace(/\D/g, ''))) {
-              return rowOt.replace(/\D/g, '');
+            const otNum = rowOt.replace(/\D/g, '');
+            if (rowInterno.toUpperCase().includes(String(targetInterno).toUpperCase()) && /^\d+$/.test(otNum) && !previas.includes(otNum)) {
+              return otNum;
             }
           }
         }
       }
       return null;
-    }, claveBusquedaTaxes(order));
+    }, claveBusquedaTaxes(order), otsPreviasExpress);
 
     if (generatedOt) {
       console.log(`[Express OT] Generated OT #${generatedOt} for Interno ${order.interno} in 3 seconds!`);
