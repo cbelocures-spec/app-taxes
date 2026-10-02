@@ -131,6 +131,14 @@ app.use((req, res, next) => {
     return next();
   }
 
+  // El cliente a veces manda el usuario dos veces: varios fetch ponen 'x-user-username' a mano y
+  // el wrapper global de fetch agrega 'X-User-Username' - el navegador los junta en "a, a".
+  // Ese valor no existía en la DB, así que acá se borraba y TODO el pedido quedaba anónimo:
+  // órdenes sin creador (Responsable en Taxes caía en el fallback), Lavadero guardado como
+  // sector Taller, etc. Se toma el primero.
+  if (typeof req.headers['x-user-username'] === 'string' && req.headers['x-user-username'].includes(',')) {
+    req.headers['x-user-username'] = req.headers['x-user-username'].split(',')[0].trim();
+  }
   const username = req.headers['x-user-username'];
   // Only reject if a username IS provided but doesn't exist in the DB AT ALL.
   // If the user exists but has a masked/old password, keep the username so the

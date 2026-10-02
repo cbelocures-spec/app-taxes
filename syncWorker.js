@@ -62,26 +62,11 @@ const CREATOR_USERNAME_TO_RESPONSABLE = {
   'a.brahim@contenedoreshugo.com.ar': 'Brahim, Hugo Adrian',
   'sergios@contenedoreshugo.com.ar': 'Schirripa, Sergio Ricardo',
   'n.rodriguez@contenedoreshugo.com.ar': 'RODRIGUEZ NICOLAS',
-  'paniol@contenedoreshugo.com.ar': 'Belocures, Cesar Hernán'
+  'paniol@contenedoreshugo.com.ar': 'Belocures, Cesar Hernán',
+  // Agregados 2026-10-02 (lista completa pasada por el usuario).
+  'ftoledo@contenedoreshugo.com.ar': 'Toledo, Fernando Damián',
+  'gaston@contenedoreshugo.com.ar': 'Diharse, Gastón Alejandro'
 };
-
-// Resolves who should be selected as "Responsable" in Taxes for a given order: the real
-// name already saved on the order wins if present; otherwise map whoever created it in the
-// app (order.createdBy) to their real name via the table above.
-// Busca en el catálogo de Responsables de Taxes a la persona por las palabras de su nombre,
-// sin importar orden, acentos ni un segundo nombre: "Gaston Diharse" -> "Diharse, Gastón Alejandro".
-function buscarResponsablePorNombre(nombre) {
-  const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  const palabras = norm(nombre).split(/[^a-z0-9]+/).filter(w => w.length >= 2);
-  if (palabras.length === 0) return null;
-  const list = (db.getCatalogs().responsables || []);
-  const candidatos = list.filter(r => {
-    const del = norm(r.label).split(/[^a-z0-9]+/);
-    return palabras.every(w => del.includes(w));
-  });
-  // Si hay más de uno (dos personas con el mismo nombre y apellido), no adivinar.
-  return candidatos.length === 1 ? candidatos[0].label : null;
-}
 
 // Texto con el que una orden figura en la tabla de O.T. de Taxes: su interno o, en un Lavado
 // Particular (sin interno), su título "Lavado A.P.: <persona>". Las búsquedas de "O.T. ya
@@ -94,15 +79,11 @@ function claveBusquedaTaxes(order) {
   return '';
 }
 
-// Lavado Particular: el Responsable en Taxes es la persona dueña del auto, no el supervisor.
-function resolveResponsableLavadoParticular(order) {
-  if (!order || !order.lavadoParticularPersona) return null;
-  return buscarResponsablePorNombre(order.lavadoParticularPersona);
-}
-
+// Resolves who should be selected as "Responsable" in Taxes for a given order: the real
+// name already saved on the order wins if present; otherwise map whoever created it in the
+// app (order.createdBy) to their real name via the table above. Lavado Particular usa el mismo
+// criterio (quien cargó la orden, no el dueño del auto) - decidido por el usuario 2026-10-02.
 function resolveResponsableFromCreator(order) {
-  const particular = resolveResponsableLavadoParticular(order);
-  if (particular) return particular;
   const raw = order && order.responsable;
   const isEmailOrAuto = !raw || raw === 'AUTO' || String(raw).includes('@');
   if (!isEmailOrAuto) return raw;
@@ -3649,12 +3630,6 @@ async function syncWorkOrder(orderId) {
     // Resolve "AUTO" Responsable to currently logged-in user
     // Also treat email addresses as AUTO (e.g. paniol@contenedoreshugo.com.ar stored by mistake)
     let targetResponsable = order.responsable;
-    // Lavado Particular: Responsable = la persona dueña del auto (tal cual figura en Taxes).
-    const responsableParticular = resolveResponsableLavadoParticular(order);
-    if (responsableParticular) {
-      targetResponsable = responsableParticular;
-      console.log("Lavado Particular - Responsable = dueño del auto:", targetResponsable);
-    }
     const isEmailOrAuto = !targetResponsable || targetResponsable === 'AUTO' || targetResponsable.includes('@');
     if (isEmailOrAuto) {
       console.log("Resolving Responsable automatically...");
