@@ -889,6 +889,9 @@ app.get('/api/db-debug', (req, res) => {
   });
 });
 
+// Órdenes que el Auto-Heal de GET /api/orders ya intentó archivar en este proceso (ver ahí).
+const autoHealArchiveIntentado = new Set();
+
 // Polled by app.js so a tab left open since before a deploy notices it's stale
 // and reloads, instead of continuing to run old client logic against the new backend.
 app.get('/api/app-version', (req, res) => {
@@ -929,11 +932,18 @@ app.get('/api/orders', (req, res) => {
     // service, but never got re-checked because nothing edited them since syncing completed
     // (see database.js's updateWorkOrder, which normally catches this - this sweep is only
     // for orders that were already stuck before that fix existed).
+    // Ojo: esto corre en CADA GET /api/orders (cada celular lo pide cada 2s). Una orden sacada a
+    // mano del Historial (unarchivedManually) nunca se re-archiva sola, así que antes se
+    // reintentaba en cada pedido para siempre - y cada intento reescribe db.json entero (miles
+    // de órdenes, dos veces con el backup). Eso trababa el server 40-60s (pasó el 03/10 con el
+    // Interno 153). Se respeta esa marca y cada orden se intenta una sola vez por proceso.
     orders.forEach(o => {
-      if (o.archived || o.deleted || o.estadoUnidad === 'fuera_de_servicio') return;
+      if (o.archived || o.deleted || o.unarchivedManually || o.estadoUnidad === 'fuera_de_servicio') return;
+      if (autoHealArchiveIntentado.has(o.id)) return;
       const tasks = o.tasks || [];
       const allDoneAndSynced = tasks.length > 0 && tasks.every(t => t && (t.status === 'Finalizada' || t.status === 'Completada') && t.synced === true);
       if (allDoneAndSynced) {
+        autoHealArchiveIntentado.add(o.id);
         console.log(`[Auto-Heal] Order ${o.id} finished and synced but never archived. Moving to Historial...`);
         const updated = db.updateWorkOrder(o.id, {});
         if (updated) { o.archived = updated.archived; o.archivedAt = updated.archivedAt; }
