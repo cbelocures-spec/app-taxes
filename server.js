@@ -1974,6 +1974,50 @@ app.post('/api/tareas-asignadas-manuales', (req, res) => {
   }
 });
 
+// --- LIMPIEZA DEL HISTORIAL (ver db.purgarHistorialViejo) ---
+// Vista previa (no borra nada) y activar/desactivar el borrado nocturno. Solo Pañol. Nunca 401.
+const PURGA_DIAS = 15;
+app.get('/api/admin/purga-historial/preview', (req, res) => {
+  try {
+    if (!esUsuarioPanol(usuarioDelPedido(req))) return res.status(403).json({ error: 'Solo Pañol' });
+    const s = db.getSettings();
+    res.json({ ...db.purgarHistorialViejo({ dias: PURGA_DIAS, dryRun: true }), activa: s.purgaHistorialActiva === true, ultimaEjecucion: s.purgaHistorialUltima || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/purga-historial/activar', (req, res) => {
+  try {
+    if (!esUsuarioPanol(usuarioDelPedido(req))) return res.status(403).json({ error: 'Solo Pañol' });
+    const activa = !!(req.body && req.body.activa);
+    db.saveSettings({ purgaHistorialActiva: activa });
+    console.log(`[Purga Historial] Borrado nocturno ${activa ? 'ACTIVADO' : 'desactivado'} por ${usuarioDelPedido(req)}.`);
+    res.json({ success: true, activa });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Corre una vez por día a las 03:00 (hora Argentina), solo si fue activada. A propósito NO
+// corre al arrancar el server (cada deploy reinicia, y el código de arranque tiene que ser
+// inofensivo - ver la limpieza de duplicados que borraba tareas el 02/10).
+function revisarPurgaNocturna() {
+  try {
+    const s = db.getSettings();
+    if (s.purgaHistorialActiva !== true) return;
+    const ahora = new Date();
+    const hora = Number(ahora.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', hour12: false }));
+    const hoy = ahora.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+    if (hora !== 3 || s.purgaHistorialUltima === hoy) return;
+    db.saveSettings({ purgaHistorialUltima: hoy });
+    const r = db.purgarHistorialViejo({ dias: PURGA_DIAS, dryRun: false });
+    console.log(`[Purga Historial] Nocturna ${hoy}: historial=${r.historialABorrar} borradas=${r.borradasABorrar} quedan=${r.quedan}`);
+  } catch (e) {
+    console.error('[Purga Historial] Error:', e.message);
+  }
+}
+
 // --- PEDIDOS DE SOPORTE ---
 // Cualquier usuario manda un pedido desde el botón flotante; solo Pañol los ve todos (campana)
 // y los pasa a En revisión / Resuelto. Cada usuario ve los suyos y recibe el aviso del cambio.
@@ -5729,6 +5773,10 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
       console.warn('[Auto-Pause Límite] Error:', e.message);
     }
   }, 5 * 60 * 1000);
+
+  // Limpieza nocturna del Historial: se revisa cada 10 min, solo actúa a las 03:00 y si está
+  // activada (no en el arranque).
+  setInterval(revisarPurgaNocturna, 10 * 60 * 1000);
 
   // Start localtunnel for HTTPS access from mobile (no cert issues)
   if (localtunnel) {

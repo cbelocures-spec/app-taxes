@@ -1833,6 +1833,57 @@ class LocalDB {
     return nueva;
   }
 
+  // --- Limpieza del Historial (pedido del usuario 2026-10-03) ---
+  // Las órdenes ya subidas a Taxes se conservan `dias` días en la app y después se BORRAN de
+  // verdad (sin respaldo, la copia queda en Taxes). Solo entra lo que ya no puede cambiar:
+  //  - En Historial (archived), no borrada, con N° de O.T., con al menos una tarea y TODAS
+  //    sus tareas Finalizadas y subidas a Taxes (synced), sin cronómetro andando, y archivada
+  //    hace más de `dias` días.
+  //  - Órdenes ya borradas (soft-delete) hace más de `dias` días.
+  // Nunca toca órdenes activas (ni las ocultas por la fusión de tarjetas), Fuera de Servicio,
+  // ni nada con tareas pendientes o sin subir. dryRun = true solo informa, no borra.
+  purgarHistorialViejo({ dias = 15, dryRun = true } = {}) {
+    const db = this.read();
+    const limite = Date.now() - dias * 86400000;
+    const fecha = v => { const t = Date.parse(v || ''); return isNaN(t) ? null : t; };
+    const historial = [], borradas = [];
+    (db.workOrders || []).forEach(o => {
+      if (!o) return;
+      if (o.deleted === true) {
+        const t = fecha(o.deletedAt) || fecha(o.createdAt);
+        if (t && t < limite) borradas.push(o);
+        return;
+      }
+      if (o.archived !== true || o.estadoUnidad === 'fuera_de_servicio') return;
+      if (!o.taxesOrderNumber || !String(o.taxesOrderNumber).trim()) return;
+      const tasks = (o.tasks || []).filter(Boolean);
+      if (tasks.length === 0) return;
+      const cerrada = tasks.every(t => (t.status === 'Finalizada' || t.status === 'Completada') && t.synced === true && t.timerStarted !== true && t.timerStarted !== 'true');
+      if (!cerrada) return;
+      const t = fecha(o.archivedAt) || fecha(o.syncDate) || fecha(o.createdAt);
+      if (t && t < limite) historial.push(o);
+    });
+
+    const resumen = {
+      dias,
+      dryRun,
+      totalAntes: (db.workOrders || []).length,
+      historialABorrar: historial.length,
+      borradasABorrar: borradas.length,
+      quedan: (db.workOrders || []).length - historial.length - borradas.length,
+      historialMasNuevoQueSeBorra: historial.reduce((m, o) => Math.max(m, fecha(o.archivedAt) || fecha(o.syncDate) || 0), 0) || null,
+      ejemplos: historial.slice(0, 10).map(o => `${o.interno} [${o.clasificacion}] O.T. ${o.taxesOrderNumber} · archivada ${o.archivedAt || o.syncDate || '-'}`)
+    };
+    if (dryRun || (historial.length === 0 && borradas.length === 0)) return resumen;
+
+    const ids = new Set([...historial, ...borradas].map(o => o.id));
+    db.workOrders = db.workOrders.filter(o => !o || !ids.has(o.id));
+    if (db.backupOrders) ids.forEach(id => { delete db.backupOrders[id]; });
+    this.write(db);
+    console.log(`[Purga Historial] Borradas ${historial.length} órdenes de Historial (> ${dias} días, ya en Taxes) y ${borradas.length} órdenes borradas viejas. Quedan ${db.workOrders.length}.`);
+    return resumen;
+  }
+
   // --- Pedidos de soporte ---
   getSoporteTickets() {
     return this.read().soporteTickets || [];
