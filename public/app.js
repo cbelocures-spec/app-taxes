@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '406';
+const CURRENT_APP_VERSION = '407';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -16123,6 +16123,11 @@ function adjustPtStateLists(state) {
   [...activeOrders, ...recentArchivedOrdersForPt].forEach(o => {
     const taxInt = String(o.interno || '').trim().toUpperCase();
     if (!taxInt) return;
+    // Un checklist o un lavado quedan "operativo" por defecto y NO significan que la unidad
+    // volvió a servicio (el 69, Fuera de Servicio por herrería, desaparecía del Parte apenas
+    // le hacían el Ctrol Luces del día).
+    const clasif = String(o.clasificacion || '').trim().toLowerCase();
+    if (clasif === 'checklist' || clasif === 'lavadero' || String(o.sector || '').trim().toLowerCase() === 'lavadero') return;
     const oTime = parseInt(o.id) || 0;
     const existing = latestOrderByInterno.get(taxInt);
     if (!existing || oTime > (parseInt(existing.id) || 0)) {
