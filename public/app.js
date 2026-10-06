@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '408';
+const CURRENT_APP_VERSION = '409';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -8562,7 +8562,10 @@ function addGomeriaTireRow(btn) {
   if (isGomeriaReparacionMode()) {
     row.className = 'gomeria-tire-row gomeria-reparacion-row';
     row.innerHTML = `
-      <button type="button" onclick="removeGomeriaTireRow(this)" style="position:absolute; top:6px; right:6px; border:none; background:none; color:var(--danger); cursor:pointer; padding:2px;" title="Quitar">
+      <button type="button" onclick="duplicarFilaCubierta(this)" style="position:absolute; top:6px; right:30px; border:none; background:none; color:var(--text-muted); cursor:pointer; padding:2px;" title="Duplicar (copia todo, después cambiás el eje o el N° de fuego)">
+      <span class="material-icons" style="font-size:16px;">content_copy</span>
+    </button>
+    <button type="button" onclick="removeGomeriaTireRow(this)" style="position:absolute; top:6px; right:6px; border:none; background:none; color:var(--danger); cursor:pointer; padding:2px;" title="Quitar">
         <span class="material-icons" style="font-size:16px;">close</span>
       </button>
       <div class="form-group" style="margin-bottom:10px;">
@@ -8582,6 +8585,9 @@ function addGomeriaTireRow(btn) {
 
   row.className = 'gomeria-tire-row';
   row.innerHTML = `
+    <button type="button" onclick="duplicarFilaCubierta(this)" style="position:absolute; top:6px; right:30px; border:none; background:none; color:var(--text-muted); cursor:pointer; padding:2px;" title="Duplicar (copia todo, después cambiás el eje o el N° de fuego)">
+      <span class="material-icons" style="font-size:16px;">content_copy</span>
+    </button>
     <button type="button" onclick="removeGomeriaTireRow(this)" style="position:absolute; top:6px; right:6px; border:none; background:none; color:var(--danger); cursor:pointer; padding:2px;" title="Quitar esta cubierta">
       <span class="material-icons" style="font-size:16px;">close</span>
     </button>
@@ -9055,12 +9061,15 @@ function addElastiqueroEjeRow(btn) {
   row.className = 'elastiquero-eje-row';
   row.style.cssText = 'border:1px solid var(--border-color); border-radius:8px; padding:10px; margin-top:10px; position:relative;';
   row.innerHTML = `
+    <button type="button" onclick="duplicarFilaCubierta(this)" style="position:absolute; top:6px; right:30px; border:none; background:none; color:var(--text-muted); cursor:pointer; padding:2px;" title="Duplicar (copia todo, después cambiás el eje o el N° de fuego)">
+      <span class="material-icons" style="font-size:16px;">content_copy</span>
+    </button>
     <button type="button" onclick="removeElastiqueroEjeRow(this)" style="position:absolute; top:6px; right:6px; border:none; background:none; color:var(--danger); cursor:pointer; padding:2px;" title="Quitar este eje">
       <span class="material-icons" style="font-size:16px;">close</span>
     </button>
     <div class="form-group" style="margin-bottom:8px;">
       <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Eje / Posición</label>
-      <select class="elastiquero-posicion-select" style="width:100%; margin-bottom:6px;">
+      <select class="elastiquero-posicion-select" style="width:100%; margin-bottom:6px;" onchange="this.nextElementSibling.style.display = (this.value === '__otro__') ? 'block' : 'none'">
         <option value="">Seleccionar posición...</option>
         <optgroup label="Eje Delantero">
           <option value="Delantero izquierdo">Delantero izquierdo</option>
@@ -9091,11 +9100,25 @@ function addElastiqueroEjeRow(btn) {
     </div>
   `;
   rowsContainer.appendChild(row);
-  const posSelect = row.querySelector('.elastiquero-posicion-select');
-  const posOtro = row.querySelector('.elastiquero-posicion-otro');
-  posSelect.addEventListener('change', () => {
-    posOtro.style.display = (posSelect.value === '__otro__') ? 'block' : 'none';
+}
+
+// Botón "duplicar" de una cubierta / eje (Gomería y Elastiquero): copia la fila entera, con todo
+// lo cargado, justo abajo - así solo hay que cambiar el eje o el N° de fuego.
+function duplicarFilaCubierta(btn) {
+  const row = btn.closest('.gomeria-tire-row, .elastiquero-cubierta-row, .elastiquero-eje-row');
+  if (!row) return;
+  const copia = row.cloneNode(true);
+  // cloneNode no siempre arrastra lo elegido/escrito: se copia campo por campo.
+  const origen = row.querySelectorAll('input, select, textarea');
+  const destino = copia.querySelectorAll('input, select, textarea');
+  origen.forEach((el, i) => {
+    if (!destino[i]) return;
+    if (el.type === 'checkbox' || el.type === 'radio') destino[i].checked = el.checked;
+    else destino[i].value = el.value;
   });
+  row.after(copia);
+  copia.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  showToast('Copiado. Cambiá el eje o el N° de fuego.', 'success');
 }
 
 function removeElastiqueroEjeRow(btn) {
@@ -9116,6 +9139,9 @@ function addElastiqueroCubiertaRow(btn) {
   row.className = 'elastiquero-cubierta-row';
   row.style.cssText = 'border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-top:10px; position:relative;';
   row.innerHTML = `
+    <button type="button" onclick="duplicarFilaCubierta(this)" style="position:absolute; top:6px; right:30px; border:none; background:none; color:var(--text-muted); cursor:pointer; padding:2px;" title="Duplicar (copia todo, después cambiás el eje o el N° de fuego)">
+      <span class="material-icons" style="font-size:16px;">content_copy</span>
+    </button>
     <button type="button" onclick="removeElastiqueroCubiertaRow(this)" style="position:absolute; top:6px; right:6px; border:none; background:none; color:var(--danger); cursor:pointer; padding:2px;" title="Quitar esta cubierta">
       <span class="material-icons" style="font-size:16px;">close</span>
     </button>
