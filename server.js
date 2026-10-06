@@ -90,7 +90,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '407';
+const APP_VERSION = '408';
 
 // Middleware
 app.use(cors());
@@ -4966,6 +4966,175 @@ app.post('/api/parte-taller/novedad', (req, res) => {
   }
 });
 
+// ── Servicio VTV ──
+// Vencimientos de VTV por unidad (db.vtv, sembrado del Excel). Reglas pedidas por el usuario:
+//  - 7 días antes del vencimiento: novedad "VTV próxima a vencer - <fecha>" en Servicios
+//    Pendientes del Parte Taller.
+//  - 1 día antes (o ya vencida): la unidad pasa a Fuera de Servicio. NO se crea ninguna orden;
+//    el supervisor arma la orden de revisión a mano.
+//  - Si la unidad ya estaba parada (Reparación / F. Servicio / Preparación / Tránsito) no se le
+//    cambia el estado, solo se le agrega la novedad.
+//  - "Registrar VTV" carga el próximo vencimiento y saca las novedades VTV del Parte.
+// Solo para unidades que existen en el catálogo de Taxes (los autos a nombre de una persona
+// del Excel quedan solo en la solapa VTV).
+const VTV_LINEA_RE = /^VTV (próxima a vencer|vencida|vence)/i;
+function hoyArIso() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+}
+function diasHastaIso(iso, hoyIso) {
+  return Math.round((Date.parse(iso + 'T00:00:00Z') - Date.parse(hoyIso + 'T00:00:00Z')) / 86400000);
+}
+function isoADdMmAaaa(iso) {
+  const [y, m, d] = String(iso || '').split('-');
+  return d && m && y ? `${d}/${m}/${y}` : '';
+}
+const PT_LISTAS_PARADO = ['reparacion', 'fuera_de_servicio', 'inversiones', 'transito'];
+function buscarEnParteTaller(state, interno) {
+  const clave = String(interno).trim().toUpperCase();
+  for (const lista of ['servicios_pendientes', ...PT_LISTAS_PARADO]) {
+    const u = (state[lista] || []).find(x => String(x.interno || '').trim().toUpperCase() === clave);
+    if (u) return { lista, unidad: u };
+  }
+  return null;
+}
+// Suma una línea a la novedad de una unidad que ya está en el Parte, sin moverla de lista.
+function agregarLineaNovedad(unidad, texto) {
+  const norm = s => String(s || '').replace(/^\[\s*[xX]?\s*\]\s*/, '').trim().toUpperCase();
+  const hoy = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+  if (Array.isArray(unidad.novedad_items)) {
+    if (unidad.novedad_items.some(it => norm(it.texto) === norm(texto))) return;
+    unidad.novedad_items.push({ texto, hecho: false, fecha_ingreso: hoy });
+    unidad.novedad = unidad.novedad_items.map(it => `${it.hecho ? '[X]' : '[ ]'} ${it.texto}`).join('\n');
+    return;
+  }
+  const lineas = String(unidad.novedad || '').split('\n').map(l => l.trim()).filter(Boolean);
+  if (lineas.some(l => norm(l) === norm(texto))) return;
+  lineas.push(`[ ] ${texto}`);
+  unidad.novedad = lineas.join('\n');
+}
+
+function revisarVtvParteTaller() {
+  try {
+    const vtv = db.getVtv();
+    const rodados = (db.getCatalogs() || {}).rodados || [];
+    const enCatalogo = new Set(rodados.map(r => String(r.interno || '').trim().toUpperCase()));
+    const hoy = hoyArIso();
+    vtv.avisos = vtv.avisos || {};
+    let cambioVtv = false;
+    (vtv.unidades || []).forEach(u => {
+      if (!u.vencimiento) return;
+      const interno = String(u.interno).trim();
+      if (!enCatalogo.has(interno.toUpperCase())) return;
+      const dias = diasHastaIso(u.vencimiento, hoy);
+      const aviso = vtv.avisos[interno] || {};
+      const fecha = isoADdMmAaaa(u.vencimiento);
+      let texto = null, pasarAFuera = false;
+      if (dias <= 1 && aviso.fuera !== u.vencimiento) {
+        texto = dias <= 0 ? `VTV vencida - ${fecha}` : `VTV vence mañana - ${fecha}`;
+        pasarAFuera = true;
+      } else if (dias <= 7 && dias > 1 && aviso.pendiente !== u.vencimiento) {
+        texto = `VTV próxima a vencer - ${fecha}`;
+      }
+      if (!texto) return;
+      const state = db.getParteTallerState();
+      const actual = buscarEnParteTaller(state, interno);
+      if (actual && PT_LISTAS_PARADO.includes(actual.lista)) {
+        // Ya parada por otro motivo: no se toca el estado, solo se agrega la novedad.
+        agregarLineaNovedad(actual.unidad, texto);
+        db.saveParteTallerState(state);
+      } else {
+        actualizarEstadoFlotaLocal(interno, pasarAFuera ? 'fuera_de_servicio' : 'servicios_pendientes', texto, '');
+      }
+      vtv.avisos[interno] = pasarAFuera
+        ? { pendiente: u.vencimiento, fuera: u.vencimiento }
+        : { ...aviso, pendiente: u.vencimiento };
+      cambioVtv = true;
+      console.log(`[VTV] Interno ${interno}: ${texto}${pasarAFuera ? ' -> Fuera de Servicio' : ' -> Servicios Pendientes'}`);
+    });
+    if (cambioVtv) db.saveVtv(vtv);
+  } catch (e) {
+    console.error('[VTV] Error revisando vencimientos:', e.message);
+  }
+}
+
+app.get('/api/vtv', (req, res) => {
+  try {
+    res.json({ ok: true, hoy: hoyArIso(), unidades: db.getVtv().unidades || [] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// modo 'realizada' = la VTV se hizo hoy (queda en el historial y se sacan las novedades VTV del
+// Parte); modo 'corregir' = solo se carga/corrige la fecha de vencimiento.
+app.post('/api/vtv/registrar', (req, res) => {
+  try {
+    const { interno, vencimiento, modo } = req.body || {};
+    const clave = String(interno || '').trim().toUpperCase();
+    if (!clave) return res.status(400).json({ error: 'Falta el interno' });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(vencimiento || '')) || isNaN(Date.parse(vencimiento))) {
+      return res.status(400).json({ error: 'Fecha de vencimiento inválida' });
+    }
+    const vtv = db.getVtv();
+    const unidad = (vtv.unidades || []).find(u => String(u.interno).trim().toUpperCase() === clave);
+    if (!unidad) return res.status(404).json({ error: 'Unidad no encontrada en VTV' });
+    const hoy = hoyArIso();
+    const realizada = modo !== 'corregir';
+    unidad.historial = Array.isArray(unidad.historial) ? unidad.historial : [];
+    unidad.historial.push({
+      fecha: hoy, tipo: realizada ? 'realizada' : 'corregida',
+      vencimientoAnterior: unidad.vencimiento || null, vencimientoNuevo: vencimiento,
+      usuario: usuarioDelPedido(req)
+    });
+    if (realizada) unidad.ultimaVtv = hoy;
+    unidad.vencimiento = vencimiento;
+    unidad.nota = '';
+    vtv.avisos = vtv.avisos || {};
+    delete vtv.avisos[String(unidad.interno).trim()];
+    db.saveVtv(vtv);
+
+    // Con la VTV hecha (o la fecha corrida más adelante) se sacan las novedades VTV del Parte.
+    // Si a una unidad parada no le queda nada pendiente, sale del Parte.
+    if (realizada || diasHastaIso(vencimiento, hoy) > 7) {
+      const state = db.getParteTallerState();
+      let cambio = false;
+      ['servicios_pendientes', ...PT_LISTAS_PARADO].forEach(lista => {
+        state[lista] = (state[lista] || []).filter(u => {
+          if (String(u.interno || '').trim().toUpperCase() !== clave) return true;
+          const limpiar = s => String(s || '').replace(/^\[\s*[xX]?\s*\]\s*/, '').trim();
+          let lineas;
+          if (Array.isArray(u.novedad_items)) {
+            const antes = u.novedad_items.length;
+            u.novedad_items = u.novedad_items.filter(it => !VTV_LINEA_RE.test(limpiar(it.texto)));
+            if (u.novedad_items.length === antes) return true;
+            u.novedad = u.novedad_items.map(it => `${it.hecho ? '[X]' : '[ ]'} ${it.texto}`).join('\n');
+            lineas = u.novedad_items.map(it => (it.hecho ? '[X] ' : '[ ] ') + it.texto);
+          } else {
+            const todas = String(u.novedad || '').split('\n').map(l => l.trim()).filter(Boolean);
+            lineas = todas.filter(l => !VTV_LINEA_RE.test(limpiar(l)));
+            if (lineas.length === todas.length) return true;
+            u.novedad = lineas.join('\n');
+          }
+          cambio = true;
+          if (!lineas.length) return false;
+          if (lista !== 'servicios_pendientes' && !lineas.some(l => l.startsWith('[ ]'))) return false;
+          return true;
+        });
+      });
+      if (cambio) {
+        recalcularTotalesResumenLocal(state);
+        db.saveParteTallerState(state);
+      }
+    } else {
+      revisarVtvParteTaller();
+    }
+    res.json({ ok: true, unidad });
+  } catch (error) {
+    console.error('[VTV] Error registrando:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Renders a self-contained HTML report (built client-side from the currently-displayed Parte
 // Taller state) into a PDF via a short-lived headless Chromium instance. The actual Puppeteer
 // work (pdfGenerator.js) runs in the same sync child process as syncWorker.js - see
@@ -5777,6 +5946,10 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   // Limpieza nocturna del Historial: se revisa cada 10 min, solo actúa a las 03:00 y si está
   // activada (no en el arranque).
   setInterval(revisarPurgaNocturna, 10 * 60 * 1000);
+
+  // Vencimientos de VTV -> novedades / Fuera de Servicio en el Parte Taller. Cada 10 min (no
+  // en el arranque); no repite un aviso ya dado para el mismo vencimiento.
+  setInterval(revisarVtvParteTaller, 10 * 60 * 1000);
 
   // Start localtunnel for HTTPS access from mobile (no cert issues)
   if (localtunnel) {

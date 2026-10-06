@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=62">
+  <link rel="stylesheet" href="style.css?v=63">
   <script>
     (function() {
       try {
@@ -277,12 +277,18 @@
       </div>
 
       <!-- HOME: PREVENTIVOS VENCIDOS -->
-      <div id="stats-dashboard-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); max-width: 220px; gap: 10px; margin-bottom: 18px;">
+      <div id="stats-dashboard-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 220px)); max-width: 450px; gap: 10px; margin-bottom: 18px;">
         <div class="stat-card" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;">
           <span class="stat-card-icon" style="background: var(--danger-light); color: var(--danger);"><span class="material-icons">event_busy</span></span>
           <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Preventivos Vencidos</div>
           <div style="font-size: 24px; font-weight: 800; color: #ef4444; margin: 6px 0;" id="stat-overdue-prev">0</div>
           <div style="font-size: 10px; color: var(--text-muted);" id="stat-sub-prev">0 este mes</div>
+        </div>
+        <div class="stat-card" id="home-vtv-card" onclick="abrirSolapaVtv()" style="cursor: pointer; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;">
+          <span class="stat-card-icon" id="home-vtv-icon" style="background: #dcfce7; color: #16a34a;"><span class="material-icons">verified</span></span>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">VTV este mes</div>
+          <div style="font-size: 24px; font-weight: 800; color: #16a34a; margin: 6px 0; line-height: 1;" id="home-vtv-num">–</div>
+          <div style="font-size: 10px; color: var(--text-muted);" id="home-vtv-sub">Cargando...</div>
         </div>
       </div>
 
@@ -1165,7 +1171,10 @@
     <section id="view-preventivos" class="app-view">
       <!-- Sub-tabs internal menu -->
       <div class="preventivos-tabs-wrapper">
-        <button class="preventivos-tab-btn active" onclick="switchPrevSubTab('dashboard')">
+        <button class="preventivos-tab-btn active" onclick="switchPrevSubTab('vtv')">
+          <span class="material-icons">verified</span> Servicio VTV
+        </button>
+        <button class="preventivos-tab-btn" onclick="switchPrevSubTab('dashboard')">
           <span class="material-icons">build</span> Mantenimiento KM/HS
         </button>
         <button class="preventivos-tab-btn" onclick="switchPrevSubTab('combustible')">
@@ -1193,8 +1202,50 @@
         </button>
       </div>
 
+      <!-- SUB-VIEW: SERVICIO VTV -->
+      <div id="prev-subview-vtv" class="prev-subview">
+        <div class="vtv-metrics">
+          <div class="prev-metric-card" onclick="filtrarVtv('todas')" style="cursor: pointer;">
+            <div class="prev-metric-icon blue"><span class="material-icons">local_shipping</span></div>
+            <div class="prev-metric-info"><h4>Total Unidades</h4><p id="vtv-metric-total">0</p></div>
+          </div>
+          <div class="prev-metric-card" onclick="filtrarVtv('vigentes')" style="cursor: pointer;">
+            <div class="prev-metric-icon green"><span class="material-icons">check_circle</span></div>
+            <div class="prev-metric-info"><h4>Vigentes</h4><p id="vtv-metric-ok">0</p></div>
+          </div>
+          <div class="prev-metric-card" onclick="filtrarVtv('porvencer')" style="cursor: pointer;">
+            <div class="prev-metric-icon" style="background:#fef3c7;color:#d97706;"><span class="material-icons">schedule</span></div>
+            <div class="prev-metric-info"><h4>Vencen en 30 días</h4><p id="vtv-metric-warn">0</p></div>
+          </div>
+          <div class="prev-metric-card" onclick="filtrarVtv('vencidas')" style="cursor: pointer;">
+            <div class="prev-metric-icon red"><span class="material-icons">error</span></div>
+            <div class="prev-metric-info"><h4>Vencidas</h4><p id="vtv-metric-bad">0</p></div>
+          </div>
+        </div>
+        <div class="vtv-chips" id="vtv-chips">
+          <span class="vtv-chip on" data-f="todas" onclick="filtrarVtv('todas')">Todas</span>
+          <span class="vtv-chip" data-f="vencidas" onclick="filtrarVtv('vencidas')">Vencidas</span>
+          <span class="vtv-chip" data-f="porvencer" onclick="filtrarVtv('porvencer')">Por vencer</span>
+          <span class="vtv-chip" data-f="vigentes" onclick="filtrarVtv('vigentes')">Vigentes</span>
+          <span class="vtv-chip" data-f="sindato" onclick="filtrarVtv('sindato')">Sin dato</span>
+        </div>
+        <div class="prev-table-container">
+          <table class="prev-table">
+            <thead>
+              <tr>
+                <th>Interno</th><th>Modelo</th><th>Patente</th><th>Última VTV</th><th>Vencimiento</th><th>Días restantes</th><th>Estado</th><th style="text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="prev-vtv-tbody">
+              <tr><td colspan="8" style="text-align: center; padding: 20px;">Cargando VTV...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prev-card-list" id="prev-vtv-cards"></div>
+      </div>
+
       <!-- SUB-VIEW: DASHBOARD (KM/HS) -->
-      <div id="prev-subview-dashboard" class="prev-subview">
+      <div id="prev-subview-dashboard" class="prev-subview" style="display: none;">
         <div class="prev-metrics-grid">
           <div class="prev-metric-card" onclick="filterByAlertState('all')" style="cursor: pointer;">
             <div class="prev-metric-icon blue"><span class="material-icons">local_shipping</span></div>
@@ -1962,7 +2013,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.49</div>
+      <div class="sidebar-version">Versión 1.27.50</div>
     </div>
   </aside>
 
@@ -3300,6 +3351,31 @@
     }
   </style>
 
-  <script src="app.js?v=407"></script>
+  <!-- Modal Registrar VTV -->
+  <div id="vtv-modal" class="vtv-modal-backdrop" style="display:none;" onclick="if(event.target===this) cerrarModalVtv()">
+    <div class="vtv-modal">
+      <div class="vtv-modal-head">
+        <span class="material-icons" style="color:#0284c7;">verified</span>
+        <b id="vtv-modal-title">Registrar VTV</b>
+      </div>
+      <div class="vtv-modal-body">
+        <div class="vtv-modal-info" id="vtv-modal-info"></div>
+        <label for="vtv-modal-fecha">Próximo vencimiento *</label>
+        <input type="date" id="vtv-modal-fecha">
+        <div class="vtv-chips" style="margin-top:10px;" id="vtv-modal-atajos">
+          <span class="vtv-chip" onclick="vtvAtajo(6)">+6 meses</span>
+          <span class="vtv-chip" onclick="vtvAtajo(12)">+1 año</span>
+          <span class="vtv-chip" onclick="vtvAtajo(24)">+2 años</span>
+        </div>
+        <p class="vtv-modal-nota" id="vtv-modal-nota"></p>
+      </div>
+      <div class="vtv-modal-foot">
+        <button class="btn btn-secondary btn-sm" onclick="cerrarModalVtv()">Cancelar</button>
+        <button class="btn btn-primary btn-sm" id="vtv-modal-guardar" onclick="guardarVtv()">Guardar VTV</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=408"></script>
 </body>
 </html>

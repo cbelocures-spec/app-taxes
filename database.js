@@ -828,6 +828,32 @@ class LocalDB {
     return state;
   }
 
+  // --- Servicio VTV ---
+  // db.vtv = { unidades: [{interno, marca, modelo, patente, vencimiento 'YYYY-MM-DD'|null, nota,
+  // ultimaVtv, historial}], avisos: {interno: {pendiente: venc, fuera: venc}} }.
+  // La primera vez se carga sola desde vtv_seed.json (el Excel que pasó el usuario el 06/10/2026).
+  getVtv() {
+    const db = this.read();
+    if (db.vtv && Array.isArray(db.vtv.unidades)) return db.vtv;
+    let unidades = [];
+    try {
+      unidades = JSON.parse(fs.readFileSync(path.join(__dirname, 'vtv_seed.json'), 'utf8'))
+        .map(u => ({ ...u, ultimaVtv: null, historial: [] }));
+    } catch (e) {
+      console.warn('[VTV] No se pudo leer vtv_seed.json:', e.message);
+    }
+    db.vtv = { unidades, avisos: {} };
+    this.write(db);
+    return db.vtv;
+  }
+
+  saveVtv(vtv) {
+    const db = this.read();
+    db.vtv = vtv;
+    this.write(db);
+    return vtv;
+  }
+
   // --- Áreas Edilicio Methods ---
   // Supervisor-maintained list of building areas/sectors (Baño, Oficina, Depósito, etc.) used
   // to split Edilicio work into separate O.T.s per area instead of one big order per building.

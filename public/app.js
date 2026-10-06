@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '407';
+const CURRENT_APP_VERSION = '408';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -715,6 +715,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(fetchOrders, 2000);
   setInterval(checkWorkerStatus, 5000);
   setInterval(fetchSettingsPolling, 10000);
+  // Vencimientos de VTV (solapa en Preventivos + tarjeta en Inicio)
+  fetchVtv();
+  setInterval(fetchVtv, 5 * 60 * 1000);
 
   // Fetch novelties and employee mappings on startup
   fetchNovelties();
@@ -984,6 +987,7 @@ function switchView(viewId) {
 
     if (viewId === 'preventivos') {
       try { fetchPreventivoFlota(); } catch(e) {}
+      try { fetchVtv(); } catch(e) {}
     }
 
     if (viewId === 'gomeria') {
@@ -14839,6 +14843,210 @@ let prevCurrentServiceRow = null; // { rowIndex, interno, modelo }
 let prevCurrentCombustibleRow = null;
 let currentCombustibleReset = null;
 
+// ── Servicio VTV ──
+// Vencimientos de VTV por unidad (cargados del Excel, /api/vtv). Los avisos al Parte Taller
+// (7 días antes: Servicios Pendientes; 1 día antes: Fuera de Servicio) los hace el server solo.
+let vtvData = [];
+let vtvHoy = null; // 'YYYY-MM-DD' del server (hora Argentina)
+let vtvFiltro = 'todas';
+let vtvModalUnidad = null;
+let vtvModalModo = 'realizada';
+
+function vtvHoyIso() {
+  return vtvHoy || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+}
+function vtvDias(iso) {
+  if (!iso) return null;
+  return Math.round((Date.parse(iso + 'T00:00:00Z') - Date.parse(vtvHoyIso() + 'T00:00:00Z')) / 86400000);
+}
+function vtvFmt(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = String(iso).split('-');
+  return `${d}/${m}/${y}`;
+}
+function vtvEstado(u) {
+  const dias = vtvDias(u.vencimiento);
+  if (dias === null) return { key: 'sindato', cls: 'vtv-none', txt: /0\s*KM/i.test(u.nota || '') ? '0 KM' : 'Sin dato', color: 'var(--text-muted)' };
+  if (dias < 0) return { key: 'vencidas', cls: 'vtv-bad', txt: 'Vencida', color: '#991b1b' };
+  if (dias <= 30) return { key: 'porvencer', cls: 'vtv-warn', txt: dias === 0 ? 'Vence hoy' : 'Vence pronto', color: '#92400e' };
+  return { key: 'vigentes', cls: 'vtv-ok', txt: 'Vigente', color: '#166534' };
+}
+
+async function fetchVtv() {
+  try {
+    const res = await fetch(`/api/vtv?_=${Date.now()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    vtvData = Array.isArray(data.unidades) ? data.unidades : [];
+    vtvHoy = data.hoy || null;
+    renderVtvTable();
+    renderHomeVtvCard();
+  } catch (error) {
+    console.error('Error cargando VTV:', error);
+    const tbody = document.getElementById('prev-vtv-tbody');
+    if (tbody && !vtvData.length) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--danger);">Error: ${escapeHtml(error.message)}</td></tr>`;
+  }
+}
+
+function filtrarVtv(filtro) {
+  vtvFiltro = filtro;
+  document.querySelectorAll('#vtv-chips .vtv-chip').forEach(c => c.classList.toggle('on', c.dataset.f === filtro));
+  renderVtvTable();
+}
+
+function renderVtvTable() {
+  const tbody = document.getElementById('prev-vtv-tbody');
+  const cards = document.getElementById('prev-vtv-cards');
+  if (!tbody) return;
+  const busca = (document.getElementById('prev-search-input')?.value || '').toLowerCase().trim();
+  const conEstado = vtvData.map(u => ({ u, est: vtvEstado(u), dias: vtvDias(u.vencimiento) }));
+  const cuenta = k => conEstado.filter(x => x.est.key === k).length;
+  const el = id => document.getElementById(id);
+  if (el('vtv-metric-total')) el('vtv-metric-total').textContent = vtvData.length;
+  if (el('vtv-metric-ok')) el('vtv-metric-ok').textContent = cuenta('vigentes');
+  if (el('vtv-metric-warn')) el('vtv-metric-warn').textContent = cuenta('porvencer');
+  if (el('vtv-metric-bad')) el('vtv-metric-bad').textContent = cuenta('vencidas');
+
+  const lista = conEstado
+    .filter(x => vtvFiltro === 'todas' || x.est.key === vtvFiltro)
+    .filter(x => !busca || [x.u.interno, x.u.patente, x.u.modelo, x.u.marca].some(v => String(v || '').toLowerCase().includes(busca)))
+    .sort((a, b) => (a.dias === null) - (b.dias === null) || (a.dias ?? 0) - (b.dias ?? 0));
+
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">No hay unidades para mostrar.</td></tr>';
+    if (cards) cards.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">No hay unidades para mostrar.</div>';
+    return;
+  }
+  const modelo = u => escapeHtml(`${u.marca || ''} ${u.modelo || ''}`.trim());
+  const botones = (u, est, movil) => {
+    const i = escapeHtml(JSON.stringify(String(u.interno)));
+    const size = movil ? 'btn-sm' : 'btn-xs';
+    const flex = movil ? 'flex:1; justify-content:center;' : '';
+    const principal = est.key === 'sindato'
+      ? `<button class="btn btn-secondary ${size}" style="display:inline-flex; align-items:center; gap:3px; ${flex}" onclick="abrirModalVtv(${i}, 'corregir')"><span class="material-icons" style="font-size:14px;">event</span> Cargar fecha</button>`
+      : `<button class="btn ${est.key === 'vigentes' ? 'btn-secondary' : 'btn-primary'} ${size}" style="display:inline-flex; align-items:center; gap:3px; ${flex}" onclick="abrirModalVtv(${i}, 'realizada')"><span class="material-icons" style="font-size:14px;">verified</span> Registrar VTV</button>`;
+    const corregir = est.key === 'sindato' ? '' :
+      `<button class="btn btn-secondary ${size}" title="Corregir la fecha de vencimiento (sin registrar una VTV nueva)" style="display:inline-flex; align-items:center; ${movil ? '' : 'padding:2px 6px;'}" onclick="abrirModalVtv(${i}, 'corregir')"><span class="material-icons" style="font-size:14px;">edit</span></button>`;
+    return principal + corregir;
+  };
+  tbody.innerHTML = lista.map(({ u, est, dias }) => `<tr>
+      <td><strong style="color:var(--primary); font-size:15px;">${escapeHtml(String(u.interno))}</strong></td>
+      <td>${modelo(u)}</td>
+      <td>${escapeHtml(u.patente || '')}</td>
+      <td>${vtvFmt(u.ultimaVtv)}</td>
+      <td>${vtvFmt(u.vencimiento)}</td>
+      <td style="font-weight:700; color:${est.color};">${dias === null ? '—' : dias}</td>
+      <td><span class="vtv-badge ${est.cls}">${est.txt}</span></td>
+      <td style="text-align:right;"><div style="display:inline-flex; gap:6px;">${botones(u, est, false)}</div></td>
+    </tr>`).join('');
+  if (cards) {
+    cards.innerHTML = lista.map(({ u, est, dias }) => `<div class="prev-mobile-card">
+        <div class="prev-mobile-card-header">
+          <div><strong style="font-size:16px; color:var(--primary);">${escapeHtml(String(u.interno))}</strong>
+            <br><span style="font-size:12px; color:var(--text-muted);">${modelo(u)} · ${escapeHtml(u.patente || '')}</span></div>
+          <span class="vtv-badge ${est.cls}">${est.txt}</span>
+        </div>
+        <div class="prev-mobile-card-row"><span>Vencimiento</span><strong>${vtvFmt(u.vencimiento)}</strong></div>
+        <div class="prev-mobile-card-row"><span>Días restantes</span><strong style="color:${est.color};">${dias === null ? '—' : dias}</strong></div>
+        <div class="prev-mobile-card-row"><span>Última VTV</span><strong>${vtvFmt(u.ultimaVtv)}</strong></div>
+        <div style="display:flex; gap:8px; margin-top:8px;">${botones(u, est, true)}</div>
+      </div>`).join('');
+  }
+}
+
+// Tarjeta "VTV este mes" en Inicio, al lado de Preventivos Vencidos.
+function renderHomeVtvCard() {
+  const num = document.getElementById('home-vtv-num');
+  const sub = document.getElementById('home-vtv-sub');
+  const icon = document.getElementById('home-vtv-icon');
+  if (!num || !sub) return;
+  const hoy = vtvHoyIso();
+  const mes = hoy.slice(0, 7);
+  const conFecha = vtvData.filter(u => u.vencimiento);
+  const vencidas = conFecha.filter(u => vtvDias(u.vencimiento) < 0).length;
+  const esteMes = conFecha.filter(u => u.vencimiento.slice(0, 7) === mes && vtvDias(u.vencimiento) >= 0).length;
+  const futuras = conFecha.filter(u => vtvDias(u.vencimiento) >= 0).sort((a, b) => a.vencimiento.localeCompare(b.vencimiento));
+  const alerta = esteMes > 0 || vencidas > 0;
+  const color = alerta ? '#ea580c' : '#16a34a';
+  num.style.color = color;
+  if (icon) { icon.style.background = alerta ? '#ffedd5' : '#dcfce7'; icon.style.color = color; }
+  num.innerHTML = `${esteMes}${(esteMes || vencidas) ? ` <span style="font-size:11px; font-weight:600; color:var(--text-muted);">a vencer${vencidas ? ` · <b style="color:#dc2626;">${vencidas} vencida${vencidas === 1 ? '' : 's'}</b>` : ''}</span>` : ''}`;
+  if (!futuras.length) { sub.textContent = vtvData.length ? 'Sin próximos vencimientos' : ''; return; }
+  const prox = futuras[0].vencimiento;
+  const mismas = futuras.filter(u => u.vencimiento === prox);
+  const dias = vtvDias(prox);
+  const cuando = dias === 0 ? 'hoy' : dias === 1 ? 'mañana' : `${dias} días`;
+  const [, m, d] = prox.split('-');
+  sub.innerHTML = `Próxima ${dias <= 1 ? '' : 'en '}<b style="color:${dias <= 30 ? '#ea580c' : 'inherit'};">${cuando}</b> (${d}/${m}) · ${mismas.length} unid.` +
+    (dias <= 30 ? ' ' + mismas.slice(0, 4).map(u => `<span class="home-vtv-u">${escapeHtml(String(u.interno))}</span>`).join('') : '');
+}
+
+function abrirSolapaVtv() {
+  switchView('preventivos');
+  switchPrevSubTab('vtv');
+}
+
+function abrirModalVtv(interno, modo) {
+  const u = vtvData.find(x => String(x.interno) === String(interno));
+  if (!u) return;
+  vtvModalUnidad = u;
+  vtvModalModo = modo === 'corregir' ? 'corregir' : 'realizada';
+  const realizada = vtvModalModo === 'realizada';
+  document.getElementById('vtv-modal-title').textContent = `${realizada ? 'Registrar VTV' : (u.vencimiento ? 'Corregir vencimiento' : 'Cargar vencimiento')} — Interno ${u.interno}`;
+  const est = vtvEstado(u);
+  document.getElementById('vtv-modal-info').innerHTML =
+    `${escapeHtml(`${u.marca || ''} ${u.modelo || ''}`.trim())} · ${escapeHtml(u.patente || '')}<br>` +
+    `Vencimiento ${realizada ? 'anterior' : 'actual'}: <b style="color:${est.color};">${vtvFmt(u.vencimiento)}</b>` +
+    (realizada ? `<br>VTV realizada: <b>${vtvFmt(vtvHoyIso())}</b> (hoy)` : '');
+  document.getElementById('vtv-modal-nota').textContent = realizada
+    ? 'Al guardar, se saca la novedad de VTV del Parte de Taller.'
+    : 'Solo cambia la fecha de vencimiento, no registra una VTV nueva.';
+  document.getElementById('vtv-modal-atajos').style.display = realizada ? 'flex' : 'none';
+  // Propuesta: un año después de hoy (la carga final la hace el usuario).
+  document.getElementById('vtv-modal-fecha').value = realizada ? vtvSumarMeses(vtvHoyIso(), 12) : (u.vencimiento || '');
+  document.getElementById('vtv-modal-guardar').disabled = false;
+  document.getElementById('vtv-modal').style.display = 'flex';
+}
+
+function vtvSumarMeses(iso, meses) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const f = new Date(Date.UTC(y, m - 1 + meses, d));
+  return f.toISOString().slice(0, 10);
+}
+
+function vtvAtajo(meses) {
+  document.getElementById('vtv-modal-fecha').value = vtvSumarMeses(vtvHoyIso(), meses);
+}
+
+function cerrarModalVtv() {
+  document.getElementById('vtv-modal').style.display = 'none';
+  vtvModalUnidad = null;
+}
+
+async function guardarVtv() {
+  if (!vtvModalUnidad) return;
+  const fecha = document.getElementById('vtv-modal-fecha').value;
+  if (!fecha) { showToast('Cargá la fecha del próximo vencimiento', 'error'); return; }
+  if (vtvModalModo === 'realizada' && vtvDias(fecha) <= 0) { showToast('El próximo vencimiento tiene que ser una fecha futura', 'error'); return; }
+  const btn = document.getElementById('vtv-modal-guardar');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/vtv/registrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ interno: vtvModalUnidad.interno, vencimiento: fecha, modo: vtvModalModo })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    showToast(`VTV del interno ${vtvModalUnidad.interno} guardada: vence ${vtvFmt(fecha)}`, 'success');
+    cerrarModalVtv();
+    await fetchVtv();
+  } catch (e) {
+    showToast('No se pudo guardar la VTV: ' + e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
 function switchPrevSubTab(tab) {
   document.querySelectorAll('.preventivos-tab-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.prev-subview').forEach(v => v.style.display = 'none');
@@ -14852,7 +15060,9 @@ function switchPrevSubTab(tab) {
     }
   });
   // Load data for the tab
-  if (tab === 'dashboard') {
+  if (tab === 'vtv') {
+    fetchVtv();
+  } else if (tab === 'dashboard') {
     fetchPreventivoFlota();
   } else if (tab === 'combustible') {
     fetchPrevCombustible();
@@ -14867,6 +15077,7 @@ function switchPrevSubTab(tab) {
 
 function applyPrevFilters() {
   renderPrevFlotaTable();
+  renderVtvTable();
   if (typeof renderPrevLivianasTable === 'function') renderPrevLivianasTable();
 }
 

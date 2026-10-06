@@ -1,0 +1,773 @@
+[
+ {
+  "interno": "50",
+  "marca": "MERCEDES BENZ",
+  "modelo": "1624 ELEC.",
+  "patente": "GHH672",
+  "vencimiento": "2027-02-07"
+ },
+ {
+  "interno": "51",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "GPP956",
+  "vencimiento": "2027-09-21"
+ },
+ {
+  "interno": "52",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "GYN260",
+  "vencimiento": "2027-09-18"
+ },
+ {
+  "interno": "53",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "HTR485",
+  "vencimiento": "2027-03-19"
+ },
+ {
+  "interno": "54",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "IFB529",
+  "vencimiento": "2027-09-09"
+ },
+ {
+  "interno": "56",
+  "marca": "MERCEDES BENZ",
+  "modelo": "1624 ELEC.",
+  "patente": "IMI928",
+  "vencimiento": "2026-12-29"
+ },
+ {
+  "interno": "57",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "IVP604",
+  "vencimiento": "2027-06-30"
+ },
+ {
+  "interno": "59",
+  "marca": "MERCEDES BENZ",
+  "modelo": "1624 ELEC.",
+  "patente": "JAP788",
+  "vencimiento": "2027-07-01"
+ },
+ {
+  "interno": "60",
+  "marca": "MERCEDES BENZ",
+  "modelo": "1624 ELEC.",
+  "patente": "JXA757",
+  "vencimiento": "2027-02-03"
+ },
+ {
+  "interno": "61",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "KOJ250",
+  "vencimiento": "2026-10-03"
+ },
+ {
+  "interno": "63",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "LDH459",
+  "vencimiento": "2026-11-25"
+ },
+ {
+  "interno": "64",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "LIZ724",
+  "vencimiento": "2027-05-20"
+ },
+ {
+  "interno": "65",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "LMT383",
+  "vencimiento": "2027-07-23"
+ },
+ {
+  "interno": "66",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "MAH464",
+  "vencimiento": "2027-08-11"
+ },
+ {
+  "interno": "67",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "MAH463",
+  "vencimiento": "2026-11-12"
+ },
+ {
+  "interno": "68",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "MAH466",
+  "vencimiento": "2026-11-26"
+ },
+ {
+  "interno": "69",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "MAH465",
+  "vencimiento": "2026-12-17"
+ },
+ {
+  "interno": "71",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "NKL878",
+  "vencimiento": "2027-07-18"
+ },
+ {
+  "interno": "72",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "NRW714",
+  "vencimiento": "2027-07-02"
+ },
+ {
+  "interno": "73",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "NRW717",
+  "vencimiento": "2027-09-21"
+ },
+ {
+  "interno": "74",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "NVX357",
+  "vencimiento": "2027-09-11"
+ },
+ {
+  "interno": "75",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "NVX356",
+  "vencimiento": "2027-07-06"
+ },
+ {
+  "interno": "76",
+  "marca": "MERCEDES BENZ",
+  "modelo": "1720 ELEC.",
+  "patente": "OMM782",
+  "vencimiento": "2027-05-09"
+ },
+ {
+  "interno": "77",
+  "marca": "MERCEDES BENZ",
+  "modelo": "1720 ELEC.",
+  "patente": "OMM781",
+  "vencimiento": "2027-03-16"
+ },
+ {
+  "interno": "78",
+  "marca": "MERCEDES BENZ",
+  "modelo": "1720 ELEC.",
+  "patente": "OMM783",
+  "vencimiento": "2027-10-03"
+ },
+ {
+  "interno": "79",
+  "marca": "MERCEDES BENZ",
+  "modelo": "1720 ELEC.",
+  "patente": "OMM780",
+  "vencimiento": "2027-03-18"
+ },
+ {
+  "interno": "87",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "HGT994",
+  "vencimiento": "2027-05-06"
+ },
+ {
+  "interno": "88",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "HGT995",
+  "vencimiento": "2027-08-28"
+ },
+ {
+  "interno": "89",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "HSC167",
+  "vencimiento": "2027-09-19"
+ },
+ {
+  "interno": "90",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "HSC170",
+  "vencimiento": "2027-01-01"
+ },
+ {
+  "interno": "91",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "HZY622",
+  "vencimiento": "2027-05-26"
+ },
+ {
+  "interno": "92",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "HSC171",
+  "vencimiento": "2027-07-16"
+ },
+ {
+  "interno": "94",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "HZY621",
+  "vencimiento": "2026-12-16"
+ },
+ {
+  "interno": "95",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "HZY623",
+  "vencimiento": "2027-09-22"
+ },
+ {
+  "interno": "96",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "KUS869",
+  "vencimiento": "2026-11-25"
+ },
+ {
+  "interno": "97",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "IEQ747",
+  "vencimiento": "2027-05-16"
+ },
+ {
+  "interno": "98",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "JOS108",
+  "vencimiento": "2027-09-18"
+ },
+ {
+  "interno": "99",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "IEQ749",
+  "vencimiento": "2027-08-25"
+ },
+ {
+  "interno": "101",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "KDU219",
+  "vencimiento": "2026-10-16"
+ },
+ {
+  "interno": "100",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "KGJ083",
+  "vencimiento": "2027-08-13"
+ },
+ {
+  "interno": "102",
+  "marca": "VOLKSWAGEN",
+  "modelo": "9-150",
+  "patente": "FAF658",
+  "vencimiento": "2027-02-12"
+ },
+ {
+  "interno": "103",
+  "marca": "IVECO",
+  "modelo": "240 E28",
+  "patente": "AF037YV",
+  "vencimiento": "2027-04-07"
+ },
+ {
+  "interno": "104",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "KUS861",
+  "vencimiento": "2027-07-02"
+ },
+ {
+  "interno": "105",
+  "marca": "IVECO",
+  "modelo": "170 E22",
+  "patente": "JXV488",
+  "vencimiento": "2027-09-21"
+ },
+ {
+  "interno": "106",
+  "marca": "IVECO",
+  "modelo": "170 E22",
+  "patente": "HXB871",
+  "vencimiento": "2027-04-13"
+ },
+ {
+  "interno": "109",
+  "marca": "IVECO",
+  "modelo": "170 E22",
+  "patente": "LEG291",
+  "vencimiento": "2027-04-29"
+ },
+ {
+  "interno": "110",
+  "marca": "IVECO",
+  "modelo": "170 E22",
+  "patente": "LXO071",
+  "vencimiento": "2027-01-28"
+ },
+ {
+  "interno": "111",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AF513GN",
+  "vencimiento": "2027-02-09"
+ },
+ {
+  "interno": "112",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AF513GO",
+  "vencimiento": "2027-04-28"
+ },
+ {
+  "interno": "114",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AF756NL",
+  "vencimiento": "2027-07-23"
+ },
+ {
+  "interno": "115",
+  "marca": "IVECO",
+  "modelo": "170 E24",
+  "patente": "HDE827",
+  "vencimiento": "2026-11-12"
+ },
+ {
+  "interno": "116",
+  "marca": "SCANIA",
+  "modelo": "P270",
+  "patente": "GTO176",
+  "vencimiento": null,
+  "nota": ""
+ },
+ {
+  "interno": "117",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "KVX842",
+  "vencimiento": "2027-03-20"
+ },
+ {
+  "interno": "118",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "ICT511",
+  "vencimiento": "2027-01-27"
+ },
+ {
+  "interno": "119",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "KVX850",
+  "vencimiento": "2027-03-17"
+ },
+ {
+  "interno": "120",
+  "marca": "IVECO",
+  "modelo": "170 E22",
+  "patente": "MZN101",
+  "vencimiento": "2026-11-01"
+ },
+ {
+  "interno": "121",
+  "marca": "IVECO",
+  "modelo": "170 E22",
+  "patente": "MZN099",
+  "vencimiento": "2027-06-04"
+ },
+ {
+  "interno": "122",
+  "marca": "IVECO",
+  "modelo": "170 E22",
+  "patente": "MZN063",
+  "vencimiento": "2027-02-11"
+ },
+ {
+  "interno": "123",
+  "marca": "VOLKSWAGEN",
+  "modelo": "VERTIS 130V18",
+  "patente": "KGD338",
+  "vencimiento": "2027-07-02"
+ },
+ {
+  "interno": "125",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "ICT512",
+  "vencimiento": "2026-11-13"
+ },
+ {
+  "interno": "126",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "IEQ745",
+  "vencimiento": "2027-01-13"
+ },
+ {
+  "interno": "127",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AG643PG",
+  "vencimiento": "2027-08-25"
+ },
+ {
+  "interno": "128",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "KVX840",
+  "vencimiento": "2027-06-30"
+ },
+ {
+  "interno": "129",
+  "marca": "MERCEDES BENZ",
+  "modelo": "ATEGO 1725",
+  "patente": "KVX858",
+  "vencimiento": "2027-09-18"
+ },
+ {
+  "interno": "131",
+  "marca": "VOLKSWAGEN",
+  "modelo": "17220",
+  "patente": "HJD245",
+  "vencimiento": "2027-03-26"
+ },
+ {
+  "interno": "132",
+  "marca": "VOLKSWAGEN",
+  "modelo": "17220",
+  "patente": "LLP358",
+  "vencimiento": "2027-09-16"
+ },
+ {
+  "interno": "133",
+  "marca": "VOLKSWAGEN",
+  "modelo": "",
+  "patente": "AG787VM",
+  "vencimiento": "2027-02-14"
+ },
+ {
+  "interno": "134",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AF430QT",
+  "vencimiento": "2026-12-26"
+ },
+ {
+  "interno": "135",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AG916WU",
+  "vencimiento": "2027-04-01"
+ },
+ {
+  "interno": "136",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AG916WV",
+  "vencimiento": "2027-03-13"
+ },
+ {
+  "interno": "137",
+  "marca": "VOLKSWAGEN",
+  "modelo": "17280",
+  "patente": "AH182UI",
+  "vencimiento": "2027-06-26"
+ },
+ {
+  "interno": "138",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AH380CZ",
+  "vencimiento": "2026-10-16"
+ },
+ {
+  "interno": "139",
+  "marca": "IVECO",
+  "modelo": "20 170 E22",
+  "patente": "NSM683",
+  "vencimiento": "2026-11-14"
+ },
+ {
+  "interno": "140",
+  "marca": "IVECO",
+  "modelo": "TECTOR 15 210",
+  "patente": "AH875HT",
+  "vencimiento": "2026-12-02"
+ },
+ {
+  "interno": "141",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AH380DA",
+  "vencimiento": "2026-11-07"
+ },
+ {
+  "interno": "142",
+  "marca": "IVECO",
+  "modelo": "240 E28",
+  "patente": "AH875EM",
+  "vencimiento": "2027-03-05"
+ },
+ {
+  "interno": "143",
+  "marca": "VOLKSWAGEN",
+  "modelo": "17220",
+  "patente": "LQL160",
+  "vencimiento": "2027-01-10"
+ },
+ {
+  "interno": "144",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AH540JR",
+  "vencimiento": "2027-01-05"
+ },
+ {
+  "interno": "145",
+  "marca": "VOLKSWAGEN",
+  "modelo": "19330",
+  "patente": "AH963YV",
+  "vencimiento": "2027-03-05"
+ },
+ {
+  "interno": "146",
+  "marca": "IVECO",
+  "modelo": "VERTIS 130V18",
+  "patente": "MGY392",
+  "vencimiento": "2027-01-10"
+ },
+ {
+  "interno": "147",
+  "marca": "VOLKSWAGEN",
+  "modelo": "19330",
+  "patente": "AI000GR",
+  "vencimiento": "2027-06-19"
+ },
+ {
+  "interno": "148",
+  "marca": "VOLKSWAGEN",
+  "modelo": "17280",
+  "patente": "AI000GS",
+  "vencimiento": "2027-04-17"
+ },
+ {
+  "interno": "149",
+  "marca": "IVECO",
+  "modelo": "VERTIS 1380V18",
+  "patente": "MAL538",
+  "vencimiento": "2027-02-24"
+ },
+ {
+  "interno": "150",
+  "marca": "VOLKSWAGEN",
+  "modelo": "17280",
+  "patente": "AI000HM",
+  "vencimiento": "2027-05-20"
+ },
+ {
+  "interno": "151",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AD991FM",
+  "vencimiento": "2027-05-04"
+ },
+ {
+  "interno": "152",
+  "marca": "IVECO",
+  "modelo": "170 E230",
+  "patente": "HMZ936",
+  "vencimiento": null,
+  "nota": ""
+ },
+ {
+  "interno": "153",
+  "marca": "VOLKSWAGEN",
+  "modelo": "11180",
+  "patente": "AI024EY",
+  "vencimiento": null,
+  "nota": ""
+ },
+ {
+  "interno": "154",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AH540JQ",
+  "vencimiento": "2027-09-08"
+ },
+ {
+  "interno": "155",
+  "marca": "IVECO",
+  "modelo": "TECTOR 170-280",
+  "patente": "LCM114",
+  "vencimiento": "2027-08-21"
+ },
+ {
+  "interno": "156",
+  "marca": "IVECO",
+  "modelo": "TECTOR 170-280",
+  "patente": "KVX853",
+  "vencimiento": "2027-09-01"
+ },
+ {
+  "interno": "157",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AI234TG",
+  "vencimiento": "2027-07-30"
+ },
+ {
+  "interno": "158",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AI234TF",
+  "vencimiento": "2027-07-30"
+ },
+ {
+  "interno": "159",
+  "marca": "IVECO",
+  "modelo": "170 E28",
+  "patente": "AI234TH",
+  "vencimiento": "2027-08-20"
+ },
+ {
+  "interno": "AC01",
+  "marca": "OMBU",
+  "modelo": "ACOPLADO",
+  "patente": "AH380CD",
+  "vencimiento": "2027-08-04"
+ },
+ {
+  "interno": "AC02",
+  "marca": "GOMATRO",
+  "modelo": "ACOPLADO",
+  "patente": "WSI975",
+  "vencimiento": "2027-07-19"
+ },
+ {
+  "interno": "AC03",
+  "marca": "bonano",
+  "modelo": "ACOPLADO",
+  "patente": "GZM172",
+  "vencimiento": "2027-08-25"
+ },
+ {
+  "interno": "BURGOS, EDUARDO",
+  "marca": "FIAT",
+  "modelo": "CRONOS",
+  "patente": "AE616WH",
+  "vencimiento": "2027-02-01"
+ },
+ {
+  "interno": "SPAGNUOLO, LUIS",
+  "marca": "FIAT",
+  "modelo": "CRONOS",
+  "patente": "AE616WI",
+  "vencimiento": "2026-12-03"
+ },
+ {
+  "interno": "HUARTE, CRISTIAN",
+  "marca": "FIAT",
+  "modelo": "CRONOS",
+  "patente": "AH612DZ",
+  "vencimiento": null,
+  "nota": "0KM"
+ },
+ {
+  "interno": "SOTELO, MARTIN",
+  "marca": "FIAT",
+  "modelo": "TORO",
+  "patente": "AH612DB",
+  "vencimiento": null,
+  "nota": "0KM"
+ },
+ {
+  "interno": "FRESCO, FRESCO",
+  "marca": "FIAT",
+  "modelo": "ARGO",
+  "patente": "AI000HT",
+  "vencimiento": null,
+  "nota": "0KM"
+ },
+ {
+  "interno": "PANETTA, JAVIER",
+  "marca": "",
+  "modelo": "ARGO",
+  "patente": "AI024CU",
+  "vencimiento": null,
+  "nota": "0KM"
+ },
+ {
+  "interno": "TOLEDO, FERNANDO",
+  "marca": "FIAT",
+  "modelo": "STRADA",
+  "patente": "AI024DU",
+  "vencimiento": null,
+  "nota": "0KM"
+ },
+ {
+  "interno": "A01",
+  "marca": "TOYOTA",
+  "modelo": "HILUX",
+  "patente": "AG787UB",
+  "vencimiento": "2026-10-22"
+ },
+ {
+  "interno": "2",
+  "marca": "VOLKSWAGEN",
+  "modelo": "SAVEIRO 1,6L",
+  "patente": "AA412BM",
+  "vencimiento": "2027-01-08"
+ },
+ {
+  "interno": "4",
+  "marca": "VOLKSWAGEN",
+  "modelo": "AMAROK",
+  "patente": "MFF688",
+  "vencimiento": "2027-01-08"
+ },
+ {
+  "interno": "5",
+  "marca": "VOLKSWAGEN",
+  "modelo": "AMAROK",
+  "patente": "AC000GY",
+  "vencimiento": "2026-12-17"
+ },
+ {
+  "interno": "7",
+  "marca": "VOLKSWAGEN",
+  "modelo": "AMAROK",
+  "patente": "AD947SE",
+  "vencimiento": "2027-03-09"
+ },
+ {
+  "interno": "12",
+  "marca": "FIAT",
+  "modelo": "FIORINO",
+  "patente": "AC145XQ",
+  "vencimiento": "2026-09-26"
+ }
+]
