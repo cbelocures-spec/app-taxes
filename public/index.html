@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=63">
+  <link rel="stylesheet" href="style.css?v=64">
   <script>
     (function() {
       try {
@@ -754,6 +754,8 @@
         <div id="eh-recorrido-widget" class="eh-recorrido-widget" style="display:none;"></div>
       </div>
 
+      <div class="eh-horas-dia"></div>
+
       <p class="eh-footnote">Podés volver a este modo desde Ajustes cuando quieras.</p>
     </section>
 
@@ -874,9 +876,10 @@
 
         <div id="elastiquero-horas-resumen" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:14px;"></div>
 
-        <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitElastiqueroOrders()" style="margin-bottom: 30px;">
+        <button type="button" class="btn btn-primary btn-block btn-lg" onclick="submitElastiqueroOrders()" style="margin-bottom: 16px;">
           <span class="material-icons">send</span> Subir Tareas
         </button>
+        <div class="eh-horas-dia"></div>
       </div>
     </section>
 
@@ -2013,7 +2016,7 @@
         <span class="material-icons">logout</span>
         <span>Cerrar sesión</span>
       </button>
-      <div class="sidebar-version">Versión 1.27.51</div>
+      <div class="sidebar-version">Versión 1.27.52</div>
     </div>
   </aside>
 
@@ -3376,6 +3379,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=409"></script>
+  <script src="app.js?v=410"></script>
 </body>
 </html>

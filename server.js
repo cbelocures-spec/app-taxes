@@ -90,7 +90,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '409';
+const APP_VERSION = '410';
 
 // Middleware
 app.use(cors());
@@ -2031,7 +2031,44 @@ function esUsuarioPanol(username) {
   const u = String(username || '').toLowerCase();
   return u.includes('paniol') || u.includes('panol') || u.includes('pañol');
 }
-const SOPORTE_CAPTURAS_DIR = path.join(path.dirname(db.DB_PATH), 'soporte_capturas');
+// --- HORAS DEL DÍA (Elastiquero) ---
+// Total de horas que subió hoy cada empleado pedido (Javier/Cristian/Darío), sumando TODAS sus
+// tareas del día: Elastiquero, Gomería y también las órdenes de Auxilio que arma Taller con
+// ellos. El día de una tarea sale del inicio del cronómetro, o si no tiene, del momento en que
+// se cargó (el id de la tarea empieza con ese timestamp). Las horas son "horas.minutos".
+// Una tarea con cronómetro todavía andando (sin horas cargadas) recién suma al terminarla.
+app.get('/api/horas-del-dia', (req, res) => {
+  try {
+    const empleados = String(req.query.empleados || '').split(',').map(s => s.trim()).filter(Boolean);
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+    const diaDe = ms => (ms > 0 ? new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }) : null);
+    const resultado = {};
+    empleados.forEach(e => { resultado[e] = { minutos: 0, cargas: [] }; });
+    const vistas = new Set();
+    (db.read().workOrders || []).forEach(o => {
+      if (!o || o.deleted === true) return;
+      (o.tasks || []).forEach(t => {
+        if (!t || !resultado[String(t.empleado || '').trim()]) return;
+        if (t.id && vistas.has(t.id)) return; // misma tarea copiada en dos órdenes
+        if (t.id) vistas.add(t.id);
+        const inicioCrono = (t.timerHistory || []).map(h => Number(h.timestamp) || 0).filter(Boolean)[0] || 0;
+        const dia = diaDe(inicioCrono) || diaDe(parseInt(String(t.id || '').split('-')[0], 10)) || (t.date ? String(t.date).slice(0, 10) : null);
+        if (dia !== hoy) return;
+        const minutos = hmmToMinutesServer(parseFloat(String(t.horasEstimadas || '0').replace(',', '.')) || 0);
+        if (!minutos) return;
+        const r = resultado[String(t.empleado).trim()];
+        r.minutos += minutos;
+        r.cargas.push({ interno: o.interno || '', clasificacion: o.clasificacion || '', minutos, descripcion: String(t.descripcion || '').slice(0, 80), momento: inicioCrono || parseInt(String(t.id || '').split('-')[0], 10) || 0 });
+      });
+    });
+    Object.values(resultado).forEach(r => r.cargas.sort((a, b) => a.momento - b.momento));
+    res.json({ ok: true, hoy, empleados: resultado });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+const SOPORTE_CAPTURAS_DIR =path.join(path.dirname(db.DB_PATH), 'soporte_capturas');
 const SOPORTE_ESTADOS = ['pendiente', 'en_revision', 'resuelto'];
 
 // La captura no va al JSON de la base (lo haría pesado): se guarda como archivo al lado.

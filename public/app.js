@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '409';
+const CURRENT_APP_VERSION = '410';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -1011,6 +1011,10 @@ function switchView(viewId) {
       const formBody = document.getElementById('elastiquero-form-body');
       if (intakeGate) intakeGate.style.display = '';
       if (formBody) formBody.style.display = 'none';
+    }
+
+    if (viewId === 'elastiquero-home' || viewId === 'elastiquero') {
+      try { fetchHorasDelDia(); } catch(e) {}
     }
 
     if (viewId === 'elastiquero-home') {
@@ -9514,8 +9518,9 @@ function updateElastiqueroHorasResumen() {
     const completo = horas >= minimo;
     const bg = completo ? '#dff5e6' : '#fde3e3';
     const fg = completo ? '#1e7d43' : '#b3271e';
-    const horasTxt = Number.isInteger(horas) ? horas : horas.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-    return `<span style="display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; background:${bg}; color:${fg}; font-size:12px; font-weight:700; white-space:nowrap;" title="${label}: ${horasTxt}hs cargadas (minimo ${minimo}hs)">${label}: ${horasTxt}h</span>`;
+    // En horas y minutos ("0h 20m"), no en horas decimales: 20 minutos se veía "0.33h".
+    const horasTxt = formatHorasMinutos(minutos);
+    return `<span style="display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; background:${bg}; color:${fg}; font-size:12px; font-weight:700; white-space:nowrap;" title="${label}: ${horasTxt} cargadas en este formulario (minimo ${minimo}hs)">${label}: ${horasTxt}</span>`;
   }).join('');
 }
 
@@ -10137,11 +10142,90 @@ async function submitElastiqueroOrders() {
     }
     updateElastiqueroHorasResumen();
     fetchOrders();
+    // Vuelve al menú de Elastiquero ("¿Qué vas a cargar?") para el próximo camión.
+    switchView('elastiquero-home');
     mostrarConfirmacionElastiqueroTareas();
   } catch (err) {
     showToast(err.message, 'danger');
     console.error('Error creating elastiquero orders', err);
   }
+}
+
+// --- HORAS SUBIDAS HOY (Javier / Cristian / Darío) ---
+// Abajo de todo en Elastiquero (menú y formulario): lo que subió cada uno en el día, sumando
+// Elastiquero, Gomería y las órdenes de Auxilio de Taller (lo calcula /api/horas-del-dia).
+const HORAS_DIA_EMPLEADOS = [
+  { value: '528', nombre: 'Javier' },
+  { value: '598', nombre: 'Cristian' },
+  { value: 'CALOMINO DARIO', nombre: 'Darío' }
+];
+let horasDiaTimer = null;
+
+function formatHorasMinutos(minutos) {
+  const m = Math.max(0, Math.round(minutos || 0));
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+}
+
+async function fetchHorasDelDia() {
+  const destinos = document.querySelectorAll('.eh-horas-dia');
+  if (!destinos.length) return;
+  try {
+    const qs = encodeURIComponent(HORAS_DIA_EMPLEADOS.map(e => e.value).join(','));
+    const res = await fetch(`/api/horas-del-dia?empleados=${qs}&_=${Date.now()}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const html = renderHorasDelDiaHtml(data);
+    destinos.forEach(d => { d.innerHTML = html; });
+  } catch (e) {
+    console.warn('No se pudieron cargar las horas del día:', e.message);
+  }
+  // Se refresca sola cada minuto mientras se esté en Elastiquero.
+  clearTimeout(horasDiaTimer);
+  horasDiaTimer = setTimeout(() => {
+    const visible = ['view-elastiquero', 'view-elastiquero-home'].some(id => document.getElementById(id)?.classList.contains('active'));
+    if (visible) fetchHorasDelDia();
+  }, 60000);
+}
+
+function renderHorasDelDiaHtml(data) {
+  const hoy = data.hoy || '';
+  const [y, mo, d] = hoy.split('-').map(Number);
+  const fecha = y ? new Date(y, mo - 1, d) : new Date();
+  const minimoHs = fecha.getDay() === 6 ? 4 : 7; // sábado 4 hs, resto 7 hs
+  const diaTxt = fecha.toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: '2-digit' });
+  const tag = clasif => {
+    const c = String(clasif || '').toLowerCase();
+    if (c.includes('elastiq')) return '<span class="hd-tag hd-t-el">ELÁSTICO</span>';
+    if (c.includes('gomer')) return '<span class="hd-tag hd-t-go">GOMERÍA</span>';
+    if (c.includes('auxilio')) return '<span class="hd-tag hd-t-aux">AUXILIO</span>';
+    return `<span class="hd-tag hd-t-otro">${escapeHtml(String(clasif || 'OTRO').toUpperCase())}</span>`;
+  };
+  const internoTxt = i => {
+    const s = String(i || '').trim();
+    if (!s) return 'Particular';
+    return /^[A-Z]{0,2}\d+$/i.test(s) ? `Int. ${escapeHtml(s)}` : escapeHtml(s.charAt(0) + s.slice(1).toLowerCase());
+  };
+  const tarjetas = HORAS_DIA_EMPLEADOS.map(emp => {
+    const r = (data.empleados || {})[emp.value] || { minutos: 0, cargas: [] };
+    const completo = r.minutos >= minimoHs * 60;
+    const color = completo ? '#1e7d43' : '#b3271e';
+    const pct = Math.min(100, Math.round(r.minutos / (minimoHs * 60) * 100));
+    const meta = completo ? '✓ completo' : `faltan ${formatHorasMinutos(minimoHs * 60 - r.minutos)}`;
+    const lista = r.cargas.length
+      ? `<ul class="hd-list">${r.cargas.map(c => `<li title="${escapeHtml(c.descripcion || '')}"><span>${tag(c.clasificacion)}${internoTxt(c.interno)}</span><b>${formatHorasMinutos(c.minutos)}</b></li>`).join('')}</ul>`
+      : '<div class="hd-meta" style="margin-top:6px;">Todavía no subió horas hoy.</div>';
+    return `<div class="hd-emp">
+      <div class="hd-name">${emp.nombre}</div>
+      <div class="hd-total" style="color:${color};">${formatHorasMinutos(r.minutos)}</div>
+      <div class="hd-meta">${meta}</div>
+      <div class="hd-bar"><div style="width:${pct}%; background:${completo ? '#22c55e' : '#ef4444'};"></div></div>
+      ${lista}
+    </div>`;
+  }).join('');
+  return `<div class="hd-card">
+    <div class="hd-title"><span class="material-icons" style="color:#0284c7;">schedule</span> Horas subidas hoy <small>${diaTxt} · mínimo ${minimoHs} hs</small></div>
+    <div class="hd-grid">${tarjetas}</div>
+  </div>`;
 }
 
 // Cartel grande de confirmación al terminar "Subir Tareas" en Elastiquero - antes esto mandaba
