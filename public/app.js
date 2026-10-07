@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '410';
+const CURRENT_APP_VERSION = '411';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -9978,7 +9978,23 @@ function buildElastiqueroDescription(block) {
   return lines.join('\n');
 }
 
+// Un doble toque en "Subir Tareas" cargaba todo dos veces (el 07/10 la "Orden y limpieza" quedó
+// repetida a los 3 con 2 segundos de diferencia): mientras se está subiendo, se ignora otro toque.
+let elastiqueroSubiendo = false;
 async function submitElastiqueroOrders() {
+  if (elastiqueroSubiendo) return;
+  elastiqueroSubiendo = true;
+  const btns = document.querySelectorAll('button[onclick="submitElastiqueroOrders()"]');
+  btns.forEach(b => { b.disabled = true; });
+  try {
+    await submitElastiqueroOrdersInterno();
+  } finally {
+    elastiqueroSubiendo = false;
+    btns.forEach(b => { b.disabled = false; });
+  }
+}
+
+async function submitElastiqueroOrdersInterno() {
   const blocks = Array.from(document.querySelectorAll('.elastiquero-interno-block'));
   if (blocks.length === 0) {
     showToast('Agregá al menos un interno.', 'danger');

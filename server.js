@@ -90,7 +90,7 @@ const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 // checkForAppUpdate) instead of silently continuing to run stale client-side logic
 // against a backend that has since moved on — this is what let an old tab's outdated
 // window._ptState wipe the Parte Taller sheet again even after the fix had shipped.
-const APP_VERSION = '410';
+const APP_VERSION = '411';
 
 // Middleware
 app.use(cors());
@@ -2040,8 +2040,12 @@ function esUsuarioPanol(username) {
 app.get('/api/horas-del-dia', (req, res) => {
   try {
     const empleados = String(req.query.empleados || '').split(',').map(s => s.trim()).filter(Boolean);
-    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+    // Lo que se carga a mano antes de las 7:00 es el trabajo del día anterior (entran a las 6 y a
+    // primera hora suben lo de ayer), así que el "día de trabajo" arranca a las 7:00. Las tareas
+    // con cronómetro van por el día real en que se empezaron.
+    const CORTE_MS = 7 * 3600 * 1000;
     const diaDe = ms => (ms > 0 ? new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }) : null);
+    const hoy = diaDe(Date.now() - CORTE_MS);
     const resultado = {};
     empleados.forEach(e => { resultado[e] = { minutos: 0, cargas: [] }; });
     const vistas = new Set();
@@ -2052,7 +2056,8 @@ app.get('/api/horas-del-dia', (req, res) => {
         if (t.id && vistas.has(t.id)) return; // misma tarea copiada en dos órdenes
         if (t.id) vistas.add(t.id);
         const inicioCrono = (t.timerHistory || []).map(h => Number(h.timestamp) || 0).filter(Boolean)[0] || 0;
-        const dia = diaDe(inicioCrono) || diaDe(parseInt(String(t.id || '').split('-')[0], 10)) || (t.date ? String(t.date).slice(0, 10) : null);
+        const cargada = parseInt(String(t.id || '').split('-')[0], 10) || 0;
+        const dia = diaDe(inicioCrono) || (cargada > 0 ? diaDe(cargada - CORTE_MS) : null) || (t.date ? String(t.date).slice(0, 10) : null);
         if (dia !== hoy) return;
         const minutos = hmmToMinutesServer(parseFloat(String(t.horasEstimadas || '0').replace(',', '.')) || 0);
         if (!minutos) return;
