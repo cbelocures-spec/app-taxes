@@ -4,7 +4,7 @@
 // no request it makes on its own would ever notice the backend moved on. This is what
 // let a stale tab's outdated window._ptState wipe the Parte Taller sheet again even
 // after the fix had already shipped. Polling and reloading closes that gap.
-const CURRENT_APP_VERSION = '411';
+const CURRENT_APP_VERSION = '412';
 
 // Reloj visible al lado del logo, en la hora real del SERVIDOR (no la del dispositivo) - así
 // se puede detectar de un vistazo si una tablet/celular del taller tiene mal puesta la hora
@@ -1749,6 +1749,21 @@ async function confirmChecklistReviewAndApply() {
   const ctx = _checklistReviewCtx;
   if (!ctx) return;
   const { interno, orderId, estado, tipo } = ctx;
+
+  // Si la unidad tiene ítems pendientes, hay que marcar al menos uno como realizado: si no, se
+  // confirmaba sin marcar nada y el Parte Taller quedaba con todo pendiente igual.
+  const totalItems = document.querySelectorAll('.pt-review-item-chk').length;
+  const marcados = document.querySelectorAll('.pt-review-item-chk:checked').length;
+  if (totalItems > 0 && marcados === 0) {
+    showToast('Marcá al menos un ítem que se haya realizado para poder guardar.', 'danger');
+    const lista = document.getElementById('pt-review-checklist');
+    if (lista) {
+      lista.style.outline = '2px solid var(--danger)';
+      lista.style.borderRadius = '8px';
+      setTimeout(() => { lista.style.outline = ''; }, 2500);
+    }
+    return;
+  }
 
   const uncheckedTexts = Array.from(document.querySelectorAll('.pt-review-item-chk:not(:checked)')).map(chk => chk.dataset.texto);
   const remainingItems = [...uncheckedTexts, ...ctx.newItems];
